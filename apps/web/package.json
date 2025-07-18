@@ -12,7 +12,8 @@
     "generate-pwa-assets": "pwa-assets-generator",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "clean": "rm -rf node_modules .turbo .tanstack"
   },
   "devDependencies": {
     "@tanstack/react-router-devtools": "^1.114.27",

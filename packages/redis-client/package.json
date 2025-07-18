@@ -1,0 +1,32 @@
+{
+	"name": "@repo/redis-client",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsc --build",
+		"clean": "rm -rf dist node_modules",
+		"dev": "tsc -w",
+		"lint": "eslint . --ext .ts"
+	},
+	"dependencies": {
+		"ioredis": "5.6.1"
+	},
+	"devDependencies": {
+		"@repo/eslint-config": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"eslint": "9.27.0",
+		"typescript": "5.8.2"
+	},
+	"peerDependencies": {
+		"ioredis": "5.6.1"
+	}
+}

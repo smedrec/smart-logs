@@ -1,0 +1,25 @@
+{
+	"extends": "@repo/typescript-config/lib.json",
+	"compilerOptions": {
+		"noEmit": false,
+		"outDir": "./dist",
+		"declaration": true,
+		"declarationMap": true,
+		"composite": true,
+		"types": ["node"]
+		// We inherit module, target, moduleResolution ('bundler'), lib, strict, etc., from the base.
+	},
+	"references": [
+		{ "path": "../audit-db" }
+	],
+	"include": ["src/**/*", "../audit-db/src/archival-cli.ts"],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"eslint.config.ts",
+		"**/*.test.ts",
+		"**/*.spec.ts",
+		"**/src/config/*.ts"
+	]
+}
+

@@ -1,0 +1,40 @@
+{
+	"name": "worker",
+	"version": "0.1.0",
+	"private": true,
+	"sideEffects": false,
+	"type": "module",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "tsc --build",
+		"check:lint": "eslint . --ext .ts",
+		"check:types": "tsc --noEmit",
+		"clean": "rm -rf dist node_modules .turbo",
+		"dev": "concurrently \"tsc -w\" \"nodemon dist/index.js\"",
+		"start": "node dist/index.js",
+		"test": "vitest run",
+		"test:ci": "vitest run --coverage",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@hono/node-server": "1.16.0",
+		"@repo/audit": "workspace:*",
+		"@repo/audit-db": "workspace:*",
+		"@repo/redis-client": "workspace:*",
+		"bullmq": "5.56.4",
+		"dotenv": "17.2.0",
+		"hono": "4.8.4",
+		"pino": "9.7.0",
+		"postgres": "3.4.7",
+		"workers-tagged-logger": "0.13.1"
+	},
+	"devDependencies": {
+		"@repo/eslint-config": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "24.0.13",
+		"concurrently": "9.2.0",
+		"nodemon": "3.1.10",
+		"typescript": "5.8.2",
+		"vitest": "3.2.4"
+	}
+}

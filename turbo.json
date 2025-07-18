@@ -7,8 +7,8 @@
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": ["dist/**"]
 		},
-		"lint": {
-			"dependsOn": ["^lint"]
+		"check:lint": {
+			"dependsOn": ["^check:lint"]
 		},
 		"check-types": {
 			"dependsOn": ["^check-types"]
@@ -32,9 +32,7 @@
 		"db:generate": {
 			"cache": false,
 			"persistent": true
-		}
-		
-		,
+		},
 		"db:start": {
 			"cache": false,
 			"persistent": true
@@ -48,6 +46,15 @@
 			"persistent": true
 		},
 		"db:down": {
+			"cache": false,
+			"persistent": true
+		},
+		"test": {
+			"dependsOn": ["^build"],
+			"outputs": [],
+			"outputLogs": "new-only"
+		},
+		"clean": {
 			"cache": false,
 			"persistent": true
 		}
