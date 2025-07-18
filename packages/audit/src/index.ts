@@ -14,7 +14,11 @@ export * from './queue/reliable-processor.js'
 // Export monitoring with explicit exports to avoid conflicts
 export { MonitoringService, ConsoleAlertHandler } from './monitor/monitoring.js'
 export type { AlertHandler } from './monitor/monitoring.js'
-export type { Alert, AlertSeverity, AlertType } from './monitor/monitoring-types.js'
+export type { Alert, AlertSeverity, AlertType, OrganizationalAlert } from './monitor/monitoring-types.js'
+
+// Export database alert handler
+export { DatabaseAlertHandler, createDatabaseAlertHandler } from './monitor/database-alert-handler.js'
+export type { AlertQueryFilters, AlertResolution } from './monitor/database-alert-handler.js'
 
 // Export health check with explicit exports to avoid conflicts
 export {

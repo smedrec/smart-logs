@@ -79,7 +79,7 @@ export interface SuspiciousPattern {
 export interface AlertHandler {
 	sendAlert(alert: Alert): Promise<void>
 	resolveAlert(alertId: string, resolvedBy: string): Promise<void>
-	getActiveAlerts(): Promise<Alert[]>
+	getActiveAlerts(organizationId?: string): Promise<Alert[]>
 }
 
 /**
@@ -104,14 +104,17 @@ export class MonitoringService {
 	private config: PatternDetectionConfig
 	private alertHandlers: AlertHandler[] = []
 	private metricsCollector: MetricsCollector
+	private organizationId?: string
 
 	constructor(
 		config: PatternDetectionConfig = DEFAULT_PATTERN_CONFIG,
-		metricsCollector?: MetricsCollector
+		metricsCollector?: MetricsCollector,
+		organizationId?: string
 	) {
 		this.config = config
 		this.metrics = this.initializeMetrics()
 		this.metricsCollector = metricsCollector || new DefaultMetricsCollector()
+		this.organizationId = organizationId
 	}
 
 	/**
@@ -442,6 +445,9 @@ export class MonitoringService {
 	 * Create alert from suspicious pattern
 	 */
 	private createAlertFromPattern(pattern: SuspiciousPattern): Alert {
+		// Extract organizationId from the first event in the pattern
+		const organizationId = pattern.events[0]?.organizationId || this.organizationId
+
 		return {
 			id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 			severity: pattern.severity,
@@ -453,6 +459,7 @@ export class MonitoringService {
 			metadata: {
 				patternType: pattern.type,
 				eventCount: pattern.events.length,
+				organizationId: organizationId,
 				...pattern.metadata,
 			},
 			resolved: false,
@@ -625,8 +632,9 @@ export class ConsoleAlertHandler implements AlertHandler {
 		console.log(`✅ Alert ${alertId} resolved by ${resolvedBy}`)
 	}
 
-	async getActiveAlerts(): Promise<Alert[]> {
+	async getActiveAlerts(organizationId?: string): Promise<Alert[]> {
 		// Console handler doesn't store alerts
+		console.log(`📋 Getting active alerts${organizationId ? ` for organization ${organizationId}` : ''}`)
 		return []
 	}
 }

@@ -65,3 +65,10 @@ export interface Alert {
 	resolvedBy?: string
 	correlationId?: string
 }
+
+/**
+ * Enhanced alert interface with organization support
+ */
+export interface OrganizationalAlert extends Alert {
+	organizationId: string
+}

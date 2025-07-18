@@ -324,6 +324,58 @@ export const archiveStorage = pgTable(
 	}
 )
 
+/**
+ * Alerts table for persistent alert storage with multi-organizational support
+ * Requirements 5.1, 5.2, 5.3, 8.1: Real-time monitoring and alerting with organizational isolation
+ */
+export const alerts = pgTable(
+	'alerts',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(), // Alert ID (UUID)
+		organizationId: varchar('organization_id', { length: 255 }).notNull(), // Multi-tenant isolation
+		severity: varchar('severity', { length: 20 }).notNull(), // LOW, MEDIUM, HIGH, CRITICAL
+		type: varchar('type', { length: 20 }).notNull(), // SECURITY, COMPLIANCE, PERFORMANCE, SYSTEM
+		title: varchar('title', { length: 500 }).notNull(),
+		description: text('description').notNull(),
+		source: varchar('source', { length: 100 }).notNull(), // Component that generated the alert
+		correlationId: varchar('correlation_id', { length: 255 }), // Link to related events
+		metadata: jsonb('metadata').notNull().default('{}'), // Additional alert context
+		resolved: varchar('resolved', { length: 10 }).notNull().default('false'), // Boolean as string
+		resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'string' }),
+		resolvedBy: varchar('resolved_by', { length: 255 }), // User who resolved the alert
+		resolutionNotes: text('resolution_notes'), // Optional notes about resolution
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			// Primary indexes for multi-organizational queries
+			index('alerts_organization_id_idx').on(table.organizationId),
+			index('alerts_organization_resolved_idx').on(table.organizationId, table.resolved),
+			index('alerts_organization_severity_idx').on(table.organizationId, table.severity),
+			index('alerts_organization_type_idx').on(table.organizationId, table.type),
+			
+			// Performance indexes
+			index('alerts_created_at_idx').on(table.createdAt),
+			index('alerts_updated_at_idx').on(table.updatedAt),
+			index('alerts_resolved_at_idx').on(table.resolvedAt),
+			index('alerts_severity_idx').on(table.severity),
+			index('alerts_type_idx').on(table.type),
+			index('alerts_source_idx').on(table.source),
+			index('alerts_correlation_id_idx').on(table.correlationId),
+			
+			// Composite indexes for common queries
+			index('alerts_org_created_resolved_idx').on(table.organizationId, table.createdAt, table.resolved),
+			index('alerts_org_severity_created_idx').on(table.organizationId, table.severity, table.createdAt),
+			index('alerts_resolved_by_idx').on(table.resolvedBy),
+		]
+	}
+)
+
 // Notes for implementation:
 // - When inserting data, the `timestamp` field of the `AuditLogEvent` (which is a string)
 //   will be directly inserted into the `timestamp` column of this table.
