@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-# tmp docker
-.docker
+# tmp kiro
+.kiro
 # Wrangler
 .wrangler
 .dev.vars
@@ -14,6 +14,7 @@ node_modules
 .pnp.js
 
 .eslintcache
+tsconfig.tsbuildinfo
 
 # Local env files
 .env
