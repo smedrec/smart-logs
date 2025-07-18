@@ -1,8 +1,38 @@
 # smart-logs
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Router, Hono, TRPC, and more.
+The SMEDREC Audit System provides comprehensive audit logging capabilities for healthcare applications, ensuring compliance with HIPAA, GDPR, and other regulatory requirements.
 
-## Features
+## Key Features
+
+### 🔒 Security & Compliance
+
+- Cryptographic integrity verification with SHA-256 hashing
+- HMAC signatures for tamper detection
+- GDPR compliance with data classification and retention policies
+- Automatic data sanitization to prevent injection attacks
+
+### 🚀 Reliability
+
+- Guaranteed delivery with reliable event processor
+- Circuit breaker pattern for fault tolerance
+- Dead letter queue for failed events
+- Automatic retry mechanisms with exponential backoff
+
+### 📊 Monitoring & Observability
+
+- Real-time health checks and metrics
+- Performance monitoring with latency tracking
+- Queue depth monitoring
+- Comprehensive error handling and logging
+
+### 🏥 Healthcare-Specific
+
+- FHIR resource audit events
+- Practitioner license verification tracking
+- Patient data access logging
+- HIPAA-compliant audit trails
+
+## Tools
 
 - **TypeScript** - For type safety and improved developer experience
 - **TanStack Router** - File-based routing with full type safety
@@ -62,6 +92,7 @@ smart-logs/
 │   ├── native/      # Mobile application (React Native, Expo)
 │   ├── docs/        # Documentation site (Astro Starlight)
 │   └── server/      # Backend API (Hono, TRPC)
+│   └── worker/      # Audit worker (BullMQ, Redis, Hono)
 ```
 
 ## Available Scripts
