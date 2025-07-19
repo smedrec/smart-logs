@@ -9,7 +9,6 @@ import { newApp } from './lib/hono/'
 import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
 import { logger } from './lib/logs/middleware.js'
-import { createContext } from './lib/trpc/context'
 import { appRouter } from './routers/index'
 
 const app = newApp()
@@ -33,15 +32,16 @@ app.use(
 
 app.on(['POST', 'GET'], '/api/auth/**', (c) => auth.handler(c.req.raw))
 
-app.use(
-	'/trpc/*',
-	trpcServer({
-		router: appRouter,
-		createContext: (_opts, context) => {
-			return createContext({ context })
-		},
-	})
-)
+app.use("/trpc/*", async (c, next) =>
+    trpcServer({
+      router: appRouter,
+      createContext: () => ({
+        services: c.get('services'),
+        session: c.get('session'),
+        requestId: c.get('requestId'),
+      }),
+    })(c, next)
+  )
 
 app.get('/', (c) => {
 	return c.text('OK')

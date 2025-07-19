@@ -159,7 +159,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 			await error.handleError(
 				err,
 				{
-					correlationId: requestId,
+					requestId: requestId,
 					userId: session?.session.userId,
 					sessionId: session?.session.id,
 					metadata: {
@@ -201,7 +201,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 			await error.handleError(
 				err,
 				{
-					correlationId: requestId,
+					requestId: requestId,
 					userId: session?.session.userId,
 					sessionId: session?.session.id,
 					metadata: {
@@ -242,7 +242,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 	await error.handleError(
 		err,
 		{
-			correlationId: requestId,
+			requestId: requestId,
 			userId: session?.session.userId,
 			sessionId: session?.session.id,
 			metadata: {

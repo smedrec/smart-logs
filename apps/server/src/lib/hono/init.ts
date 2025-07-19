@@ -1,6 +1,6 @@
 import { db as authDb } from '@/db/index.js'
 
-import { Audit, DatabaseErrorLogger, ErrorHandler } from '@repo/audit'
+import { Audit, DatabaseAlertHandler, DatabaseErrorLogger, DatabaseHealthCheck, ErrorHandler, HealthCheckService, MonitoringService, RedisHealthCheck } from '@repo/audit'
 import { AuditDb, errorAggregation, errorLog } from '@repo/audit-db'
 
 //import { InfisicalKmsClient } from '@repo/infisical-kms';
@@ -26,6 +26,11 @@ export { auditDbInstance }
 
 let audit: Audit | undefined = undefined
 export { audit }
+
+// Alert and health check services
+let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
+let monitoringService: MonitoringService | undefined = undefined
+let healthCheckService: HealthCheckService | undefined = undefined
 
 // Error handling services
 let errorHandler: ErrorHandler | undefined = undefined
@@ -76,13 +81,22 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			audit: auditDbInstance.getDrizzleInstance(),
 		}
 
+		if (!healthCheckService) {
+			healthCheckService = new HealthCheckService()
+			// Register health checks
+			healthCheckService.registerHealthCheck(
+				new DatabaseHealthCheck(() => auditDbInstance!.checkAuditDbConnection())
+			)
+			//healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
+		}
+
 		if (!audit) audit = new Audit('audit')
+
+		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db)
 
 		if (!databaseErrorLogger)
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
 		if (!errorHandler) errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
-
-		const error = errorHandler
 
 		/**const kms = new InfisicalKmsClient({
 			baseUrl: c.env.INFISICAL_URL!,
@@ -100,9 +114,11 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			db,
 			//kms,
 			//redis,
+			health: healthCheckService,
+			alert: databaseAlertHandler,
 			audit,
 			logger,
-			error,
+			error: errorHandler,
 			//cache,
 		})
 

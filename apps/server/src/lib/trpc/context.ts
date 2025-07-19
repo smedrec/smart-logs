@@ -12,9 +12,10 @@ import {
 	errorLog,
 } from '@repo/audit-db'
 
-import { auth } from '../auth'
+import type { Session } from '@/lib/auth.js'
 
 import type { Context as HonoContext } from 'hono'
+import type { ServiceContext } from '../hono/context'
 
 export type CreateContextOptions = {
 	context: HonoContext
@@ -50,4 +51,8 @@ export async function createContext({ context }: CreateContextOptions) {
 	}
 }
 
-export type Context = Awaited<ReturnType<typeof createContext>>
+export type Context = {
+	session: Session | null
+	requestId: string
+	services: ServiceContext
+}

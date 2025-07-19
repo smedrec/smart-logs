@@ -10,14 +10,16 @@ export const publicProcedure = t.procedure
 
 export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
 	if (!ctx.session) {
+		const { error} = ctx.services
 		const err = new TRPCError({
 			code: 'UNAUTHORIZED',
 			message: 'Authentication required',
 			cause: 'No session',
 		})
-		await ctx.errorHandler.handleError(
+		await error.handleError(
 			err,
 			{
+				requestId: ctx.requestId,
 				metadata: {
 					message: err.message,
 					name: err.name,

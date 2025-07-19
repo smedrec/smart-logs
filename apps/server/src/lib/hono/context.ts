@@ -2,7 +2,7 @@ import type * as authSchema from '@/db/schema/auth.js'
 import type { Session } from '@/lib/auth.js'
 import type { betterAuth } from 'better-auth'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { Audit, ErrorHandler } from '@repo/audit'
+import type { Audit, DatabaseAlertHandler, ErrorHandler, HealthCheckService } from '@repo/audit'
 import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 //import type { fhir } from '@repo/fhir'
 import type { HonoApp } from '@repo/hono-helpers'
@@ -28,6 +28,8 @@ export type ServiceContext = {
 	}
 	//kms: InfisicalKmsClient
 	//redis:  Redis,
+	health: HealthCheckService
+	alert: DatabaseAlertHandler
 	audit: Audit
 	logger: Logger
 	error: ErrorHandler
