@@ -223,10 +223,8 @@ export const errorLog = pgTable(
 		aggregationKey: varchar('aggregation_key', { length: 255 }).notNull(),
 		context: jsonb('context'), // Environment, metadata, stack trace
 		troubleshooting: jsonb('troubleshooting'), // Possible causes and suggested actions
-		timestamp: timestamp('timestamp', { withTimezone: true, mode: 'string' }).notNull(),
-		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
-			.notNull()
-			.defaultNow(),
+		timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => {
 		return [
@@ -266,9 +264,7 @@ export const errorAggregation = pgTable(
 		affectedComponents: jsonb('affected_components').notNull().default('[]'), // Array of component names
 		affectedUsers: jsonb('affected_users').notNull().default('[]'), // Array of user IDs
 		samples: jsonb('samples').notNull().default('[]'), // Sample error instances
-		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
-			.notNull()
-			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => {
 		return [
@@ -358,7 +354,7 @@ export const alerts = pgTable(
 			index('alerts_organization_resolved_idx').on(table.organizationId, table.resolved),
 			index('alerts_organization_severity_idx').on(table.organizationId, table.severity),
 			index('alerts_organization_type_idx').on(table.organizationId, table.type),
-			
+
 			// Performance indexes
 			index('alerts_created_at_idx').on(table.createdAt),
 			index('alerts_updated_at_idx').on(table.updatedAt),
@@ -367,10 +363,18 @@ export const alerts = pgTable(
 			index('alerts_type_idx').on(table.type),
 			index('alerts_source_idx').on(table.source),
 			index('alerts_correlation_id_idx').on(table.correlationId),
-			
+
 			// Composite indexes for common queries
-			index('alerts_org_created_resolved_idx').on(table.organizationId, table.createdAt, table.resolved),
-			index('alerts_org_severity_created_idx').on(table.organizationId, table.severity, table.createdAt),
+			index('alerts_org_created_resolved_idx').on(
+				table.organizationId,
+				table.createdAt,
+				table.resolved
+			),
+			index('alerts_org_severity_created_idx').on(
+				table.organizationId,
+				table.severity,
+				table.createdAt
+			),
 			index('alerts_resolved_by_idx').on(table.resolvedBy),
 		]
 	}

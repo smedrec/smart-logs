@@ -1,14 +1,15 @@
 {
-  "compilerOptions": {
-    "module": "es2022",
-    "target": "es2022"
-  },
-  "files": [],
-  "include": [],
-  "references": [
-    { "path": "./packages/audit" },
-    { "path": "./packages/audit-db" },
-    { "path": "./packages/audit-sdk" },
-    { "path": "./packages/redis-client" }
-  ]
+	"compilerOptions": {
+		"module": "es2022",
+		"target": "es2022"
+	},
+	"files": [],
+	"include": [],
+	"references": [
+		{ "path": "./packages/audit" },
+		{ "path": "./packages/audit-db" },
+		{ "path": "./packages/audit-sdk" },
+		{ "path": "./packages/redis-client" },
+		{ "path": "./packages/hono-helpers" }
+	]
 }

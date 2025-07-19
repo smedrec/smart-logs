@@ -127,11 +127,11 @@ export class DatabaseErrorLogger implements ErrorLogger {
 			}
 
 			// Use insert for now - in a real implementation, we would use upsert
-			await this.db.insert(this.errorAggregationTable).values(entry)
+			//await this.db.insert(this.errorAggregationTable).values(entry)
 
 			// Note: The following code would be used for upsert in a real implementation
 			// but is commented out as the mock doesn't support it
-			/*
+
 			await this.db
 				.insert(this.errorAggregationTable)
 				.values(entry)
@@ -148,7 +148,6 @@ export class DatabaseErrorLogger implements ErrorLogger {
 						updatedAt: entry.updatedAt,
 					},
 				})
-			*/
 		} catch (dbError) {
 			// Fallback to console logging if database insert fails
 			console.error('Failed to log aggregation to database:', dbError)

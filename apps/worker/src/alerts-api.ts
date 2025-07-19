@@ -3,10 +3,10 @@
  *
  */
 
-import { Hono } from 'hono'
 import { validator } from 'hono/validator'
 import { pino } from 'pino'
 
+import type { Hono } from 'hono'
 import type { DatabaseAlertHandler } from '@repo/audit'
 
 const apiLogger = pino({ name: 'alerts-api' })
@@ -14,18 +14,14 @@ const apiLogger = pino({ name: 'alerts-api' })
 /**
  * Create errors API router
  */
-export function createAlertsAPI(
-	databaseAlertHandler: DatabaseAlertHandler
-): Hono {
-	const app = new Hono()
-
+export function createAlertsAPI(app: Hono, databaseAlertHandler: DatabaseAlertHandler): Hono {
 	// Alerts endpoints
 	app.get('/:organizationId', async (c) => {
 		if (!databaseAlertHandler) {
 			c.status(503)
 			return c.json({ error: 'Database alerts service not initialized' })
 		}
-	
+
 		const organizationId = c.req.param('organizationId')
 		if (!organizationId) {
 			c.status(400)
@@ -54,7 +50,7 @@ export function createAlertsAPI(
 			c.status(503)
 			return c.json({ error: 'Database alerts service not initialized' })
 		}
-	
+
 		const organizationId = c.req.param('organizationId')
 		if (!organizationId) {
 			c.status(400)
@@ -74,17 +70,17 @@ export function createAlertsAPI(
 			})
 		}
 	})
-	
+
 	app.post('/:alertId/resolve', async (c) => {
 		if (!databaseAlertHandler) {
 			c.status(503)
 			return c.json({ error: 'Database alerts service not initialized' })
 		}
-	
+
 		const alertId = c.req.param('alertId')
 		const body = await c.req.json().catch(() => ({}))
 		const resolvedBy = body.resolvedBy || 'system'
-	
+
 		try {
 			await databaseAlertHandler.resolveAlert(alertId, resolvedBy)
 			return c.json({

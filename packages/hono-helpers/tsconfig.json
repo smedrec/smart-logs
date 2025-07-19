@@ -1,0 +1,14 @@
+{
+	"extends": "@repo/typescript-config/lib.json", // Changed from workers-lib.json
+	"compilerOptions": {
+		"noEmit": false,
+		"outDir": "./dist",
+		"declaration": true,
+		"declarationMap": true,
+		"lib": ["es2022", "dom"], // Explicitly add "dom" for Web APIs used by Hono
+		// module, target, moduleResolution ('bundler'), strict, etc., are inherited from lib.json -> base.json
+		"types": ["node"] // Add node types for a Node.js environment
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist", "eslint.config.ts", "**/*.test.ts", "**/*.spec.ts"]
+}

@@ -3,12 +3,10 @@
  *
  */
 
-import { Hono } from 'hono'
-import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
 import { validator } from 'hono/validator'
 import { pino } from 'pino'
 
+import type { Hono } from 'hono'
 import type { DatabaseErrorLogger, ErrorHandler } from '@repo/audit'
 
 const apiLogger = pino({ name: 'errors-api' })
@@ -17,15 +15,10 @@ const apiLogger = pino({ name: 'errors-api' })
  * Create errors API router
  */
 export async function createErrorsAPI(
+	app: Hono,
 	errorHandler: ErrorHandler,
 	databaseErrorLogger: DatabaseErrorLogger
 ): Promise<Hono> {
-	const app = new Hono()
-
-	// Middleware
-	app.use('*', cors())
-	app.use('*', logger())
-
 	// Error handling and logging endpoints
 	app.get('/statistics', async (c) => {
 		if (!errorHandler) {
@@ -106,6 +99,25 @@ export async function createErrorsAPI(
 			})
 		} catch (error) {
 			apiLogger.error('Failed to get error history:', error)
+			const err = error instanceof Error ? error : new Error(String(error))
+			if (errorHandler) {
+				await errorHandler.handleError(
+					err,
+					{
+						correlationId: eventData.correlationId,
+						userId: eventData.principalId,
+						sessionId: eventData.sessionContext?.sessionId,
+						metadata: {
+							action: eventData.action,
+							targetResourceType: eventData.targetResourceType,
+							targetResourceId: eventData.targetResourceId,
+							eventData: eventData,
+						},
+					},
+					'errors-api',
+					'processErrorsHistory'
+				)
+			}
 			c.status(500)
 			return c.json({
 				error: 'Failed to get error history',

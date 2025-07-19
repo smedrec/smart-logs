@@ -10,7 +10,6 @@
  * Requirements: 4.1, 4.4, 8.1
  */
 
-import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { validator } from 'hono/validator'
@@ -22,6 +21,7 @@ import {
 	ScheduledReportingService,
 } from '@repo/audit'
 
+import type { Hono } from 'hono'
 import type {
 	DeliveryConfig,
 	ExportConfig,
@@ -35,13 +35,7 @@ const apiLogger = pino({ name: 'compliance-api' })
 /**
  * Create compliance API router
  */
-export function createComplianceAPI(auditDb: AuditDb): Hono {
-	const app = new Hono()
-
-	// Middleware
-	app.use('*', cors())
-	app.use('*', logger())
-
+export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 	// Initialize services
 	const reportingService = new ComplianceReportingService()
 	const exportService = new DataExportService()
