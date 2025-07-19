@@ -1,6 +1,15 @@
 import { db as authDb } from '@/db/index.js'
 
-import { Audit, DatabaseAlertHandler, DatabaseErrorLogger, DatabaseHealthCheck, ErrorHandler, HealthCheckService, MonitoringService, RedisHealthCheck } from '@repo/audit'
+import {
+	Audit,
+	DatabaseAlertHandler,
+	DatabaseErrorLogger,
+	DatabaseHealthCheck,
+	ErrorHandler,
+	HealthCheckService,
+	MonitoringService,
+	RedisHealthCheck,
+} from '@repo/audit'
 import { AuditDb, errorAggregation, errorLog } from '@repo/audit-db'
 
 //import { InfisicalKmsClient } from '@repo/infisical-kms';
@@ -66,7 +75,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		})
 
 		if (!auditDbInstance) {
-			auditDbInstance = new AuditDb(c.env.APP_DB_URL)
+			auditDbInstance = new AuditDb(c.env.AUDIT_DB_URL)
 			// Check the database connection
 			const isConnected = await auditDbInstance.checkAuditDbConnection()
 			if (!isConnected) {
@@ -92,7 +101,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!audit) audit = new Audit('audit')
 
-		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db)
+		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db.audit)
 
 		if (!databaseErrorLogger)
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
