@@ -14,20 +14,18 @@ COPY pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
 COPY tsconfig.json ./
-COPY turbo.jsonc ./
-COPY patches/fhirclient@2.6.0.patch ./patches/fhirclient@2.6.0.patch
+COPY tsconfig.build.json ./
 
 # Copy necessary package.json files for all apps and packages
 # This is a bit of a shotgun approach, but ensures all workspace dependencies are recognized by pnpm
 # A more optimized approach would be to use `pnpm list -r --depth -1 --json` to get the dependency tree
 # and copy only the necessary package.json files.
-COPY apps/audit/package.json ./apps/audit/
+COPY apps/worker/package.json ./apps/worker/
 
 COPY packages/audit/package.json ./packages/audit/
 COPY packages/audit-db/package.json ./packages/audit-db/
 COPY packages/redis-client/package.json ./packages/redis-client/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
-COPY packages/tools/package.json ./packages/tools/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 
 # Install all dependencies
@@ -39,19 +37,18 @@ COPY --from=deps /app /app
 
 # Copy the source code for the audit app and its direct dependencies
 # This assumes that @repo/audit is a local workspace package
-COPY apps/audit ./apps/audit
+COPY apps/worker ./apps/worker
 COPY packages/audit ./packages/audit
 COPY packages/audit-db ./packages/audit-db
 COPY packages/redis-client ./packages/redis-client
 COPY packages/typescript-config ./packages/typescript-config
-COPY packages/tools ./packages/tools
 COPY packages/eslint-config ./packages/eslint-config
 
 # If there are other @repo dependencies for audit-worker, they need to be copied too.
 # For example, if @repo/tools or @repo/eslint-config were runtime dependencies (they are devDeps here).
 
 # Set the working directory for the build
-WORKDIR /app/apps/audit
+WORKDIR /app/apps/worker
 
 # Build the audit worker
 # We need to ensure that the build command also builds any local workspace dependencies if they haven't been built.
@@ -66,10 +63,10 @@ WORKDIR /app
 # Copy built artifacts and necessary files
 COPY --from=build /app /app
 # Copy the source code again for nodemon to pick up changes
-COPY apps/audit/src ./apps/audit/src
+COPY apps/worker/src ./apps/worker/src
 
 # Set the working directory for the app
-WORKDIR /app/apps/audit
+WORKDIR /app/apps/worker
 
 # Expose ports for healthcheck
 EXPOSE 5600

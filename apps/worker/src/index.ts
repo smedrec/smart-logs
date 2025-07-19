@@ -7,6 +7,7 @@ import { pino } from 'pino'
 import {
 	CircuitBreakerHealthCheck,
 	ConsoleAlertHandler,
+	DatabaseAlertHandler,
 	DatabaseErrorLogger,
 	DatabaseHealthCheck,
 	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
@@ -35,6 +36,7 @@ import { createErrorsAPI } from './errors-api.js'
 
 import type { LogLevel } from 'workers-tagged-logger'
 import type { AuditLogEvent, ReliableProcessorConfig } from '@repo/audit'
+import { createAlertsAPI } from './alerts-api.js'
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
 const AUDIT_QUEUE_NAME = process.env.AUDIT_QUEUE_NAME || 'audit'
@@ -79,6 +81,7 @@ export { auditDbService }
 let reliableProcessor: ReliableEventProcessor<AuditLogEvent> | undefined = undefined
 
 // Monitoring and health check services
+let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
 
@@ -148,56 +151,6 @@ app.get('/metrics', async (c) => {
 	}
 })
 
-app.get('/alerts', async (c) => {
-	if (!monitoringService) {
-		c.status(503)
-		return c.json({ error: 'Monitoring service not initialized' })
-	}
-
-	try {
-		const activeAlerts = monitoringService.getActiveAlerts()
-		return c.json({
-			alerts: activeAlerts,
-			count: activeAlerts.length,
-			timestamp: new Date().toISOString(),
-		})
-	} catch (error) {
-		logger.error('Failed to get alerts:', error)
-		c.status(500)
-		return c.json({
-			error: 'Failed to get alerts',
-			message: error instanceof Error ? error.message : 'Unknown error',
-		})
-	}
-})
-
-app.post('/alerts/:alertId/resolve', async (c) => {
-	if (!monitoringService) {
-		c.status(503)
-		return c.json({ error: 'Monitoring service not initialized' })
-	}
-
-	const alertId = c.req.param('alertId')
-	const body = await c.req.json().catch(() => ({}))
-	const resolvedBy = body.resolvedBy || 'system'
-
-	try {
-		await monitoringService.resolveAlert(alertId, resolvedBy)
-		return c.json({
-			success: true,
-			message: `Alert ${alertId} resolved by ${resolvedBy}`,
-			timestamp: new Date().toISOString(),
-		})
-	} catch (error) {
-		logger.error('Failed to resolve alert:', error)
-		c.status(500)
-		return c.json({
-			error: 'Failed to resolve alert',
-			message: error instanceof Error ? error.message : 'Unknown error',
-		})
-	}
-})
-
 app.get('/health/:component', async (c) => {
 	if (!healthCheckService) {
 		c.status(503)
@@ -260,8 +213,10 @@ async function main() {
 	errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
 
 	// 3. Initialize monitoring and health check services
+	databaseAlertHandler = new DatabaseAlertHandler(db)
 	monitoringService = new MonitoringService()
 	monitoringService.addAlertHandler(new ConsoleAlertHandler())
+	monitoringService.addAlertHandler(databaseAlertHandler)
 
 	healthCheckService = new HealthCheckService()
 
@@ -419,6 +374,10 @@ async function main() {
 	// 7. Mount errors API routes
 	const errorsAPI = await createErrorsAPI(errorHandler, databaseErrorLogger)
 	app.route('/api/errors', errorsAPI)
+
+	// 8. Mount alerts API routes
+	const alertsAPI = createAlertsAPI(databaseAlertHandler)
+	app.route('/api/alerts', alertsAPI)
 
 	logger.info('📊 Compliance API routes mounted at /api/compliance')
 

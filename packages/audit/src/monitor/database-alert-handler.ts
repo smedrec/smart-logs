@@ -56,7 +56,8 @@ export interface AlertResolution {
  * Database alert handler implementation
  */
 export class DatabaseAlertHandler implements AlertHandler {
-	constructor(private db: NodePgDatabase<any>) {}
+	//constructor(private db: NodePgDatabase<any>) {}
+	constructor(private db: any) {}
 
 	/**
 	 * Send (persist) alert to database
