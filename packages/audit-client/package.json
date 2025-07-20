@@ -1,0 +1,27 @@
+{
+	"name": "@repo/app-client",
+	"version": "0.1.0",
+	"private": true,
+	"sideEffects": false,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup src/index.ts --format cjs,esm --dts",
+		"check:lint": "run-eslint",
+		"check:types": "run-tsc",
+		"clean": "rm -rf dist node_modules .turbo",
+		"test": "vitest run"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@repo/eslint-config": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"tsup": "8.5.0",
+		"typescript": "5.8.2",
+		"vitest": "3.2.4"
+	}
+}

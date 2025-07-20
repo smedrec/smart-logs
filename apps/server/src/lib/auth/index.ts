@@ -4,27 +4,11 @@ import { expo } from '@better-auth/expo'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, apiKey, mcp, oidcProvider, openAPI, organization } from 'better-auth/plugins'
-import Redis from 'ioredis'
 
+import { getRedisConnection } from '../redis'
 import { getActiveOrganization } from './functions'
 
-import type { RedisOptions } from 'ioredis'
-
-const defaultOptions: RedisOptions = { maxRetriesPerRequest: null }
-const redis = new Redis(process.env.BETTER_AUTH_REDIS_URL!, {
-	...defaultOptions,
-	// enableReadyCheck: false, // May be needed depending on Redis setup/version
-})
-
-redis.on('connect', () => {
-	console.info('🟢 Connected to Redis for Better Auth service.')
-})
-
-redis.on('error', (err) => {
-	console.error('🔴 Redis connection error for Better Auth service:', err)
-	// Depending on the error, you might want to exit or implement a retry mechanism for the worker itself.
-	// For now, this will prevent the worker from starting or stop it if the connection is lost later.
-})
+const redis = getRedisConnection()
 
 export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	database: drizzleAdapter(db, {
@@ -116,4 +100,10 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	],
 })
 
-export type Session = typeof auth.$Infer.Session
+export type Session = {
+	session: (typeof auth.$Infer.Session)['session'] & {
+		activeOrganizationId: string | null | undefined
+		activeOrganizationRole: string | null | undefined
+	}
+	user: (typeof auth.$Infer.Session)['user']
+}

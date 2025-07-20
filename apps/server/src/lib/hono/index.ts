@@ -7,6 +7,7 @@ import { auth } from '../auth/index.js'
 import { handleError, handleZodError } from '../errors/index.js'
 
 import type { Context as GenericContext } from 'hono'
+import type { Session } from '../auth/index.js'
 import type { HonoEnv } from './context.js'
 
 //import { sentry } from '@hono/sentry';
@@ -51,7 +52,7 @@ export function newApp() {
 			session.session.activeOrganizationRole = organization?.role ?? null
 		}*/
 
-		c.set('session', session)
+		c.set('session', session as Session)
 
 		return next()
 	})

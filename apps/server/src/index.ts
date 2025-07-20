@@ -48,6 +48,10 @@ app.use('/trpc/*', async (c, next) =>
 const complianceAPI = createComplianceAPI(app)
 app.route('/api/compliance', complianceAPI)
 
+app.get('/session', (c) => {
+	return c.json(c.get('session'))
+})
+
 app.get('/', (c) => {
 	return c.text('OK')
 })

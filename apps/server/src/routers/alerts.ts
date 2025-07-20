@@ -33,7 +33,7 @@ const alertsRouter = {
 					},
 				},
 				'trpc-api',
-				'processAlertsActive'
+				'alerts.active'
 			)
 			throw err
 		}
@@ -66,7 +66,7 @@ const alertsRouter = {
 					},
 				},
 				'trpc-api',
-				'processAlertsStatistics'
+				'alerts.statistics'
 			)
 			throw err
 		}
@@ -110,7 +110,7 @@ const alertsRouter = {
 						},
 					},
 					'trpc-api',
-					'processAlertsResolve'
+					'alerts.resolve'
 				)
 				throw err
 			}
