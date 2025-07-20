@@ -1,5 +1,5 @@
-import type * as authSchema from '@/db/schema/auth.js'
-import type { Session } from '@/lib/auth.js'
+import type * as authSchema from '@/db/schema'
+import type { Session } from '@/lib/auth/index.js'
 import type { betterAuth } from 'better-auth'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {

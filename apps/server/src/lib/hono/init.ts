@@ -17,7 +17,7 @@ import { AuditDb, errorAggregation, errorLog } from '@repo/audit-db'
 
 //import { InfisicalKmsClient } from '@repo/infisical-kms';
 
-import { auth } from '../auth.js'
+import { auth } from '../auth/index.js'
 import { ConsoleLogger } from '../logs/index.js'
 
 import type { MiddlewareHandler } from 'hono'

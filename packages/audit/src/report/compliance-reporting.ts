@@ -435,6 +435,7 @@ export class ComplianceReportingService {
 			statistics: {
 				hashAlgorithms,
 				verificationLatency: {
+					// TODO: Replace with real values
 					average: 50, // Placeholder values
 					median: 45,
 					p95: 120,
@@ -610,6 +611,7 @@ export class ComplianceReportingService {
 	 * Generate HIPAA-specific metrics
 	 */
 	private generateHIPAAMetrics(events: AuditLogEvent[]) {
+		// TODO: Replace with real HIPAA metrics logic
 		return {
 			phiAccessEvents: events.filter((e) => e.action.includes('read')).length,
 			phiModificationEvents: events.filter(
@@ -627,6 +629,7 @@ export class ComplianceReportingService {
 	 * Generate GDPR-specific metrics
 	 */
 	private generateGDPRMetrics(events: AuditLogEvent[]) {
+		// TODO: Replace with real GDPR metrics logic	
 		return {
 			personalDataEvents: events.length,
 			dataSubjectRights: events.filter((e) => this.isDataSubjectRightsAction(e.action)).length,
@@ -641,6 +644,7 @@ export class ComplianceReportingService {
 	 * Perform risk assessment for HIPAA compliance
 	 */
 	private performRiskAssessment(events: AuditLogEvent[]) {
+		// TODO: Replace with real risk assessment logic
 		const highRiskEvents = events.filter(
 			(event) =>
 				event.status === 'failure' ||
@@ -673,6 +677,7 @@ export class ComplianceReportingService {
 		})
 
 		return {
+			// TODO: Replace with real high risk events
 			highRiskEvents: this.convertToReportEvents(highRiskEvents),
 			suspiciousPatterns,
 			recommendations: [
@@ -689,6 +694,7 @@ export class ComplianceReportingService {
 	private generateLegalBasisBreakdown(events: AuditLogEvent[]): Record<string, number> {
 		const breakdown: Record<string, number> = {}
 
+		// TODO: Replace with real legal basis breakdown logic
 		events.forEach((event) => {
 			const basis = (event as any).gdprContext?.legalBasis || 'unspecified'
 			breakdown[basis] = (breakdown[basis] || 0) + 1
@@ -701,6 +707,7 @@ export class ComplianceReportingService {
 	 * Generate data subject rights summary
 	 */
 	private generateDataSubjectRightsSummary(events: AuditLogEvent[]) {
+		// TODO: Replace with real data subject rights summary logic
 		return {
 			accessRequests: events.filter((e) => e.action.includes('access')).length,
 			rectificationRequests: events.filter((e) => e.action.includes('rectify')).length,
@@ -724,6 +731,7 @@ export class ComplianceReportingService {
 	private isPHIResource(resourceType?: string): boolean {
 		if (!resourceType) return false
 
+		// TODO: Replace with real list of phi resources
 		const phiResources = [
 			'Patient',
 			'Observation',
@@ -746,6 +754,7 @@ export class ComplianceReportingService {
 	}
 
 	private isPersonalDataProcessing(event: AuditLogEvent): boolean {
+		// TODO: Replace with real list of personal data actions
 		const personalDataActions = [
 			'data.create',
 			'data.read',
@@ -763,6 +772,7 @@ export class ComplianceReportingService {
 	}
 
 	private isDataSubjectRightsAction(action: string): boolean {
+		// TODO: Replace with real list of data subject rights actions
 		const rightsActions = [
 			'data.export',
 			'data.delete',
@@ -779,6 +789,7 @@ export class ComplianceReportingService {
 	private async verifyEventIntegrity(event: AuditLogEvent): Promise<boolean> {
 		// Placeholder for actual integrity verification
 		// In real implementation, would use the crypto service
+		// TODO: Replace with actual integrity verification logic
 		return event.hash !== undefined && event.hash.length > 0
 	}
 }

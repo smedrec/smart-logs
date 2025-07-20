@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
-import * as schema from './schema/auth.js'
+import * as schema from './schema'
 
 const maxConnections = 10
 const client = postgres(process.env.DATABASE_URL || '', {

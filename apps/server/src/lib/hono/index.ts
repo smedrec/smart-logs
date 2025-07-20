@@ -3,7 +3,7 @@ import { prettyJSON } from 'hono/pretty-json'
 
 import { useNotFound } from '@repo/hono-helpers'
 
-import { auth } from '../auth.js'
+import { auth } from '../auth/index.js'
 import { handleError, handleZodError } from '../errors/index.js'
 
 import type { Context as GenericContext } from 'hono'

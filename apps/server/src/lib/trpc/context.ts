@@ -1,4 +1,4 @@
-import type { Session } from '@/lib/auth.js'
+import type { Session } from '@/lib/auth/index.js'
 import type { ServiceContext } from '../hono/context'
 
 
