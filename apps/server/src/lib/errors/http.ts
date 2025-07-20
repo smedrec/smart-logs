@@ -155,6 +155,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 				name: err.name,
 				code: err.code,
 				status: err.status,
+				stack: err.stack,
 			})
 			await error.handleError(
 				err,
@@ -168,6 +169,8 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 						name: err.name,
 						code: err.code,
 						status: err.status,
+						cause: err.cause,
+						stack: err.stack,
 					},
 				},
 				'server-api',
@@ -209,10 +212,12 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 						message: err.message,
 						name: err.name,
 						status: err.status,
+						cause: err.cause,
+						stack: err.stack,
 					},
 				},
 				'server-api',
-				'processHTTPException'
+				`${c.req.path}`
 			)
 		}
 		const code = statusToCode(err.status)
@@ -254,7 +259,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 			},
 		},
 		'server-api',
-		'processUnhandledException'
+		`${c.req.path}`
 	)
 	return c.json<z.infer<typeof ErrorSchema>>(
 		{

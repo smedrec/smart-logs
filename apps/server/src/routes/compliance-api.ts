@@ -15,8 +15,6 @@ import type { HonoEnv } from '@/lib/hono/context'
 import type { Hono } from 'hono'
 import type { ExportConfig, ReportCriteria, ScheduledReportConfig } from '@repo/audit'
 import { ApiError } from '@/lib/errors'
-import { t } from '@/lib/trpc'
-import { th } from 'zod/locales'
 
 /**
  * Create compliance API router
