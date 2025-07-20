@@ -15,7 +15,7 @@ function RouteComponent() {
 				{pathname === 'accept-invitation' ? (
 					<AcceptInvitationCard />
 				) : (
-					<AuthCard pathname={pathname} redirectTo="/app" />
+					<AuthCard pathname={pathname} redirectTo="/dashboard" />
 				)}
 
 				<p className="text-center text-muted-foreground text-xs">

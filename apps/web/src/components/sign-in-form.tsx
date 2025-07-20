@@ -1,27 +1,24 @@
-import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import z from "zod";
-import Loader from "./loader";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
+import { authClient } from '@/lib/auth-client'
+import { useForm } from '@tanstack/react-form'
+import { useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
+import z from 'zod'
 
-export default function SignInForm({
-	onSwitchToSignUp,
-}: {
-	onSwitchToSignUp: () => void;
-}) {
+import Loader from './loader'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+
+export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
 	const navigate = useNavigate({
-		from: "/",
-	});
-	const { isPending } = authClient.useSession();
+		from: '/',
+	})
+	const { isPending } = authClient.useSession()
 
 	const form = useForm({
 		defaultValues: {
-			email: "",
-			password: "",
+			email: '',
+			password: '',
 		},
 		onSubmit: async ({ value }) => {
 			await authClient.signIn.email(
@@ -32,26 +29,26 @@ export default function SignInForm({
 				{
 					onSuccess: () => {
 						navigate({
-							to: "/dashboard",
-						});
-						toast.success("Sign in successful");
+							to: '/dashboard',
+						})
+						toast.success('Sign in successful')
 					},
 					onError: (error) => {
-						toast.error(error.error.message);
+						toast.error(error.error.message)
 					},
-				},
-			);
+				}
+			)
 		},
 		validators: {
 			onSubmit: z.object({
-				email: z.email("Invalid email address"),
-				password: z.string().min(8, "Password must be at least 8 characters"),
+				email: z.email('Invalid email address'),
+				password: z.string().min(8, 'Password must be at least 8 characters'),
 			}),
 		},
-	});
+	})
 
 	if (isPending) {
-		return <Loader />;
+		return <Loader />
 	}
 
 	return (
@@ -60,9 +57,9 @@ export default function SignInForm({
 
 			<form
 				onSubmit={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					void form.handleSubmit();
+					e.preventDefault()
+					e.stopPropagation()
+					void form.handleSubmit()
 				}}
 				className="space-y-4"
 			>
@@ -119,7 +116,7 @@ export default function SignInForm({
 							className="w-full"
 							disabled={!state.canSubmit || state.isSubmitting}
 						>
-							{state.isSubmitting ? "Submitting..." : "Sign In"}
+							{state.isSubmitting ? 'Submitting...' : 'Sign In'}
 						</Button>
 					)}
 				</form.Subscribe>
@@ -135,5 +132,5 @@ export default function SignInForm({
 				</Button>
 			</div>
 		</div>
-	);
+	)
 }
