@@ -13,7 +13,7 @@ function RouteComponent() {
 
 	const navigate = Route.useNavigate()
 
-	const privateData = useQuery(trpc.privateData.queryOptions())
+	const privateData = useQuery(trpc.alerts.active.queryOptions())
 
 	useEffect(() => {
 		if (!session && !isPending) {
@@ -31,7 +31,12 @@ function RouteComponent() {
 		<div>
 			<h1>Dashboard</h1>
 			<p>Welcome {session?.user.name}</p>
-			<p>privateData: {privateData.data?.message}</p>
+			{privateData.data?.map((alert) => (
+				<div key={alert.id}>
+					<h2>{alert.title}</h2>
+					<p>{alert.description}</p>
+				</div>
+			))}
 		</div>
 	)
 }

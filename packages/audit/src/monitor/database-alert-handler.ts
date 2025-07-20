@@ -4,6 +4,7 @@
  */
 
 import { sql } from 'drizzle-orm'
+
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { Alert, AlertSeverity, AlertType } from './monitoring-types.js'
 import type { AlertHandler } from './monitoring.js'
@@ -99,7 +100,11 @@ export class DatabaseAlertHandler implements AlertHandler {
 	/**
 	 * Resolve alert in database
 	 */
-	async resolveAlert(alertId: string, resolvedBy: string, resolutionData?: AlertResolution): Promise<void> {
+	async resolveAlert(
+		alertId: string,
+		resolvedBy: string,
+		resolutionData?: AlertResolution
+	): Promise<void> {
 		const now = new Date().toISOString()
 
 		try {
@@ -138,7 +143,9 @@ export class DatabaseAlertHandler implements AlertHandler {
 				ORDER BY created_at DESC
 			`)
 
-			return result.rows.map(this.mapDatabaseAlertToAlert)
+			// Handle different database result formats
+			const rows = result.rows || result || []
+			return rows.map(this.mapDatabaseAlertToAlert)
 		} catch (error) {
 			throw new Error(`Failed to retrieve active alerts: ${error}`)
 		}
@@ -172,7 +179,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			// Add sorting
 			const sortColumn = filters.sortBy || 'createdAt'
 			const sortDirection = filters.sortOrder || 'desc'
-			
+
 			switch (sortColumn) {
 				case 'createdAt':
 					query += ` ORDER BY created_at ${sortDirection.toUpperCase()}`
@@ -201,7 +208,8 @@ export class DatabaseAlertHandler implements AlertHandler {
 			}
 
 			const result = await this.db.execute(sql.raw(query))
-			return result.rows.map(this.mapDatabaseAlertToAlert)
+			const rows = result.rows || result || []
+			return rows.map(this.mapDatabaseAlertToAlert)
 		} catch (error) {
 			throw new Error(`Failed to retrieve alerts: ${error}`)
 		}
@@ -219,11 +227,12 @@ export class DatabaseAlertHandler implements AlertHandler {
 				LIMIT 1
 			`)
 
-			if (result.rows.length === 0) {
+			const rows = result.rows || result || []
+			if (rows.length === 0) {
 				return null
 			}
 
-			return this.mapDatabaseAlertToAlert(result.rows[0])
+			return this.mapDatabaseAlertToAlert(rows[0])
 		} catch (error) {
 			throw new Error(`Failed to retrieve alert by ID: ${error}`)
 		}
@@ -257,7 +266,8 @@ export class DatabaseAlertHandler implements AlertHandler {
 				WHERE organization_id = ${organizationId}
 			`)
 
-			const row = result.rows[0]
+			const rows = result.rows || result || []
+			const row = rows[0]
 
 			return {
 				total: parseInt(row.total as string),

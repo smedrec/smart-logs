@@ -12,77 +12,16 @@
 import { validator } from 'hono/validator'
 import { pino } from 'pino'
 
-import {
-	ComplianceReportingService,
-	DataExportService,
-	ScheduledReportingService,
-} from '@repo/audit'
-
+import type { HonoEnv } from '@/lib/hono/context'
 import type { Hono } from 'hono'
-import type {
-	DeliveryConfig,
-	ExportConfig,
-	ReportCriteria,
-	ScheduledReportConfig,
-} from '@repo/audit'
-import type { AuditDb } from '@repo/audit-db'
+import type { ExportConfig, ReportCriteria, ScheduledReportConfig } from '@repo/audit'
 
 const apiLogger = pino({ name: 'compliance-api' })
 
 /**
  * Create compliance API router
  */
-export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
-	// Initialize services
-	const reportingService = new ComplianceReportingService()
-	const exportService = new DataExportService()
-
-	// Placeholder delivery config - in real implementation would come from environment
-	const deliveryConfig: DeliveryConfig = {
-		email: {
-			smtpConfig: {
-				host: process.env.SMTP_HOST || 'localhost',
-				port: parseInt(process.env.SMTP_PORT || '587'),
-				secure: process.env.SMTP_SECURE === 'true',
-				auth: {
-					user: process.env.SMTP_USER || '',
-					pass: process.env.SMTP_PASS || '',
-				},
-			},
-			from: process.env.SMTP_FROM || 'audit@smedrec.com',
-			subject: 'Scheduled Audit Report',
-			bodyTemplate: 'Please find the attached audit report.',
-			attachmentName: 'audit-report',
-		},
-		webhook: {
-			url: process.env.WEBHOOK_URL || '',
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${process.env.WEBHOOK_TOKEN || ''}`,
-			},
-			timeout: 30000,
-			retryConfig: {
-				maxRetries: 3,
-				backoffMultiplier: 2,
-				maxBackoffDelay: 30000,
-			},
-		},
-		storage: {
-			provider: 'local',
-			config: {
-				basePath: process.env.STORAGE_PATH || './reports',
-			},
-			path: '/audit-reports',
-			retention: {
-				days: 90,
-				autoCleanup: true,
-			},
-		},
-	}
-
-	const scheduledReportingService = new ScheduledReportingService(deliveryConfig)
-
+export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	/**
 	 * Generate general compliance report
 	 * POST /api/compliance/reports/generate
@@ -97,23 +36,28 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			return { criteria: criteria as ReportCriteria, reportType: reportType as string }
 		}),
 		async (c) => {
+			const { compliance, db, logger } = c.get('services')
 			try {
 				const { criteria, reportType } = c.req.valid('json')
 
 				// Fetch audit events from database based on criteria
-				const events = await fetchAuditEvents(auditDb, criteria)
+				const events = await fetchAuditEvents(db.audit, criteria)
 
 				// Generate report
-				const report = await reportingService.generateComplianceReport(events, criteria, reportType)
+				const report = await compliance.report.generateComplianceReport(
+					events,
+					criteria,
+					reportType
+				)
 
-				apiLogger.info(`Generated compliance report: ${report.metadata.reportId}`)
+				logger.info(`Generated compliance report: ${report.metadata.reportId}`)
 
 				return c.json({
 					success: true,
 					report,
 				})
 			} catch (error) {
-				apiLogger.error('Failed to generate compliance report:', error)
+				logger.error('Failed to generate compliance report:', error)
 				return c.json(
 					{
 						success: false,
@@ -139,14 +83,15 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			return { criteria: criteria as ReportCriteria }
 		}),
 		async (c) => {
+			const { compliance, db } = c.get('services')
 			try {
 				const { criteria } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(auditDb, criteria)
+				const events = await fetchAuditEvents(db.audit, criteria)
 
 				// Generate HIPAA report
-				const report = await reportingService.generateHIPAAReport(events, criteria)
+				const report = await compliance.report.generateHIPAAReport(events, criteria)
 
 				apiLogger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
 
@@ -181,14 +126,15 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			return { criteria: criteria as ReportCriteria }
 		}),
 		async (c) => {
+			const { compliance, db } = c.get('services')
 			try {
 				const { criteria } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(auditDb, criteria)
+				const events = await fetchAuditEvents(db.audit, criteria)
 
 				// Generate GDPR report
-				const report = await reportingService.generateGDPRReport(events, criteria)
+				const report = await compliance.report.generateGDPRReport(events, criteria)
 
 				apiLogger.info(`Generated GDPR report: ${report.metadata.reportId}`)
 
@@ -226,14 +172,15 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			}
 		}),
 		async (c) => {
+			const { compliance, db } = c.get('services')
 			try {
 				const { criteria, performVerification = true } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(auditDb, criteria)
+				const events = await fetchAuditEvents(db.audit, criteria)
 
 				// Generate integrity verification report
-				const report = await reportingService.generateIntegrityVerificationReport(
+				const report = await compliance.report.generateIntegrityVerificationReport(
 					events,
 					performVerification
 				)
@@ -271,11 +218,12 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			return { report, config: config as ExportConfig }
 		}),
 		async (c) => {
+			const { compliance } = c.get('services')
 			try {
 				const { report, config } = c.req.valid('json')
 
 				// Export the report
-				const exportResult = await exportService.exportComplianceReport(report, config)
+				const exportResult = await compliance.export.exportComplianceReport(report, config)
 
 				apiLogger.info(`Exported report: ${exportResult.exportId}`)
 
@@ -317,11 +265,12 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			}
 		}),
 		async (c) => {
+			const { compliance, db } = c.get('services')
 			try {
 				const { criteria, config } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(auditDb, criteria)
+				const events = await fetchAuditEvents(db.audit, criteria)
 
 				// Convert to report events format
 				const reportEvents = events.map((event) => ({
@@ -344,7 +293,7 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 				}))
 
 				// Export the events
-				const exportResult = await exportService.exportAuditEvents(reportEvents, config, {
+				const exportResult = await compliance.export.exportAuditEvents(reportEvents, config, {
 					criteria,
 				})
 
@@ -385,10 +334,11 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			return config
 		}),
 		async (c) => {
+			const { compliance } = c.get('services')
 			try {
 				const config = c.req.valid('json')
 
-				const scheduledReport = await scheduledReportingService.createScheduledReport(config)
+				const scheduledReport = await compliance.scheduled.createScheduledReport(config)
 
 				apiLogger.info(`Created scheduled report: ${scheduledReport.id}`)
 
@@ -414,8 +364,9 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 	 * GET /api/compliance/scheduled-reports
 	 */
 	app.get('/scheduled-reports', async (c) => {
+		const { compliance } = c.get('services')
 		try {
-			const scheduledReports = await scheduledReportingService.getScheduledReports()
+			const scheduledReports = await compliance.scheduled.getScheduledReports()
 
 			return c.json({
 				success: true,
@@ -438,9 +389,10 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 	 * GET /api/compliance/scheduled-reports/:id
 	 */
 	app.get('/scheduled-reports/:id', async (c) => {
+		const { compliance } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
-			const scheduledReport = await scheduledReportingService.getScheduledReport(reportId)
+			const scheduledReport = await compliance.scheduled.getScheduledReport(reportId)
 
 			if (!scheduledReport) {
 				return c.json(
@@ -478,14 +430,12 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 			return value as Partial<ScheduledReportConfig>
 		}),
 		async (c) => {
+			const { compliance } = c.get('services')
 			try {
 				const reportId = c.req.param('id')
 				const updates = c.req.valid('json')
 
-				const updatedReport = await scheduledReportingService.updateScheduledReport(
-					reportId,
-					updates
-				)
+				const updatedReport = await compliance.scheduled.updateScheduledReport(reportId, updates)
 
 				apiLogger.info(`Updated scheduled report: ${reportId}`)
 
@@ -511,10 +461,11 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 	 * DELETE /api/compliance/scheduled-reports/:id
 	 */
 	app.delete('/scheduled-reports/:id', async (c) => {
+		const { compliance } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
 
-			await scheduledReportingService.deleteScheduledReport(reportId)
+			await compliance.scheduled.deleteScheduledReport(reportId)
 
 			apiLogger.info(`Deleted scheduled report: ${reportId}`)
 
@@ -539,10 +490,11 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 	 * POST /api/compliance/scheduled-reports/:id/execute
 	 */
 	app.post('/scheduled-reports/:id/execute', async (c) => {
+		const { compliance } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
 
-			const execution = await scheduledReportingService.executeReport(reportId)
+			const execution = await compliance.scheduled.executeReport(reportId)
 
 			apiLogger.info(`Executed scheduled report: ${reportId}`)
 
@@ -567,11 +519,12 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 	 * GET /api/compliance/scheduled-reports/:id/executions
 	 */
 	app.get('/scheduled-reports/:id/executions', async (c) => {
+		const { compliance } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
 			const limit = parseInt(c.req.query('limit') || '50')
 
-			const executions = await scheduledReportingService.getExecutionHistory(reportId, limit)
+			const executions = await compliance.scheduled.getExecutionHistory(reportId, limit)
 
 			return c.json({
 				success: true,
@@ -594,8 +547,9 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 	 * GET /api/compliance/templates
 	 */
 	app.get('/templates', async (c) => {
+		const { compliance } = c.get('services')
 		try {
-			const templates = await scheduledReportingService.getReportTemplates()
+			const templates = await compliance.scheduled.getReportTemplates()
 
 			return c.json({
 				success: true,
@@ -619,11 +573,9 @@ export function createComplianceAPI(app: Hono, auditDb: AuditDb): Hono {
 /**
  * Helper function to fetch audit events from database based on criteria
  */
-async function fetchAuditEvents(auditDb: AuditDb, criteria: ReportCriteria): Promise<any[]> {
+async function fetchAuditEvents(db: any, criteria: ReportCriteria): Promise<any[]> {
 	// This is a simplified implementation
 	// In a real implementation, would use proper database queries with the criteria
-
-	const db = auditDb.getDrizzleInstance()
 
 	// Placeholder query - would implement proper filtering based on criteria
 	// Import the audit log table schema

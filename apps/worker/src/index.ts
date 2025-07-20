@@ -344,11 +344,11 @@ async function main() {
 	healthCheckService.registerHealthCheck(
 		new QueueHealthCheck(
 			async () => {
-				const metrics = await reliableProcessor!.getMetrics()
+				const metrics = reliableProcessor!.getMetrics()
 				return metrics.queueDepth || 0
 			},
 			async () => {
-				const metrics = await reliableProcessor!.getMetrics()
+				const metrics = reliableProcessor!.getMetrics()
 				return metrics.totalProcessed || 0
 			}
 		)

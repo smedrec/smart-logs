@@ -10,6 +10,7 @@ import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
 import { logger } from './lib/logs/middleware.js'
 import { appRouter } from './routers/index'
+import { createComplianceAPI } from './routes/compliance-api'
 
 const app = newApp()
 
@@ -32,16 +33,20 @@ app.use(
 
 app.on(['POST', 'GET'], '/api/auth/**', (c) => auth.handler(c.req.raw))
 
-app.use("/trpc/*", async (c, next) =>
-    trpcServer({
-      router: appRouter,
-      createContext: () => ({
-        services: c.get('services'),
-        session: c.get('session'),
-        requestId: c.get('requestId'),
-      }),
-    })(c, next)
-  )
+app.use('/trpc/*', async (c, next) =>
+	trpcServer({
+		router: appRouter,
+		createContext: () => ({
+			services: c.get('services'),
+			session: c.get('session'),
+			requestId: c.get('requestId'),
+		}),
+	})(c, next)
+)
+
+// Mount compliance API routes
+const complianceAPI = createComplianceAPI(app)
+app.route('/api/compliance', complianceAPI)
 
 app.get('/', (c) => {
 	return c.text('OK')
