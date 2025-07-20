@@ -10,13 +10,13 @@
  * Requirements: 4.1, 4.4, 8.1
  */
 import { validator } from 'hono/validator'
-import { pino } from 'pino'
 
 import type { HonoEnv } from '@/lib/hono/context'
 import type { Hono } from 'hono'
 import type { ExportConfig, ReportCriteria, ScheduledReportConfig } from '@repo/audit'
-
-const apiLogger = pino({ name: 'compliance-api' })
+import { ApiError } from '@/lib/errors'
+import { t } from '@/lib/trpc'
+import { th } from 'zod/locales'
 
 /**
  * Create compliance API router
@@ -56,15 +56,14 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 					success: true,
 					report,
 				})
-			} catch (error) {
-				logger.error('Failed to generate compliance report:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to generate compliance report: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -83,7 +82,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 			return { criteria: criteria as ReportCriteria }
 		}),
 		async (c) => {
-			const { compliance, db } = c.get('services')
+			const { compliance, db, logger } = c.get('services')
 			try {
 				const { criteria } = c.req.valid('json')
 
@@ -93,21 +92,20 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				// Generate HIPAA report
 				const report = await compliance.report.generateHIPAAReport(events, criteria)
 
-				apiLogger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
+				logger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
 
 				return c.json({
 					success: true,
 					report,
 				})
-			} catch (error) {
-				apiLogger.error('Failed to generate HIPAA report:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to generate HIPAA report: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -126,7 +124,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 			return { criteria: criteria as ReportCriteria }
 		}),
 		async (c) => {
-			const { compliance, db } = c.get('services')
+			const { compliance, db, logger } = c.get('services')
 			try {
 				const { criteria } = c.req.valid('json')
 
@@ -136,21 +134,20 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				// Generate GDPR report
 				const report = await compliance.report.generateGDPRReport(events, criteria)
 
-				apiLogger.info(`Generated GDPR report: ${report.metadata.reportId}`)
+				logger.info(`Generated GDPR report: ${report.metadata.reportId}`)
 
 				return c.json({
 					success: true,
 					report,
 				})
-			} catch (error) {
-				apiLogger.error('Failed to generate GDPR report:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to generate GDPR report: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -172,7 +169,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 			}
 		}),
 		async (c) => {
-			const { compliance, db } = c.get('services')
+			const { compliance, db, logger } = c.get('services')
 			try {
 				const { criteria, performVerification = true } = c.req.valid('json')
 
@@ -185,21 +182,20 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 					performVerification
 				)
 
-				apiLogger.info(`Generated integrity verification report: ${report.verificationId}`)
+				logger.info(`Generated integrity verification report: ${report.verificationId}`)
 
 				return c.json({
 					success: true,
 					report,
 				})
-			} catch (error) {
-				apiLogger.error('Failed to generate integrity verification report:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to generate integrity verification report: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -218,14 +214,14 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 			return { report, config: config as ExportConfig }
 		}),
 		async (c) => {
-			const { compliance } = c.get('services')
+			const { compliance, logger } = c.get('services')
 			try {
 				const { report, config } = c.req.valid('json')
 
 				// Export the report
 				const exportResult = await compliance.export.exportComplianceReport(report, config)
 
-				apiLogger.info(`Exported report: ${exportResult.exportId}`)
+				logger.info(`Exported report: ${exportResult.exportId}`)
 
 				// Set appropriate headers for file download
 				c.header('Content-Type', exportResult.contentType)
@@ -235,15 +231,14 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				c.header('X-Checksum', exportResult.checksum)
 
 				return c.body(exportResult.data)
-			} catch (error) {
-				apiLogger.error('Failed to export report:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to export report: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -265,7 +260,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 			}
 		}),
 		async (c) => {
-			const { compliance, db } = c.get('services')
+			const { compliance, db, logger } = c.get('services')
 			try {
 				const { criteria, config } = c.req.valid('json')
 
@@ -297,7 +292,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 					criteria,
 				})
 
-				apiLogger.info(`Exported ${reportEvents.length} audit events: ${exportResult.exportId}`)
+				logger.info(`Exported ${reportEvents.length} audit events: ${exportResult.exportId}`)
 
 				// Set appropriate headers for file download
 				c.header('Content-Type', exportResult.contentType)
@@ -307,15 +302,14 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				c.header('X-Checksum', exportResult.checksum)
 
 				return c.body(exportResult.data)
-			} catch (error) {
-				apiLogger.error('Failed to export audit events:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to export audit events: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -336,27 +330,26 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 			return config
 		}),
 		async (c) => {
-			const { compliance } = c.get('services')
+			const { compliance, logger } = c.get('services')
 			try {
 				const config = c.req.valid('json')
 
 				const scheduledReport = await compliance.scheduled.createScheduledReport(config)
 
-				apiLogger.info(`Created scheduled report: ${scheduledReport.id}`)
+				logger.info(`Created scheduled report: ${scheduledReport.id}`)
 
 				return c.json({
 					success: true,
 					scheduledReport,
 				})
-			} catch (error) {
-				apiLogger.error('Failed to create scheduled report:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to create scheduled report: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -366,7 +359,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * GET /api/compliance/scheduled-reports
 	 */
 	app.get('/scheduled-reports', async (c) => {
-		const { compliance } = c.get('services')
+		const { compliance, logger } = c.get('services')
 		try {
 			const scheduledReports = await compliance.scheduled.getScheduledReports()
 
@@ -375,7 +368,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				scheduledReports,
 			})
 		} catch (error) {
-			apiLogger.error('Failed to get scheduled reports:', error)
+			logger.error('Failed to get scheduled reports:', error)
 			return c.json(
 				{
 					success: false,
@@ -391,7 +384,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * GET /api/compliance/scheduled-reports/:id
 	 */
 	app.get('/scheduled-reports/:id', async (c) => {
-		const { compliance } = c.get('services')
+		const { compliance, logger } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
 			const scheduledReport = await compliance.scheduled.getScheduledReport(reportId)
@@ -410,15 +403,14 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				success: true,
 				scheduledReport,
 			})
-		} catch (error) {
-			apiLogger.error('Failed to get scheduled report:', error)
-			return c.json(
-				{
-					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error',
-				},
-				500
-			)
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Unknown error'
+			logger.error(`Failed to get scheduled report: ${message}`)
+			const error = new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+			throw error
 		}
 	})
 
@@ -432,28 +424,27 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 			return value as Partial<ScheduledReportConfig>
 		}),
 		async (c) => {
-			const { compliance } = c.get('services')
+			const { compliance, logger } = c.get('services')
 			try {
 				const reportId = c.req.param('id')
 				const updates = c.req.valid('json')
 
 				const updatedReport = await compliance.scheduled.updateScheduledReport(reportId, updates)
 
-				apiLogger.info(`Updated scheduled report: ${reportId}`)
+				logger.info(`Updated scheduled report: ${reportId}`)
 
 				return c.json({
 					success: true,
 					scheduledReport: updatedReport,
 				})
-			} catch (error) {
-				apiLogger.error('Failed to update scheduled report:', error)
-				return c.json(
-					{
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error',
-					},
-					500
-				)
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to update scheduled report: ${message}`)
+				const error = new ApiError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message,
+				})
+				throw error
 			}
 		}
 	)
@@ -463,27 +454,26 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * DELETE /api/compliance/scheduled-reports/:id
 	 */
 	app.delete('/scheduled-reports/:id', async (c) => {
-		const { compliance } = c.get('services')
+		const { compliance, logger } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
 
 			await compliance.scheduled.deleteScheduledReport(reportId)
 
-			apiLogger.info(`Deleted scheduled report: ${reportId}`)
+			logger.info(`Deleted scheduled report: ${reportId}`)
 
 			return c.json({
 				success: true,
 				message: 'Scheduled report deleted successfully',
 			})
-		} catch (error) {
-			apiLogger.error('Failed to delete scheduled report:', error)
-			return c.json(
-				{
-					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error',
-				},
-				500
-			)
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Unknown error'
+			logger.error(`Failed to delete scheduled report: ${message}`)
+			const error = new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+			throw error
 		}
 	})
 
@@ -492,27 +482,26 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * POST /api/compliance/scheduled-reports/:id/execute
 	 */
 	app.post('/scheduled-reports/:id/execute', async (c) => {
-		const { compliance } = c.get('services')
+		const { compliance, logger } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
 
 			const execution = await compliance.scheduled.executeReport(reportId)
 
-			apiLogger.info(`Executed scheduled report: ${reportId}`)
+			logger.info(`Executed scheduled report: ${reportId}`)
 
 			return c.json({
 				success: true,
 				execution,
 			})
-		} catch (error) {
-			apiLogger.error('Failed to execute scheduled report:', error)
-			return c.json(
-				{
-					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error',
-				},
-				500
-			)
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Unknown error'
+			logger.error(`Failed to execute scheduled report: ${message}`)
+			const error = new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+			throw error
 		}
 	})
 
@@ -521,7 +510,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * GET /api/compliance/scheduled-reports/:id/executions
 	 */
 	app.get('/scheduled-reports/:id/executions', async (c) => {
-		const { compliance } = c.get('services')
+		const { compliance, logger } = c.get('services')
 		try {
 			const reportId = c.req.param('id')
 			const limit = parseInt(c.req.query('limit') || '50')
@@ -532,15 +521,14 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				success: true,
 				executions,
 			})
-		} catch (error) {
-			apiLogger.error('Failed to get execution history:', error)
-			return c.json(
-				{
-					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error',
-				},
-				500
-			)
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Unknown error'
+			logger.error(`Failed to get execution history: ${message}`)
+			const error = new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+			throw error
 		}
 	})
 
@@ -549,7 +537,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * GET /api/compliance/templates
 	 */
 	app.get('/templates', async (c) => {
-		const { compliance } = c.get('services')
+		const { compliance, logger } = c.get('services')
 		try {
 			const templates = await compliance.scheduled.getReportTemplates()
 
@@ -557,15 +545,14 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				success: true,
 				templates,
 			})
-		} catch (error) {
-			apiLogger.error('Failed to get report templates:', error)
-			return c.json(
-				{
-					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error',
-				},
-				500
-			)
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Unknown error'
+			logger.error(`Failed to get report templates: ${message}`)
+			const error = new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+			throw error
 		}
 	})
 

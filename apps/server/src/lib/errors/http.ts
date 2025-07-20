@@ -171,7 +171,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 					},
 				},
 				'server-api',
-				'processApiError'
+				`${c.req.path}`
 			)
 		}
 		return c.json<z.infer<typeof ErrorSchema>>(
