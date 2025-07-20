@@ -10,6 +10,11 @@
  * Requirements: 4.1, 4.4, 8.1
  */
 
+import { and, desc, eq, gte, lte } from 'drizzle-orm'
+
+import { reportExecutions, reportTemplates, scheduledReports } from '@repo/audit-db'
+
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
 	ExportConfig,
 	ReportCriteria,
@@ -124,12 +129,22 @@ export interface DeliveryConfig {
  * Scheduled Reporting Service
  */
 export class ScheduledReportingService {
-	private scheduledReports: Map<string, ScheduledReportConfig> = new Map()
-	private reportTemplates: Map<string, ReportTemplate> = new Map()
-	private executionHistory: Map<string, ReportExecution[]> = new Map()
+	private db: PostgresJsDatabase<{
+		scheduledReports: typeof scheduledReports
+		reportTemplates: typeof reportTemplates
+		reportExecutions: typeof reportExecutions
+	}>
 	private deliveryConfig: DeliveryConfig
 
-	constructor(deliveryConfig: DeliveryConfig) {
+	constructor(
+		db: PostgresJsDatabase<{
+			scheduledReports: typeof scheduledReports
+			reportTemplates: typeof reportTemplates
+			reportExecutions: typeof reportExecutions
+		}>,
+		deliveryConfig: DeliveryConfig
+	) {
+		this.db = db
 		this.deliveryConfig = deliveryConfig
 	}
 
@@ -137,19 +152,39 @@ export class ScheduledReportingService {
 	 * Create a new scheduled report configuration
 	 */
 	async createScheduledReport(
-		config: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'>
+		config: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> & { organizationId: string }
 	): Promise<ScheduledReportConfig> {
-		const reportConfig: ScheduledReportConfig = {
-			...config,
-			id: this.generateId('report'),
-			createdAt: new Date().toISOString(),
-			nextRun: this.calculateNextRun(config.schedule),
+		const reportId = this.generateId('report')
+		const nextRun = this.calculateNextRun(config.schedule)
+
+		const dbRecord = {
+			id: reportId,
+			name: config.name,
+			description: config.description || null,
+			organizationId: config.organizationId,
+			templateId: config.templateId || null,
+			criteria: config.criteria,
+			format: config.format,
+			schedule: config.schedule,
+			delivery: config.delivery,
+			enabled: config.enabled ? 'true' : 'false',
+			lastRun: null,
+			nextRun,
+			createdBy: config.createdBy,
+			updatedBy: null,
 		}
 
-		this.scheduledReports.set(reportConfig.id, reportConfig)
+		await this.db.insert(scheduledReports).values(dbRecord).returning()
+
+		const reportConfig: ScheduledReportConfig = {
+			...config,
+			id: reportId,
+			createdAt: new Date().toISOString(),
+			nextRun,
+		}
 
 		// Schedule the report
-		if (reportConfig.enabled) {
+		if (config.enabled) {
 			await this.scheduleReport(reportConfig)
 		}
 
@@ -161,22 +196,59 @@ export class ScheduledReportingService {
 	 */
 	async updateScheduledReport(
 		reportId: string,
-		updates: Partial<ScheduledReportConfig>
+		updates: Partial<ScheduledReportConfig> & { updatedBy?: string }
 	): Promise<ScheduledReportConfig> {
-		const existingConfig = this.scheduledReports.get(reportId)
-		if (!existingConfig) {
+		const existingRecords = await this.db
+			.select()
+			.from(scheduledReports)
+			.where(eq(scheduledReports.id, reportId))
+
+		if (existingRecords.length === 0) {
 			throw new Error(`Scheduled report not found: ${reportId}`)
 		}
 
-		const updatedConfig: ScheduledReportConfig = {
-			...existingConfig,
-			...updates,
-			nextRun:
-				updates.nextRun ||
-				(updates.schedule ? this.calculateNextRun(updates.schedule) : existingConfig.nextRun),
+		const existing = existingRecords[0]
+		const nextRun =
+			updates.nextRun ||
+			(updates.schedule ? this.calculateNextRun(updates.schedule) : existing.nextRun)
+
+		const updateData: any = {
+			updatedAt: new Date().toISOString(),
+			updatedBy: updates.updatedBy || null,
 		}
 
-		this.scheduledReports.set(reportId, updatedConfig)
+		if (updates.name) updateData.name = updates.name
+		if (updates.description !== undefined) updateData.description = updates.description
+		if (updates.criteria) updateData.criteria = updates.criteria
+		if (updates.format) updateData.format = updates.format
+		if (updates.schedule) updateData.schedule = updates.schedule
+		if (updates.delivery) updateData.delivery = updates.delivery
+		if (updates.enabled !== undefined) updateData.enabled = updates.enabled ? 'true' : 'false'
+		if (nextRun) updateData.nextRun = nextRun
+
+		await this.db.update(scheduledReports).set(updateData).where(eq(scheduledReports.id, reportId))
+
+		// Get updated record
+		const updatedRecords = await this.db
+			.select()
+			.from(scheduledReports)
+			.where(eq(scheduledReports.id, reportId))
+
+		const updated = updatedRecords[0]
+		const updatedConfig: ScheduledReportConfig = {
+			id: updated.id,
+			name: updated.name,
+			description: updated.description || undefined,
+			criteria: updated.criteria as ReportCriteria,
+			format: updated.format as ReportFormat,
+			schedule: updated.schedule as ScheduledReportConfig['schedule'],
+			delivery: updated.delivery as ScheduledReportConfig['delivery'],
+			enabled: updated.enabled === 'true',
+			lastRun: updated.lastRun || undefined,
+			nextRun: updated.nextRun || undefined,
+			createdAt: updated.createdAt,
+			createdBy: updated.createdBy,
+		}
 
 		// Reschedule if enabled
 		if (updatedConfig.enabled) {
@@ -192,55 +264,120 @@ export class ScheduledReportingService {
 	 * Delete a scheduled report configuration
 	 */
 	async deleteScheduledReport(reportId: string): Promise<void> {
-		const config = this.scheduledReports.get(reportId)
-		if (!config) {
+		const existingRecords = await this.db
+			.select()
+			.from(scheduledReports)
+			.where(eq(scheduledReports.id, reportId))
+
+		if (existingRecords.length === 0) {
 			throw new Error(`Scheduled report not found: ${reportId}`)
 		}
 
 		await this.unscheduleReport(reportId)
-		this.scheduledReports.delete(reportId)
-		this.executionHistory.delete(reportId)
+
+		// Delete related executions first (foreign key constraint)
+		await this.db.delete(reportExecutions).where(eq(reportExecutions.reportConfigId, reportId))
+
+		// Delete the scheduled report
+		await this.db.delete(scheduledReports).where(eq(scheduledReports.id, reportId))
 	}
 
 	/**
 	 * Get all scheduled report configurations
 	 */
-	async getScheduledReports(): Promise<ScheduledReportConfig[]> {
-		return Array.from(this.scheduledReports.values())
+	async getScheduledReports(organizationId?: string): Promise<ScheduledReportConfig[]> {
+		const query = this.db.select().from(scheduledReports)
+
+		const records = organizationId
+			? await query.where(eq(scheduledReports.organizationId, organizationId))
+			: await query
+
+		return records.map((record) => ({
+			id: record.id,
+			name: record.name,
+			description: record.description || undefined,
+			criteria: record.criteria as ReportCriteria,
+			format: record.format as ReportFormat,
+			schedule: record.schedule as ScheduledReportConfig['schedule'],
+			delivery: record.delivery as ScheduledReportConfig['delivery'],
+			enabled: record.enabled === 'true',
+			lastRun: record.lastRun || undefined,
+			nextRun: record.nextRun || undefined,
+			createdAt: record.createdAt,
+			createdBy: record.createdBy,
+		}))
 	}
 
 	/**
 	 * Get a specific scheduled report configuration
 	 */
 	async getScheduledReport(reportId: string): Promise<ScheduledReportConfig | null> {
-		return this.scheduledReports.get(reportId) || null
+		const records = await this.db
+			.select()
+			.from(scheduledReports)
+			.where(eq(scheduledReports.id, reportId))
+
+		if (records.length === 0) {
+			return null
+		}
+
+		const record = records[0]
+		return {
+			id: record.id,
+			name: record.name,
+			description: record.description || undefined,
+			criteria: record.criteria as ReportCriteria,
+			format: record.format as ReportFormat,
+			schedule: record.schedule as ScheduledReportConfig['schedule'],
+			delivery: record.delivery as ScheduledReportConfig['delivery'],
+			enabled: record.enabled === 'true',
+			lastRun: record.lastRun || undefined,
+			nextRun: record.nextRun || undefined,
+			createdAt: record.createdAt,
+			createdBy: record.createdBy,
+		}
 	}
 
 	/**
 	 * Execute a scheduled report immediately
 	 */
 	async executeReport(reportId: string): Promise<ReportExecution> {
-		const config = this.scheduledReports.get(reportId)
+		const config = await this.getScheduledReport(reportId)
 		if (!config) {
 			throw new Error(`Scheduled report not found: ${reportId}`)
 		}
 
+		const executionId = this.generateId('execution')
+		const now = new Date().toISOString()
+
 		const execution: ReportExecution = {
-			executionId: this.generateId('execution'),
+			executionId,
 			reportConfigId: reportId,
-			scheduledTime: new Date().toISOString(),
-			executionTime: new Date().toISOString(),
+			scheduledTime: now,
+			executionTime: now,
 			status: 'running',
 			deliveryAttempts: [],
 		}
 
 		try {
-			// Add to execution history
-			const history = this.executionHistory.get(reportId) || []
-			history.push(execution)
-			this.executionHistory.set(reportId, history)
-
 			const startTime = Date.now()
+
+			// Insert execution record
+			const dbExecution = {
+				id: executionId,
+				reportConfigId: reportId,
+				organizationId: (config as any).organizationId || 'unknown',
+				scheduledTime: now,
+				executionTime: now,
+				status: 'running' as const,
+				duration: null,
+				recordsProcessed: null,
+				exportResult: null,
+				deliveryAttempts: [],
+				error: null,
+			}
+
+			await this.db.insert(reportExecutions).values(dbExecution)
 
 			// Generate the report (placeholder - would integrate with ComplianceReportingService)
 			const reportResult = await this.generateReport(config)
@@ -253,13 +390,40 @@ export class ScheduledReportingService {
 			execution.status = 'completed'
 			execution.duration = Date.now() - startTime
 
+			// Update execution record
+			await this.db
+				.update(reportExecutions)
+				.set({
+					status: 'completed',
+					duration: execution.duration,
+					recordsProcessed: execution.recordsProcessed,
+					exportResult: reportResult,
+					deliveryAttempts: execution.deliveryAttempts,
+				})
+				.where(eq(reportExecutions.id, executionId))
+
 			// Update next run time
-			config.lastRun = execution.executionTime
-			config.nextRun = this.calculateNextRun(config.schedule)
-			this.scheduledReports.set(reportId, config)
+			const nextRun = this.calculateNextRun(config.schedule)
+			await this.db
+				.update(scheduledReports)
+				.set({
+					lastRun: execution.executionTime,
+					nextRun,
+				})
+				.where(eq(scheduledReports.id, reportId))
 		} catch (error) {
 			execution.status = 'failed'
 			execution.error = error instanceof Error ? error.message : 'Unknown error'
+
+			// Update execution record with error
+			await this.db
+				.update(reportExecutions)
+				.set({
+					status: 'failed',
+					error: execution.error,
+					deliveryAttempts: execution.deliveryAttempts,
+				})
+				.where(eq(reportExecutions.id, executionId))
 		}
 
 		return execution
@@ -269,41 +433,120 @@ export class ScheduledReportingService {
 	 * Get execution history for a scheduled report
 	 */
 	async getExecutionHistory(reportId: string, limit: number = 50): Promise<ReportExecution[]> {
-		const history = this.executionHistory.get(reportId) || []
-		return history
-			.sort((a, b) => new Date(b.executionTime).getTime() - new Date(a.executionTime).getTime())
-			.slice(0, limit)
+		const records = await this.db
+			.select()
+			.from(reportExecutions)
+			.where(eq(reportExecutions.reportConfigId, reportId))
+			.orderBy(desc(reportExecutions.executionTime))
+			.limit(limit)
+
+		return records.map((record) => ({
+			executionId: record.id,
+			reportConfigId: record.reportConfigId,
+			scheduledTime: record.scheduledTime,
+			executionTime: record.executionTime,
+			status: record.status as 'running' | 'completed' | 'failed',
+			duration: record.duration || undefined,
+			recordsProcessed: record.recordsProcessed || undefined,
+			exportResult: record.exportResult as ExportResult | undefined,
+			deliveryAttempts: (record.deliveryAttempts as DeliveryAttempt[]) || [],
+			error: record.error || undefined,
+		}))
 	}
 
 	/**
 	 * Create a report template
 	 */
 	async createReportTemplate(
-		template: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>
+		template: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'> & { organizationId: string }
 	): Promise<ReportTemplate> {
-		const reportTemplate: ReportTemplate = {
-			...template,
-			id: this.generateId('template'),
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
+		const templateId = this.generateId('template')
+		const now = new Date().toISOString()
+
+		const dbRecord = {
+			id: templateId,
+			name: template.name,
+			description: template.description || null,
+			organizationId: template.organizationId,
+			reportType: template.reportType,
+			defaultCriteria: template.defaultCriteria,
+			defaultFormat: template.defaultFormat,
+			defaultExportConfig: template.defaultExportConfig,
+			tags: template.tags,
+			isActive: template.isActive ? 'true' : 'false',
+			createdBy: template.createdBy,
+			updatedBy: template.updatedBy,
 		}
 
-		this.reportTemplates.set(reportTemplate.id, reportTemplate)
-		return reportTemplate
+		await this.db.insert(reportTemplates).values(dbRecord)
+
+		return {
+			...template,
+			id: templateId,
+			createdAt: now,
+			updatedAt: now,
+		}
 	}
 
 	/**
 	 * Get all report templates
 	 */
-	async getReportTemplates(): Promise<ReportTemplate[]> {
-		return Array.from(this.reportTemplates.values()).filter((t) => t.isActive)
+	async getReportTemplates(organizationId?: string): Promise<ReportTemplate[]> {
+		const whereConditions = organizationId
+			? and(
+					eq(reportTemplates.isActive, 'true'),
+					eq(reportTemplates.organizationId, organizationId)
+				)
+			: eq(reportTemplates.isActive, 'true')
+
+		const records = await this.db.select().from(reportTemplates).where(whereConditions)
+
+		return records.map((record) => ({
+			id: record.id,
+			name: record.name,
+			description: record.description || undefined,
+			reportType: record.reportType as ReportTemplate['reportType'],
+			defaultCriteria: record.defaultCriteria as Partial<ReportCriteria>,
+			defaultFormat: record.defaultFormat as ReportFormat,
+			defaultExportConfig: record.defaultExportConfig as Partial<ExportConfig>,
+			tags: (record.tags as string[]) || [],
+			createdAt: record.createdAt,
+			createdBy: record.createdBy,
+			updatedAt: record.updatedAt,
+			updatedBy: record.updatedBy || '',
+			isActive: record.isActive === 'true',
+		}))
 	}
 
 	/**
 	 * Get a specific report template
 	 */
 	async getReportTemplate(templateId: string): Promise<ReportTemplate | null> {
-		return this.reportTemplates.get(templateId) || null
+		const records = await this.db
+			.select()
+			.from(reportTemplates)
+			.where(eq(reportTemplates.id, templateId))
+
+		if (records.length === 0) {
+			return null
+		}
+
+		const record = records[0]
+		return {
+			id: record.id,
+			name: record.name,
+			description: record.description || undefined,
+			reportType: record.reportType as ReportTemplate['reportType'],
+			defaultCriteria: record.defaultCriteria as Partial<ReportCriteria>,
+			defaultFormat: record.defaultFormat as ReportFormat,
+			defaultExportConfig: record.defaultExportConfig as Partial<ExportConfig>,
+			tags: (record.tags as string[]) || [],
+			createdAt: record.createdAt,
+			createdBy: record.createdBy,
+			updatedAt: record.updatedAt,
+			updatedBy: record.updatedBy || '',
+			isActive: record.isActive === 'true',
+		}
 	}
 
 	/**
@@ -311,21 +554,26 @@ export class ScheduledReportingService {
 	 */
 	async createReportFromTemplate(
 		templateId: string,
-		overrides: Partial<ScheduledReportConfig>
+		overrides: Partial<ScheduledReportConfig> & { organizationId: string }
 	): Promise<ScheduledReportConfig> {
-		const template = this.reportTemplates.get(templateId)
+		const template = await this.getReportTemplate(templateId)
 		if (!template) {
 			throw new Error(`Report template not found: ${templateId}`)
 		}
 
-		const reportConfig: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> = {
-			name: `${template.name} - ${new Date().toISOString().split('T')[0]}`,
-			description: template.description,
+		const reportConfig: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> & {
+			organizationId: string
+		} = {
+			...overrides,
+			name: overrides.name || `${template.name} - ${new Date().toISOString().split('T')[0]}`,
+			description: overrides.description || template.description,
+			organizationId: overrides.organizationId,
+			templateId,
 			criteria: {
 				...template.defaultCriteria,
 				...overrides.criteria,
 			} as ReportCriteria,
-			format: template.defaultFormat,
+			format: overrides.format || template.defaultFormat,
 			schedule: overrides.schedule || {
 				frequency: 'monthly',
 				dayOfMonth: 1,
@@ -338,7 +586,6 @@ export class ScheduledReportingService {
 			},
 			enabled: overrides.enabled !== undefined ? overrides.enabled : true,
 			createdBy: overrides.createdBy || 'system',
-			...overrides,
 		}
 
 		return this.createScheduledReport(reportConfig)
@@ -348,23 +595,22 @@ export class ScheduledReportingService {
 	 * Check for due reports and execute them
 	 */
 	async processDueReports(): Promise<ReportExecution[]> {
-		const now = new Date()
-		const dueReports: ScheduledReportConfig[] = []
+		const now = new Date().toISOString()
 
-		for (const config of this.scheduledReports.values()) {
-			if (config.enabled && config.nextRun && new Date(config.nextRun) <= now) {
-				dueReports.push(config)
-			}
-		}
+		// Find all enabled reports that are due for execution
+		const dueRecords = await this.db
+			.select()
+			.from(scheduledReports)
+			.where(and(eq(scheduledReports.enabled, 'true'), lte(scheduledReports.nextRun, now)))
 
 		const executions: ReportExecution[] = []
 
-		for (const config of dueReports) {
+		for (const record of dueRecords) {
 			try {
-				const execution = await this.executeReport(config.id)
+				const execution = await this.executeReport(record.id)
 				executions.push(execution)
 			} catch (error) {
-				console.error(`Failed to execute scheduled report ${config.id}:`, error)
+				console.error(`Failed to execute scheduled report ${record.id}:`, error)
 			}
 		}
 
@@ -375,19 +621,46 @@ export class ScheduledReportingService {
 	 * Retry failed deliveries
 	 */
 	async retryFailedDeliveries(maxAge: number = 24 * 60 * 60 * 1000): Promise<void> {
-		const cutoffTime = new Date(Date.now() - maxAge)
+		const cutoffTime = new Date(Date.now() - maxAge).toISOString()
 
-		for (const executions of this.executionHistory.values()) {
-			for (const execution of executions) {
-				if (new Date(execution.executionTime) < cutoffTime) continue
+		// Get recent executions that might have failed deliveries
+		const recentExecutions = await this.db
+			.select()
+			.from(reportExecutions)
+			.where(gte(reportExecutions.executionTime, cutoffTime))
 
-				const failedAttempts = execution.deliveryAttempts.filter(
-					(attempt) => attempt.status === 'failed' && attempt.retryCount < 3
-				)
+		for (const executionRecord of recentExecutions) {
+			const deliveryAttempts = (executionRecord.deliveryAttempts as DeliveryAttempt[]) || []
+
+			const failedAttempts = deliveryAttempts.filter(
+				(attempt) => attempt.status === 'failed' && attempt.retryCount < 3
+			)
+
+			if (failedAttempts.length > 0) {
+				const execution: ReportExecution = {
+					executionId: executionRecord.id,
+					reportConfigId: executionRecord.reportConfigId,
+					scheduledTime: executionRecord.scheduledTime,
+					executionTime: executionRecord.executionTime,
+					status: executionRecord.status as 'running' | 'completed' | 'failed',
+					duration: executionRecord.duration || undefined,
+					recordsProcessed: executionRecord.recordsProcessed || undefined,
+					exportResult: executionRecord.exportResult as ExportResult | undefined,
+					deliveryAttempts,
+					error: executionRecord.error || undefined,
+				}
 
 				for (const attempt of failedAttempts) {
 					try {
 						await this.retryDelivery(execution, attempt)
+
+						// Update the execution record with the updated delivery attempts
+						await this.db
+							.update(reportExecutions)
+							.set({
+								deliveryAttempts: execution.deliveryAttempts,
+							})
+							.where(eq(reportExecutions.id, executionRecord.id))
 					} catch (error) {
 						console.error(`Failed to retry delivery ${attempt.attemptId}:`, error)
 					}
@@ -545,7 +818,7 @@ export class ScheduledReportingService {
 	}
 
 	private async retryDelivery(execution: ReportExecution, attempt: DeliveryAttempt): Promise<void> {
-		const config = this.scheduledReports.get(execution.reportConfigId)
+		const config = await this.getScheduledReport(execution.reportConfigId)
 		if (!config || !execution.exportResult) return
 
 		attempt.retryCount++
@@ -574,6 +847,6 @@ export class ScheduledReportingService {
 	}
 
 	private generateId(prefix: string): string {
-		return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+		return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 	}
 }

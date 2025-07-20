@@ -163,7 +163,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		if (!reportingService) reportingService = new ComplianceReportingService()
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService)
-			scheduledReportingService = new ScheduledReportingService(deliveryConfig)
+			scheduledReportingService = new ScheduledReportingService(db.audit, deliveryConfig)
 
 		const compliance = {
 			report: reportingService,

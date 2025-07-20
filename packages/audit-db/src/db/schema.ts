@@ -380,6 +380,150 @@ export const alerts = pgTable(
 	}
 )
 
+/**
+ * Scheduled reports table for storing scheduled report configurations
+ * Requirements 4.1, 4.4, 8.1: Automated compliance report scheduling and delivery
+ */
+export const scheduledReports = pgTable(
+	'scheduled_reports',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(),
+		name: varchar('name', { length: 255 }).notNull(),
+		description: text('description'),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		templateId: varchar('template_id', { length: 255 }), // Reference to report template
+		criteria: jsonb('criteria').notNull(), // ReportCriteria as JSON
+		format: varchar('format', { length: 50 }).notNull(), // ReportFormat
+		schedule: jsonb('schedule').notNull(), // Schedule configuration
+		delivery: jsonb('delivery').notNull(), // Delivery configuration
+		enabled: varchar('enabled', { length: 10 }).notNull().default('true'),
+		lastRun: timestamp('last_run', { withTimezone: true, mode: 'string' }),
+		nextRun: timestamp('next_run', { withTimezone: true, mode: 'string' }),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		createdBy: varchar('created_by', { length: 255 }).notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedBy: varchar('updated_by', { length: 255 }),
+	},
+	(table) => {
+		return [
+			// Primary indexes for multi-organizational queries
+			index('scheduled_reports_organization_id_idx').on(table.organizationId),
+			index('scheduled_reports_template_id_idx').on(table.templateId),
+			index('scheduled_reports_enabled_idx').on(table.enabled),
+			index('scheduled_reports_next_run_idx').on(table.nextRun),
+			index('scheduled_reports_created_at_idx').on(table.createdAt),
+			index('scheduled_reports_created_by_idx').on(table.createdBy),
+
+			// Composite indexes for common queries
+			index('scheduled_reports_org_enabled_idx').on(table.organizationId, table.enabled),
+			index('scheduled_reports_org_next_run_idx').on(table.organizationId, table.nextRun),
+			index('scheduled_reports_enabled_next_run_idx').on(table.enabled, table.nextRun),
+		]
+	}
+)
+
+/**
+ * Report templates table for reusable report configurations
+ * Requirements 4.1, 4.4: Report template management and reusability
+ */
+export const reportTemplates = pgTable(
+	'report_templates',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(),
+		name: varchar('name', { length: 255 }).notNull(),
+		description: text('description'),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		reportType: varchar('report_type', { length: 100 }).notNull(), // HIPAA_AUDIT_TRAIL, GDPR_PROCESSING_ACTIVITIES, etc.
+		defaultCriteria: jsonb('default_criteria').notNull(), // Default ReportCriteria as JSON
+		defaultFormat: varchar('default_format', { length: 50 }).notNull(), // Default ReportFormat
+		defaultExportConfig: jsonb('default_export_config').notNull(), // Default ExportConfig as JSON
+		tags: jsonb('tags').notNull().default('[]'), // Array of tags
+		isActive: varchar('is_active', { length: 10 }).notNull().default('true'),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		createdBy: varchar('created_by', { length: 255 }).notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedBy: varchar('updated_by', { length: 255 }),
+	},
+	(table) => {
+		return [
+			// Primary indexes for multi-organizational queries
+			index('report_templates_organization_id_idx').on(table.organizationId),
+			index('report_templates_report_type_idx').on(table.reportType),
+			index('report_templates_is_active_idx').on(table.isActive),
+			index('report_templates_created_at_idx').on(table.createdAt),
+			index('report_templates_created_by_idx').on(table.createdBy),
+			index('report_templates_name_idx').on(table.name),
+
+			// Composite indexes for common queries
+			index('report_templates_org_active_idx').on(table.organizationId, table.isActive),
+			index('report_templates_org_type_idx').on(table.organizationId, table.reportType),
+			index('report_templates_active_type_idx').on(table.isActive, table.reportType),
+
+			// JSONB indexes for tag queries
+			index('report_templates_tags_idx').on(sql`(${table.tags})`),
+		]
+	}
+)
+
+/**
+ * Report executions table for tracking scheduled report execution history
+ * Requirements 4.1, 4.4: Report execution tracking and delivery monitoring
+ */
+export const reportExecutions = pgTable(
+	'report_executions',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(), // executionId
+		reportConfigId: varchar('report_config_id', { length: 255 })
+			.references(() => scheduledReports.id)
+			.notNull(),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		scheduledTime: timestamp('scheduled_time', { withTimezone: true, mode: 'string' }).notNull(),
+		executionTime: timestamp('execution_time', { withTimezone: true, mode: 'string' }).notNull(),
+		status: varchar('status', { length: 20 }).notNull(), // running, completed, failed
+		duration: integer('duration'), // in milliseconds
+		recordsProcessed: integer('records_processed'),
+		exportResult: jsonb('export_result'), // ExportResult as JSON
+		deliveryAttempts: jsonb('delivery_attempts').notNull().default('[]'), // Array of DeliveryAttempt
+		error: text('error'),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			// Primary indexes
+			index('report_executions_report_config_id_idx').on(table.reportConfigId),
+			index('report_executions_organization_id_idx').on(table.organizationId),
+			index('report_executions_status_idx').on(table.status),
+			index('report_executions_scheduled_time_idx').on(table.scheduledTime),
+			index('report_executions_execution_time_idx').on(table.executionTime),
+			index('report_executions_created_at_idx').on(table.createdAt),
+
+			// Composite indexes for common queries
+			index('report_executions_org_status_idx').on(table.organizationId, table.status),
+			index('report_executions_config_execution_time_idx').on(
+				table.reportConfigId,
+				table.executionTime
+			),
+			index('report_executions_org_execution_time_idx').on(
+				table.organizationId,
+				table.executionTime
+			),
+		]
+	}
+)
+
+// Add foreign key reference from scheduled_reports to report_templates
+// Note: This creates a soft reference since templateId is nullable
+
 // Notes for implementation:
 // - When inserting data, the `timestamp` field of the `AuditLogEvent` (which is a string)
 //   will be directly inserted into the `timestamp` column of this table.
@@ -390,4 +534,7 @@ export const alerts = pgTable(
 // - The error_log table stores structured error information for analysis and troubleshooting
 // - The error_aggregation table tracks error patterns and trends for system health monitoring
 // - The archive_storage table stores compressed audit data for long-term retention
+// - The scheduled_reports table stores automated report configurations with scheduling and delivery settings
+// - The report_templates table provides reusable report configurations for different compliance requirements
+// - The report_executions table tracks the execution history and delivery status of scheduled reports
 // - Consider adding database indexes on frequently queried columns for performance optimization

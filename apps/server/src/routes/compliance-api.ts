@@ -327,7 +327,9 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	app.post(
 		'/scheduled-reports',
 		validator('json', (value, c) => {
-			const config = value as Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'>
+			const config = value as Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> & {
+				organizationId: string
+			}
 			if (!config.name || !config.criteria || !config.schedule || !config.delivery) {
 				return c.text('Missing required fields', 400)
 			}

@@ -248,6 +248,7 @@ export interface ScheduledReportConfig {
 	id: string
 	name: string
 	description?: string
+	templateId?: string
 	criteria: ReportCriteria
 	format: ReportFormat
 	schedule: {
