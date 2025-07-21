@@ -6,7 +6,7 @@ import { validateTimeOrder } from './date'
 const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/
 
 const baseEventSchema = z.object({
-	id: z.string().uuid(),
+	id: z.uuid(),
 	title: z.string().min(1).max(256),
 	description: z.string().min(1),
 	startDate: z.date(),
@@ -16,8 +16,8 @@ const baseEventSchema = z.object({
 	location: z.string().min(1).max(256),
 	category: z.string().min(1).max(100),
 	color: z.string().min(1).max(25),
-	createdAt: z.string().datetime(),
-	updatedAt: z.string().datetime(),
+	createdAt: z.iso.datetime(),
+	updatedAt: z.iso.datetime(),
 })
 
 export const createEventSchema = z.object({

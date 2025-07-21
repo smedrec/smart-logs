@@ -1,3 +1,4 @@
+import { STALE_TIMES } from '@/constants/query-constants'
 import { QueryCache, QueryClient } from '@tanstack/react-query'
 import { createTRPCClient, httpBatchLink } from '@trpc/client'
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query'
@@ -5,7 +6,6 @@ import { toast } from 'sonner'
 import superjson from 'superjson'
 
 import type { AppRouter } from '../../../server/src/routers/index'
-import { STALE_TIMES } from '@/lib/constants'
 
 export const queryClient = new QueryClient({
 	defaultOptions: {

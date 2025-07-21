@@ -5,10 +5,15 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, apiKey, mcp, oidcProvider, openAPI, organization } from 'better-auth/plugins'
 
+import { SendMail } from '@repo/send-mail'
+
 import { getRedisConnection } from '../redis'
 import { getActiveOrganization } from './functions'
 
+import type { MailerSendOptions } from '@repo/send-mail'
+
 const redis = getRedisConnection()
+const email = new SendMail('mail')
 
 export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	database: drizzleAdapter(db, {
@@ -73,6 +78,28 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 				enabled: true,
 				maximumTeams: 10, // Optional: limit teams per organization
 				allowRemovingAllTeams: false, // Optional: prevent removing the last team
+			},
+			async sendInvitationEmail(data) {
+				const inviteLink = `${process.env.APP_PUBLIC_URL}/accept-invitation/${data.id}`
+				const emailDetails: MailerSendOptions = {
+					from: 'no-reply@smedrec.com',
+					to: data.email,
+					subject: `Invite to join to the ${data.organization.name} team!`,
+					html: `
+						<p>Hi,</p>
+						<p>${data.inviter.user.name} sen you a invite to join the ${data.organization.name} team!
+						<p>Click the link below to accept:</p>
+						<p><a href="${inviteLink}">${inviteLink}</a></p>
+						<p>If you have any doubt please send a email to: ${data.inviter.user.email}.</p>
+					`,
+				}
+				await email.send({
+					principalId: data.inviter.user.id,
+					organizationId: data.organization.id,
+					service: 'smart-logs',
+					action: 'sendInvitationEmail',
+					emailDetails,
+				})
 			},
 		}),
 		oidcProvider({

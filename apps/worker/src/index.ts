@@ -185,7 +185,7 @@ app.get('/health/:component', async (c) => {
 	}
 })
 
-const server = serve(app)
+//const server = serve(app)
 
 // Main function to start the worker
 async function main() {
@@ -381,7 +381,7 @@ async function main() {
 
 	logger.info('📊 Compliance API routes mounted at /api/compliance')
 
-	serve({
+	const server = serve({
 		fetch: app.fetch,
 		port: port,
 	})
