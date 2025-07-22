@@ -23,6 +23,55 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	trustedOrigins: [process.env.CORS_ORIGIN || '', 'my-better-t-app://'],
 	emailAndPassword: {
 		enabled: true,
+		minPasswordLength: 8,
+		maxPasswordLength: 128,
+		requireEmailVerification: true,
+		sendResetPassword: async ({ user, url }) => {
+			const org = await getActiveOrganization(user.id)
+			// TODO - return a error to user
+			if (!org) return
+			const emailDetails: MailerSendOptions = {
+				from: 'no-reply@smedrec.com',
+				to: user.email,
+				subject: 'Reset your password',
+				html: `
+					<p>Hi ${user.name},</p>
+					<p>Click the link below to reset your password:</p>
+					<p><a href="${url}">${url}</a></p>
+				`,
+			}
+			await email.send({
+				principalId: user.id,
+				organizationId: org.organizationId,
+				service: 'smart-logs',
+				action: 'sendResetPassword',
+				emailDetails,
+			})
+		},
+	},
+	emailVerification: {
+		sendOnSignUp: true,
+		autoSignInAfterVerification: true,
+		sendVerificationEmail: async ({ user, url }) => {
+			// TODO: redirect to APP
+			const emailDetails: MailerSendOptions = {
+				from: 'SMEDREC <no-reply@smedrec.com>',
+				to: user.email,
+				subject: 'Verify your email address',
+				html: `
+					<p>Hi ${user.name},</p>
+					<p>Click the link below to verify your email address:</p>
+					<p><a href="${url}">${url}</a></p>
+				`,
+			}
+			await email.send({
+				principalId: user.id,
+				organizationId: '',
+				service: 'smart-logs',
+				action: 'sendVerificationEmail',
+				emailDetails,
+			})
+		},
 	},
 	secret: process.env.BETTER_AUTH_SECRET,
 	baseURL: process.env.BETTER_AUTH_URL,

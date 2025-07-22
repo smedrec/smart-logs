@@ -23,7 +23,7 @@ export default function UserMenu() {
 	if (!session) {
 		return (
 			<Button variant="outline" asChild>
-				<Link to="/login">Sign In</Link>
+				<Link to="/auth/sign-in">Sign In</Link>
 			</Button>
 		)
 	}
@@ -39,6 +39,18 @@ export default function UserMenu() {
 				<DropdownMenuItem>{session.user.email}</DropdownMenuItem>
 				<DropdownMenuItem asChild>
 					<Button
+						className="w-full"
+						onClick={() => {
+							navigate({
+								to: '/settings/account',
+							})
+						}}
+					>
+						Settings
+					</Button>
+				</DropdownMenuItem>
+				<DropdownMenuItem asChild>
+					<Button
 						variant="destructive"
 						className="w-full"
 						onClick={() => {
@@ -46,7 +58,7 @@ export default function UserMenu() {
 								fetchOptions: {
 									onSuccess: () => {
 										navigate({
-											to: '/',
+											to: '/auth/sign-in',
 										})
 									},
 								},

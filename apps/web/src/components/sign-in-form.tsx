@@ -10,9 +10,7 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 
 export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
-	const navigate = useNavigate({
-		from: '/',
-	})
+	const navigate = useNavigate()
 	const { isPending } = authClient.useSession()
 
 	const form = useForm({

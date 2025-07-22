@@ -1,12 +1,12 @@
-import Header from '@/components/header'
-import Loader from '@/components/loader'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import {
 	createRootRouteWithContext,
 	HeadContent,
+	Link,
 	Outlet,
+	useRouter,
 	useRouterState,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
@@ -16,13 +16,18 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import '../index.css'
 
+import { Spinner } from '@/components/ui/kibo-ui/spinner'
 import { authClient } from '@/lib/auth-client'
 import { seo } from '@/lib/seo'
+import { AuthQueryProvider } from '@daveyplate/better-auth-tanstack'
+import { AuthUIProviderTanstack } from '@daveyplate/better-auth-ui/tanstack'
+
+import type { AuthContext } from '@/contexts/auth'
 
 export interface RouterAppContext {
 	trpc: typeof trpc
 	queryClient: QueryClient
-	authClient: typeof authClient
+	auth: AuthContext
 }
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
@@ -52,6 +57,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 })
 
 function RootComponent() {
+	const router = useRouter()
 	const isFetching = useRouterState({
 		select: (s) => s.isLoading,
 	})
@@ -60,10 +66,31 @@ function RootComponent() {
 		<>
 			<HeadContent />
 			<ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-				<div className="grid grid-rows-[auto_1fr] h-svh">
-					<Header />
-					{isFetching ? <Loader /> : <Outlet />}
-				</div>
+				<AuthQueryProvider>
+					<AuthUIProviderTanstack
+						authClient={authClient}
+						navigate={(href) => router.navigate({ href })}
+						replace={(href) => router.navigate({ href, replace: true })}
+						Link={({ href, ...props }) => <Link to={href} {...props} />}
+						avatar={true}
+						organization={{
+							logo: true,
+						}}
+						apiKey={{
+							metadata: {
+								environment: 'development',
+								version: 'v1',
+							},
+						}}
+						settings={{
+							url: '/dashboard/settings/account',
+						}}
+					>
+						<div className="grid grid-rows-[auto_1fr] h-svh">
+							{isFetching ? <Spinner variant="bars" size={64} /> : <Outlet />}
+						</div>
+					</AuthUIProviderTanstack>
+				</AuthQueryProvider>
 				<Toaster richColors />
 			</ThemeProvider>
 			<TanStackRouterDevtools position="bottom-left" />

@@ -1,13 +1,15 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
-import starlight from '@astrojs/starlight';
+import starlight from '@astrojs/starlight'
+import { defineConfig } from 'astro/config'
 
 // https://astro.build/config
 export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Smart Logs Docs',
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/joseantcordeiro/smart-logs' }],
+			social: [
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/joseantcordeiro/smart-logs' },
+			],
 			sidebar: [
 				{
 					label: 'Development',
@@ -29,4 +31,4 @@ export default defineConfig({
 			],
 		}),
 	],
-});
+})
