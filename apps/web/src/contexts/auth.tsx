@@ -1,10 +1,10 @@
-import { useSession } from '@/hooks/auth-hooks'
 import { authClient } from '@/lib/auth-client'
 import * as React from 'react'
 
 import type { Session } from '@/lib/auth-client'
 
 export interface AuthContext {
+	isPending: boolean
 	isAuthenticated: boolean
 	session: Session | null
 }
@@ -14,11 +14,11 @@ const AuthContext = React.createContext<AuthContext | null>(null)
 const key = 'tanstack.auth.user'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-	const { data: session } = authClient.useSession()
+	const { data: session, isPending } = authClient.useSession()
 	const isAuthenticated = !!session
 
 	return (
-		<AuthContext.Provider value={{ isAuthenticated, session: session as Session }}>
+		<AuthContext.Provider value={{ isPending, isAuthenticated, session: session as Session }}>
 			{children}
 		</AuthContext.Provider>
 	)

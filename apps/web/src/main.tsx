@@ -11,7 +11,7 @@ const router = createRouter({
 	routeTree,
 	defaultPreload: 'intent',
 	defaultPendingComponent: () => <Spinner variant="bars" size={64} />,
-	context: { trpc, queryClient, auth: { isAuthenticated: false, session: null } },
+	context: { trpc, queryClient, auth: { isPending: true, isAuthenticated: false, session: null } },
 	Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
 		return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 	},
