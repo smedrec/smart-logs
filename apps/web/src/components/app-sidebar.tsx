@@ -26,7 +26,6 @@ import * as React from 'react'
 import { ApiStatus } from './api-status'
 import { NavOrganizations } from './nav-organizations'
 
-// This is sample data.
 const data = {
 	navMain: [
 		{
