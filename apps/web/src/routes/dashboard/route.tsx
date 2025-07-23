@@ -1,9 +1,7 @@
 import { AppSidebar } from '@/components/app-sidebar'
 import { ModeToggle } from '@/components/mode-toggle'
-import { Spinner } from '@/components/ui/kibo-ui/spinner'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { useAuth } from '@/contexts/auth'
 import { UserButton } from '@daveyplate/better-auth-ui'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 

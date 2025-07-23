@@ -1,6 +1,7 @@
-import { db } from '@/db'
-import { activeOrganization, member } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+
+import { db } from './db/index.js'
+import { activeOrganization, member } from './db/schema/index.js'
 
 interface ActiveOrganization {
 	userId: string
@@ -40,7 +41,7 @@ async function getActiveOrganization(userId: string): Promise<ActiveOrganization
         message: 'User must agree to the TOS before signing up.',
       });*/
 		}
-    return undefined
+		return undefined
 	} catch (error) {
 		// TODO: handle error
 		return undefined

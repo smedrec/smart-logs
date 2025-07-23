@@ -1,5 +1,3 @@
-import { db } from '@/db'
-import * as schema from '@/db/schema/auth'
 import { expo } from '@better-auth/expo'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
@@ -7,8 +5,10 @@ import { admin, apiKey, mcp, oidcProvider, openAPI, organization } from 'better-
 
 import { SendMail } from '@repo/send-mail'
 
-import { getRedisConnection } from '../redis'
-import { getActiveOrganization } from './functions'
+import { db } from './db/index.js'
+import * as schema from './db/schema/auth.js'
+import { getActiveOrganization } from './functions.js'
+import { getRedisConnection } from './redis.js'
 
 import type { MailerSendOptions } from '@repo/send-mail'
 

@@ -4,7 +4,8 @@ import { serve } from '@hono/node-server'
 import { trpcServer } from '@hono/trpc-server'
 import { cors } from 'hono/cors'
 
-import { auth } from './lib/auth'
+import { auth } from '@repo/auth'
+
 import { newApp } from './lib/hono/'
 import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
