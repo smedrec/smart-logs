@@ -42,7 +42,8 @@ const alertsRouter = {
 		const { alert, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 		try {
-			const statistics = await alert.getAlertStatistics(organizationId)
+			//const statistics = await alert.getAlertStatistics(organizationId)
+			const statistics = await alert.getAlertStatistics('G47R3UBSyF2aVGT3hwMKbh06aZngIA8m')
 			return statistics
 		} catch (e) {
 			const message = e instanceof Error ? e.message : 'Unknown error'

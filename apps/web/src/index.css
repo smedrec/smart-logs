@@ -53,6 +53,14 @@ body {
 	--sidebar-accent-foreground: oklch(0.205 0 0);
 	--sidebar-border: oklch(0.922 0 0);
 	--sidebar-ring: oklch(0.708 0 0);
+	--color-low: oklch(0.72 0.19 150);
+	--color-medium: oklch(0.8 0.16 86);
+	--color-high: oklch(0.7 0.19 48);
+	--color-critical: oklch(0.58 0.22 27);
+	--color-security: oklch(0.64 0.21 25);
+	--color-compliance: oklch(0.49 0.22 264);
+	--color-performance: oklch(0.72 0.19 150);
+	--color-system: oklch(0.37 0.03 260);
 }
 
 .dark {
