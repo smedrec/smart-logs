@@ -27,6 +27,26 @@ app.on(
 	})
 )
 
+app.post('/hello', async (c) => {
+	const session = c.get('session')
+	const event = await inngest.send({
+		// The event name
+		name: 'demo/event.sent',
+		// The event's data
+		data: {
+			message: 'Hello from Inngest!',
+		},
+		user: {
+			id: session?.session.userId,
+			organizationId: session?.session.activeOrganizationId,
+		},
+	})
+	return c.json({
+		message: 'Event sent',
+		id: event.ids[0],
+	})
+})
+
 honoServe(
 	{
 		fetch: app.fetch,

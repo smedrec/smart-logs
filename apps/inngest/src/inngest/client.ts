@@ -1,3 +1,5 @@
+import 'dotenv/config'
+
 import { Inngest } from 'inngest'
 
 import { bindingsMiddleware } from './middleware.js'
