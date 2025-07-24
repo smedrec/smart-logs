@@ -5,11 +5,11 @@ import { trpcServer } from '@hono/trpc-server'
 import { cors } from 'hono/cors'
 
 import { auth } from '@repo/auth'
+import { useConsoleLogger } from '@repo/hono-helpers'
 
 import { newApp } from './lib/hono/'
 import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
-import { logger } from './lib/logs/middleware.js'
 import { appRouter } from './routers/index'
 import { createComplianceAPI } from './routes/compliance-api'
 
@@ -20,7 +20,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 app.use('*', init())
-app.use(logger())
+app.use(useConsoleLogger())
 
 app.use(
 	'/*',

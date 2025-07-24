@@ -4,7 +4,7 @@ import { InngestMiddleware } from 'inngest'
 import type { HonoEnv } from '../lib/hono/context.js'
 
 /**
- * This middleware is used to pass the Cloudflare Workers environment variables
+ * This middleware is used to pass the Hono environment variables
  * to Inngest functions.
  */
 export const bindingsMiddleware = new InngestMiddleware({
@@ -18,6 +18,8 @@ export const bindingsMiddleware = new InngestMiddleware({
 						return {
 							ctx: {
 								env: honoCtx.env,
+								session: honoCtx.var.session,
+								services: honoCtx.var.services,
 							},
 						}
 					},

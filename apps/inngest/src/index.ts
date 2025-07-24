@@ -3,11 +3,12 @@ import 'dotenv/config'
 import { serve as honoServe } from '@hono/node-server'
 import { serve } from 'inngest/hono'
 
+import { useConsoleLogger } from '@repo/hono-helpers'
+
 import { functions, inngest } from './inngest/index.js'
 import { newApp } from './lib/hono'
 import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
-import { logger } from './lib/logs/middleware'
 
 const app = newApp()
 
@@ -16,7 +17,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 app.use('*', init())
-app.use(logger())
+app.use(useConsoleLogger())
 
 app.on(
 	['GET', 'PUT', 'POST'],
@@ -45,6 +46,10 @@ app.post('/hello', async (c) => {
 		message: 'Event sent',
 		id: event.ids[0],
 	})
+})
+
+app.get('/session', (c) => {
+	return c.json(c.get('session'))
 })
 
 honoServe(

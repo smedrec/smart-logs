@@ -7,17 +7,20 @@ export class ConsoleLogger implements Logger {
 	private requestId: string
 	private readonly environment: LogSchema['environment']
 	private readonly application: LogSchema['application']
+	private readonly version: LogSchema['version']
 	private readonly defaultFields: Fields
 
 	constructor(opts: {
 		requestId: string
 		environment: LogSchema['environment']
 		application: LogSchema['application']
+		version: LogSchema['version']
 		defaultFields?: Fields
 	}) {
 		this.requestId = opts.requestId
 		this.environment = opts.environment
 		this.application = opts.application
+		this.version = opts.version
 		this.defaultFields = opts.defaultFields ?? {}
 	}
 
@@ -30,6 +33,7 @@ export class ConsoleLogger implements Logger {
 			type: 'log',
 			environment: this.environment,
 			application: this.application,
+			version: this.version,
 			requestId: this.requestId,
 			time: Date.now(),
 			level,

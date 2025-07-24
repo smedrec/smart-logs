@@ -1,3 +1,4 @@
+import { version } from 'os'
 import { z } from 'zod'
 
 export const logContext = z.object({
@@ -6,9 +7,10 @@ export const logContext = z.object({
 
 const commonFields = z.object({
 	environment: z.enum(['VITEST', 'development', 'staging', 'production']),
-	application: z.enum(['api', 'semantic-cache', 'agent', 'logdrain', 'vault']),
+	application: z.enum(['api', 'inngest', 'agent', 'logdrain', 'vault']),
 	isolateId: z.string().optional(),
 	requestId: z.string(),
+	version: z.string().optional(),
 	time: z.number(),
 })
 
@@ -18,7 +20,7 @@ export const logSchema = z.discriminatedUnion('type', [
 			type: z.literal('log'),
 			level: z.enum(['debug', 'info', 'warn', 'error', 'fatal']),
 			message: z.string(),
-			context: z.record(z.any()),
+			context: z.record(z.string(), z.any()),
 		})
 	),
 ])

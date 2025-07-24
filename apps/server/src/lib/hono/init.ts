@@ -16,8 +16,7 @@ import { AuditDb, errorAggregation, errorLog } from '@repo/audit-db'
 
 import { auth } from '@repo/auth'
 import { db as authDb } from '@repo/auth/dist/db/index.js'
-
-import { ConsoleLogger } from '../logs/index.js'
+import { ConsoleLogger } from '@repo/hono-helpers'
 
 import type { MiddlewareHandler } from 'hono'
 import type { DeliveryConfig } from '@repo/audit'
@@ -114,15 +113,22 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		c.set('isolateCreatedAt', isolateCreatedAt)
 		const requestId = crypto.randomUUID()
 		c.set('requestId', requestId)
+		const application = 'api'
+		c.set('application', application)
+		const version = '0.1.0'
+		c.set('version', version)
 
 		c.set('requestStartedAt', Date.now())
 
 		c.res.headers.set('x-requestId', requestId)
+		c.res.headers.set('x-application', application)
+		c.res.headers.set('x-version', version)
 
 		const logger = new ConsoleLogger({
 			requestId,
-			application: 'api',
+			application,
 			environment: c.env.ENVIRONMENT as 'VITEST' | 'development' | 'staging' | 'production',
+			version,
 			defaultFields: { environment: c.env.ENVIRONMENT },
 		})
 

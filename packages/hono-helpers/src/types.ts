@@ -67,6 +67,17 @@ export type SharedHonoEnv = {
 /** Global Hono variables */
 export type SharedHonoVariables = {
 	// Things like Sentry, etc. that should be present on all Workers
+	isolateId: string
+	isolateCreatedAt: number
+	requestId: string
+	application: string
+	version: string
+	requestStartedAt: number
+	/**
+	 * IP address or region information
+	 */
+	location: string
+	userAgent?: string
 }
 
 /** Top-level Hono app */

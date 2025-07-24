@@ -3,10 +3,13 @@
  * Logger Middleware for Hono.
  */
 
-import { ConsoleLogger } from './index.js'
 import { getColorEnabledAsync } from 'hono/utils/color'
 
-import type { MiddlewareHandler } from 'hono/types'
+import { ConsoleLogger } from '../helpers/logs/index.js'
+
+import type { Context } from 'hono'
+import type { MiddlewareHandler, Next } from 'hono/types'
+import type { HonoApp } from '../types.js'
 
 enum LogPrefix {
 	Outgoing = '-->',
@@ -77,6 +80,54 @@ async function log(
  * ```ts
  * const app = new Hono()
  *
+ * app.use(useConsoleLogger())
+ * app.get('/', (c) => c.text('Hello Hono!'))
+ * ```
+ */
+export function useConsoleLogger<T extends HonoApp>(
+	fn: PrintFunc = console.log
+): MiddlewareHandler {
+	return async (ctx: Context<T>, next: Next): Promise<void> => {
+		const c = ctx as unknown as Context<HonoApp>
+
+		const { method, url } = c.req
+
+		const path = url.slice(url.indexOf('/', 8))
+
+		//await log(fn, LogPrefix.Incoming, method, path)
+		new ConsoleLogger({
+			requestId: c.get('requestId'),
+			environment: c.env.ENVIRONMENT,
+			application: c.get('application') as 'api' | 'inngest' | 'agent' | 'logdrain' | 'vault',
+			version: c.get('version'),
+		}).info(LogPrefix.Incoming, { method, path })
+
+		const start = Date.now()
+
+		await next()
+
+		//await log(fn, LogPrefix.Outgoing, method, path, c.res.status, time(start))
+		new ConsoleLogger({
+			requestId: c.get('requestId'),
+			environment: c.env.ENVIRONMENT,
+			application: c.get('application') as 'api' | 'inngest' | 'agent' | 'logdrain' | 'vault',
+			version: c.get('version'),
+		}).info(LogPrefix.Outgoing, { method, path, status: c.res.status, elapsed: time(start) })
+	}
+}
+
+/**
+ * Logger Middleware for Hono.
+ *
+ * @see {@link https://hono.dev/docs/middleware/builtin/logger}
+ *
+ * @param {PrintFunc} [fn=console.log] - Optional function for customized logging behavior.
+ * @returns {MiddlewareHandler} The middleware handler function.
+ *
+ * @example
+ * ```ts
+ * const app = new Hono()
+ *
  * app.use(logger())
  * app.get('/', (c) => c.text('Hello Hono!'))
  * ```
@@ -91,7 +142,8 @@ export const logger = (fn: PrintFunc = console.log): MiddlewareHandler => {
 		new ConsoleLogger({
 			requestId: c.get('requestId'),
 			environment: c.env.ENVIRONMENT,
-			application: 'api',
+			application: c.get('application'),
+			version: c.get('version'),
 		}).info(LogPrefix.Incoming, { method, path })
 
 		const start = Date.now()
@@ -102,7 +154,8 @@ export const logger = (fn: PrintFunc = console.log): MiddlewareHandler => {
 		new ConsoleLogger({
 			requestId: c.get('requestId'),
 			environment: c.env.ENVIRONMENT,
-			application: 'api',
+			application: c.get('application'),
+			version: c.get('version'),
 		}).info(LogPrefix.Outgoing, { method, path, status: c.res.status, elapsed: time(start) })
 	}
 }

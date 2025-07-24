@@ -13,11 +13,11 @@ import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import type { Session } from '@repo/auth'
 import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
 //import type { fhir } from '@repo/fhir'
-import type { HonoApp } from '@repo/hono-helpers'
-import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
+
 //import type { InfisicalKmsClient } from '@repo/infisical-kms'
 //import type { cerbos } from '../cerbos/index.js'
-import type { Logger } from '../logs/index.js'
+import type { HonoApp, Logger } from '@repo/hono-helpers'
+import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
 
 export type Env = SharedHonoEnv & {
 	// add additional Bindings here
@@ -50,17 +50,8 @@ export type ServiceContext = {
 
 /** Variables can be extended */
 export type Variables = SharedHonoVariables & {
-	isolateId: string
-	isolateCreatedAt: number
-	requestId: string
-	requestStartedAt: number
 	session: Session | null
 	services: ServiceContext
-	/**
-	 * IP address or region information
-	 */
-	location: string
-	userAgent?: string
 }
 
 export interface HonoEnv extends HonoApp {
