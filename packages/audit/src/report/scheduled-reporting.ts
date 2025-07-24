@@ -521,11 +521,15 @@ export class ScheduledReportingService {
 	/**
 	 * Get a specific report template
 	 */
-	async getReportTemplate(templateId: string): Promise<ReportTemplate | null> {
-		const records = await this.db
-			.select()
-			.from(reportTemplates)
-			.where(eq(reportTemplates.id, templateId))
+	async getReportTemplate(
+		templateId: string,
+		organizationId?: string
+	): Promise<ReportTemplate | null> {
+		const whereConditions = organizationId
+			? and(eq(reportTemplates.id, templateId), eq(reportTemplates.organizationId, organizationId))
+			: eq(reportTemplates.id, templateId)
+
+		const records = await this.db.select().from(reportTemplates).where(whereConditions)
 
 		if (records.length === 0) {
 			return null
