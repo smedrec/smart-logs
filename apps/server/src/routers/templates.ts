@@ -5,39 +5,51 @@ import z from 'zod'
 import type { TRPCRouterRecord } from '@trpc/server'
 
 const templatesRouter = {
-	all: protectedProcedure.query(async ({ ctx }) => {
-		const { compliance, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
-		try {
-			const templates = await compliance.scheduled.getReportTemplates(organizationId)
-			return templates
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to get all compliance report templates: ${message}`)
-			const err = new TRPCError({
-				code: 'INTERNAL_SERVER_ERROR',
-				message: `Failed to get all compliance report templates: ${message}`,
+	all: protectedProcedure
+		.input(
+			z.object({
+				limit: z.number().optional(),
+				offset: z.number().optional(),
 			})
-			await error.handleError(
-				err,
-				{
-					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
-					metadata: {
-						organizationId: ctx.session.session.activeOrganizationId,
-						message: err.message,
-						name: err.name,
-						code: err.code,
-						cause: err.cause,
+		)
+		.query(async ({ ctx, input }) => {
+			const { compliance, logger, error } = ctx.services
+			const { limit, offset } = input
+			const organizationId = ctx.session.session.activeOrganizationId as string
+			try {
+				const templates = await compliance.scheduled.getReportTemplates(
+					organizationId,
+					limit,
+					offset
+				)
+				return templates
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to get all compliance report templates: ${message}`)
+				const err = new TRPCError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message: `Failed to get all compliance report templates: ${message}`,
+				})
+				await error.handleError(
+					err,
+					{
+						requestId: ctx.requestId,
+						userId: ctx.session.session.userId,
+						sessionId: ctx.session.session.id,
+						metadata: {
+							organizationId: ctx.session.session.activeOrganizationId,
+							message: err.message,
+							name: err.name,
+							code: err.code,
+							cause: err.cause,
+						},
 					},
-				},
-				'trpc-api',
-				'templates.all'
-			)
-			throw err
-		}
-	}),
+					'trpc-api',
+					'templates.all'
+				)
+				throw err
+			}
+		}),
 	id: protectedProcedure
 		.input(
 			z.object({

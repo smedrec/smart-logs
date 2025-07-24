@@ -491,7 +491,11 @@ export class ScheduledReportingService {
 	/**
 	 * Get all report templates
 	 */
-	async getReportTemplates(organizationId?: string): Promise<ReportTemplate[]> {
+	async getReportTemplates(
+		organizationId?: string,
+		limit: number = 50,
+		offset: number = 0
+	): Promise<ReportTemplate[]> {
 		const whereConditions = organizationId
 			? and(
 					eq(reportTemplates.isActive, 'true'),
@@ -499,7 +503,12 @@ export class ScheduledReportingService {
 				)
 			: eq(reportTemplates.isActive, 'true')
 
-		const records = await this.db.select().from(reportTemplates).where(whereConditions)
+		const records = await this.db
+			.select()
+			.from(reportTemplates)
+			.where(whereConditions)
+			.limit(limit)
+			.offset(offset)
 
 		return records.map((record) => ({
 			id: record.id,

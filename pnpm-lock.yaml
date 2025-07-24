@@ -329,6 +329,9 @@ importers:
       '@repo/audit':
         specifier: workspace:*
         version: link:../../packages/audit
+      '@repo/audit-db':
+        specifier: workspace:*
+        version: link:../../packages/audit-db
       '@tabler/icons-react':
         specifier: ^3.34.0
         version: 3.34.0(react@19.0.0)
