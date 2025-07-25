@@ -9,17 +9,21 @@ import {
 	BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Spinner } from '@/components/ui/kibo-ui/spinner'
-import { auditClient } from '@/lib/audit-client'
 import { formatDate } from '@/lib/date'
+import { transformData } from '@/utils/charts'
 import { trpc } from '@/utils/trpc'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Bar, BarChart, CartesianGrid, LabelList, Pie, PieChart, XAxis, YAxis } from 'recharts'
 
+import type { ChartConfig } from '@/components/ui/chart'
+import type { OutputData } from '@/utils/charts'
 import type { DateRange } from 'react-day-picker'
-import type { HIPAAComplianceReport } from '@repo/audit'
 
 export const Route = createFileRoute('/dashboard/compliance/hipaa')({
 	component: RouteComponent,
@@ -32,31 +36,33 @@ function RouteComponent() {
 		from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 14),
 		to: today,
 	})
+	const [summaryData, setSummaryData] = useState<OutputData>()
 
 	const { data: report, isLoading } = useQuery(
 		trpc.reports.hipaa.queryOptions({
 			criteria: {
 				dateRange: {
 					startDate: formatDate(dateRange.from, 'yyyy-MM-dd'),
-					/**dateRange.from?.getFullYear().toString() +
-						'-' +
-						dateRange.from?.getMonth().toString() +
-						'-' +
-						dateRange.from?.getDay().toString(),*/
 					endDate: formatDate(dateRange.to, 'yyyy-MM-dd'),
-					/**dateRange.to?.getFullYear().toString() +
-						'-' +
-						dateRange.to?.getMonth().toString() +
-						'-' +
-						dateRange.to?.getDay().toString(),*/
 				},
 				limit: 50,
 			},
 		})
 	)
 
-	console.log(JSON.stringify(report))
 	const columns = createColumns()
+
+	useEffect(() => {
+		if (report) {
+			setSummaryData(
+				transformData({
+					eventsByStatus: report.summary.eventsByStatus,
+					eventsByAction: report.summary.eventsByAction,
+					eventsByDataClassification: report.summary.eventsByDataClassification,
+				})
+			)
+		}
+	}, [report])
 
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">
@@ -94,9 +100,245 @@ function RouteComponent() {
 						<Spinner variant="bars" size={64} />
 					</div>
 				) : (
-					<DataTable columns={columns} data={report ? report.events : []} />
+					<>
+						<div className="grid auto-rows-min gap-4 py-4 md:grid-cols-3">
+							<div className="aspect-video rounded-xl">
+								<Card
+									key="uniquePrincipals"
+									className="group hover:shadow-lg transition-all duration-200"
+								>
+									<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+										<CardTitle className="text-sm font-medium text-muted-foreground">
+											Unique Principals
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="pt-0">
+										<div className="text-3xl font-bold mb-2">
+											{report?.summary.uniquePrincipals}
+										</div>
+										<p className="text-sm text-muted-foreground leading-relaxed">
+											Unique Principals
+										</p>
+									</CardContent>
+								</Card>
+							</div>
+							<div className="aspect-video rounded-xl">
+								<Card
+									key="uniqueResources"
+									className="group hover:shadow-lg transition-all duration-200"
+								>
+									<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+										<CardTitle className="text-sm font-medium text-muted-foreground">
+											Unique Resources
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="pt-0">
+										<div className="text-3xl font-bold mb-2">{report?.summary.uniqueResources}</div>
+										<p className="text-sm text-muted-foreground leading-relaxed">
+											Unique Resources
+										</p>
+									</CardContent>
+								</Card>
+							</div>
+							<div className="aspect-video rounded-xl">
+								<Card
+									key="integrityViolations"
+									className="group hover:shadow-lg transition-all duration-200"
+								>
+									<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+										<CardTitle className="text-sm font-medium text-muted-foreground">
+											Integrity Violations
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="pt-0">
+										<div className="text-3xl font-bold mb-2">
+											{report?.summary.integrityViolations}
+										</div>
+										<p className="text-sm text-muted-foreground leading-relaxed">
+											Integrity Violations
+										</p>
+									</CardContent>
+								</Card>
+							</div>
+						</div>
+						<div className="flex flex-1 items-center justify-center">
+							<DataTable columns={columns} data={report ? report.events : []} />
+						</div>
+						<div className="grid auto-rows-min gap-4 md:grid-cols-3">
+							<div className="aspect-video rounded-xl">
+								<Card className="flex flex-col">
+									<CardHeader className="items-center pb-0">
+										<CardTitle>By Status</CardTitle>
+									</CardHeader>
+									<CardContent className="flex-1 pb-0">
+										<ChartContainer
+											config={byStatusChartConfig}
+											className="mx-auto aspect-square max-h-[250px]"
+										>
+											<PieChart>
+												<ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+												<Pie
+													data={summaryData?.transformedItems.filter(
+														(item) => item.category === 'eventsByStatus'
+													)}
+													dataKey="value"
+													nameKey="itemName"
+													innerRadius={60}
+												/>
+											</PieChart>
+										</ChartContainer>
+									</CardContent>
+									<CardFooter className="flex-col gap-2 text-sm">
+										<div className="text-muted-foreground leading-none">
+											{`Showing audit events from ${formatDate(dateRange.from, 'yyyy-MM-dd')} to ${formatDate(dateRange.to, 'yyyy-MM-dd')}`}
+										</div>
+									</CardFooter>
+								</Card>
+							</div>
+							<div className="aspect-video rounded-xl">
+								<Card className="flex flex-col">
+									<CardHeader className="items-center pb-0">
+										<CardTitle>By Action</CardTitle>
+									</CardHeader>
+									<CardContent className="flex-1 pb-0">
+										<ChartContainer config={byActionChartConfig}>
+											<BarChart
+												accessibilityLayer
+												data={summaryData?.transformedItems.filter(
+													(item) => item.category === 'eventsByAction'
+												)}
+												layout="vertical"
+												margin={{
+													left: -20,
+												}}
+											>
+												<CartesianGrid horizontal={false} />
+												<XAxis type="number" dataKey="value" hide />
+												<YAxis
+													dataKey="itemName"
+													type="category"
+													tickLine={false}
+													tickMargin={10}
+													axisLine={false}
+													tickFormatter={(value) => value.slice(0, 3)}
+													hide
+												/>
+												<ChartTooltip
+													cursor={false}
+													content={<ChartTooltipContent indicator="line" />}
+												/>
+												<Bar
+													dataKey="value"
+													layout="vertical"
+													fill="var(--color-success)"
+													radius={5}
+												>
+													<LabelList
+														dataKey="itemName"
+														position="insideLeft"
+														offset={24}
+														className="fill-(--color-label)"
+														fontSize={12}
+													/>
+													<LabelList
+														dataKey="value"
+														position="right"
+														offset={8}
+														className="fill-foreground"
+														fontSize={12}
+													/>
+												</Bar>
+											</BarChart>
+										</ChartContainer>
+									</CardContent>
+									<CardFooter className="flex-col gap-2 text-sm">
+										<div className="text-muted-foreground leading-none">
+											{`Showing audit events from ${formatDate(dateRange.from, 'yyyy-MM-dd')} to ${formatDate(dateRange.to, 'yyyy-MM-dd')}`}
+										</div>
+									</CardFooter>
+								</Card>
+							</div>
+							<div className="aspect-video rounded-xl">
+								<Card className="flex flex-col">
+									<CardHeader className="items-center pb-0">
+										<CardTitle>By Data Classification</CardTitle>
+									</CardHeader>
+									<CardContent className="flex-1 pb-0">
+										<ChartContainer
+											config={byDataClassificationChartConfig}
+											className="mx-auto aspect-square max-h-[250px]"
+										>
+											<PieChart>
+												<ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+												<Pie
+													data={summaryData?.transformedItems.filter(
+														(item) => item.category === 'eventsByDataClassification'
+													)}
+													dataKey="value"
+													nameKey="itemName"
+													innerRadius={60}
+												/>
+											</PieChart>
+										</ChartContainer>
+									</CardContent>
+									<CardFooter className="flex-col gap-2 text-sm">
+										<div className="text-muted-foreground leading-none">
+											{`Showing audit events from ${formatDate(dateRange.from, 'yyyy-MM-dd')} to ${formatDate(dateRange.to, 'yyyy-MM-dd')}`}
+										</div>
+									</CardFooter>
+								</Card>
+							</div>
+						</div>
+					</>
 				)}
 			</div>
 		</div>
 	)
 }
+
+const byStatusChartConfig = {
+	status: {
+		label: 'Status',
+	},
+	attempt: {
+		label: 'attempt',
+		color: 'var(--chart-2)',
+	},
+	success: {
+		label: 'success',
+		color: 'var(--chart-1)',
+	},
+	failure: {
+		label: 'failure',
+		color: 'var(--chart-4)',
+	},
+} satisfies ChartConfig
+
+const byActionChartConfig = {
+	action: {
+		label: 'Action',
+		color: 'var(--chart-1)',
+	},
+} satisfies ChartConfig
+
+const byDataClassificationChartConfig = {
+	dataClassification: {
+		label: 'Data Classification',
+	},
+	PUBLIC: {
+		label: 'PUBLIC',
+		color: 'var(--chart-1)',
+	},
+	INTERNAL: {
+		label: 'INTERNAL',
+		color: 'var(--chart-2)',
+	},
+	CONFIDENTIAL: {
+		label: 'CONFIDENTIAL',
+		color: 'var(--chart-3)',
+	},
+	PHI: {
+		label: 'PHI',
+		color: 'var(--chart-4)',
+	},
+} satisfies ChartConfig
