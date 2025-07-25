@@ -75,6 +75,10 @@ function RouteComponent() {
 					<BreadcrumbItem>
 						<BreadcrumbPage>Hipaa Reports</BreadcrumbPage>
 					</BreadcrumbItem>
+					<BreadcrumbSeparator className="hidden md:block" />
+					<BreadcrumbItem>
+						<BreadcrumbPage>{report?.metadata.reportId}</BreadcrumbPage>
+					</BreadcrumbItem>
 				</BreadcrumbList>
 			</Breadcrumb>
 
@@ -85,7 +89,7 @@ function RouteComponent() {
 						initialDateFrom={dateRange.from}
 						initialDateTo={dateRange.to}
 						align="start"
-						locale="en-GB"
+						locale="en-US"
 						showCompare={false}
 					/>
 					<div className="flex items-center gap-4">
@@ -101,6 +105,7 @@ function RouteComponent() {
 					</div>
 				) : (
 					<>
+						<DataTable columns={columns} data={report ? report.events : []} />
 						<div className="grid auto-rows-min gap-4 py-4 md:grid-cols-3">
 							<div className="aspect-video rounded-xl">
 								<Card
@@ -160,9 +165,6 @@ function RouteComponent() {
 									</CardContent>
 								</Card>
 							</div>
-						</div>
-						<div className="flex flex-1 items-center justify-center">
-							<DataTable columns={columns} data={report ? report.events : []} />
 						</div>
 						<div className="grid auto-rows-min gap-4 md:grid-cols-3">
 							<div className="aspect-video rounded-xl">

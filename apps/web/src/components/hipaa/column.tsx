@@ -1,5 +1,7 @@
 'use client'
 
+import { DataTableColumnHeader } from '../ui/data-table-column-header'
+
 import type { ColumnDef } from '@tanstack/react-table'
 import type { ComplianceReportEvent } from '@repo/audit'
 
@@ -7,35 +9,45 @@ export const createColumns = (): ColumnDef<ComplianceReportEvent>[] => {
 	const columns: ColumnDef<ComplianceReportEvent>[] = [
 		{
 			accessorKey: 'timestamp',
-			header: 'Timestamp',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Timestamp" />,
 		},
 		{
 			accessorKey: 'action',
-			header: 'Action',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Action" />,
 		},
 		{
 			accessorKey: 'targetResourceType',
-			header: 'Target Resource',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Resource" />,
 		},
 		{
 			accessorKey: 'targetResourceId',
-			header: 'Id',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="ID" />,
 		},
 		{
 			accessorKey: 'status',
-			header: 'Status',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+			cell: ({ row }) => {
+				const status = row.getValue('status') as string
+
+				return <div className={`text-${status} font-medium`}>{status.toUpperCase()}</div>
+			},
 		},
 		{
 			accessorKey: 'outcomeDescription',
-			header: 'Description',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
 		},
 		{
 			accessorKey: 'dataClassification',
-			header: 'Classification',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Classification" />,
 		},
 		{
 			accessorKey: 'integrityStatus',
-			header: 'Integrity',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Integrity" />,
+			cell: ({ row }) => {
+				const integrity = row.getValue('integrityStatus') as string
+
+				return <div className="font-medium">{integrity.toUpperCase()}</div>
+			},
 		},
 	]
 

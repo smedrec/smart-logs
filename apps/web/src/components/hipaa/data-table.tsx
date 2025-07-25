@@ -1,6 +1,12 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
 	Table,
@@ -18,8 +24,11 @@ import {
 	getSortedRowModel,
 	useReactTable,
 } from '@tanstack/react-table'
-import { ArrowDownUp, ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react'
+import { ArrowDownUp, ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
+
+import { DataTablePagination } from '../ui/data-table-pagination'
+import { DataTableViewOptions } from '../ui/data-table-view-options'
 
 import type { ColumnDef, ColumnFiltersState, SortingState } from '@tanstack/react-table'
 
@@ -51,14 +60,14 @@ export function DataTable<TData, TValue>({ columns, data }: DataTableProps<TData
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
 				<Input
-					placeholder="Filter..."
-					// value={(table.getColumn("name_4603829743")?.getFilterValue() as string) ?? ""}
-					// onChange={(event) =>
-					//   table.getColumn("name_4603829743")?.setFilterValue(event.target.value)
-					// }
+					placeholder="Filter by action..."
+					value={(table.getColumn('action')?.getFilterValue() as string) ?? ''}
+					onChange={(event) => table.getColumn('action')?.setFilterValue(event.target.value)}
 					className="max-w-sm"
 				/>
-				<div className="flex items-center gap-4"></div>
+				<div className="flex items-center gap-4">
+					<DataTableViewOptions table={table} />
+				</div>
 			</div>
 			<div className="rounded-md border">
 				<Table>
@@ -114,22 +123,7 @@ export function DataTable<TData, TValue>({ columns, data }: DataTableProps<TData
 			</div>
 
 			<div className="flex items-center justify-end space-x-2 py-4">
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={() => table.previousPage()}
-					disabled={!table.getCanPreviousPage()}
-				>
-					Previous
-				</Button>
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={() => table.nextPage()}
-					disabled={!table.getCanNextPage()}
-				>
-					Next
-				</Button>
+				<DataTablePagination table={table} />
 			</div>
 		</div>
 	)
