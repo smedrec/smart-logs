@@ -61,7 +61,7 @@ First, import and instantiate the client:
 ```typescript
 import { AppClient } from '@smart-logs/audit-client'
 
-import type { ClientOptions } from '@repo/app-client'
+import type { ClientOptions } from '@repo/audit-client'
 
 const options: ClientOptions = {
 	baseUrl: 'https://api.yourapp.com', // Replace with your actual API base URL

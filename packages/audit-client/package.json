@@ -1,5 +1,5 @@
 {
-	"name": "@repo/app-client",
+	"name": "@repo/audit-client",
 	"version": "0.1.0",
 	"private": true,
 	"sideEffects": false,
@@ -16,7 +16,9 @@
 		"clean": "rm -rf dist node_modules .turbo",
 		"test": "vitest run"
 	},
-	"dependencies": {},
+	"dependencies": {
+		"@repo/audit": "workspace:*"
+	},
 	"devDependencies": {
 		"@repo/eslint-config": "workspace:*",
 		"@repo/typescript-config": "workspace:*",

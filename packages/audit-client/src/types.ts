@@ -2,7 +2,7 @@ export interface ClientOptions {
 	/** Base URL for API requests */
 	baseUrl: string
 	/** API key for authentication */
-	apiKey: string
+	apiKey?: string
 	/** Number of retry attempts for failed requests */
 	retries?: number
 	/** Initial backoff time in milliseconds between retries */

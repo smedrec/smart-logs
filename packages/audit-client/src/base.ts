@@ -32,10 +32,10 @@ export class BaseResource {
 		for (let attempt = 0; attempt <= retries; attempt++) {
 			try {
 				const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
-					...options,
+					method: options.method || 'GET',
 					headers: {
 						...headers,
-						Authorization: 'apikey ' + this.options.apiKey,
+						//Authorization: 'apikey ' + this.options.apiKey,
 						...options.headers,
 					},
 					body:

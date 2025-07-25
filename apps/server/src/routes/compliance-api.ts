@@ -9,12 +9,12 @@
  *
  * Requirements: 4.1, 4.4, 8.1
  */
+import { ApiError } from '@/lib/errors'
 import { validator } from 'hono/validator'
 
 import type { HonoEnv } from '@/lib/hono/context'
 import type { Hono } from 'hono'
 import type { ExportConfig, ReportCriteria, ScheduledReportConfig } from '@repo/audit'
-import { ApiError } from '@/lib/errors'
 
 /**
  * Create compliance API router
@@ -92,10 +92,11 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 
 				logger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
 
-				return c.json({
+				return c.json(report)
+				/**return c.json({
 					success: true,
 					report,
-				})
+				})*/
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
 				logger.error(`Failed to generate HIPAA report: ${message}`)

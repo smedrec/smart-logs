@@ -11,6 +11,7 @@
 		{ "path": "./packages/audit-sdk" },
 		{ "path": "./packages/redis-client" },
 		{ "path": "./packages/hono-helpers" },
-		{ "path": "./packages/auth" }
+		{ "path": "./packages/auth" },
+		{ "path": "./packages/trpc" }
 	]
 }

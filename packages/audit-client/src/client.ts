@@ -1,3 +1,5 @@
+import { HIPAAComplianceReport, ReportCriteria } from '@repo/audit'
+
 import { BaseResource } from './base.js'
 
 import type { ClientOptions, DecryptResponse, EncryptResponse, VersionResponse } from './types.js'
@@ -21,6 +23,18 @@ export class AuditClient extends BaseResource {
 	 */
 	public version(): Promise<VersionResponse> {
 		return this.request(`/version`)
+	}
+
+	/**
+	 * Generate HIPAA report
+	 * @param criteria ReportCriteria
+	 * @returns Promise contains HIPAAComplianceReport
+	 */
+	public async hipaa(criteria: ReportCriteria): Promise<HIPAAComplianceReport> {
+		return await this.request<HIPAAComplianceReport>(`/api/compliance/reports/hipaa`, {
+			method: 'POST',
+			body: { criteria: criteria },
+		})
 	}
 
 	/**

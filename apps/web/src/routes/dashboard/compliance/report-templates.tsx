@@ -1,4 +1,5 @@
-import { createColumns } from '@/components/templates/column'
+import { ComingSoon } from '@/components/pages/coming-soon'
+/**import { createColumns } from '@/components/templates/column'
 import { DataTable } from '@/components/templates/data-table'
 import ReportTemplateForm from '@/components/templates/form'
 import {
@@ -18,16 +19,21 @@ import {
 } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/kibo-ui/spinner'
 import { trpc } from '@/utils/trpc'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query' */
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
 
-import type { ReportTemplate, ReportTemplateData } from '@/types/report-templates'
+/**import { useState } from 'react'
+
+import type { ReportTemplate, ReportTemplateData } from '@/types/report-templates'*/
 
 export const Route = createFileRoute('/dashboard/compliance/report-templates')({
 	component: RouteComponent,
 })
 
+function RouteComponent() {
+	return <ComingSoon />
+}
+/**
 function RouteComponent() {
 	const [data, setData] = useState<ReportTemplate[] | ReportTemplateData[]>([])
 	const [editingTemplate, setEditingTemplate] = useState<ReportTemplateData | null>(null)
@@ -108,3 +114,4 @@ function RouteComponent() {
 		</div>
 	)
 }
+ */

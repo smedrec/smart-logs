@@ -329,9 +329,9 @@ importers:
       '@repo/audit':
         specifier: workspace:*
         version: link:../../packages/audit
-      '@repo/audit-db':
+      '@repo/audit-client':
         specifier: workspace:*
-        version: link:../../packages/audit-db
+        version: link:../../packages/audit-client
       '@tabler/icons-react':
         specifier: ^3.34.0
         version: 3.34.0(react@19.0.0)
@@ -553,6 +553,10 @@ importers:
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.13)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
 
   packages/audit-client:
+    dependencies:
+      '@repo/audit':
+        specifier: workspace:*
+        version: link:../audit
     devDependencies:
       '@repo/eslint-config':
         specifier: workspace:*
@@ -799,6 +803,46 @@ importers:
       ioredis:
         specifier: 5.6.1
         version: 5.6.1
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 24.0.13
+        version: 24.0.13
+      typescript:
+        specifier: 5.5.4
+        version: 5.5.4
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.13)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
+
+  packages/trpc:
+    dependencies:
+      '@hono/trpc-server':
+        specifier: ^0.4.0
+        version: 0.4.0(@trpc/server@11.4.3(typescript@5.5.4))(hono@4.8.4)
+      '@repo/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@repo/audit-db':
+        specifier: workspace:*
+        version: link:../audit-db
+      '@repo/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@repo/hono-helpers':
+        specifier: workspace:*
+        version: link:../hono-helpers
+      better-auth:
+        specifier: ^1.2.10
+        version: 1.2.12
+      drizzle-orm:
+        specifier: ^0.44.2
+        version: 0.44.2(@opentelemetry/api@1.9.0)(@prisma/client@5.22.0(prisma@5.22.0))(@types/better-sqlite3@7.6.13)(@types/pg@8.15.4)(better-sqlite3@11.10.0)(kysely@0.28.3)(pg@8.16.3)(postgres@3.4.7)(prisma@5.22.0)
     devDependencies:
       '@repo/eslint-config':
         specifier: workspace:*
@@ -12363,6 +12407,11 @@ snapshots:
       '@standard-schema/spec': 1.0.0
       hono: 4.8.4
 
+  '@hono/trpc-server@0.4.0(@trpc/server@11.4.3(typescript@5.5.4))(hono@4.8.4)':
+    dependencies:
+      '@trpc/server': 11.4.3(typescript@5.5.4)
+      hono: 4.8.4
+
   '@hono/trpc-server@0.4.0(@trpc/server@11.4.3(typescript@5.8.2))(hono@4.8.4)':
     dependencies:
       '@trpc/server': 11.4.3(typescript@5.8.2)
@@ -15197,6 +15246,10 @@ snapshots:
     dependencies:
       '@trpc/server': 11.4.3(typescript@5.8.2)
       typescript: 5.8.2
+
+  '@trpc/server@11.4.3(typescript@5.5.4)':
+    dependencies:
+      typescript: 5.5.4
 
   '@trpc/server@11.4.3(typescript@5.8.2)':
     dependencies:
