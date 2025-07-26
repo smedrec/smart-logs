@@ -5,7 +5,7 @@
 
 import { sql } from 'drizzle-orm'
 
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Alert, AlertSeverity, AlertType } from './monitoring-types.js'
 import type { AlertHandler } from './monitoring.js'
 
@@ -57,8 +57,7 @@ export interface AlertResolution {
  * Database alert handler implementation
  */
 export class DatabaseAlertHandler implements AlertHandler {
-	//constructor(private db: NodePgDatabase<any>) {}
-	constructor(private db: any) {}
+	constructor(private db: PostgresJsDatabase<any>) {}
 
 	/**
 	 * Send (persist) alert to database
@@ -119,7 +118,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 				WHERE id = ${alertId}
 			`)
 
-			if (!result.rowCount || result.rowCount === 0) {
+			if (!result.length || result.length === 0) {
 				throw new Error(`Alert with ID ${alertId} not found`)
 			}
 		} catch (error) {
@@ -144,7 +143,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			`)
 
 			// Handle different database result formats
-			const rows = result.rows || result || []
+			const rows = result || []
 			return rows.map(this.mapDatabaseAlertToAlert)
 		} catch (error) {
 			throw new Error(`Failed to retrieve active alerts: ${error}`)
@@ -208,7 +207,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			}
 
 			const result = await this.db.execute(sql.raw(query))
-			const rows = result.rows || result || []
+			const rows = result || []
 			return rows.map(this.mapDatabaseAlertToAlert)
 		} catch (error) {
 			throw new Error(`Failed to retrieve alerts: ${error}`)
@@ -227,7 +226,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 				LIMIT 1
 			`)
 
-			const rows = result.rows || result || []
+			const rows = result || []
 			if (rows.length === 0) {
 				return null
 			}
@@ -266,7 +265,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 				WHERE organization_id = ${organizationId}
 			`)
 
-			const rows = result.rows || result || []
+			const rows = result || []
 			const row = rows[0]
 
 			return {
@@ -306,7 +305,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 				AND resolved_at < ${cutoffDate.toISOString()}
 			`)
 
-			return result.rowCount || 0
+			return result.length || 0
 		} catch (error) {
 			throw new Error(`Failed to cleanup resolved alerts: ${error}`)
 		}
@@ -339,6 +338,6 @@ export class DatabaseAlertHandler implements AlertHandler {
 /**
  * Factory function to create DatabaseAlertHandler
  */
-export function createDatabaseAlertHandler(db: NodePgDatabase<any>): DatabaseAlertHandler {
+export function createDatabaseAlertHandler(db: PostgresJsDatabase<any>): DatabaseAlertHandler {
 	return new DatabaseAlertHandler(db)
 }

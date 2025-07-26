@@ -24,7 +24,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * Generate general compliance report
 	 * POST /api/compliance/reports/generate
 	 */
-	app.post(
+	/**app.post(
 		'/reports/generate',
 		validator('json', (value, c) => {
 			const { criteria, reportType } = value
@@ -64,7 +64,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				throw error
 			}
 		}
-	)
+	)*/
 
 	/**
 	 * Generate HIPAA compliance report
@@ -81,14 +81,19 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 		}),
 		async (c) => {
 			const { compliance, db, logger } = c.get('services')
+			const session = c.get('session')
 			try {
 				const { criteria } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(db.audit, criteria)
+				//const events = await fetchAuditEvents(db.audit, criteria)
+				const criteriaWithOrganizationId = {
+					...criteria,
+					organizationIds: [session?.session.activeOrganizationId as string],
+				}
 
 				// Generate HIPAA report
-				const report = await compliance.report.generateHIPAAReport(events, criteria)
+				const report = await compliance.report.generateHIPAAReport(criteriaWithOrganizationId)
 
 				logger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
 
@@ -124,14 +129,19 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 		}),
 		async (c) => {
 			const { compliance, db, logger } = c.get('services')
+			const session = c.get('session')
 			try {
 				const { criteria } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(db.audit, criteria)
+				//const events = await fetchAuditEvents(db.audit, criteria)
+				const criteriaWithOrganizationId = {
+					...criteria,
+					organizationIds: [session?.session.activeOrganizationId as string],
+				}
 
 				// Generate GDPR report
-				const report = await compliance.report.generateGDPRReport(events, criteria)
+				const report = await compliance.report.generateGDPRReport(criteriaWithOrganizationId)
 
 				logger.info(`Generated GDPR report: ${report.metadata.reportId}`)
 
@@ -173,11 +183,11 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				const { criteria, performVerification = true } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(db.audit, criteria)
+				//const events = await fetchAuditEvents(db.audit, criteria)
 
 				// Generate integrity verification report
 				const report = await compliance.report.generateIntegrityVerificationReport(
-					events,
+					criteria,
 					performVerification
 				)
 

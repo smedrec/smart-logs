@@ -3,15 +3,12 @@
  * Demonstrates multi-organizational alert persistence and management
  */
 
-import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
-import {
-	MonitoringService,
-	DatabaseAlertHandler,
-	createDatabaseAlertHandler,
-	type AuditLogEvent,
-	type AlertQueryFilters,
-} from '../index.js'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
+
+import { createDatabaseAlertHandler, DatabaseAlertHandler, MonitoringService } from '../index.js'
+
+import type { AlertQueryFilters, AuditLogEvent } from '../index.js'
 
 /**
  * Example: Setting up monitoring with database alert persistence
@@ -21,11 +18,11 @@ export async function setupMonitoringWithDatabaseAlerts(
 	organizationId: string
 ) {
 	// Setup database connection
-	const pool = new Pool({
-		connectionString: databaseUrl,
+	const client = postgres(databaseUrl, {
+		max: 10,
 	})
 
-	const db = drizzle(pool)
+	const db = drizzle(client)
 
 	// Create database alert handler
 	const databaseAlertHandler = createDatabaseAlertHandler(db)
@@ -43,7 +40,7 @@ export async function setupMonitoringWithDatabaseAlerts(
 	return {
 		monitoringService,
 		databaseAlertHandler,
-		cleanup: () => pool.end(),
+		cleanup: () => client.end(),
 	}
 }
 
@@ -51,10 +48,11 @@ export async function setupMonitoringWithDatabaseAlerts(
  * Example: Processing audit events with alert persistence
  */
 export async function processAuditEventsWithAlerts() {
-	const { monitoringService, databaseAlertHandler, cleanup } = await setupMonitoringWithDatabaseAlerts(
-		process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_db',
-		'org-123'
-	)
+	const { monitoringService, databaseAlertHandler, cleanup } =
+		await setupMonitoringWithDatabaseAlerts(
+			process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_db',
+			'org-123'
+		)
 
 	try {
 		// Simulate suspicious audit events that should trigger alerts
@@ -113,21 +111,16 @@ export async function processAuditEventsWithAlerts() {
 		// Demonstrate alert resolution
 		if (activeAlerts.length > 0) {
 			const alertToResolve = activeAlerts[0]
-			await databaseAlertHandler.resolveAlert(
-				alertToResolve.id,
-				'admin-user',
-				{
-					resolvedBy: 'security-admin',
-					resolutionNotes: 'Investigated - legitimate user with forgotten password',
-				}
-			)
+			await databaseAlertHandler.resolveAlert(alertToResolve.id, 'admin-user', {
+				resolvedBy: 'security-admin',
+				resolutionNotes: 'Investigated - legitimate user with forgotten password',
+			})
 			console.log(`✅ Resolved alert: ${alertToResolve.id}`)
 		}
 
 		// Get alert statistics
 		const stats = await databaseAlertHandler.getAlertStatistics('org-123')
 		console.log('📈 Alert Statistics:', stats)
-
 	} finally {
 		await cleanup()
 	}
@@ -177,7 +170,6 @@ export async function demonstrateAlertQuerying() {
 		})
 
 		console.log(`✅ Recent resolved alerts: ${resolvedAlerts.length}`)
-
 	} finally {
 		await cleanup()
 	}
@@ -239,7 +231,6 @@ export async function demonstrateMultiOrganizationalIsolation() {
 
 		console.log('📊 Organization 1 stats:', org1Stats)
 		console.log('📊 Organization 2 stats:', org2Stats)
-
 	} finally {
 		await org1Setup.cleanup()
 		await org2Setup.cleanup()
@@ -263,7 +254,6 @@ export async function demonstrateAlertMaintenance() {
 		// Get current alert statistics after cleanup
 		const stats = await databaseAlertHandler.getAlertStatistics('org-123')
 		console.log('📊 Post-cleanup statistics:', stats)
-
 	} finally {
 		await cleanup()
 	}
@@ -276,15 +266,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	try {
 		await processAuditEventsWithAlerts()
 		console.log('\n---\n')
-		
+
 		await demonstrateAlertQuerying()
 		console.log('\n---\n')
-		
+
 		await demonstrateMultiOrganizationalIsolation()
 		console.log('\n---\n')
-		
+
 		await demonstrateAlertMaintenance()
-		
+
 		console.log('✅ All examples completed successfully!')
 	} catch (error) {
 		console.error('❌ Example failed:', error)

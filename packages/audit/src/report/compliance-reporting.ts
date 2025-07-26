@@ -9,8 +9,10 @@
  *
  * Requirements: 4.1, 4.4, 8.1
  */
+import { sql } from 'drizzle-orm'
 
-import type { AuditLogEvent, DataClassification } from '../types.js'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { AuditEventStatus, AuditLogEvent, DataClassification } from '../types.js'
 
 /**
  * Report criteria for filtering and configuring compliance reports
@@ -51,6 +53,12 @@ export interface ReportCriteria {
 
 	/** Offset for pagination */
 	offset?: number
+
+	/** Sorting criteria */
+	sortBy?: 'timestamp' | 'status'
+
+	/** Sorting direction */
+	sortOrder?: 'asc' | 'desc'
 }
 
 /**
@@ -275,6 +283,8 @@ export interface ScheduledReportConfig {
  * Compliance Reporting Service
  */
 export class ComplianceReportingService {
+	constructor(private db: PostgresJsDatabase<any>) {}
+
 	/**
 	 * Generate a general compliance report
 	 */
@@ -313,9 +323,10 @@ export class ComplianceReportingService {
 	 * Generate HIPAA-specific compliance report
 	 */
 	async generateHIPAAReport(
-		events: AuditLogEvent[],
+		//events: AuditLogEvent[],
 		criteria: ReportCriteria
 	): Promise<HIPAAComplianceReport> {
+		const events = await this.getEvents(criteria)
 		const baseReport = await this.generateComplianceReport(events, criteria, 'HIPAA_AUDIT_TRAIL')
 
 		// Filter for PHI-related events
@@ -341,9 +352,10 @@ export class ComplianceReportingService {
 	 * Generate GDPR-specific compliance report
 	 */
 	async generateGDPRReport(
-		events: AuditLogEvent[],
+		//events: AuditLogEvent[],
 		criteria: ReportCriteria
 	): Promise<GDPRComplianceReport> {
+		const events = await this.getEvents(criteria)
 		const baseReport = await this.generateComplianceReport(
 			events,
 			criteria,
@@ -375,9 +387,11 @@ export class ComplianceReportingService {
 	 * Generate audit trail verification report
 	 */
 	async generateIntegrityVerificationReport(
-		events: AuditLogEvent[],
+		//events: AuditLogEvent[],
+		criteria: ReportCriteria,
 		performVerification: boolean = true
 	): Promise<IntegrityVerificationReport> {
+		const events = await this.getEvents(criteria)
 		const verificationId = this.generateReportId()
 		const verifiedAt = new Date().toISOString()
 
@@ -441,6 +455,81 @@ export class ComplianceReportingService {
 					p95: 120,
 				},
 			},
+		}
+	}
+
+	/**
+	 * Get events for a specific report
+	 */
+	private async getEvents(criteria: ReportCriteria): Promise<AuditLogEvent[]> {
+		try {
+			// Build the base query using template literals for simplicity
+			let query = `SELECT * FROM audit_log WHERE organization_id = '${criteria.organizationIds?.[0]}'`
+
+			if (criteria.principalIds && criteria.principalIds.length > 0) {
+				query += ` AND principal_id IN (${criteria.principalIds.map((id) => `'${id}'`).join(',')})`
+			}
+			// Data classification filter
+			if (criteria.dataClassifications && criteria.dataClassifications.length > 0) {
+				query += ` AND data_classification IN (${criteria.dataClassifications
+					.map((dc) => `'${dc}'`)
+					.join(',')})`
+			}
+			// Actions filter
+			if (criteria.actions && criteria.actions.length > 0) {
+				query += ` AND action IN (${criteria.actions.map((a) => `'${a}'`).join(',')})`
+			}
+			// Status filter
+			if (criteria.statuses && criteria.statuses.length > 0) {
+				query += ` AND status IN (${criteria.statuses.map((s) => `'${s}'`).join(',')})`
+			}
+			// Resource types filter
+			if (criteria.resourceTypes && criteria.resourceTypes.length > 0) {
+				query += ` AND target_resource_type IN (${criteria.resourceTypes
+					.map((rt) => `'${rt}'`)
+					.join(',')})`
+			}
+			// Include only events with integrity verification
+			if (criteria.verifiedOnly && !criteria.includeIntegrityFailures) {
+				query += ` AND hash IS NOT NULL AND hash_algorithm IS NOT NULL`
+			}
+			// Apply date range filter
+			if (criteria.dateRange) {
+				query += ` AND timestamp >= ${criteria.dateRange.startDate} AND timestamp <= ${criteria.dateRange.endDate}`
+			}
+
+			// Add sorting
+			const sortColumn = criteria.sortBy || 'createdAt'
+			const sortDirection = criteria.sortOrder || 'desc'
+
+			switch (sortColumn) {
+				case 'timestamp':
+					query += ` ORDER BY timestamp ${sortDirection.toUpperCase()}`
+					break
+				case 'status':
+					query += ` ORDER BY CASE status 
+								WHEN 'attempt' THEN 1 
+								WHEN 'success' THEN 2 
+								WHEN 'failure' THEN 3 
+							END ${sortDirection.toUpperCase()}`
+					break
+				default:
+					query += ` ORDER BY timestamp DESC`
+			}
+
+			// Add pagination
+			if (criteria.limit) {
+				query += ` LIMIT ${criteria.limit}`
+			}
+			if (criteria.offset) {
+				query += ` OFFSET ${criteria.offset}`
+			}
+
+			const result = await this.db.execute(sql.raw(query))
+			const rows = result || []
+			return rows.map(this.mapDatabaseAuditLogToAuditLog)
+		} catch (error) {
+			throw new Error(`Failed to retrieve audit log events: ${error}`)
 		}
 	}
 
@@ -629,7 +718,7 @@ export class ComplianceReportingService {
 	 * Generate GDPR-specific metrics
 	 */
 	private generateGDPRMetrics(events: AuditLogEvent[]) {
-		// TODO: Replace with real GDPR metrics logic	
+		// TODO: Replace with real GDPR metrics logic
 		return {
 			personalDataEvents: events.length,
 			dataSubjectRights: events.filter((e) => this.isDataSubjectRightsAction(e.action)).length,
@@ -791,5 +880,38 @@ export class ComplianceReportingService {
 		// In real implementation, would use the crypto service
 		// TODO: Replace with actual integrity verification logic
 		return event.hash !== undefined && event.hash.length > 0
+	}
+
+	/**
+	 * Map database audit log record to AuditLog interface
+	 */
+	private mapDatabaseAuditLogToAuditLog(dbAuditLog: any): AuditLogEvent {
+		return {
+			id: dbAuditLog.id,
+			timestamp: dbAuditLog.timestamp as string,
+			principalId: dbAuditLog.principal_id as string,
+			organizationId: dbAuditLog.organization_id as string,
+			action: dbAuditLog.action as string,
+			targetResourceType: dbAuditLog.target_resource_type as string,
+			targetResourceId: dbAuditLog.target_resource_id as string,
+			status: dbAuditLog.status as AuditEventStatus,
+			outcomeDescription: dbAuditLog.outcome_description as string,
+			hash: dbAuditLog.hash as string,
+			hashAlgorithm: dbAuditLog.hash_algorithm,
+			signature: dbAuditLog.signature as string,
+			eventVersion: dbAuditLog.event_version,
+			correlationId: dbAuditLog.correlation_id,
+			dataClassification: dbAuditLog.data_classification as DataClassification,
+			retentionPolicy: dbAuditLog.retention_policy as string,
+			processingLatency: dbAuditLog.processing_latency as number,
+			queueDepth: dbAuditLog.queue_depth as number,
+			archivedAt: dbAuditLog.archived_at,
+			details: {
+				...(typeof dbAuditLog.details === 'string'
+					? JSON.parse(dbAuditLog.details)
+					: dbAuditLog.details),
+				organizationId: dbAuditLog.organization_id,
+			},
+		}
 	}
 }
