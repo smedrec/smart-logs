@@ -1,4 +1,3 @@
-import { fetchAuditEvents } from '@/lib/reports/functions'
 import { protectedProcedure } from '@/lib/trpc'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
@@ -27,6 +26,8 @@ const reportsRouter = {
 					includeIntegrityFailures: z.boolean().optional(), // Include failed integrity checks
 					limit: z.number().default(50), // Maximum number of events to include
 					offset: z.number().default(0), // Offset for pagination
+					sortBy: z.enum(['timestamp', 'status']).optional(), // Sorting criteria
+					sortOrder: z.enum(['asc', 'desc']).optional(), // Sorting direction
 				}),
 			})
 		)
@@ -39,11 +40,11 @@ const reportsRouter = {
 					startDate: input.criteria.dateRange.startDate,
 					endDate: input.criteria.dateRange.endDate,
 				},
-				//organizationIds: [organizationId],
+				organizationIds: [organizationId],
 			}
-			const events = await fetchAuditEvents(db.audit, criteria)
+
 			try {
-				const report = await compliance.report.generateHIPAAReport(events, criteria)
+				const report = await compliance.report.generateHIPAAReport(criteria)
 				return report
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
@@ -92,6 +93,8 @@ const reportsRouter = {
 					includeIntegrityFailures: z.boolean().optional(), // Include failed integrity checks
 					limit: z.number().default(50), // Maximum number of events to include
 					offset: z.number().default(0), // Offset for pagination
+					sortBy: z.enum(['timestamp', 'status']).optional(), // Sorting criteria
+					sortOrder: z.enum(['asc', 'desc']).optional(), // Sorting direction
 				}),
 			})
 		)
@@ -104,11 +107,11 @@ const reportsRouter = {
 					startDate: input.criteria.dateRange.startDate,
 					endDate: input.criteria.dateRange.endDate,
 				},
-				//organizationIds: [organizationId],
+				organizationIds: [organizationId],
 			}
-			const events = await fetchAuditEvents(db.audit, criteria)
+
 			try {
-				const report = await compliance.report.generateGDPRReport(events, criteria)
+				const report = await compliance.report.generateGDPRReport(criteria)
 				return report
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
@@ -132,7 +135,7 @@ const reportsRouter = {
 						},
 					},
 					'trpc-api',
-					'reports.hipaa'
+					'reports.gdpr'
 				)
 				throw err
 			}
