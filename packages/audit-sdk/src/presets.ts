@@ -1,4 +1,4 @@
-import type { AuditPreset } from './types.js'
+import type { AuditPreset } from '@repo/audit'
 
 /**
  * Predefined audit event configurations for common use cases

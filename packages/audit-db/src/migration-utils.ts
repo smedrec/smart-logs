@@ -6,6 +6,8 @@ import postgres from 'postgres'
 
 import 'dotenv/config'
 
+import { desc, or } from 'drizzle-orm'
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 /**
@@ -206,6 +208,139 @@ export class MigrationUtils {
 			console.log('✅ Default retention policies inserted successfully')
 		} catch (error) {
 			console.error('❌ Failed to insert default retention policies:', error)
+			throw error
+		}
+	}
+
+	/**
+	 * Insert default retention policies
+	 */
+	async insertDefaultAuditPresets(): Promise<void> {
+		try {
+			const defaultPresets = [
+				{
+					name: 'authentication',
+					description: 'Authentication Events',
+					organizationId: '*',
+					action: 'auth.generic',
+					dataClassification: 'INTERNAL',
+					requiredFields: ['principalId', 'sessionContext'],
+					defaultValues: {
+						retentionPolicy: 'auth-logs-1-year',
+					},
+					created_by: 'system',
+				},
+				{
+					name: 'fhir_access',
+					description: 'FHIR Resource Access',
+					organizationId: '*',
+					action: 'fhir.resource.access',
+					dataClassification: 'PHI',
+					requiredFields: ['principalId', 'targetResourceType', 'targetResourceId'],
+					defaultValues: {
+						retentionPolicy: 'hipaa-6-years',
+					},
+					validation: {
+						maxStringLength: 5000,
+						requiredFields: ['timestamp', 'action', 'status', 'principalId', 'targetResourceType'],
+					},
+					created_by: 'system',
+				},
+				{
+					name: 'system',
+					description: 'System Operations',
+					organizationId: '*',
+					action: 'system.operation',
+					dataClassification: 'INTERNAL',
+					requiredFields: ['action', 'status'],
+					defaultValues: {
+						retentionPolicy: 'system-logs-2-years',
+					},
+					created_by: 'system',
+				},
+				{
+					name: 'data_operation',
+					description: 'Data Operations',
+					organizationId: '*',
+					action: 'data.operation',
+					dataClassification: 'CONFIDENTIAL',
+					requiredFields: ['principalId', 'targetResourceType', 'targetResourceId'],
+					defaultValues: {
+						retentionPolicy: 'data-ops-3-years',
+					},
+					created_by: 'system',
+				},
+				{
+					name: 'admin',
+					description: 'Administrative Actions',
+					organizationId: '*',
+					action: 'admin.action',
+					dataClassification: 'CONFIDENTIAL',
+					requiredFields: ['principalId', 'organizationId'],
+					defaultValues: {
+						retentionPolicy: 'admin-logs-7-years',
+					},
+					created_by: 'system',
+				},
+				{
+					name: 'security',
+					description: 'Security Events',
+					organizationId: '*',
+					action: 'security.event',
+					dataClassification: 'CONFIDENTIAL',
+					requiredFields: ['principalId', 'sessionContext'],
+					defaultValues: {
+						retentionPolicy: 'security-logs-7-years',
+					},
+					created_by: 'system',
+				},
+				{
+					name: 'compliance',
+					description: 'Compliance Events',
+					organizationId: '*',
+					action: 'compliance.event',
+					dataClassification: 'CONFIDENTIAL',
+					requiredFields: ['principalId', 'action', 'outcomeDescription'],
+					defaultValues: {
+						retentionPolicy: 'compliance-logs-10-years',
+					},
+					created_by: 'system',
+				},
+				{
+					name: 'practitioner',
+					description: 'Practitioner Management',
+					action: 'practitioner.management',
+					dataClassification: 'CONFIDENTIAL',
+					requiredFields: ['principalId', 'targetResourceId'],
+					defaultValues: {
+						retentionPolicy: 'practitioner-logs-permanent',
+					},
+					created_by: 'system',
+				},
+			]
+
+			for (const preset of defaultPresets) {
+				await this.client`
+					INSERT INTO audit_preset (
+						name, description, organization_id, action, data_classification, required_fields, default_values, validation, created_by
+					) VALUES (
+						${preset.name},
+						${preset.description},
+						${preset.organizationId ?? null},
+						${preset.action},
+						${preset.dataClassification},
+						${JSON.stringify(preset.requiredFields)},
+						${JSON.stringify(preset.defaultValues)},
+						${preset.validation ? JSON.stringify(preset.validation) : null},
+						${preset.created_by}
+					)
+					ON CONFLICT (name) DO NOTHING
+				`
+			}
+
+			console.log('✅ Default audit presets inserted successfully')
+		} catch (error) {
+			console.error('❌ Failed to insert default audit presets:', error)
 			throw error
 		}
 	}

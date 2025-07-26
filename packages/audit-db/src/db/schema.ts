@@ -46,6 +46,7 @@
 // - [key: string]: any -> jsonb 'details' - OK (nullable)
 // This looks good.
 
+import { table } from 'console'
 import { sql } from 'drizzle-orm'
 import {
 	index,
@@ -58,7 +59,9 @@ import {
 	varchar,
 } from 'drizzle-orm/pg-core'
 
-import type { AuditEventStatus } from '@repo/audit'
+import { DEFAULT_VALIDATION_CONFIG } from '@repo/audit'
+
+import type { AuditEventStatus, ValidationConfig } from '@repo/audit'
 
 /**
  * Data classification levels for audit events
@@ -129,6 +132,45 @@ export const auditLog = pgTable(
 				table.retentionPolicy
 			),
 			index('audit_log_resource_type_id_idx').on(table.targetResourceType, table.targetResourceId),
+		]
+	}
+)
+
+/**
+ * Audit preset table for managing audit presets
+ * Requirements 4.1, 4.4: Audit preset management and compliance
+ */
+export const auditPreset = pgTable(
+	'audit_preset',
+	{
+		id: serial('id').primaryKey(),
+		name: varchar('name', { length: 255 }).notNull(),
+		description: text('description'),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		dataClassification: varchar('data_classification', { length: 20 })
+			.$type<DataClassification>()
+			.notNull(),
+		requiredFields: jsonb('required_fields').$type<string[]>(),
+		defaultValues: jsonb('default_values').$type<Record<string, any>>().notNull(),
+		validation: jsonb('validation').$type<ValidationConfig>().default(DEFAULT_VALIDATION_CONFIG),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		createdBy: varchar('created_by', { length: 255 }).notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedBy: varchar('updated_by', { length: 255 }),
+	},
+	(table) => {
+		return [
+			index('audit_preset_name_idx').on(table.name),
+			index('audit_preset_organization_id_idx').on(table.organizationId),
+			index('audit_preset_data_classification_idx').on(table.dataClassification),
+			index('audit_preset_created_at_idx').on(table.createdAt),
+			index('audit_preset_updated_at_idx').on(table.updatedAt),
+			index('audit_preset_created_by_idx').on(table.createdBy),
+			index('audit_preset_updated_by_idx').on(table.updatedBy),
 		]
 	}
 )

@@ -128,18 +128,6 @@ export interface ComplianceRule {
 //}
 
 /**
- * Predefined audit event configurations
- */
-export interface AuditPreset {
-	name: string
-	action: string
-	dataClassification: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
-	requiredFields: string[]
-	defaultValues?: Record<string, any>
-	validation?: Partial<ValidationConfig>
-}
-
-/**
  * Middleware configuration options
  */
 export interface MiddlewareOptions {
