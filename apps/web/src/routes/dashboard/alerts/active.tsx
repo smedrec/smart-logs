@@ -2,14 +2,6 @@ import { createColumns } from '@/components/alerts/columns'
 import { DataTable } from '@/components/alerts/data-table'
 //import ResolveAlertForm from '@/components/alerts/form'
 import {
-	Breadcrumb,
-	BreadcrumbItem,
-	BreadcrumbLink,
-	BreadcrumbList,
-	BreadcrumbPage,
-	BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
-import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
@@ -17,6 +9,7 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/kibo-ui/spinner'
+import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { trpc } from '@/utils/trpc'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
@@ -42,17 +35,7 @@ function RouteComponent() {
 
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">
-			<Breadcrumb>
-				<BreadcrumbList>
-					<BreadcrumbItem className="hidden md:block">
-						<BreadcrumbLink href="#">Alerts</BreadcrumbLink>
-					</BreadcrumbItem>
-					<BreadcrumbSeparator className="hidden md:block" />
-					<BreadcrumbItem>
-						<BreadcrumbPage>Active</BreadcrumbPage>
-					</BreadcrumbItem>
-				</BreadcrumbList>
-			</Breadcrumb>
+			<PageBreadcrumb link="Alerts" page="Active" />
 			{/*<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
 				<DialogContent>
 					<DialogHeader>

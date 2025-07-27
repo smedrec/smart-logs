@@ -1,14 +1,7 @@
-import {
-	Breadcrumb,
-	BreadcrumbItem,
-	BreadcrumbLink,
-	BreadcrumbList,
-	BreadcrumbPage,
-	BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Spinner } from '@/components/ui/kibo-ui/spinner'
+import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { transformSeverityData, transformTypeData } from '@/utils/charts'
 import { trpc } from '@/utils/trpc'
 import { useQuery } from '@tanstack/react-query'
@@ -37,17 +30,7 @@ function RouteComponent() {
 
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">
-			<Breadcrumb>
-				<BreadcrumbList>
-					<BreadcrumbItem className="hidden md:block">
-						<BreadcrumbLink href="#">Alerts</BreadcrumbLink>
-					</BreadcrumbItem>
-					<BreadcrumbSeparator className="hidden md:block" />
-					<BreadcrumbItem>
-						<BreadcrumbPage>Statistics</BreadcrumbPage>
-					</BreadcrumbItem>
-				</BreadcrumbList>
-			</Breadcrumb>
+			<PageBreadcrumb link="Alerts" page="Statistics" />
 			<div className="min-h-[100vh] flex-1 rounded-xl md:min-h-min">
 				{isLoading ? (
 					<div className="flex flex-1 items-center justify-center">
