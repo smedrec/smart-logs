@@ -5,22 +5,6 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { UserButton } from '@daveyplate/better-auth-ui'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 
-const sleepUntil = async (f, timeoutMs: number) => {
-	return new Promise<void>((resolve, reject) => {
-		const timeWas = new Date().getTime()
-		const wait = setInterval(function () {
-			if (f()) {
-				clearInterval(wait)
-				resolve()
-			} else if (new Date().getTime() - timeWas > timeoutMs) {
-				// Timeout
-				clearInterval(wait)
-				reject()
-			}
-		}, 20)
-	})
-}
-
 export const Route = createFileRoute('/dashboard')({
 	beforeLoad: ({ context, location }) => {
 		if (!context.auth.isAuthenticated) {

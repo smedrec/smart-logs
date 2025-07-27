@@ -10,36 +10,33 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
-import type { Alert, AlertResolution } from '@repo/audit'
-
-export interface ResolveAlertData {
-	resolutionData?: AlertResolution
-}
+import { Textarea } from '../ui/textarea'
 
 const formSchema = z.object({
 	resolutionNotes: z.string(),
 })
 
 interface FormProps {
-	onSubmit: (data: string) => void
+	onSubmit: (data: string) => Promise<void>
 }
 
 export default function ResolveAlertForm({ onSubmit }: FormProps) {
 	const form = useForm<z.infer<typeof formSchema>>({
 		resolver: zodResolver(formSchema),
+		defaultValues: {
+			resolutionNotes: '',
+		},
 	})
 
-	function handleSubmit(values: z.infer<typeof formSchema>) {
+	async function handleSubmit(values: z.infer<typeof formSchema>) {
 		try {
-			onSubmit(values as ResolveAlertData)
+			await onSubmit(values.resolutionNotes)
 			form.reset()
-			toast.success('User data submitted successfully!')
 		} catch (error) {
 			console.error('Form submission error', error)
 			toast.error('Failed to submit the form. Please try again.')
@@ -59,11 +56,11 @@ export default function ResolveAlertForm({ onSubmit }: FormProps) {
 							name="resolutionNotes"
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Resolution Notes</FormLabel>
+									<FormLabel>Resolution Note</FormLabel>
 									<FormControl>
-										<Input placeholder="Resolution notes" type="textarea" {...field} />
+										<Textarea placeholder="Resolution note" {...field} />
 									</FormControl>
-									<FormDescription>This is your public display name.</FormDescription>
+									<FormDescription>This is your resolved notes.</FormDescription>
 									<FormMessage />
 								</FormItem>
 							)}

@@ -3,6 +3,8 @@
  * Implements suspicious pattern detection, alert generation, and metrics collection
  */
 
+import { AlertResolution } from './database-alert-handler.js'
+
 import type { AuditLogEvent } from '../types.js'
 import type {
 	Alert,
@@ -78,7 +80,11 @@ export interface SuspiciousPattern {
  */
 export interface AlertHandler {
 	sendAlert(alert: Alert): Promise<void>
-	resolveAlert(alertId: string, resolvedBy: string): Promise<void>
+	resolveAlert(
+		alertId: string,
+		resolvedBy: string,
+		resolutionData?: AlertResolution
+	): Promise<{ success: boolean }>
 	getActiveAlerts(organizationId?: string): Promise<Alert[]>
 }
 
@@ -628,13 +634,16 @@ export class ConsoleAlertHandler implements AlertHandler {
 		console.log(`   Metadata:`, alert.metadata)
 	}
 
-	async resolveAlert(alertId: string, resolvedBy: string): Promise<void> {
+	async resolveAlert(alertId: string, resolvedBy: string): Promise<{ success: boolean }> {
 		console.log(`✅ Alert ${alertId} resolved by ${resolvedBy}`)
+		return { success: true }
 	}
 
 	async getActiveAlerts(organizationId?: string): Promise<Alert[]> {
 		// Console handler doesn't store alerts
-		console.log(`📋 Getting active alerts${organizationId ? ` for organization ${organizationId}` : ''}`)
+		console.log(
+			`📋 Getting active alerts${organizationId ? ` for organization ${organizationId}` : ''}`
+		)
 		return []
 	}
 }

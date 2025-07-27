@@ -103,7 +103,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 		alertId: string,
 		resolvedBy: string,
 		resolutionData?: AlertResolution
-	): Promise<void> {
+	): Promise<{ success: boolean }> {
 		const now = new Date().toISOString()
 
 		try {
@@ -121,6 +121,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			if (!result.length || result.length === 0) {
 				throw new Error(`Alert with ID ${alertId} not found`)
 			}
+			return { success: true }
 		} catch (error) {
 			throw new Error(`Failed to resolve alert in database: ${error}`)
 		}

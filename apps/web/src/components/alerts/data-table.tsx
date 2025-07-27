@@ -21,6 +21,9 @@ import {
 } from '@tanstack/react-table'
 import { useState } from 'react'
 
+import { DataTablePagination } from '../ui/data-table-pagination'
+import { DataTableViewOptions } from '../ui/data-table-view-options'
+
 import type { ColumnDef, ColumnFiltersState, SortingState } from '@tanstack/react-table'
 
 interface DataTableProps<TData, TValue> {
@@ -75,6 +78,8 @@ export function DataTable<TData, TValue>({
 							Resolve Selected ({Object.keys(rowSelection).length})
 						</Button>
 					)}
+
+					<DataTableViewOptions table={table} />
 				</div>
 			</div>
 			<div className="rounded-md border">
@@ -129,23 +134,8 @@ export function DataTable<TData, TValue>({
 				</Table>
 			</div>
 
-			<div className="flex items-center justify-end space-x-2 py-4">
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={() => table.previousPage()}
-					disabled={!table.getCanPreviousPage()}
-				>
-					Previous
-				</Button>
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={() => table.nextPage()}
-					disabled={!table.getCanNextPage()}
-				>
-					Next
-				</Button>
+			<div className="flex items-center justify-center space-x-2 py-4">
+				<DataTablePagination table={table} />
 			</div>
 		</div>
 	)

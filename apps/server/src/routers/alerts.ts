@@ -76,18 +76,21 @@ const alertsRouter = {
 		.input(
 			z.object({
 				alertId: z.string(),
-				resolvedBy: z.string().optional(),
+				resolutionNotes: z.string().optional(),
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { alert, logger, error } = ctx.services
-			const resolvedBy = input.resolvedBy || ctx.session.session.userId
+			const resolvedBy = ctx.session.session.userId
+			const resolutionData = {
+				resolvedBy,
+				resolutionNotes: input.resolutionNotes,
+			}
 			try {
-				await alert.resolveAlert(input.alertId, resolvedBy)
+				const result = await alert.resolveAlert(input.alertId, resolvedBy, resolutionData)
 				return {
-					success: true,
+					success: result.success,
 					message: `Alert ${input.alertId} resolved by ${resolvedBy}`,
-					timestamp: new Date().toISOString(),
 				}
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
