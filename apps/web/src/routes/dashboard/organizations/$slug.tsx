@@ -7,29 +7,30 @@ import {
 	BreadcrumbPage,
 	BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
-import { OrganizationSettingsCards } from '@daveyplate/better-auth-ui'
+import { useActiveOrganization } from '@/hooks/auth-hooks'
 import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/dashboard/settings/organization')({
+export const Route = createFileRoute('/dashboard/organizations/$slug')({
 	component: RouteComponent,
 })
 
 function RouteComponent() {
+	const { slug } = Route.useParams()
+	const { data: organization } = useActiveOrganization()
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">
 			<Breadcrumb>
 				<BreadcrumbList>
 					<BreadcrumbItem className="hidden md:block">
-						<BreadcrumbLink href="#">Setting</BreadcrumbLink>
+						<BreadcrumbLink href="#">Organization</BreadcrumbLink>
 					</BreadcrumbItem>
 					<BreadcrumbSeparator className="hidden md:block" />
 					<BreadcrumbItem>
-						<BreadcrumbPage>Organization</BreadcrumbPage>
+						<BreadcrumbPage>{organization?.name}</BreadcrumbPage>
 					</BreadcrumbItem>
 				</BreadcrumbList>
 			</Breadcrumb>
 			<AuditPresets />
-			<OrganizationSettingsCards />
 		</div>
 	)
 }

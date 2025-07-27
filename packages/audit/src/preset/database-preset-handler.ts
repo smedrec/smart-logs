@@ -142,11 +142,10 @@ export class DatabasePresetHandler implements PresetHandler {
 			organizationId: dbPreset.organization_id,
 			action: dbPreset.action,
 			dataClassification: dbPreset.data_classification as DataClassification,
-			requiredFields: {
-				...(typeof dbPreset.required_fields === 'string'
+			requiredFields:
+				typeof dbPreset.required_fields === 'string'
 					? JSON.parse(dbPreset.required_fields)
-					: dbPreset.required_fields),
-			},
+					: dbPreset.required_fields,
 			defaultValues: {
 				...(typeof dbPreset.default_values === 'string'
 					? JSON.parse(dbPreset.default_values)

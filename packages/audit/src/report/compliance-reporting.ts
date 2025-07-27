@@ -495,7 +495,7 @@ export class ComplianceReportingService {
 			}
 			// Apply date range filter
 			if (criteria.dateRange) {
-				query += ` AND timestamp >= ${criteria.dateRange.startDate} AND timestamp <= ${criteria.dateRange.endDate}`
+				query += ` AND timestamp >= '${criteria.dateRange.startDate}' AND timestamp <= '${criteria.dateRange.endDate}'`
 			}
 
 			// Add sorting

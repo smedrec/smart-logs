@@ -72,7 +72,11 @@ function RouteComponent() {
 						<Spinner variant="bars" size={64} />
 					</div>
 				) : (
-					<DataTable columns={columns} data={alerts} onmultiResolve={handlemultiResolve} />
+					<DataTable
+						columns={columns}
+						data={alerts ? alerts : []}
+						onmultiResolve={handlemultiResolve}
+					/>
 				)}
 			</div>
 		</div>
