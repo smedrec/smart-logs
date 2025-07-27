@@ -12,6 +12,7 @@ import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
 import { appRouter } from './routers/index'
 import { createComplianceAPI } from './routes/compliance-api'
+import { createPresetAPI } from './routes/preset-api'
 
 const app = newApp()
 
@@ -48,6 +49,8 @@ app.use('/trpc/*', async (c, next) =>
 // Mount compliance API routes
 const complianceAPI = createComplianceAPI(app)
 app.route('/api/compliance', complianceAPI)
+const presetAPI = createPresetAPI(app)
+app.route('/api/audit-preset', presetAPI)
 
 app.get('/session', (c) => {
 	return c.json(c.get('session'))

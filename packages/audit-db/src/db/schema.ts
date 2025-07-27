@@ -46,7 +46,6 @@
 // - [key: string]: any -> jsonb 'details' - OK (nullable)
 // This looks good.
 
-import { table } from 'console'
 import { sql } from 'drizzle-orm'
 import {
 	index,
@@ -56,6 +55,7 @@ import {
 	serial,
 	text,
 	timestamp,
+	uniqueIndex,
 	varchar,
 } from 'drizzle-orm/pg-core'
 
@@ -147,6 +147,7 @@ export const auditPreset = pgTable(
 		name: varchar('name', { length: 255 }).notNull(),
 		description: text('description'),
 		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		action: varchar('action', { length: 255 }).notNull(),
 		dataClassification: varchar('data_classification', { length: 20 })
 			.$type<DataClassification>()
 			.notNull(),
@@ -171,6 +172,8 @@ export const auditPreset = pgTable(
 			index('audit_preset_updated_at_idx').on(table.updatedAt),
 			index('audit_preset_created_by_idx').on(table.createdBy),
 			index('audit_preset_updated_by_idx').on(table.updatedBy),
+			// Add unique constraint for name per organization
+			uniqueIndex('audit_preset_name_org_unique').on(table.name, table.organizationId),
 		]
 	}
 )

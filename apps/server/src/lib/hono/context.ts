@@ -4,6 +4,7 @@ import type {
 	Audit,
 	ComplianceReportingService,
 	DatabaseAlertHandler,
+	DatabasePresetHandler,
 	DataExportService,
 	ErrorHandler,
 	HealthCheckService,
@@ -41,6 +42,7 @@ export type ServiceContext = {
 		report: ComplianceReportingService
 		export: DataExportService
 		scheduled: ScheduledReportingService
+		preset: DatabasePresetHandler
 	}
 	alert: DatabaseAlertHandler
 	audit: Audit

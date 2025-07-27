@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "audit_preset_name_org_unique" ON "audit_preset" USING btree ("name","organization_id");

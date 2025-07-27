@@ -1,6 +1,7 @@
 import {
 	Audit,
 	ComplianceReportingService,
+	createDatabasePresetHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
 	DatabaseHealthCheck,
@@ -19,7 +20,7 @@ import { db as authDb } from '@repo/auth/dist/db/index.js'
 import { ConsoleLogger } from '@repo/hono-helpers'
 
 import type { MiddlewareHandler } from 'hono'
-import type { DeliveryConfig } from '@repo/audit'
+import type { DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
 //import {initCache} from "../cache";
 import type { HonoEnv } from '../hono/context.js'
 
@@ -51,6 +52,7 @@ let databaseErrorLogger: DatabaseErrorLogger | undefined = undefined
 let reportingService: ComplianceReportingService | undefined = undefined
 let dataExportService: DataExportService | undefined = undefined
 let scheduledReportingService: ScheduledReportingService | undefined = undefined
+let presetDatabaseHandler: DatabasePresetHandler | undefined = undefined
 
 // Placeholder delivery config - in real implementation would come from environment
 const deliveryConfig: DeliveryConfig = {
@@ -169,11 +171,13 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService)
 			scheduledReportingService = new ScheduledReportingService(db.audit, deliveryConfig)
+		if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(db.audit)
 
 		const compliance = {
 			report: reportingService,
 			export: dataExportService,
 			scheduled: scheduledReportingService,
+			preset: presetDatabaseHandler,
 		}
 
 		/**const kms = new InfisicalKmsClient({

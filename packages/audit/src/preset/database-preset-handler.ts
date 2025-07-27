@@ -63,12 +63,25 @@ export class DatabasePresetHandler implements PresetHandler {
 				INSERT INTO audit_preset (
 					name, description, organization_id, action, data_classification, required_fields, default_values, validation, created_by
 				) VALUES (
-					${preset.name}, ${preset.description}, ${preset.organizationId}, ${preset.action}, ${preset.dataClassification}, ${preset.requiredFields}, ${preset.defaultValues}, ${preset.validation}, ${preset.createdBy}
+					${preset.name}, ${preset.description}, ${preset.organizationId}, ${preset.action}, ${preset.dataClassification}, ${JSON.stringify(preset.requiredFields)}, ${JSON.stringify(preset.defaultValues)}, ${preset.validation ? JSON.stringify(preset.validation) : null}, ${preset.createdBy}
 				)
-				ON CONFLICT (name) DO NOTHING
+				ON CONFLICT (name, organization_id) DO UPDATE SET
+					description = EXCLUDED.description,
+					action = EXCLUDED.action,
+					data_classification = EXCLUDED.data_classification,
+					required_fields = EXCLUDED.required_fields,
+					default_values = EXCLUDED.default_values,
+					validation = EXCLUDED.validation,
+					updated_at = NOW(),
+					updated_by = EXCLUDED.created_by
+				RETURNING *
 			`)
 
-			return this.mapDatabasePresetToPreset(result[0])
+			const rows = result || []
+			if (rows.length === 0) {
+				throw new Error('Preset already exists or failed to insert')
+			}
+			return this.mapDatabasePresetToPreset(rows[0])
 		} catch (error) {
 			throw new Error(`Failed to create preset: ${error}`)
 		}
@@ -130,14 +143,14 @@ export class DatabasePresetHandler implements PresetHandler {
 			action: dbPreset.action,
 			dataClassification: dbPreset.data_classification as DataClassification,
 			requiredFields: {
-				...(typeof dbPreset.requiredFields === 'string'
-					? JSON.parse(dbPreset.requiredFields)
-					: dbPreset.requiredFields),
+				...(typeof dbPreset.required_fields === 'string'
+					? JSON.parse(dbPreset.required_fields)
+					: dbPreset.required_fields),
 			},
 			defaultValues: {
-				...(typeof dbPreset.defaultValues === 'string'
-					? JSON.parse(dbPreset.defaultValues)
-					: dbPreset.defaultValues),
+				...(typeof dbPreset.default_values === 'string'
+					? JSON.parse(dbPreset.default_values)
+					: dbPreset.default_values),
 			},
 			validation: {
 				...(typeof dbPreset.validation === 'string'
