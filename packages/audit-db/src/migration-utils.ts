@@ -8,6 +8,8 @@ import 'dotenv/config'
 
 import { desc, or } from 'drizzle-orm'
 
+import { DEFAULT_VALIDATION_CONFIG } from '@repo/audit'
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 /**
@@ -309,6 +311,7 @@ export class MigrationUtils {
 				{
 					name: 'practitioner',
 					description: 'Practitioner Management',
+					organizationId: '*',
 					action: 'practitioner.management',
 					dataClassification: 'CONFIDENTIAL',
 					requiredFields: ['principalId', 'targetResourceId'],
@@ -331,7 +334,7 @@ export class MigrationUtils {
 						${preset.dataClassification},
 						${JSON.stringify(preset.requiredFields)},
 						${JSON.stringify(preset.defaultValues)},
-						${preset.validation ? JSON.stringify(preset.validation) : null},
+						${preset.validation ? JSON.stringify(preset.validation) : JSON.stringify(DEFAULT_VALIDATION_CONFIG)},
 						${preset.created_by}
 					)
 					ON CONFLICT (name) DO NOTHING
@@ -400,6 +403,10 @@ export async function runMigrationCommand(command: string, migrationName?: strin
 
 			case 'seed-policies':
 				await migrationUtils.insertDefaultRetentionPolicies()
+				break
+
+			case 'seed-presets':
+				await migrationUtils.insertDefaultAuditPresets()
 				break
 
 			default:

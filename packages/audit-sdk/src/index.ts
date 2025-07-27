@@ -36,7 +36,7 @@ export type {
 export type { ValidationConfig, AuditValidationError, AuditSanitizationError } from '@repo/audit'
 
 // SDK-specific types
-export type { AuditSDKConfig, AuditPreset, ComplianceConfig, MiddlewareOptions } from './types.js'
+export type { AuditSDKConfig, ComplianceConfig, MiddlewareOptions } from './types.js'
 
 // Main SDK class as default export
 export { AuditSDK as default } from './sdk.js'

@@ -114,7 +114,7 @@ export function createPresetAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 					dataClassification,
 					requiredFields,
 					defaultValues,
-					validation,
+					validation: validation || DEFAULT_VALIDATION_CONFIG,
 					createdBy: userId,
 				})
 				logger.info(`Created audit preset: ${preset.name}`)
