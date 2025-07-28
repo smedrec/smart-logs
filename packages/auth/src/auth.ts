@@ -128,6 +128,18 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 				maximumTeams: 10, // Optional: limit teams per organization
 				allowRemovingAllTeams: false, // Optional: prevent removing the last team
 			},
+			schema: {
+				organization: {
+					additionalFields: {
+						retentionDays: {
+							type: 'number',
+							input: true,
+							defaultValue: 90,
+							required: false,
+						},
+					},
+				},
+			},
 			async sendInvitationEmail(data) {
 				const inviteLink = `${process.env.APP_PUBLIC_URL}/accept-invitation/${data.id}`
 				const emailDetails: MailerSendOptions = {

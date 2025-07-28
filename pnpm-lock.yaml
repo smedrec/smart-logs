@@ -332,6 +332,9 @@ importers:
       '@repo/audit-client':
         specifier: workspace:*
         version: link:../../packages/audit-client
+      '@repo/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@tabler/icons-react':
         specifier: ^3.34.0
         version: 3.34.0(react@19.0.0)

@@ -165,7 +165,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
 		if (!errorHandler) errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
 
-		if (!reportingService) reportingService = new ComplianceReportingService()
+		if (!reportingService) reportingService = new ComplianceReportingService(db.audit)
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService)
 			scheduledReportingService = new ScheduledReportingService(db.audit, deliveryConfig)

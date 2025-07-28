@@ -6,9 +6,9 @@ import { serve } from 'inngest/hono'
 import { useConsoleLogger } from '@repo/hono-helpers'
 
 import { functions, inngest } from './inngest/index.js'
-import { newApp } from './lib/hono'
-import { init } from './lib/hono/init'
-import { nodeEnv } from './lib/hono/node-env'
+import { newApp } from './lib/hono/index.js'
+import { init } from './lib/hono/init.js'
+import { nodeEnv } from './lib/hono/node-env.js'
 
 const app = newApp()
 
