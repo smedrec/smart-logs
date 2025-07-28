@@ -28,15 +28,12 @@ interface FormProps {
 export default function ResolveAlertForm({ onSubmit }: FormProps) {
 	const form = useForm<z.infer<typeof formSchema>>({
 		resolver: zodResolver(formSchema),
-		defaultValues: {
-			resolutionNotes: '',
-		},
 	})
 
 	async function handleSubmit(values: z.infer<typeof formSchema>) {
 		try {
 			await onSubmit(values.resolutionNotes)
-			form.reset()
+			// Don't reset here - let the parent handle cleanup
 		} catch (error) {
 			console.error('Form submission error', error)
 			toast.error('Failed to submit the form. Please try again.')
@@ -49,25 +46,21 @@ export default function ResolveAlertForm({ onSubmit }: FormProps) {
 				onSubmit={form.handleSubmit(handleSubmit)}
 				className="space-y-8 max-w-3xl mx-auto py-10"
 			>
-				<div className="grid grid-cols-12 gap-4">
-					<div className="col-span-6">
-						<FormField
-							control={form.control}
-							name="resolutionNotes"
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>Resolution Note</FormLabel>
-									<FormControl>
-										<Textarea placeholder="Resolution note" {...field} />
-									</FormControl>
-									<FormDescription>This is your resolved notes.</FormDescription>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-					</div>
-				</div>
-				<Button type="submit">Resolve</Button>
+				<FormField
+					control={form.control}
+					name="resolutionNotes"
+					render={({ field }) => (
+						<FormItem>
+							<FormLabel>Resolution note</FormLabel>
+							<FormControl>
+								<Textarea placeholder="" className="resize-none" {...field} />
+							</FormControl>
+							<FormDescription>This is your resolution notes.</FormDescription>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
+				<Button type="submit">Submit</Button>
 			</form>
 		</Form>
 	)

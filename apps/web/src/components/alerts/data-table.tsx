@@ -19,7 +19,8 @@ import {
 	getSortedRowModel,
 	useReactTable,
 } from '@tanstack/react-table'
-import { useState } from 'react'
+import { CheckCheck } from 'lucide-react'
+import { forwardRef, useImperativeHandle, useState } from 'react'
 
 import { DataTablePagination } from '../ui/data-table-pagination'
 import { DataTableViewOptions } from '../ui/data-table-view-options'
@@ -32,11 +33,14 @@ interface DataTableProps<TData, TValue> {
 	onmultiResolve: (data: TData[]) => void
 }
 
-export function DataTable<TData, TValue>({
-	columns,
-	data,
-	onmultiResolve,
-}: DataTableProps<TData, TValue>) {
+export interface DataTableRef {
+	clearRowSelection: () => void
+}
+
+export const DataTable = forwardRef<DataTableRef, DataTableProps<any, any>>(function DataTable<
+	TData,
+	TValue,
+>({ columns, data, onmultiResolve }: DataTableProps<TData, TValue>, ref) {
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 	const [rowSelection, setRowSelection] = useState({})
 
@@ -53,6 +57,10 @@ export function DataTable<TData, TValue>({
 			rowSelection,
 		},
 	})
+
+	useImperativeHandle(ref, () => ({
+		clearRowSelection: () => setRowSelection({}),
+	}))
 
 	const handlemultiDelete = () => {
 		const selectedItems = table
@@ -74,7 +82,13 @@ export function DataTable<TData, TValue>({
 				/>
 				<div className="flex items-center gap-4">
 					{Object.keys(rowSelection).length > 0 && (
-						<Button onClick={handlemultiDelete} variant="secondary">
+						<Button
+							onClick={handlemultiDelete}
+							variant="secondary"
+							size="sm"
+							className="ml-auto hidden h-8 lg:flex"
+						>
+							<CheckCheck />
 							Resolve Selected ({Object.keys(rowSelection).length})
 						</Button>
 					)}
@@ -139,4 +153,4 @@ export function DataTable<TData, TValue>({
 			</div>
 		</div>
 	)
-}
+})

@@ -19,7 +19,7 @@ import {
 	getSortedRowModel,
 	useReactTable,
 } from '@tanstack/react-table'
-import { ArrowDownUp, ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react'
+import { ArrowDownUp, ArrowDownWideNarrow, ArrowUpNarrowWide, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { DataTablePagination } from '../ui/data-table-pagination'
@@ -78,6 +78,7 @@ export function DataTable<TData, TValue>({
 
 	return (
 		<div className="space-y-4">
+			<h1 className="font-bold text-2xl leading-tight">Audit Presets</h1>
 			<div className="flex items-center justify-between">
 				<Input
 					placeholder="Filter..."
@@ -87,14 +88,27 @@ export function DataTable<TData, TValue>({
 				/>
 				<div className="flex items-center gap-4">
 					{Object.keys(rowSelection).length > 0 && (
-						<Button onClick={handlemultiDelete} variant="destructive">
+						<Button
+							onClick={handlemultiDelete}
+							variant="destructive"
+							size="sm"
+							className="ml-auto hidden h-8 lg:flex"
+						>
+							<Trash2 />
 							Delete Selected ({Object.keys(rowSelection).length})
 						</Button>
 					)}
 
-					<Button onClick={onAdd}>Add Preset</Button>
-				</div>
-				<div className="flex items-center gap-4">
+					<Button
+						onClick={onAdd}
+						variant="outline"
+						size="sm"
+						className="ml-auto hidden h-8 lg:flex"
+					>
+						<Plus />
+						Add Preset
+					</Button>
+
 					<DataTableViewOptions table={table} />
 				</div>
 			</div>

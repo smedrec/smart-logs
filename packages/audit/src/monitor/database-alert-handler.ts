@@ -116,9 +116,11 @@ export class DatabaseAlertHandler implements AlertHandler {
 					resolution_notes = ${resolutionData?.resolutionNotes || null},
 					updated_at = ${now}
 				WHERE id = ${alertId}
+				RETURNING id
 			`)
 
-			if (!result.length || result.length === 0) {
+			// Check if any rows were affected by the UPDATE
+			if (result.length === 0) {
 				throw new Error(`Alert with ID ${alertId} not found`)
 			}
 			return { success: true }
