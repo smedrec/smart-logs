@@ -1,29 +1,31 @@
 'use client'
 
+import { DataTableColumnHeader } from '../ui/data-table-column-header'
+
 import type { ColumnDef } from '@tanstack/react-table'
-import type { Alert, AlertType } from '@repo/audit'
+import type { Alert } from '@repo/audit'
 
 export const createColumns = (): ColumnDef<Alert>[] => {
 	const columns: ColumnDef<Alert>[] = [
 		{
 			accessorKey: 'severity',
-			header: 'Severity',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Severity" />,
 		},
 		{
 			accessorKey: 'type',
-			header: 'Type',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
 		},
 		{
 			accessorKey: 'title',
-			header: 'Title',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Title" />,
 		},
 		{
 			accessorKey: 'description',
-			header: 'Description',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
 		},
 		{
 			accessorKey: 'source',
-			header: 'Source',
+			header: ({ column }) => <DataTableColumnHeader column={column} title="Source" />,
 		},
 	]
 

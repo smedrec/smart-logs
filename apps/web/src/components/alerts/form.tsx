@@ -11,10 +11,12 @@ import {
 	FormMessage,
 } from '@/components/ui/form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { Spinner } from '../ui/kibo-ui/spinner'
 import { Textarea } from '../ui/textarea'
 
 const formSchema = z.object({
@@ -26,16 +28,18 @@ interface FormProps {
 }
 
 export default function ResolveAlertForm({ onSubmit }: FormProps) {
+	const [loading, setLoading] = useState(false)
 	const form = useForm<z.infer<typeof formSchema>>({
 		resolver: zodResolver(formSchema),
 	})
 
 	async function handleSubmit(values: z.infer<typeof formSchema>) {
 		try {
+			setLoading(true)
 			await onSubmit(values.resolutionNotes)
-			// Don't reset here - let the parent handle cleanup
+			setLoading(false)
+			// let the parent handle cleanup
 		} catch (error) {
-			console.error('Form submission error', error)
 			toast.error('Failed to submit the form. Please try again.')
 		}
 	}
@@ -60,7 +64,9 @@ export default function ResolveAlertForm({ onSubmit }: FormProps) {
 						</FormItem>
 					)}
 				/>
-				<Button type="submit">Submit</Button>
+				<Button type="submit">
+					{loading ? <Spinner variant="bars" size={16} /> : 'Resolve Alerts'}
+				</Button>
 			</form>
 		</Form>
 	)

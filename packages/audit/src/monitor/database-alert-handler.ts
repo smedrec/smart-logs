@@ -306,6 +306,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 				WHERE organization_id = ${organizationId}
 				AND resolved = 'true'
 				AND resolved_at < ${cutoffDate.toISOString()}
+				RETURNING id
 			`)
 
 			return result.length || 0

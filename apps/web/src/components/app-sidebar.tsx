@@ -39,6 +39,10 @@ const data = {
 					url: '/dashboard/alerts/active',
 				},
 				{
+					title: 'Resolved',
+					url: '/dashboard/alerts/resolved',
+				},
+				{
 					title: 'Statistics',
 					url: '/dashboard/alerts/statistics',
 				},
