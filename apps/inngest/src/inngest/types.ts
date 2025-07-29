@@ -7,7 +7,7 @@ type DemoEventSent = {
 	}
 }
 
-type cleanupResolvedAlerts = {
+type CleanupResolvedAlerts = {
 	name: 'alerts/cleanup.resolved.alerts'
 	data: {
 		organization_id: string
@@ -15,4 +15,13 @@ type cleanupResolvedAlerts = {
 	}
 }
 
-export const schemas = new EventSchemas().fromUnion<DemoEventSent | cleanupResolvedAlerts>()
+type CleanupOldErrors = {
+	name: 'errors/cleanup.old.errors'
+	data: {
+		retention_days: number
+	}
+}
+
+export const schemas = new EventSchemas().fromUnion<
+	DemoEventSent | CleanupResolvedAlerts | CleanupOldErrors
+>()
