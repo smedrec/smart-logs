@@ -13,18 +13,27 @@ import {
 import {
 	flexRender,
 	getCoreRowModel,
+	getFacetedRowModel,
+	getFacetedUniqueValues,
 	getFilteredRowModel,
 	getPaginationRowModel,
 	getSortedRowModel,
 	useReactTable,
 } from '@tanstack/react-table'
-import { Trash, Trash2 } from 'lucide-react'
+import { Trash, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 
+import { DataTableFacetedFilter } from '../ui/data-table-faceted-filter'
 import { DataTablePagination } from '../ui/data-table-pagination'
 import { DataTableViewOptions } from '../ui/data-table-view-options'
+import { severities, types } from './data'
 
-import type { ColumnDef, ColumnFiltersState, SortingState } from '@tanstack/react-table'
+import type {
+	ColumnDef,
+	ColumnFiltersState,
+	SortingState,
+	VisibilityState,
+} from '@tanstack/react-table'
 
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[]
@@ -37,36 +46,74 @@ export function DataTable<TData, TValue>({
 	data,
 	onCleanup,
 }: DataTableProps<TData, TValue>) {
+	const [rowSelection, setRowSelection] = useState({})
+	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+	const [sorting, setSorting] = useState<SortingState>([])
 
 	const table = useReactTable({
 		data,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
-		onColumnFiltersChange: setColumnFilters,
-		getFilteredRowModel: getFilteredRowModel(),
 		state: {
+			sorting,
+			columnVisibility,
+			rowSelection,
 			columnFilters,
 		},
+		initialState: {
+			pagination: {
+				pageSize: 25,
+			},
+		},
+		enableRowSelection: true,
+		onRowSelectionChange: setRowSelection,
+		onSortingChange: setSorting,
+		onColumnFiltersChange: setColumnFilters,
+		onColumnVisibilityChange: setColumnVisibility,
+		getCoreRowModel: getCoreRowModel(),
+		getFilteredRowModel: getFilteredRowModel(),
+		getPaginationRowModel: getPaginationRowModel(),
+		getSortedRowModel: getSortedRowModel(),
+		getFacetedRowModel: getFacetedRowModel(),
+		getFacetedUniqueValues: getFacetedUniqueValues(),
 	})
+
+	const isFiltered = table.getState().columnFilters.length > 0
 
 	const handleOnCleanup = () => {
 		onCleanup()
 	}
 
 	return (
-		<div className="space-y-4">
+		<div className="flex flex-col gap-4">
 			<div className="flex items-center justify-between">
-				<Input
-					placeholder="Filter..."
-					// value={(table.getColumn("name_4603829743")?.getFilterValue() as string) ?? ""}
-					// onChange={(event) =>
-					//   table.getColumn("name_4603829743")?.setFilterValue(event.target.value)
-					// }
-					className="max-w-sm"
-				/>
-				<div className="flex items-center gap-4">
+				<div className="flex flex-1 items-center gap-2">
+					<Input
+						placeholder="Filter title..."
+						value={(table.getColumn('title')?.getFilterValue() as string) ?? ''}
+						onChange={(event) => table.getColumn('title')?.setFilterValue(event.target.value)}
+						className="max-w-sm"
+					/>
+					{table.getColumn('severity') && (
+						<DataTableFacetedFilter
+							column={table.getColumn('severity')}
+							title="Severity"
+							options={severities}
+						/>
+					)}
+					{table.getColumn('type') && (
+						<DataTableFacetedFilter column={table.getColumn('type')} title="Type" options={types} />
+					)}
+					{isFiltered && (
+						<Button variant="ghost" size="sm" onClick={() => table.resetColumnFilters()}>
+							Reset
+							<X />
+						</Button>
+					)}
+				</div>
+				<div className="flex items-center gap-2">
+					<DataTableViewOptions table={table} />
+
 					<Button
 						onClick={handleOnCleanup}
 						variant="secondary"
@@ -76,8 +123,6 @@ export function DataTable<TData, TValue>({
 						<Trash2 />
 						Delete old resolved alerts
 					</Button>
-
-					<DataTableViewOptions table={table} />
 				</div>
 			</div>
 			<div className="rounded-md border">
@@ -118,9 +163,7 @@ export function DataTable<TData, TValue>({
 				</Table>
 			</div>
 
-			<div className="flex items-center justify-center space-x-2 py-4">
-				<DataTablePagination table={table} />
-			</div>
+			<DataTablePagination table={table} />
 		</div>
 	)
 }

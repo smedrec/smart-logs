@@ -1,7 +1,6 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
 	Table,
@@ -14,18 +13,27 @@ import {
 import {
 	flexRender,
 	getCoreRowModel,
+	getFacetedRowModel,
+	getFacetedUniqueValues,
 	getFilteredRowModel,
 	getPaginationRowModel,
 	getSortedRowModel,
 	useReactTable,
 } from '@tanstack/react-table'
-import { CheckCheck } from 'lucide-react'
-import { forwardRef, useImperativeHandle, useState } from 'react'
+import { CheckCheck, X } from 'lucide-react'
+import * as React from 'react'
 
+import { DataTableFacetedFilter } from '../ui/data-table-faceted-filter'
 import { DataTablePagination } from '../ui/data-table-pagination'
 import { DataTableViewOptions } from '../ui/data-table-view-options'
+import { severities, types } from './data'
 
-import type { ColumnDef, ColumnFiltersState, SortingState } from '@tanstack/react-table'
+import type {
+	ColumnDef,
+	ColumnFiltersState,
+	SortingState,
+	VisibilityState,
+} from '@tanstack/react-table'
 
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[]
@@ -37,120 +45,146 @@ export interface DataTableRef {
 	clearRowSelection: () => void
 }
 
-export const DataTable = forwardRef<DataTableRef, DataTableProps<any, any>>(function DataTable<
-	TData,
-	TValue,
->({ columns, data, onmultiResolve }: DataTableProps<TData, TValue>, ref) {
-	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-	const [rowSelection, setRowSelection] = useState({})
+export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>>(
+	function DataTable<TData, TValue>(
+		{ columns, data, onmultiResolve }: DataTableProps<TData, TValue>,
+		ref: any
+	) {
+		const [rowSelection, setRowSelection] = React.useState({})
+		const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+		const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+		const [sorting, setSorting] = React.useState<SortingState>([])
 
-	const table = useReactTable({
-		data,
-		columns,
-		getCoreRowModel: getCoreRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
-		onColumnFiltersChange: setColumnFilters,
-		getFilteredRowModel: getFilteredRowModel(),
-		onRowSelectionChange: setRowSelection,
-		state: {
-			columnFilters,
-			rowSelection,
-		},
-	})
+		const table = useReactTable({
+			data,
+			columns,
+			state: {
+				sorting,
+				columnVisibility,
+				rowSelection,
+				columnFilters,
+			},
+			initialState: {
+				pagination: {
+					pageSize: 25,
+				},
+			},
+			enableRowSelection: true,
+			onRowSelectionChange: setRowSelection,
+			onSortingChange: setSorting,
+			onColumnFiltersChange: setColumnFilters,
+			onColumnVisibilityChange: setColumnVisibility,
+			getCoreRowModel: getCoreRowModel(),
+			getFilteredRowModel: getFilteredRowModel(),
+			getPaginationRowModel: getPaginationRowModel(),
+			getSortedRowModel: getSortedRowModel(),
+			getFacetedRowModel: getFacetedRowModel(),
+			getFacetedUniqueValues: getFacetedUniqueValues(),
+		})
 
-	useImperativeHandle(ref, () => ({
-		clearRowSelection: () => setRowSelection({}),
-	}))
+		const isFiltered = table.getState().columnFilters.length > 0
 
-	const handlemultiDelete = () => {
-		const selectedItems = table
-			.getFilteredSelectedRowModel()
-			.rows.map((row) => row.original as TData)
-		onmultiResolve(selectedItems)
-	}
+		React.useImperativeHandle(ref, () => ({
+			clearRowSelection: () => setRowSelection({}),
+		}))
 
-	return (
-		<div className="space-y-4">
-			<div className="flex items-center justify-between">
-				<Input
-					placeholder="Filter..."
-					// value={(table.getColumn("name_4603829743")?.getFilterValue() as string) ?? ""}
-					// onChange={(event) =>
-					//   table.getColumn("name_4603829743")?.setFilterValue(event.target.value)
-					// }
-					className="max-w-sm"
-				/>
-				<div className="flex items-center gap-4">
-					{Object.keys(rowSelection).length > 0 && (
-						<Button
-							onClick={handlemultiDelete}
-							variant="secondary"
-							size="sm"
-							className="ml-auto hidden h-8 lg:flex"
-						>
-							<CheckCheck />
-							Resolve Selected ({Object.keys(rowSelection).length})
-						</Button>
-					)}
+		const handlemultiResolve = () => {
+			const selectedItems = table
+				.getFilteredSelectedRowModel()
+				.rows.map((row) => row.original as TData)
+			onmultiResolve(selectedItems)
+		}
 
-					<DataTableViewOptions table={table} />
-				</div>
-			</div>
-			<div className="rounded-md border">
-				<Table>
-					<TableHeader>
-						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow key={headerGroup.id}>
-								<TableHead className="w-[50px]">
-									<Checkbox
-										checked={table.getIsAllPageRowsSelected()}
-										onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-										aria-label="Select all"
-									/>
-								</TableHead>
-								{headerGroup.headers.map((header) => (
-									<TableHead key={header.id}>
-										{header.isPlaceholder
-											? null
-											: flexRender(header.column.columnDef.header, header.getContext())}
-									</TableHead>
-								))}
-							</TableRow>
-						))}
-					</TableHeader>
-
-					<TableBody>
-						{table.getRowModel().rows?.length ? (
-							table.getRowModel().rows.map((row) => (
-								<TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
-									<TableCell className="w-[50px]">
-										<Checkbox
-											checked={row.getIsSelected()}
-											onCheckedChange={(value) => row.toggleSelected(!!value)}
-											aria-label="Select row"
-										/>
-									</TableCell>
-									{row.getVisibleCells().map((cell) => (
-										<TableCell key={cell.id}>
-											{flexRender(cell.column.columnDef.cell, cell.getContext())}
-										</TableCell>
-									))}
-								</TableRow>
-							))
-						) : (
-							<TableRow>
-								<TableCell colSpan={columns.length} className="h-24 text-center">
-									No results.
-								</TableCell>
-							</TableRow>
+		return (
+			<div className="flex flex-col gap-4">
+				<div className="flex items-center justify-between">
+					<div className="flex flex-1 items-center gap-2">
+						<Input
+							placeholder="Filter..."
+							// value={(table.getColumn("name_4603829743")?.getFilterValue() as string) ?? ""}
+							// onChange={(event) =>
+							//   table.getColumn("name_4603829743")?.setFilterValue(event.target.value)
+							// }
+							className="max-w-sm"
+						/>
+						{table.getColumn('severity') && (
+							<DataTableFacetedFilter
+								column={table.getColumn('severity')}
+								title="Severity"
+								options={severities}
+							/>
 						)}
-					</TableBody>
-				</Table>
-			</div>
+						{table.getColumn('type') && (
+							<DataTableFacetedFilter
+								column={table.getColumn('type')}
+								title="Type"
+								options={types}
+							/>
+						)}
+						{isFiltered && (
+							<Button variant="ghost" size="sm" onClick={() => table.resetColumnFilters()}>
+								Reset
+								<X />
+							</Button>
+						)}
+					</div>
+					<div className="flex items-center gap-2">
+						<DataTableViewOptions table={table} />
 
-			<div className="flex items-center justify-center space-x-2 py-4">
+						{Object.keys(rowSelection).length > 0 && (
+							<Button
+								onClick={handlemultiResolve}
+								variant="secondary"
+								size="sm"
+								className="ml-auto hidden h-8 lg:flex"
+							>
+								<CheckCheck />
+								Resolve Selected ({Object.keys(rowSelection).length})
+							</Button>
+						)}
+					</div>
+				</div>
+				<div className="rounded-md border">
+					<Table>
+						<TableHeader>
+							{table.getHeaderGroups().map((headerGroup) => (
+								<TableRow key={headerGroup.id}>
+									{headerGroup.headers.map((header) => {
+										return (
+											<TableHead key={header.id} colSpan={header.colSpan}>
+												{header.isPlaceholder
+													? null
+													: flexRender(header.column.columnDef.header, header.getContext())}
+											</TableHead>
+										)
+									})}
+								</TableRow>
+							))}
+						</TableHeader>
+
+						<TableBody>
+							{table.getRowModel().rows?.length ? (
+								table.getRowModel().rows.map((row) => (
+									<TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+										{row.getVisibleCells().map((cell) => (
+											<TableCell key={cell.id}>
+												{flexRender(cell.column.columnDef.cell, cell.getContext())}
+											</TableCell>
+										))}
+									</TableRow>
+								))
+							) : (
+								<TableRow>
+									<TableCell colSpan={columns.length} className="h-24 text-center">
+										No results.
+									</TableCell>
+								</TableRow>
+							)}
+						</TableBody>
+					</Table>
+				</div>
 				<DataTablePagination table={table} />
 			</div>
-		</div>
-	)
-})
+		)
+	}
+)
