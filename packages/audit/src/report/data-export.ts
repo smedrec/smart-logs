@@ -418,12 +418,12 @@ export class DataExportService {
 		config: ExportConfig
 	): Promise<{ data: Buffer; contentType: string; filename: string }> {
 		// This is a simplified PDF implementation
-		// In a real implementation, you would use a library like PDFKit or Puppeteer
+		// TODO In a real implementation, you would use a library like PDFKit or Puppeteer
 
 		const htmlContent = this.generateHTMLReport(report, config)
 
 		// Placeholder: Convert HTML to PDF
-		// In real implementation: const pdf = await htmlToPdf(htmlContent)
+		// TODO In real implementation: const pdf = await htmlToPdf(htmlContent)
 		const pdfBuffer = Buffer.from(`PDF Report Placeholder\n\n${htmlContent}`, 'utf8')
 
 		return {
@@ -517,7 +517,7 @@ export class DataExportService {
 	 */
 	private async compressData(data: string | Buffer, algorithm: 'gzip' | 'zip'): Promise<Buffer> {
 		// Placeholder implementation
-		// In real implementation, would use zlib for gzip or archiver for zip
+		// TODO In real implementation, would use zlib for gzip or archiver for zip
 		const inputBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8')
 
 		if (algorithm === 'gzip') {
@@ -537,7 +537,7 @@ export class DataExportService {
 		config: NonNullable<ExportConfig['encryption']>
 	): Promise<{ data: Buffer; iv: string }> {
 		// Placeholder implementation
-		// In real implementation, would use crypto module
+		// TODO In real implementation, would use crypto module
 		const inputBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8')
 		const iv = 'placeholder-iv-' + Math.random().toString(36).substr(2, 16)
 
@@ -552,7 +552,7 @@ export class DataExportService {
 	 */
 	private async calculateChecksum(data: string | Buffer): Promise<string> {
 		// Placeholder implementation
-		// In real implementation, would use crypto.createHash('sha256')
+		// TODO In real implementation, would use crypto.createHash('sha256')
 		const inputBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8')
 		return `sha256:${inputBuffer.length.toString(16)}-${Date.now().toString(16)}`
 	}

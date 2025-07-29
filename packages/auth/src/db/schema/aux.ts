@@ -1,5 +1,7 @@
 import {
 	boolean,
+	index,
+	jsonb,
 	pgTable,
 	primaryKey,
 	text,
@@ -10,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core'
 
 import { organization, user } from './auth'
+import { DeliveryConfig, ExportConfig } from './types'
 
 export const activeOrganization = pgTable(
 	'active_organization',
@@ -29,6 +32,27 @@ export const activeOrganization = pgTable(
 		]
 	}
 )
+
+export const reportConfig = pgTable(
+	'report_config',
+	{
+		organizationId: varchar('organization_id', { length: 50 })
+			.primaryKey()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		deliveryMethod: varchar('delivery_method', {
+			length: 10,
+			enum: ['email', 'webhook', 'storage'],
+		}).$type<'email' | 'webhook' | 'storage'>(),
+		deliveryConfig: jsonb('delivery_config').$type<DeliveryConfig>(),
+		exportConfig: jsonb('export_config').$type<ExportConfig>(),
+	},
+	(table) => {
+		return [index('report_config_delivery_method_idx').on(table.deliveryMethod)]
+	}
+)
+
+export type ReportConfigTypes = typeof reportConfig.$inferSelect
+export type newReportConfig = typeof reportConfig.$inferInsert
 
 export const events = pgTable('events', {
 	id: uuid('id').primaryKey().defaultRandom(),

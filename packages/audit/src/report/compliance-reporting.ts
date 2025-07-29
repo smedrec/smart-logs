@@ -413,7 +413,7 @@ export class ComplianceReportingService {
 					// Track hash algorithms
 					hashAlgorithms[event.hashAlgorithm] = (hashAlgorithms[event.hashAlgorithm] || 0) + 1
 
-					// Verify hash (simplified - in real implementation would use crypto service)
+					// TODO Verify hash (simplified - in real implementation would use crypto service)
 					const isValid = await this.verifyEventIntegrity(event)
 
 					if (isValid) {

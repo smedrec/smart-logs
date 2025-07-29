@@ -379,7 +379,7 @@ export class ScheduledReportingService {
 
 			await this.db.insert(reportExecutions).values(dbExecution)
 
-			// Generate the report (placeholder - would integrate with ComplianceReportingService)
+			// TODO Generate the report (placeholder - would integrate with ComplianceReportingService)
 			const reportResult = await this.generateReport(config)
 			execution.exportResult = reportResult
 			execution.recordsProcessed = reportResult.size // Placeholder
@@ -687,12 +687,12 @@ export class ScheduledReportingService {
 	 */
 
 	private async scheduleReport(config: ScheduledReportConfig): Promise<void> {
-		// In a real implementation, this would integrate with a job scheduler like Bull or Agenda
+		// TODO In a real implementation, this would integrate with a job scheduler like Bull or Agenda
 		console.log(`Scheduling report ${config.id} for ${config.nextRun}`)
 	}
 
 	private async unscheduleReport(reportId: string): Promise<void> {
-		// In a real implementation, this would cancel the scheduled job
+		// TODO In a real implementation, this would cancel the scheduled job
 		console.log(`Unscheduling report ${reportId}`)
 	}
 
@@ -731,7 +731,7 @@ export class ScheduledReportingService {
 	}
 
 	private async generateReport(config: ScheduledReportConfig): Promise<ExportResult> {
-		// Placeholder implementation - would integrate with ComplianceReportingService and DataExportService
+		// TODO Placeholder implementation - would integrate with ComplianceReportingService and DataExportService
 		const exportResult: ExportResult = {
 			exportId: this.generateId('export'),
 			format: config.format,
@@ -804,7 +804,7 @@ export class ScheduledReportingService {
 		reportResult: ExportResult,
 		attempt: DeliveryAttempt
 	): Promise<void> {
-		// Placeholder email delivery implementation
+		// TODO Placeholder email delivery implementation
 		console.log(`Delivering report via email to: ${delivery.recipients?.join(', ')}`)
 		attempt.responseTime = 250 // Placeholder
 	}
@@ -814,7 +814,7 @@ export class ScheduledReportingService {
 		reportResult: ExportResult,
 		attempt: DeliveryAttempt
 	): Promise<void> {
-		// Placeholder webhook delivery implementation
+		// TODO Placeholder webhook delivery implementation
 		console.log(`Delivering report via webhook to: ${delivery.webhookUrl}`)
 		attempt.responseCode = 200
 		attempt.responseTime = 150 // Placeholder
@@ -825,7 +825,7 @@ export class ScheduledReportingService {
 		reportResult: ExportResult,
 		attempt: DeliveryAttempt
 	): Promise<void> {
-		// Placeholder storage delivery implementation
+		// TODO Placeholder storage delivery implementation
 		console.log(`Storing report at: ${delivery.storageLocation}`)
 		attempt.responseTime = 100 // Placeholder
 	}
