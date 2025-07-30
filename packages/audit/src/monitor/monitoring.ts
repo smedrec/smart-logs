@@ -2,9 +2,13 @@
  * Real-time monitoring and alerting system for audit events
  * Implements suspicious pattern detection, alert generation, and metrics collection
  */
+import { Redis as RedisInstance } from 'ioredis'
+
+import { getSharedRedisConnection } from '@repo/redis-client'
 
 import { AlertResolution } from './database-alert-handler.js'
 
+import type { RedisOptions, Redis as RedisType } from 'ioredis'
 import type { AuditLogEvent } from '../types.js'
 import type {
 	Alert,
@@ -92,12 +96,15 @@ export interface AlertHandler {
  * Metrics collector interface
  */
 export interface MetricsCollector {
-	recordEvent(event: AuditLogEvent): void
-	recordProcessingLatency(latency: number): void
-	recordError(error: Error): void
-	recordIntegrityViolation(): void
-	getMetrics(): AuditMetrics
-	resetMetrics(): void
+	recordEvent(): Promise<void>
+	recordProcessingLatency(latency: number): Promise<void>
+	recordError(): Promise<void>
+	recordIntegrityViolation(): Promise<void>
+	recordQueueDepth(depth: number): Promise<void>
+	getMetrics(): Promise<AuditMetrics>
+	resetMetrics(): Promise<void>
+	recordSuspiciousPattern(suspiciousPatterns: number): Promise<void>
+	recordAlertGenerated(): Promise<void>
 }
 
 /**
@@ -106,21 +113,19 @@ export interface MetricsCollector {
 export class MonitoringService {
 	private events: AuditLogEvent[] = []
 	private alerts: Alert[] = []
-	private metrics: AuditMetrics
 	private config: PatternDetectionConfig
 	private alertHandlers: AlertHandler[] = []
 	private metricsCollector: MetricsCollector
-	private organizationId?: string
+	private organizationId: string
 
 	constructor(
+		organizationId: string,
 		config: PatternDetectionConfig = DEFAULT_PATTERN_CONFIG,
-		metricsCollector?: MetricsCollector,
-		organizationId?: string
+		metricsCollector?: MetricsCollector
 	) {
-		this.config = config
-		this.metrics = this.initializeMetrics()
-		this.metricsCollector = metricsCollector || new DefaultMetricsCollector()
 		this.organizationId = organizationId
+		this.config = config
+		this.metricsCollector = metricsCollector || new RedisMetricsCollector(organizationId)
 	}
 
 	/**
@@ -131,6 +136,7 @@ export class MonitoringService {
 			eventsProcessed: 0,
 			processingLatency: 0,
 			queueDepth: 0,
+			errorsGenerated: 0,
 			errorRate: 0,
 			integrityViolations: 0,
 			timestamp: new Date().toISOString(),
@@ -152,7 +158,6 @@ export class MonitoringService {
 	async processEvent(event: AuditLogEvent): Promise<void> {
 		// Store event for pattern analysis
 		this.events.push(event)
-		this.metricsCollector.recordEvent(event)
 
 		// Keep only recent events for pattern detection
 		const cutoffTime =
@@ -175,9 +180,11 @@ export class MonitoringService {
 		}
 
 		// Update metrics
-		this.metrics.eventsProcessed++
-		this.metrics.suspiciousPatterns += detectionResult.patterns.length
-		this.metrics.timestamp = new Date().toISOString()
+		this.metricsCollector.recordEvent()
+		if (detectionResult.patterns.length > 0) {
+			this.metricsCollector.recordSuspiciousPattern(detectionResult.patterns.length)
+		}
+		this.metricsCollector.recordProcessingLatency(Date.now() - new Date(event.timestamp).getTime())
 	}
 
 	/**
@@ -477,7 +484,7 @@ export class MonitoringService {
 	 */
 	private async generateAlert(alert: Alert): Promise<void> {
 		this.alerts.push(alert)
-		this.metrics.alertsGenerated++
+		this.metricsCollector.recordAlertGenerated()
 
 		// Send alert through all registered handlers
 		for (const handler of this.alertHandlers) {
@@ -492,14 +499,15 @@ export class MonitoringService {
 	/**
 	 * Get current metrics
 	 */
-	getMetrics(): AuditMetrics {
-		return { ...this.metrics, ...this.metricsCollector.getMetrics() }
+	async getMetrics(): Promise<AuditMetrics> {
+		const metrics = await this.metricsCollector.getMetrics()
+		return metrics
 	}
 
 	/**
 	 * Get active alerts
 	 */
-	getActiveAlerts(): Alert[] {
+	async getActiveAlerts(): Promise<Alert[]> {
 		return this.alerts.filter((alert) => !alert.resolved)
 	}
 
@@ -529,7 +537,7 @@ export class MonitoringService {
 	 */
 	async getHealthStatus(): Promise<HealthStatus> {
 		const now = new Date().toISOString()
-		const metrics = this.getMetrics()
+		const metrics = await this.getMetrics()
 
 		// Determine overall health based on metrics
 		let overallStatus: 'OK' | 'WARNING' | 'CRITICAL' = 'OK'
@@ -542,23 +550,25 @@ export class MonitoringService {
 			overallStatus = 'WARNING'
 		}
 
+		const activeAlerts = await this.getActiveAlerts()
+
 		return {
 			status: overallStatus,
 			components: {
 				monitoring: {
 					status: 'OK',
 					message: `Processing ${metrics.eventsProcessed} events`,
-					lastCheck: now,
+					lastCheck: metrics.timestamp,
 				},
 				alerting: {
-					status: this.getActiveAlerts().length > 10 ? 'WARNING' : 'OK',
-					message: `${this.getActiveAlerts().length} active alerts`,
+					status: activeAlerts.length > 10 ? 'WARNING' : 'OK',
+					message: `${activeAlerts.length} active alerts`,
 					lastCheck: now,
 				},
 				patternDetection: {
 					status: metrics.suspiciousPatterns > 5 ? 'WARNING' : 'OK',
 					message: `${metrics.suspiciousPatterns} suspicious patterns detected`,
-					lastCheck: now,
+					lastCheck: metrics.timestamp,
 				},
 			},
 			timestamp: now,
@@ -567,8 +577,237 @@ export class MonitoringService {
 }
 
 /**
- * Default metrics collector implementation
+ * Redis metrics collector
  */
+export class RedisMetricsCollector implements MetricsCollector {
+	private organizationId: string
+	private key: string
+	private connection: RedisType
+	private isSharedConnection: boolean
+
+	constructor(
+		organizationId: string,
+		redisOrUrlOrOptions?: string | RedisType | { url?: string; options?: RedisOptions },
+		directConnectionOptions?: RedisOptions
+	) {
+		this.organizationId = organizationId
+		this.key = `metrics:${organizationId}`
+		this.isSharedConnection = false
+
+		const defaultDirectOptions: RedisOptions = {
+			maxRetriesPerRequest: null,
+			enableAutoPipelining: true,
+		}
+
+		if (
+			redisOrUrlOrOptions &&
+			typeof redisOrUrlOrOptions === 'object' &&
+			'status' in redisOrUrlOrOptions
+		) {
+			// Scenario 1: An existing ioredis instance is provided
+			this.connection = redisOrUrlOrOptions
+			this.isSharedConnection = false // Assume externally managed, could be shared or not
+			console.log(
+				`[MonitorService] Using provided Redis instance for monitor of organization "${this.organizationId}".`
+			)
+		} else if (
+			typeof redisOrUrlOrOptions === 'string' ||
+			(typeof redisOrUrlOrOptions === 'object' &&
+				(redisOrUrlOrOptions.url || redisOrUrlOrOptions.options)) ||
+			directConnectionOptions
+		) {
+			// Scenario 2: URL string, options object, or directConnectionOptions are provided for a direct connection
+			this.isSharedConnection = false
+			let url: string | undefined
+			let options: RedisOptions = { ...defaultDirectOptions, ...directConnectionOptions }
+
+			if (typeof redisOrUrlOrOptions === 'string') {
+				url = redisOrUrlOrOptions
+			} else if (
+				typeof redisOrUrlOrOptions === 'object' &&
+				(redisOrUrlOrOptions.url || redisOrUrlOrOptions.options)
+			) {
+				// Check this condition specifically for object with url/options
+				url = redisOrUrlOrOptions.url
+				options = { ...options, ...redisOrUrlOrOptions.options }
+			}
+			// Note: directConnectionOptions are already merged into options
+
+			const envUrl = process.env['MONITOR_REDIS_URL']
+			const finalUrl = url || envUrl // Prioritize explicitly passed URL/options object over env var
+
+			if (finalUrl) {
+				// If any URL (explicit, from object, or env) is found, attempt direct connection
+				try {
+					console.log(
+						`[MonitorService] Creating new direct Redis connection to ${finalUrl.split('@').pop()} for monitor of organization "${this.organizationId}".`
+					)
+					this.connection = new RedisInstance(finalUrl, options)
+				} catch (err) {
+					console.error(
+						`[MonitorService] Failed to create direct Redis instance for monitor of organization "${this.organizationId}":`,
+						err
+					)
+					throw new Error(
+						`[MonitorService] Failed to initialize direct Redis connection for monitor of organization "${this.organizationId}". Error: ${err instanceof Error ? err.message : String(err)}`
+					)
+				}
+			} else if (url || redisOrUrlOrOptions || directConnectionOptions) {
+				// This case means an attempt for direct connection was made (e.g. empty string URL, or empty options object)
+				// but resulted in no usable URL, and MONITOR_REDIS_URL was also not set.
+				console.warn(
+					`[MonitorService] Attempted direct Redis connection for monitor of organization "${this.organizationId}" but no valid URL could be determined (explicitly or via MONITOR_REDIS_URL). Falling back to shared connection.`
+				)
+				this.connection = getSharedRedisConnection()
+				this.isSharedConnection = true
+			} else {
+				// Scenario 3: No explicit direct connection info at all, and no env var, use the shared connection
+				console.log(
+					`[MonitorService] Using shared Redis connection for monitor of organization "${this.organizationId}".`
+				)
+				this.connection = getSharedRedisConnection()
+				this.isSharedConnection = true
+			}
+		} else if (process.env['MONITOR_REDIS_URL']) {
+			// Scenario 2b: Only MONITOR_REDIS_URL is provided (no redisOrUrlOrOptions or directConnectionOptions)
+			this.isSharedConnection = false
+			const envUrl = process.env['MONITOR_REDIS_URL']
+			const options: RedisOptions = { ...defaultDirectOptions } // directConnectionOptions is undefined here
+			try {
+				console.log(
+					`[MonitorService] Creating new direct Redis connection using MONITOR_REDIS_URL to ${envUrl.split('@').pop()} for monitor of organization "${this.organizationId}".`
+				)
+				this.connection = new RedisInstance(envUrl, options)
+			} catch (err) {
+				console.error(
+					`[MonitorService] Failed to create direct Redis instance using MONITOR_REDIS_URL for monitor of organization "${this.organizationId}":`,
+					err
+				)
+				throw new Error(
+					`[MonitorService] Failed to initialize direct Redis connection using MONITOR_REDIS_URL for monitor of organization "${this.organizationId}". Error: ${err instanceof Error ? err.message : String(err)}`
+				)
+			}
+		} else {
+			// Scenario 3: No specific connection info at all, use the shared connection
+			console.log(
+				`[AuditService] Using shared Redis connection for monitor of organization "${this.organizationId}".`
+			)
+			this.connection = getSharedRedisConnection()
+			this.isSharedConnection = true
+		}
+	}
+
+	async getMetrics(): Promise<AuditMetrics> {
+		const metrics: AuditMetrics = {
+			eventsProcessed: parseInt(
+				(await this.connection.get(`${this.key}:eventsProcessed`)) || '0',
+				10
+			),
+			processingLatency: parseFloat(
+				(await this.connection.get(`${this.key}:processingLatency`)) || '0'
+			),
+			queueDepth: parseInt((await this.connection.get(`${this.key}:queueDepth`)) || '0', 10),
+			errorsGenerated: parseInt(
+				(await this.connection.get(`${this.key}:errorsGenerated`)) || '0',
+				10
+			),
+			errorRate: parseFloat((await this.connection.get(`${this.key}:errorRate`)) || '0'),
+			integrityViolations: parseInt(
+				(await this.connection.get(`${this.key}:integrityViolations`)) || '0',
+				10
+			),
+			timestamp: (await this.connection.get(`${this.key}:timestamp`)) || new Date().toISOString(),
+			alertsGenerated: parseInt(
+				(await this.connection.get(`${this.key}:alertsGenerated`)) || '0',
+				10
+			),
+			suspiciousPatterns: parseInt(
+				(await this.connection.get(`${this.key}:suspiciousPatterns`)) || '0',
+				10
+			),
+		}
+
+		return metrics
+	}
+
+	async resetMetrics(): Promise<void> {
+		await this.connection.del(`${this.key}`)
+
+		const metrics: AuditMetrics = {
+			eventsProcessed: 0,
+			processingLatency: 0,
+			queueDepth: 0,
+			errorsGenerated: 0,
+			errorRate: 0,
+			integrityViolations: 0,
+			timestamp: new Date().toISOString(),
+			alertsGenerated: 0,
+			suspiciousPatterns: 0,
+		}
+		await this.connection.set(`${this.key}`, JSON.stringify(metrics))
+	}
+
+	async recordQueueDepth(depth: number): Promise<void> {
+		await this.connection.set(`${this.key}:queueDepth`, depth.toString())
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordEvent(): Promise<void> {
+		await this.connection.incr(`${this.key}:eventsProcessed`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordProcessingLatency(latency: number): Promise<void> {
+		const currentLatency = parseFloat(
+			(await this.connection.get(`${this.key}:processingLatency`)) || '0'
+		)
+		const newLatency = (currentLatency + latency) / 2 // Calculate new average latency
+		await this.connection.set(`${this.key}:processingLatency`, newLatency.toString())
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordError(): Promise<void> {
+		await this.connection.incr(`${this.key}:errorsGenerated`)
+
+		const currentErrorsGenerated = parseInt(
+			(await this.connection.get(`${this.key}:errorsGenerated`)) || '0',
+			10
+		)
+		const currentEventsProcessed = parseInt(
+			(await this.connection.get(`${this.key}:eventsProcessed`)) || '0',
+			10
+		)
+
+		let newErrorRate: number
+		if (currentEventsProcessed === 0) {
+			newErrorRate = 0.0
+		} else {
+			newErrorRate = currentErrorsGenerated / currentEventsProcessed
+		}
+
+		await this.connection.set(`${this.key}:errorRate`, newErrorRate.toString())
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordIntegrityViolation(): Promise<void> {
+		await this.connection.incr(`${this.key}:integrityViolations`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordAlertGenerated(): Promise<void> {
+		await this.connection.incr(`${this.key}:alertsGenerated`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordSuspiciousPattern(suspiciousPatterns: number): Promise<void> {
+		await this.connection.incrby(`${this.key}:suspiciousPatterns`, suspiciousPatterns)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+}
+
+/**
+ * Default metrics collector implementation
+ 
 export class DefaultMetricsCollector implements MetricsCollector {
 	private metrics: AuditMetrics
 
@@ -577,6 +816,7 @@ export class DefaultMetricsCollector implements MetricsCollector {
 			eventsProcessed: 0,
 			processingLatency: 0,
 			queueDepth: 0,
+			errorsGenerated: 0,
 			errorRate: 0,
 			integrityViolations: 0,
 			timestamp: new Date().toISOString(),
@@ -585,7 +825,7 @@ export class DefaultMetricsCollector implements MetricsCollector {
 		}
 	}
 
-	recordEvent(event: AuditLogEvent): void {
+	recordEvent(): void {
 		this.metrics.eventsProcessed++
 		this.metrics.timestamp = new Date().toISOString()
 	}
@@ -595,7 +835,7 @@ export class DefaultMetricsCollector implements MetricsCollector {
 		this.metrics.processingLatency = (this.metrics.processingLatency + latency) / 2
 	}
 
-	recordError(error: Error): void {
+	recordError(): void {
 		// Simple error rate calculation
 		this.metrics.errorRate = Math.min(this.metrics.errorRate + 0.01, 1.0)
 	}
@@ -620,7 +860,7 @@ export class DefaultMetricsCollector implements MetricsCollector {
 			suspiciousPatterns: 0,
 		}
 	}
-}
+} */
 
 /**
  * Console alert handler for development/testing

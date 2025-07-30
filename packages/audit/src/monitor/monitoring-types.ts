@@ -9,6 +9,7 @@ export interface AuditMetrics {
 	eventsProcessed: number
 	processingLatency: number
 	queueDepth: number
+	errorsGenerated: number
 	errorRate: number
 	integrityViolations: number
 	timestamp: string

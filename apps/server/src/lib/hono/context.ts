@@ -8,6 +8,7 @@ import type {
 	DataExportService,
 	ErrorHandler,
 	HealthCheckService,
+	MonitoringService,
 	ScheduledReportingService,
 } from '@repo/audit'
 import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
@@ -45,6 +46,7 @@ export type ServiceContext = {
 		preset: DatabasePresetHandler
 	}
 	alert: DatabaseAlertHandler
+	monitor: MonitoringService
 	audit: Audit
 	logger: Logger
 	error: ErrorHandler

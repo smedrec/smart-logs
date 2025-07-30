@@ -29,9 +29,9 @@ export async function setupMonitoringWithDatabaseAlerts(
 
 	// Create monitoring service with organization context
 	const monitoringService = new MonitoringService(
+		organizationId, // Set organization context
 		undefined, // Use default config
-		undefined, // Use default metrics collector
-		organizationId // Set organization context
+		undefined // Use default metrics collector
 	)
 
 	// Add database alert handler to monitoring service
