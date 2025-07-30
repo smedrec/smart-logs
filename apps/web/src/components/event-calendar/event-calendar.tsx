@@ -1,7 +1,6 @@
 'use client'
 
 import { useEventCalendarStore } from '@/hooks/use-event'
-import { Events } from '@/types/event'
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/shallow'
 
@@ -15,6 +14,8 @@ import { EventCalendarYear } from './event-calendar-year'
 import EventCreateDialog from './event-create-dialog'
 import EventDialog from './event-dialog'
 import { EventsList } from './event-list'
+
+import type { Events } from '@/types/event'
 
 interface EventCalendarProps {
 	events: Events[]

@@ -24,23 +24,22 @@ import { LOCALES } from '@/constants/calendar-constant'
 import { useEventCalendarStore } from '@/hooks/use-event'
 import { getLocalizedDaysOfWeek } from '@/lib/date'
 import { getLocaleFromCode } from '@/lib/event'
-import {
-	CalendarViewConfigs,
-	CalendarViewType,
-	daysViewConfig,
-	DayViewConfig,
-	MonthViewConfig,
-	TimeFormatType,
-	ViewModeType,
-	WeekViewConfig,
-	YearViewConfig,
-} from '/types/event'
+import { CalendarViewType, TimeFormatType, ViewModeType } from '@/types/event'
 import { Calendar, CalendarDays, Clock, Eye, Globe, Settings, Sun, Zap } from 'lucide-react'
 import { parseAsString, useQueryState } from 'nuqs'
 import { useState, useTransition } from 'react'
 import { useShallow } from 'zustand/shallow'
 
 import { ScrollArea } from '../ui/scroll-area'
+
+import type {
+	CalendarViewConfigs,
+	daysViewConfig,
+	DayViewConfig,
+	MonthViewConfig,
+	WeekViewConfig,
+	YearViewConfig,
+} from '@/types/event'
 
 const VIEW_TYPES = [
 	{ value: 'day', label: 'Day View' },

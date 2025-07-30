@@ -11,11 +11,3 @@ export const types = [
 	{ label: 'Performance', value: 'PERFORMANCE' },
 	{ label: 'System', value: 'SYSTEM' },
 ]
-
-export const sources = [
-	{ label: 'Audit Monitoring', value: 'audit-monitoring' },
-	{ label: 'API', value: 'api' },
-	{ label: 'Web', value: 'web' },
-	{ label: 'CLI', value: 'cli' },
-	{ label: 'Other', value: 'other' },
-]

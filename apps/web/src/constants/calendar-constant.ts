@@ -1,6 +1,6 @@
 import { de, enGB, enUS, es, fr, id, ja, ko } from 'date-fns/locale'
 
-import type { EventTypes } from '../../../server/src/db/schema'
+import type { EventTypes } from '@repo/auth'
 
 export const EVENT_DEFAULTS = {
 	START_TIME: '09:00',
