@@ -159,7 +159,15 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!audit) audit = new Audit('audit')
 
+		const session = c.get('session')
+		const organizationId = session?.session.activeOrganizationId as string
 		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db.audit)
+		if (!monitoringService) {
+			monitoringService = new MonitoringService(organizationId, undefined, undefined)
+			monitoringService.addAlertHandler(databaseAlertHandler)
+		}
+
+		const monitor = { alert: databaseAlertHandler, metrics: monitoringService }
 
 		if (!databaseErrorLogger)
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
@@ -194,7 +202,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			//redis,
 			health: healthCheckService,
 			compliance,
-			alert: databaseAlertHandler,
+			monitor,
 			audit,
 			logger,
 			error: errorHandler,

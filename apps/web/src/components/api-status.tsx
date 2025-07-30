@@ -3,24 +3,39 @@ import { trpc } from '@/utils/trpc'
 import { useQuery } from '@tanstack/react-query'
 
 function ApiStatus() {
-	const healthCheck = useQuery(trpc.health.check.queryOptions())
-	return (
-		<span className="text-sm text-muted-foreground">
-			{healthCheck.isLoading ? (
-				'Checking...'
-			) : healthCheck.data ? (
+	const status = useQuery(trpc.metrics.status.queryOptions())
+	const overallStatus = status.data?.status
+
+	switch (overallStatus) {
+		case 'OK':
+			return (
 				<Status status="online">
 					<StatusIndicator />
 					<StatusLabel />
 				</Status>
-			) : (
+			)
+		case 'WARNING':
+			return (
+				<Status status="degraded">
+					<StatusIndicator />
+					<StatusLabel />
+				</Status>
+			)
+		case 'CRITICAL':
+			return (
 				<Status status="offline">
 					<StatusIndicator />
 					<StatusLabel />
 				</Status>
-			)}
-		</span>
-	)
+			)
+		default:
+			return (
+				<Status status="offline">
+					<StatusIndicator />
+					<StatusLabel />
+				</Status>
+			)
+	}
 }
 
 export { ApiStatus }

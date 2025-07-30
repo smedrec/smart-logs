@@ -45,8 +45,10 @@ export type ServiceContext = {
 		scheduled: ScheduledReportingService
 		preset: DatabasePresetHandler
 	}
-	alert: DatabaseAlertHandler
-	monitor: MonitoringService
+	monitor: {
+		alert: DatabaseAlertHandler
+		metrics: MonitoringService
+	}
 	audit: Audit
 	logger: Logger
 	error: ErrorHandler

@@ -169,6 +169,8 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 
+		const monitor = { alert: databaseAlertHandler, metrics: monitoringService }
+
 		if (!databaseErrorLogger)
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
 		if (!errorHandler) errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
@@ -204,8 +206,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			//redis,
 			health: healthCheckService,
 			compliance,
-			alert: databaseAlertHandler,
-			monitor: monitoringService,
+			monitor,
 			audit,
 			logger,
 			error: errorHandler,

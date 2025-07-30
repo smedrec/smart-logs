@@ -73,13 +73,13 @@ export const cleanupResolvedAlerts = inngest.createFunction(
 	{ id: 'cleanup-resolved-alerts' },
 	{ event: 'alerts/cleanup.resolved.alerts' },
 	async ({ event, services }) => {
-		const { alert, logger, error } = services
+		const { monitor, logger, error } = services
 		// 3️⃣ We can now grab the email and user id from the event payload
 		const { organization_id, retention_days } = event.data
 
 		try {
 			// 4️⃣ Now we can use the email and user id to send the email
-			const alerts = await alert.cleanupResolvedAlerts(organization_id, retention_days)
+			const alerts = await monitor.alert.cleanupResolvedAlerts(organization_id, retention_days)
 			logger.info(`Cleaned up ${alerts} resolved alerts for organization ${organization_id}`)
 		} catch (e) {
 			// 5️⃣ If there's an error, we can log it and handle it gracefully

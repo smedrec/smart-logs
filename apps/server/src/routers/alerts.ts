@@ -7,10 +7,10 @@ import type { AlertQueryFilters } from '@repo/audit'
 
 const alertsRouter = {
 	active: protectedProcedure.query(async ({ ctx }) => {
-		const { alert, logger, error } = ctx.services
+		const { monitor, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 		try {
-			const alerts = await alert.getActiveAlerts(organizationId)
+			const alerts = await monitor.alert.getActiveAlerts(organizationId)
 			return alerts
 		} catch (e) {
 			const message = e instanceof Error ? e.message : 'Unknown error'
@@ -40,14 +40,14 @@ const alertsRouter = {
 		}
 	}),
 	resolved: protectedProcedure.query(async ({ ctx }) => {
-		const { alert, logger, error } = ctx.services
+		const { monitor, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 		const filter: AlertQueryFilters = {
 			organizationId,
 			resolved: true,
 		}
 		try {
-			const alerts = await alert.getAlerts(filter)
+			const alerts = await monitor.alert.getAlerts(filter)
 			return alerts
 		} catch (e) {
 			const message = e instanceof Error ? e.message : 'Unknown error'
@@ -77,10 +77,10 @@ const alertsRouter = {
 		}
 	}),
 	statistics: protectedProcedure.query(async ({ ctx }) => {
-		const { alert, logger, error } = ctx.services
+		const { monitor, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 		try {
-			const statistics = await alert.getAlertStatistics(organizationId)
+			const statistics = await monitor.alert.getAlertStatistics(organizationId)
 			return statistics
 		} catch (e) {
 			const message = e instanceof Error ? e.message : 'Unknown error'
@@ -117,14 +117,14 @@ const alertsRouter = {
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { alert, logger, error } = ctx.services
+			const { monitor, logger, error } = ctx.services
 			const resolvedBy = ctx.session.session.userId
 			const resolutionData = {
 				resolvedBy,
 				resolutionNotes: input.resolutionNotes,
 			}
 			try {
-				const result = await alert.resolveAlert(input.alertId, resolvedBy, resolutionData)
+				const result = await monitor.alert.resolveAlert(input.alertId, resolvedBy, resolutionData)
 				return {
 					success: result.success,
 					message: `Alert ${input.alertId} resolved by ${resolvedBy}`,
@@ -163,10 +163,13 @@ const alertsRouter = {
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { alert, logger, error } = ctx.services
+			const { monitor, logger, error } = ctx.services
 			const organizationId = ctx.session.session.activeOrganizationId as string
 			try {
-				const result = await alert.cleanupResolvedAlerts(organizationId, input.retentionDays)
+				const result = await monitor.alert.cleanupResolvedAlerts(
+					organizationId,
+					input.retentionDays
+				)
 				return {
 					deletedAlerts: result,
 					message: `${result > 0 ? `Deleted ${result} resolved alerts` : 'No resolved alerts to delete'}`,
