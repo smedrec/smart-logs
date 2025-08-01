@@ -10,9 +10,7 @@
 		"types": ["node"]
 		// We inherit module, target, moduleResolution ('bundler'), lib, strict, etc., from the base.
 	},
-	//"references": [
-	//	{ "path": "../audit-db" }
-	//],
+	"references": [{ "path": "../audit-db" }],
 	//"include": ["src/**/*", "../audit-db/src/archival-cli.ts"],
 	"include": ["src/**/*"],
 	"exclude": [

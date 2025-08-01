@@ -244,7 +244,10 @@ export class MigrationUtils {
 					},
 					validation: {
 						maxStringLength: 5000,
+						allowedDataClassifications: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'],
 						requiredFields: ['timestamp', 'action', 'status', 'principalId', 'targetResourceType'],
+						maxCustomFieldDepth: 3,
+						allowedEventVersions: ['1.0', '1.1', '2.0'],
 					},
 					created_by: 'system',
 				},
@@ -337,7 +340,6 @@ export class MigrationUtils {
 						${preset.validation ? JSON.stringify(preset.validation) : JSON.stringify(DEFAULT_VALIDATION_CONFIG)},
 						${preset.created_by}
 					)
-					ON CONFLICT (name) DO NOTHING
 				`
 			}
 

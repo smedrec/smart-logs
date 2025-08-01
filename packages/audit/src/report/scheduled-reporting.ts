@@ -12,7 +12,11 @@
 
 import { and, desc, eq, gte, lte } from 'drizzle-orm'
 
-import { reportExecutions, reportTemplates, scheduledReports } from '@repo/audit-db'
+import {
+	reportExecutions,
+	reportTemplates,
+	scheduledReports,
+} from '../../../audit-db/src/db/schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {

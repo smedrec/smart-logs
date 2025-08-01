@@ -19,7 +19,6 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@repo/audit-db": "workspace:*",
 		"@repo/redis-client": "workspace:*",
 		"bullmq": "5.56.4",
 		"drizzle-orm": "0.44.2",

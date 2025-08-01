@@ -1,14 +1,14 @@
 {
-  "extends": "@repo/typescript-config/base.json",
-  "compilerOptions": {
-    "noEmit": false,
-    "outDir": "dist",
-    "composite": true,
-    "rootDir": "src"
-  },
-  "references": [
-    { "path": "../audit" }
-  ],
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts"]
+	"extends": "@repo/typescript-config/base.json",
+	"compilerOptions": {
+		"noEmit": false,
+		"outDir": "dist",
+		"composite": true,
+		"rootDir": "src"
+	},
+	//"references": [
+	//  { "path": "../audit" }
+	//],
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts"]
 }

@@ -45,12 +45,35 @@ export class DatabasePresetHandler implements PresetHandler {
 
 			const rows = result || []
 			if (rows.length === 0) {
-				return null
+				return await this.getDefaultPreset(name)
 			}
 
 			return this.mapDatabasePresetToPreset(rows[0])
 		} catch (error) {
 			throw new Error(`Failed to retrieve preset by ID: ${error}`)
+		}
+	}
+
+	/**
+	 * Get default preset by name
+	 */
+	async getDefaultPreset(name: string): Promise<AuditPreset | null> {
+		try {
+			const result = await this.db.execute(sql`
+				SELECT * FROM audit_preset
+				WHERE name = ${name}
+				AND organization_id = '*'
+				LIMIT 1
+			`)
+
+			const rows = result || []
+			if (rows.length === 0) {
+				return null
+			}
+
+			return this.mapDatabasePresetToPreset(rows[0])
+		} catch (error) {
+			throw new Error(`Failed to retrieve default preset by name: ${error}`)
 		}
 	}
 

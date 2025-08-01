@@ -159,11 +159,9 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!audit) audit = new Audit('audit')
 
-		const session = c.get('session')
-		const organizationId = session?.session.activeOrganizationId as string
 		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db.audit)
 		if (!monitoringService) {
-			monitoringService = new MonitoringService(organizationId, undefined, undefined)
+			monitoringService = new MonitoringService()
 			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 

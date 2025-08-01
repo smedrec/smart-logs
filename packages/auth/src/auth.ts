@@ -1,8 +1,17 @@
 import { expo } from '@better-auth/expo'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { admin, apiKey, mcp, oidcProvider, openAPI, organization } from 'better-auth/plugins'
+import {
+	admin,
+	apiKey,
+	createAuthMiddleware,
+	mcp,
+	oidcProvider,
+	openAPI,
+	organization,
+} from 'better-auth/plugins'
 
+import { AuditSDK } from '@repo/audit-sdk'
 import { SendMail } from '@repo/send-mail'
 
 import { db } from './db/index.js'
@@ -14,6 +23,34 @@ import type { MailerSendOptions } from '@repo/send-mail'
 
 const redis = getRedisConnection()
 const email = new SendMail('mail')
+// Initialize the SDK
+const auditSDK = new AuditSDK({
+	queueName: 'audit',
+	redis: {
+		url: process.env.REDIS_URL,
+	},
+	databaseUrl: process.env.AUDIT_DB_URL,
+	defaults: {
+		dataClassification: 'INTERNAL',
+		generateHash: true,
+		generateSignature: true,
+	},
+	crypto: {
+		secretKey: process.env.AUDIT_CRYPTO_SECRET,
+		enableSignatures: true,
+	},
+	compliance: {
+		hipaa: {
+			enabled: true,
+			retentionYears: 6,
+		},
+		gdpr: {
+			enabled: true,
+			defaultLegalBasis: 'legitimate_interest',
+			retentionDays: 365,
+		},
+	},
+})
 
 export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	database: drizzleAdapter(db, {
@@ -75,6 +112,52 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	},
 	secret: process.env.BETTER_AUTH_SECRET,
 	baseURL: process.env.BETTER_AUTH_URL,
+	/*hooks: {
+		before: createAuthMiddleware(async (ctx) => {
+			if (ctx.path.startsWith('/auth/sign-out')) {
+				const session = ctx.context.session
+				if (session) {
+					const details = {
+						principalId: session.session.userId,
+						organizationId: session.session.activeOrganizationId,
+						action: 'logout',
+						status: 'success',
+						sessionContext: {
+							sessionId: session.session.id,
+							ipAddress: session.session.ipAddress,
+							userAgent: session.session.userAgent,
+						},
+					}
+					await auditSDK.log(details, {
+						preset: 'authentication',
+						compliance: ['gdpr'],
+					})
+				}
+			}
+		}),
+		after: createAuthMiddleware(async (ctx) => {
+			if (ctx.path.startsWith('/auth/sign-in')) {
+				const newSession = ctx.context.newSession
+				if (newSession) {
+					const details = {
+						principalId: newSession.session.userId,
+						organizationId: newSession.session.activeOrganizationId,
+						action: 'login',
+						status: 'success',
+						sessionContext: {
+							sessionId: newSession.session.id,
+							ipAddress: newSession.session.ipAddress,
+							userAgent: newSession.session.userAgent,
+						},
+					}
+					await auditSDK.log(details, {
+						preset: 'authentication',
+						compliance: ['gdpr'],
+					})
+				}
+			}
+		}),
+	},*/
 	databaseHooks: {
 		session: {
 			create: {

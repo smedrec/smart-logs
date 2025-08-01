@@ -547,7 +547,7 @@ export class Audit {
 						err
 					)
 					if (this.connection.status !== 'end') {
-						await this.connection.disconnect()
+						this.connection.disconnect()
 						console.info(
 							`[AuditService] Direct Redis connection for queue '${this.queueName}' disconnected forcefully.`
 						)

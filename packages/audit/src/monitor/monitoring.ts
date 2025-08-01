@@ -116,16 +116,13 @@ export class MonitoringService {
 	private config: PatternDetectionConfig
 	private alertHandlers: AlertHandler[] = []
 	private metricsCollector: MetricsCollector
-	private organizationId: string
 
 	constructor(
-		organizationId: string,
 		config: PatternDetectionConfig = DEFAULT_PATTERN_CONFIG,
 		metricsCollector?: MetricsCollector
 	) {
-		this.organizationId = organizationId
 		this.config = config
-		this.metricsCollector = metricsCollector || new RedisMetricsCollector(organizationId)
+		this.metricsCollector = metricsCollector || new RedisMetricsCollector()
 	}
 
 	/**
@@ -459,7 +456,7 @@ export class MonitoringService {
 	 */
 	private createAlertFromPattern(pattern: SuspiciousPattern): Alert {
 		// Extract organizationId from the first event in the pattern
-		const organizationId = pattern.events[0]?.organizationId || this.organizationId
+		const organizationId = pattern.events[0]?.organizationId
 
 		return {
 			id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -580,18 +577,14 @@ export class MonitoringService {
  * Redis metrics collector
  */
 export class RedisMetricsCollector implements MetricsCollector {
-	private organizationId: string
-	private key: string
+	private key = 'metrics'
 	private connection: RedisType
 	private isSharedConnection: boolean
 
 	constructor(
-		organizationId: string,
 		redisOrUrlOrOptions?: string | RedisType | { url?: string; options?: RedisOptions },
 		directConnectionOptions?: RedisOptions
 	) {
-		this.organizationId = organizationId
-		this.key = `metrics:${organizationId}`
 		this.isSharedConnection = false
 
 		const defaultDirectOptions: RedisOptions = {
@@ -607,9 +600,7 @@ export class RedisMetricsCollector implements MetricsCollector {
 			// Scenario 1: An existing ioredis instance is provided
 			this.connection = redisOrUrlOrOptions
 			this.isSharedConnection = false // Assume externally managed, could be shared or not
-			console.log(
-				`[MonitorService] Using provided Redis instance for monitor of organization "${this.organizationId}".`
-			)
+			console.log(`[MonitorService] Using provided Redis instance for monitor.`)
 		} else if (
 			typeof redisOrUrlOrOptions === 'string' ||
 			(typeof redisOrUrlOrOptions === 'object' &&
@@ -640,31 +631,26 @@ export class RedisMetricsCollector implements MetricsCollector {
 				// If any URL (explicit, from object, or env) is found, attempt direct connection
 				try {
 					console.log(
-						`[MonitorService] Creating new direct Redis connection to ${finalUrl.split('@').pop()} for monitor of organization "${this.organizationId}".`
+						`[MonitorService] Creating new direct Redis connection to ${finalUrl.split('@').pop()} for monitor.`
 					)
 					this.connection = new RedisInstance(finalUrl, options)
 				} catch (err) {
-					console.error(
-						`[MonitorService] Failed to create direct Redis instance for monitor of organization "${this.organizationId}":`,
-						err
-					)
+					console.error(`[MonitorService] Failed to create direct Redis instance for monitor:`, err)
 					throw new Error(
-						`[MonitorService] Failed to initialize direct Redis connection for monitor of organization "${this.organizationId}". Error: ${err instanceof Error ? err.message : String(err)}`
+						`[MonitorService] Failed to initialize direct Redis connection for monitor. Error: ${err instanceof Error ? err.message : String(err)}`
 					)
 				}
 			} else if (url || redisOrUrlOrOptions || directConnectionOptions) {
 				// This case means an attempt for direct connection was made (e.g. empty string URL, or empty options object)
 				// but resulted in no usable URL, and MONITOR_REDIS_URL was also not set.
 				console.warn(
-					`[MonitorService] Attempted direct Redis connection for monitor of organization "${this.organizationId}" but no valid URL could be determined (explicitly or via MONITOR_REDIS_URL). Falling back to shared connection.`
+					`[MonitorService] Attempted direct Redis connection for monitor but no valid URL could be determined (explicitly or via MONITOR_REDIS_URL). Falling back to shared connection.`
 				)
 				this.connection = getSharedRedisConnection()
 				this.isSharedConnection = true
 			} else {
 				// Scenario 3: No explicit direct connection info at all, and no env var, use the shared connection
-				console.log(
-					`[MonitorService] Using shared Redis connection for monitor of organization "${this.organizationId}".`
-				)
+				console.log(`[MonitorService] Using shared Redis connection for monitor.`)
 				this.connection = getSharedRedisConnection()
 				this.isSharedConnection = true
 			}
@@ -675,23 +661,21 @@ export class RedisMetricsCollector implements MetricsCollector {
 			const options: RedisOptions = { ...defaultDirectOptions } // directConnectionOptions is undefined here
 			try {
 				console.log(
-					`[MonitorService] Creating new direct Redis connection using MONITOR_REDIS_URL to ${envUrl.split('@').pop()} for monitor of organization "${this.organizationId}".`
+					`[MonitorService] Creating new direct Redis connection using MONITOR_REDIS_URL to ${envUrl.split('@').pop()} for monitor.`
 				)
 				this.connection = new RedisInstance(envUrl, options)
 			} catch (err) {
 				console.error(
-					`[MonitorService] Failed to create direct Redis instance using MONITOR_REDIS_URL for monitor of organization "${this.organizationId}":`,
+					`[MonitorService] Failed to create direct Redis instance using MONITOR_REDIS_URL for monitor:`,
 					err
 				)
 				throw new Error(
-					`[MonitorService] Failed to initialize direct Redis connection using MONITOR_REDIS_URL for monitor of organization "${this.organizationId}". Error: ${err instanceof Error ? err.message : String(err)}`
+					`[MonitorService] Failed to initialize direct Redis connection using MONITOR_REDIS_URL for monitor. Error: ${err instanceof Error ? err.message : String(err)}`
 				)
 			}
 		} else {
 			// Scenario 3: No specific connection info at all, use the shared connection
-			console.log(
-				`[AuditService] Using shared Redis connection for monitor of organization "${this.organizationId}".`
-			)
+			console.log(`[AuditService] Using shared Redis connection for monitor.`)
 			this.connection = getSharedRedisConnection()
 			this.isSharedConnection = true
 		}

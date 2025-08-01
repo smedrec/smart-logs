@@ -188,7 +188,7 @@ export class DeadLetterHandler {
 	 * Archives a dead letter event to persistent storage
 	 */
 	private async archiveEvent(event: DeadLetterEvent): Promise<void> {
-		// In a real implementation, this would save to a persistent archive
+		// TODO In a real implementation, this would save to a persistent archive
 		// For now, we'll just log it with structured data
 		console.log('[DeadLetterHandler] Archiving DLQ event:', {
 			action: event.originalEvent.action,

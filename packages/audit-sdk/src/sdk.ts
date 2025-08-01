@@ -1,10 +1,9 @@
-import { Audit } from '@repo/audit'
+import { Audit, createDatabasePresetHandler } from '@repo/audit'
 import { AuditDb } from '@repo/audit-db'
 
 import { validateCompliance } from './compliance.js'
-import { AUDIT_PRESETS } from './presets.js'
 
-import type { AuditLogEvent } from '@repo/audit'
+import type { AuditLogEvent, DatabasePresetHandler } from '@repo/audit'
 import type { AuditSDKConfig } from './types.js'
 
 /**
@@ -13,8 +12,9 @@ import type { AuditSDKConfig } from './types.js'
  */
 export class AuditSDK {
 	private audit: Audit
-	private auditDb?: AuditDb
+	private auditDb: AuditDb
 	private config: AuditSDKConfig
+	private presetsService: DatabasePresetHandler
 
 	constructor(config: AuditSDKConfig) {
 		this.config = config
@@ -30,7 +30,11 @@ export class AuditSDK {
 		// Initialize database if URL provided
 		if (config.databaseUrl) {
 			this.auditDb = new AuditDb(config.databaseUrl)
+		} else {
+			this.auditDb = new AuditDb()
 		}
+
+		this.presetsService = createDatabasePresetHandler(this.auditDb.getDrizzleInstance())
 	}
 
 	/**
@@ -44,11 +48,16 @@ export class AuditSDK {
 			skipValidation?: boolean
 		} = {}
 	): Promise<void> {
+		const timestamp = new Date().toISOString()
 		let enrichedEvent = { ...eventDetails }
 
 		// Apply preset if specified
 		if (options.preset) {
-			const preset = AUDIT_PRESETS[options.preset]
+			//const preset = AUDIT_PRESETS[options.preset]
+			const preset = await this.presetsService.getPreset(
+				options.preset,
+				eventDetails.organizationId || undefined
+			)
 			if (preset) {
 				enrichedEvent = {
 					...preset.defaultValues,
@@ -69,7 +78,6 @@ export class AuditSDK {
 		}
 
 		// Add timestamp before compliance validation
-		const timestamp = new Date().toISOString()
 		enrichedEvent = {
 			timestamp,
 			...enrichedEvent,
@@ -83,7 +91,7 @@ export class AuditSDK {
 		}
 
 		// Log the event
-		await this.audit.log(enrichedEvent, {
+		await this.audit.logWithGuaranteedDelivery(enrichedEvent, {
 			generateHash: this.config.defaults?.generateHash ?? true,
 			generateSignature: this.config.defaults?.generateSignature ?? false,
 			skipValidation: options.skipValidation,
@@ -214,23 +222,26 @@ export class AuditSDK {
 			compliance?: string[]
 		} = {}
 	): Promise<void> {
+		const timestamp = new Date().toISOString()
 		let enrichedEvent = { ...eventDetails }
 
 		// Apply preset if specified
 		if (options.preset) {
-			const preset = AUDIT_PRESETS[options.preset]
+			const preset = await this.presetsService.getPreset(
+				options.preset,
+				eventDetails.organizationId || undefined
+			)
 			if (preset) {
 				enrichedEvent = {
 					...preset.defaultValues,
 					...enrichedEvent,
-					action: preset.action,
+					action: enrichedEvent.action || preset.action,
 					dataClassification: enrichedEvent.dataClassification || preset.dataClassification,
 				}
 			}
 		}
 
 		// Add timestamp before compliance validation
-		const timestamp = new Date().toISOString()
 		enrichedEvent = {
 			timestamp,
 			...enrichedEvent,
@@ -271,7 +282,7 @@ export class AuditSDK {
 		}
 
 		const db = this.auditDb.getDrizzleInstance()
-		// Implementation would use Drizzle ORM to query with filters
+		// TODO Implementation would use Drizzle ORM to query with filters
 		// This is a placeholder for the actual query implementation
 		throw new Error('Query implementation pending')
 	}
@@ -291,7 +302,7 @@ export class AuditSDK {
 			throw new Error('Database not configured for reporting')
 		}
 
-		// Implementation would generate compliance-specific reports
+		// TODO Implementation would generate compliance-specific reports
 		throw new Error('Compliance reporting implementation pending')
 	}
 
@@ -309,7 +320,7 @@ export class AuditSDK {
 			throw new Error('Database not configured for integrity verification')
 		}
 
-		// Implementation would verify hashes and signatures
+		// TODO Implementation would verify hashes and signatures
 		throw new Error('Integrity verification implementation pending')
 	}
 
