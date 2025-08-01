@@ -112,7 +112,7 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	},
 	secret: process.env.BETTER_AUTH_SECRET,
 	baseURL: process.env.BETTER_AUTH_URL,
-	/*hooks: {
+	hooks: {
 		before: createAuthMiddleware(async (ctx) => {
 			if (ctx.path.startsWith('/auth/sign-out')) {
 				const session = ctx.context.session
@@ -157,7 +157,7 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 				}
 			}
 		}),
-	},*/
+	},
 	databaseHooks: {
 		session: {
 			create: {

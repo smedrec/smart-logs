@@ -62,7 +62,7 @@ export class AuditSDK {
 				enrichedEvent = {
 					...preset.defaultValues,
 					...enrichedEvent,
-					action: preset.action,
+					action: enrichedEvent.action || preset.action,
 					dataClassification: enrichedEvent.dataClassification || preset.dataClassification,
 				}
 			}
@@ -141,6 +141,7 @@ export class AuditSDK {
 	 */
 	async logAuth(details: {
 		principalId?: string
+		organizationId?: string
 		action: 'login' | 'logout' | 'password_change' | 'mfa_enable' | 'mfa_disable'
 		status: 'attempt' | 'success' | 'failure'
 		sessionContext?: any
@@ -149,6 +150,7 @@ export class AuditSDK {
 		await this.log(
 			{
 				principalId: details.principalId,
+				organizationId: details.organizationId,
 				action: `auth.${details.action}.${details.status}`,
 				status: details.status,
 				outcomeDescription: details.reason || `User ${details.action} ${details.status}`,
@@ -191,6 +193,7 @@ export class AuditSDK {
 	 */
 	async logData(details: {
 		principalId: string
+		organizationId?: string
 		action: 'create' | 'read' | 'update' | 'delete' | 'export' | 'import'
 		resourceType: string
 		resourceId: string
@@ -201,6 +204,7 @@ export class AuditSDK {
 	}): Promise<void> {
 		await this.log({
 			principalId: details.principalId,
+			organizationId: details.organizationId,
 			action: `data.${details.action}`,
 			targetResourceType: details.resourceType,
 			targetResourceId: details.resourceId,

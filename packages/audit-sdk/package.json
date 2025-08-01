@@ -27,6 +27,7 @@
 		"check:types": "tsc --noEmit",
 		"clean": "rm -rf dist node_modules .turbo",
 		"docs:generate": "typedoc src/index.ts --out docs --theme default",
+		"example:basic-usage": "tsx src/__tests__/examples.ts",
 		"test": "vitest run",
 		"test:ci": "vitest run --coverage",
 		"test:watch": "vitest"

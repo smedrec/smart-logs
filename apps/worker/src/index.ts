@@ -307,7 +307,7 @@ async function main() {
 	// 3. Configure reliable processor
 	const processorConfig: ReliableProcessorConfig = {
 		...DEFAULT_RELIABLE_PROCESSOR_CONFIG,
-		queueName: AUDIT_QUEUE_NAME,
+		queueName: `${AUDIT_QUEUE_NAME}-reliable`,
 		concurrency: process.env.WORKER_CONCURRENCY ? parseInt(process.env.WORKER_CONCURRENCY, 10) : 5,
 		retryConfig: {
 			...DEFAULT_RELIABLE_PROCESSOR_CONFIG.retryConfig,
