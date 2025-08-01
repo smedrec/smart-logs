@@ -31,10 +31,6 @@ import {
 	getSharedRedisConnection,
 } from '@repo/redis-client'
 
-import { createAlertsAPI } from './alerts-api.js'
-import { createComplianceAPI } from './compliance-api.js'
-import { createErrorsAPI } from './errors-api.js'
-
 import type { LogLevel } from 'workers-tagged-logger'
 import type { AuditLogEvent, ReliableProcessorConfig } from '@repo/audit'
 
@@ -367,26 +363,12 @@ async function main() {
 
 	logger.info(`👂 Reliable processor listening for jobs on queue: "${AUDIT_QUEUE_NAME}"`)
 
-	// 6. Mount compliance API routes
-	const complianceAPI = createComplianceAPI(app, auditDbService)
-	app.route('/api/compliance', complianceAPI)
-
-	// 7. Mount errors API routes
-	const errorsAPI = await createErrorsAPI(app, errorHandler, databaseErrorLogger)
-	app.route('/api/errors', errorsAPI)
-
-	// 8. Mount alerts API routes
-	const alertsAPI = createAlertsAPI(app, databaseAlertHandler)
-	app.route('/api/alerts', alertsAPI)
-
-	logger.info('📊 Compliance API routes mounted at /api/compliance')
-
 	const server = serve({
 		fetch: app.fetch,
 		port: port,
 	})
 
-	logger.info(`👂 Healthcheck server, Compliance API and Errors API listening on port ${port}`)
+	logger.info(`👂 Healthcheck server listening on port ${port}`)
 
 	// Graceful shutdown
 	const gracefulShutdown = async (signal: string) => {
