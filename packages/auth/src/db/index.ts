@@ -3,15 +3,15 @@ import postgres from 'postgres'
 
 import * as schema from './schema/index.js'
 
-const maxConnections = 10
+const MAX_CONNECTIONS = 10
+
 const client = postgres(process.env.DATABASE_URL || '', {
-	max: maxConnections,
+	max: MAX_CONNECTIONS,
 })
 
 export const db = drizzle(client, { schema })
 
-export const initDrizzle = (params?: { maxConnections?: number }) => {
-	let maxConnections = params?.maxConnections || 10
+export const initDrizzle = (maxConnections: number = MAX_CONNECTIONS) => {
 	const client = postgres(process.env.DATABASE_URL!, {
 		max: maxConnections,
 	})
