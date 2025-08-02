@@ -45,6 +45,7 @@ export interface ProcessorMetrics {
 	averageProcessingTime: number
 	queueDepth: number
 	lastProcessedTime?: string
+	timestamp: string
 }
 
 export type EventProcessor<T = AuditLogEvent> = (event: T) => Promise<void>
@@ -54,7 +55,7 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 	private worker?: Worker<T>
 	private circuitBreaker: CircuitBreaker
 	private deadLetterHandler: DeadLetterHandler
-	private metrics: ProcessorMetrics
+	private metricsCollector: ProcessorMetricsCollector
 	private isRunning = false
 	private processingTimes: number[] = []
 
@@ -82,22 +83,13 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 		// Initialize dead letter handler
 		this.deadLetterHandler = new DeadLetterHandler(connection, config.deadLetterConfig)
 
-		// Initialize metrics
-		this.metrics = {
-			totalProcessed: 0,
-			successfullyProcessed: 0,
-			failedProcessed: 0,
-			retriedEvents: 0,
-			deadLetterEvents: 0,
-			circuitBreakerTrips: 0,
-			averageProcessingTime: 0,
-			queueDepth: 0,
-		}
+		// Initialize metrics collector
+		this.metricsCollector = new RedisProcessorMetricsCollector(connection)
 
 		// Set up circuit breaker monitoring
 		this.circuitBreaker.onStateChange((state, cbMetrics) => {
 			if (state === 'OPEN') {
-				this.metrics.circuitBreakerTrips++
+				this.metricsCollector.recordCircuitBreakerTrips()
 				console.warn(
 					`[ReliableProcessor] Circuit breaker opened for ${config.queueName}: ${cbMetrics.failureRate * 100}% failure rate`
 				)
@@ -137,14 +129,14 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 		)
 
 		// Set up worker event handlers
-		this.worker.on('completed', (job) => {
-			this.metrics.successfullyProcessed++
+		this.worker.on('completed', async (job) => {
+			await this.metricsCollector.recordSuccessfullyProcessed()
 			this.updateProcessingTime(job)
 			console.debug(`[ReliableProcessor] Job ${job.id} completed successfully`)
 		})
 
-		this.worker.on('failed', (job, error) => {
-			this.metrics.failedProcessed++
+		this.worker.on('failed', async (job, error) => {
+			await this.metricsCollector.recordFailedProcessed()
 			console.error(`[ReliableProcessor] Job ${job?.id} failed:`, error)
 		})
 
@@ -203,7 +195,7 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 	 */
 	private async processJobWithReliability(job: Job<T>): Promise<void> {
 		const startTime = Date.now()
-		this.metrics.totalProcessed++
+		await this.metricsCollector.recordTotalProcessed()
 
 		try {
 			// Execute through circuit breaker and retry mechanism
@@ -216,7 +208,7 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 				if (!retryResult.success) {
 					// Track retry attempts
 					if (retryResult.attempts.length > 1) {
-						this.metrics.retriedEvents++
+						await this.metricsCollector.recordRetriedEvents()
 					}
 
 					// Send to dead letter queue
@@ -232,13 +224,13 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 						}))
 					)
 
-					this.metrics.deadLetterEvents++
+					await this.metricsCollector.recordDeadLetterEvents()
 					throw retryResult.error
 				}
 
 				// Track successful retry if there were previous attempts
 				if (retryResult.attempts.length > 0) {
-					this.metrics.retriedEvents++
+					this.metricsCollector.recordRetriedEvents()
 				}
 			})
 
@@ -288,17 +280,12 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 			try {
 				// Update queue depth
 				const waiting = await this.queue.getWaiting()
-				this.metrics.queueDepth = waiting.length
+				await this.metricsCollector.recordQueueDepth(waiting.length)
 
 				// Update average processing time
 				if (this.processingTimes.length > 0) {
 					const sum = this.processingTimes.reduce((a, b) => a + b, 0)
-					this.metrics.averageProcessingTime = sum / this.processingTimes.length
-				}
-
-				// Update last processed time
-				if (this.metrics.successfullyProcessed > 0) {
-					this.metrics.lastProcessedTime = new Date().toISOString()
+					await this.metricsCollector.recordAverageProcessingTime(sum / this.processingTimes.length)
 				}
 
 				// Schedule next update
@@ -316,8 +303,9 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 	/**
 	 * Gets current processor metrics
 	 */
-	getMetrics(): ProcessorMetrics {
-		return { ...this.metrics }
+	async getMetrics(): Promise<ProcessorMetrics> {
+		const metrics = await this.metricsCollector.getMetrics()
+		return metrics
 	}
 
 	/**
@@ -338,26 +326,29 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 	 * Gets comprehensive health status
 	 */
 	async getHealthStatus() {
-		const [dlMetrics, cbMetrics] = await Promise.all([
+		const [metrics, dlMetrics, cbMetrics] = await Promise.all([
+			this.getMetrics(),
 			this.deadLetterHandler.getMetrics(),
 			Promise.resolve(this.circuitBreaker.getMetrics()),
 		])
 
+		const healthScore = await this.calculateHealthScore(dlMetrics, cbMetrics)
+
 		return {
 			isRunning: this.isRunning,
 			circuitBreakerState: this.circuitBreaker.getState(),
-			queueDepth: this.metrics.queueDepth,
-			processorMetrics: this.getMetrics(),
+			queueDepth: metrics.queueDepth,
+			processorMetrics: metrics,
 			circuitBreakerMetrics: cbMetrics,
 			deadLetterMetrics: dlMetrics,
-			healthScore: this.calculateHealthScore(dlMetrics, cbMetrics),
+			healthScore,
 		}
 	}
 
 	/**
 	 * Calculates a health score based on various metrics
 	 */
-	private calculateHealthScore(dlMetrics: any, cbMetrics: any): number {
+	private async calculateHealthScore(dlMetrics: any, cbMetrics: any): Promise<number> {
 		let score = 100
 
 		// Deduct points for circuit breaker issues
@@ -377,9 +368,10 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 			score -= Math.min(20, dlMetrics.totalEvents)
 		}
 
+		const queueDepth = await this.metricsCollector.getQueueDepth()
 		// Deduct points for high queue depth
-		if (this.metrics.queueDepth > 100) {
-			score -= Math.min(20, this.metrics.queueDepth / 10)
+		if (queueDepth > 100) {
+			score -= Math.min(20, queueDepth / 10)
 		}
 
 		return Math.max(0, Math.round(score))
@@ -409,5 +401,132 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 		await this.stop()
 		await this.deadLetterHandler.cleanup()
 		await this.queue.close()
+	}
+}
+
+/**
+ * Metrics collector interface
+ */
+export interface ProcessorMetricsCollector {
+	recordTotalProcessed(): Promise<void>
+	recordSuccessfullyProcessed(): Promise<void>
+	recordAverageProcessingTime(time: number): Promise<void>
+	recordRetriedEvents(): Promise<void>
+	recordFailedProcessed(): Promise<void>
+	recordCircuitBreakerTrips(): Promise<void>
+	recordQueueDepth(depth: number): Promise<void>
+	getQueueDepth(): Promise<number>
+	getMetrics(): Promise<ProcessorMetrics>
+	resetMetrics(): Promise<void>
+	recordDeadLetterEvents(): Promise<void>
+}
+
+/**
+ * Redis metrics collector
+ */
+export class RedisProcessorMetricsCollector implements ProcessorMetricsCollector {
+	private key = 'processor-metrics'
+	private connection: RedisType
+
+	constructor(connection: RedisType) {
+		this.connection = connection
+	}
+
+	async getMetrics(): Promise<ProcessorMetrics> {
+		const metrics: ProcessorMetrics = {
+			totalProcessed: parseInt(
+				(await this.connection.get(`${this.key}:totalProcessed`)) || '0',
+				10
+			),
+			averageProcessingTime: parseFloat(
+				(await this.connection.get(`${this.key}:averageProcessingTime`)) || '0'
+			),
+			queueDepth: parseInt((await this.connection.get(`${this.key}:queueDepth`)) || '0', 10),
+			successfullyProcessed: parseInt(
+				(await this.connection.get(`${this.key}:successfullyProcessed`)) || '0',
+				10
+			),
+			failedProcessed: parseInt(
+				(await this.connection.get(`${this.key}:failedProcessed`)) || '0',
+				10
+			),
+			lastProcessedTime: (await this.connection.get(`${this.key}:lastProcessedTime`)) || undefined,
+			timestamp: (await this.connection.get(`${this.key}:timestamp`)) || new Date().toISOString(),
+			retriedEvents: parseInt((await this.connection.get(`${this.key}:retriedEvents`)) || '0', 10),
+			deadLetterEvents: parseInt(
+				(await this.connection.get(`${this.key}:deadLetterEvents`)) || '0',
+				10
+			),
+			circuitBreakerTrips: parseInt(
+				(await this.connection.get(`${this.key}:circuitBreakerTrips`)) || '0',
+				10
+			),
+		}
+
+		return metrics
+	}
+
+	async resetMetrics(): Promise<void> {
+		await this.connection.del(`${this.key}`)
+
+		const metrics: ProcessorMetrics = {
+			totalProcessed: 0,
+			successfullyProcessed: 0,
+			failedProcessed: 0,
+			retriedEvents: 0,
+			deadLetterEvents: 0,
+			circuitBreakerTrips: 0,
+			averageProcessingTime: 0,
+			queueDepth: 0,
+			timestamp: new Date().toISOString(),
+		}
+		await this.connection.set(`${this.key}`, JSON.stringify(metrics))
+	}
+
+	async getQueueDepth(): Promise<number> {
+		const depth = parseInt((await this.connection.get(`${this.key}:queueDepth`)) || '0', 10)
+		return depth
+	}
+
+	async recordQueueDepth(depth: number): Promise<void> {
+		await this.connection.set(`${this.key}:queueDepth`, depth.toString())
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordTotalProcessed(): Promise<void> {
+		await this.connection.incr(`${this.key}:totalProcessed`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordRetriedEvents(): Promise<void> {
+		await this.connection.incr(`${this.key}:retriedEvents`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordFailedProcessed(): Promise<void> {
+		await this.connection.incr(`${this.key}:failedProcessed`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordAverageProcessingTime(time: number): Promise<void> {
+		await this.connection.set(`${this.key}:averageProcessingTime`, time.toString())
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordDeadLetterEvents(): Promise<void> {
+		await this.connection.incr(`${this.key}:deadLetterEvents`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	async recordSuccessfullyProcessed(): Promise<void> {
+		const now = new Date().toISOString()
+		await this.connection.incr(`${this.key}:successfullyProcessed`)
+		await this.connection.set(`${this.key}:lastProcessedTime`, now)
+		await this.connection.set(`${this.key}:timestamp`, now)
+	}
+
+	async recordCircuitBreakerTrips(): Promise<void> {
+		await this.connection.incr(`${this.key}:circuitBreakerTrips`)
+		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
 	}
 }
