@@ -78,6 +78,7 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 
 		// Initialize circuit breaker
 		this.circuitBreaker = new CircuitBreaker(
+			connection,
 			config.circuitBreakerConfig,
 			`${config.queueName}-processor`
 		)
