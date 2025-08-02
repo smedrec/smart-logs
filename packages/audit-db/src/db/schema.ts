@@ -566,6 +566,41 @@ export const reportExecutions = pgTable(
 	}
 )
 
+export const archiveDLQEvent = pgTable(
+	'archive_dlq_event',
+	{
+		id: serial('id').primaryKey(),
+		timestamp: timestamp('timestamp', { withTimezone: true, mode: 'string' }).notNull(),
+		action: varchar('action', { length: 255 }).notNull(),
+		failureReason: varchar('failure_reason', { length: 255 }).notNull(),
+		failureCount: integer('failure_count').notNull(),
+		firstFailureTime: timestamp('first_failure_time', {
+			withTimezone: true,
+			mode: 'string',
+		}).notNull(),
+		lastFailureTime: timestamp('last_failure_time', {
+			withTimezone: true,
+			mode: 'string',
+		}).notNull(),
+		originalJobId: varchar('original_job_id', { length: 255 }),
+		originalQueueName: varchar('original_queue_name', { length: 255 }),
+		originalEvent: jsonb('original_event').notNull(),
+		metadata: jsonb('metadata').notNull(),
+	},
+	(table) => {
+		return [
+			index('dlq_event_timestamp_idx').on(table.timestamp),
+			index('dlq_event_action_idx').on(table.action),
+			index('dlq_event_failure_reason_idx').on(table.failureReason),
+			index('dlq_event_failure_count_idx').on(table.failureCount),
+			index('dlq_event_first_failure_time_idx').on(table.firstFailureTime),
+			index('dlq_event_last_failure_time_idx').on(table.lastFailureTime),
+			index('dlq_event_original_job_id_idx').on(table.originalJobId),
+			index('dlq_event_original_queue_name_idx').on(table.originalQueueName),
+		]
+	}
+)
+
 // Add foreign key reference from scheduled_reports to report_templates
 // Note: This creates a soft reference since templateId is nullable
 

@@ -3,6 +3,7 @@
  */
 
 import { Queue, Worker } from 'bullmq'
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 import { DEFAULT_RETRY_CONFIG, executeWithRetry } from '../retry.js'
 import { CircuitBreaker, DEFAULT_CIRCUIT_BREAKER_CONFIG } from './circuit-breaker.js'
@@ -61,6 +62,7 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 
 	constructor(
 		private connection: RedisType,
+		private db: PostgresJsDatabase<any>,
 		private processor: EventProcessor<T>,
 		private config: ReliableProcessorConfig = DEFAULT_RELIABLE_PROCESSOR_CONFIG
 	) {
@@ -81,7 +83,7 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 		)
 
 		// Initialize dead letter handler
-		this.deadLetterHandler = new DeadLetterHandler(connection, config.deadLetterConfig)
+		this.deadLetterHandler = new DeadLetterHandler(connection, db, config.deadLetterConfig)
 
 		// Initialize metrics collector
 		this.metricsCollector = new RedisProcessorMetricsCollector(connection)
@@ -426,11 +428,8 @@ export interface ProcessorMetricsCollector {
  */
 export class RedisProcessorMetricsCollector implements ProcessorMetricsCollector {
 	private key = 'processor-metrics'
-	private connection: RedisType
 
-	constructor(connection: RedisType) {
-		this.connection = connection
-	}
+	constructor(private connection: RedisType) {}
 
 	async getMetrics(): Promise<ProcessorMetrics> {
 		const metrics: ProcessorMetrics = {

@@ -330,6 +330,7 @@ async function main() {
 	// 4. Create and start the reliable event processor
 	reliableProcessor = new ReliableEventProcessor<AuditLogEvent>(
 		connection,
+		db,
 		processAuditEvent,
 		processorConfig
 	)
@@ -340,11 +341,11 @@ async function main() {
 	healthCheckService.registerHealthCheck(
 		new QueueHealthCheck(
 			async () => {
-				const metrics = reliableProcessor!.getMetrics()
+				const metrics = await reliableProcessor!.getMetrics()
 				return metrics.queueDepth || 0
 			},
 			async () => {
-				const metrics = reliableProcessor!.getMetrics()
+				const metrics = await reliableProcessor!.getMetrics()
 				return metrics.totalProcessed || 0
 			}
 		)

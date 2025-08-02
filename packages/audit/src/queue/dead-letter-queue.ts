@@ -3,6 +3,8 @@
  */
 
 import { Queue, Worker } from 'bullmq'
+import { sql } from 'drizzle-orm'
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 import type { Job } from 'bullmq'
 import type { Redis as RedisType } from 'ioredis'
@@ -23,6 +25,15 @@ export const DEFAULT_DEAD_LETTER_CONFIG: DeadLetterConfig = {
 	processingInterval: 300000, // Process DLQ every 5 minutes
 }
 
+export interface DeadLetterEventMetadata {
+	errorStack?: string
+	retryHistory: Array<{
+		attempt: number
+		timestamp: string
+		error: string
+	}>
+}
+
 export interface DeadLetterEvent {
 	originalEvent: AuditLogEvent
 	failureReason: string
@@ -31,14 +42,7 @@ export interface DeadLetterEvent {
 	lastFailureTime: string
 	originalJobId?: string
 	originalQueueName?: string
-	metadata: {
-		errorStack?: string
-		retryHistory: Array<{
-			attempt: number
-			timestamp: string
-			error: string
-		}>
-	}
+	metadata: DeadLetterEventMetadata
 }
 
 export interface DeadLetterMetrics {
@@ -61,6 +65,7 @@ export class DeadLetterHandler {
 
 	constructor(
 		private connection: RedisType,
+		private db: PostgresJsDatabase<any>,
 		private config: DeadLetterConfig = DEFAULT_DEAD_LETTER_CONFIG
 	) {
 		this.dlQueue = new Queue(config.queueName, { connection })
@@ -188,8 +193,6 @@ export class DeadLetterHandler {
 	 * Archives a dead letter event to persistent storage
 	 */
 	private async archiveEvent(event: DeadLetterEvent): Promise<void> {
-		// TODO In a real implementation, this would save to a persistent archive
-		// For now, we'll just log it with structured data
 		console.log('[DeadLetterHandler] Archiving DLQ event:', {
 			action: event.originalEvent.action,
 			failureReason: event.failureReason,
@@ -197,6 +200,31 @@ export class DeadLetterHandler {
 			firstFailureTime: event.firstFailureTime,
 			lastFailureTime: event.lastFailureTime,
 		})
+		try {
+			await this.db.execute(sql`
+				INSERT INTO archive_dlq_event (
+					timestamp, action, failure_reason, failure_count, first_failure_time, last_failure_time,
+					original_job_id, original_queue_name, original_event, metadata
+				) VALUES (
+					${event.firstFailureTime},
+					${event.originalEvent.action},
+					${event.failureReason},
+					${event.failureCount},
+					${event.firstFailureTime},
+					${event.lastFailureTime},
+					${event.originalJobId || 'unknown'},
+					${event.originalQueueName || 'unknown'},
+					${JSON.stringify(event.originalEvent)},
+					${JSON.stringify(event.metadata)}
+				)
+			`)
+		} catch (error) {
+			console.error('[DeadLetterHandler] Failed to archive DLQ event to database:', error)
+			// This is a critical error - we're losing audit events
+			throw new Error(
+				`Critical: Failed to archive DLQ event to database: ${error instanceof Error ? error.message : String(error)}`
+			)
+		}
 	}
 
 	/**
