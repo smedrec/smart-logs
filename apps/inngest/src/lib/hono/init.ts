@@ -11,7 +11,14 @@ import {
 	RedisHealthCheck,
 	ScheduledReportingService,
 } from '@repo/audit'
-import { AuditDb, errorAggregation, errorLog, reportExecutions } from '@repo/audit-db'
+import {
+	AuditDb,
+	errorAggregation,
+	errorLog,
+	reportExecutions,
+	reportTemplates,
+	scheduledReports,
+} from '@repo/audit-db'
 //import { InfisicalKmsClient } from '@repo/infisical-kms';
 
 import { auth } from '@repo/auth'
