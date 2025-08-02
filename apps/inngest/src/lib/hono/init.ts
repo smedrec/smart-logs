@@ -11,7 +11,7 @@ import {
 	RedisHealthCheck,
 	ScheduledReportingService,
 } from '@repo/audit'
-import { AuditDb, errorAggregation, errorLog } from '@repo/audit-db'
+import { AuditDb, errorAggregation, errorLog, reportExecutions } from '@repo/audit-db'
 //import { InfisicalKmsClient } from '@repo/infisical-kms';
 
 import { auth } from '@repo/auth'
@@ -174,7 +174,13 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		if (!reportingService) reportingService = new ComplianceReportingService(db.audit)
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService)
-			scheduledReportingService = new ScheduledReportingService(db.audit, deliveryConfig)
+			scheduledReportingService = new ScheduledReportingService(
+				db.audit,
+				scheduledReports,
+				reportTemplates,
+				reportExecutions,
+				deliveryConfig
+			)
 
 		const compliance = {
 			report: reportingService,
