@@ -11,6 +11,8 @@
  */
 import { sql } from 'drizzle-orm'
 
+import { CryptoConfig, CryptoService } from '../crypto.js'
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { AuditEventStatus, AuditLogEvent, DataClassification } from '../types.js'
 
@@ -283,7 +285,12 @@ export interface ScheduledReportConfig {
  * Compliance Reporting Service
  */
 export class ComplianceReportingService {
-	constructor(private db: PostgresJsDatabase<any>) {}
+	private db: PostgresJsDatabase<any>
+	private cryptoService: CryptoService
+	constructor(db: PostgresJsDatabase<any>, cryptoConfig?: Partial<CryptoConfig>) {
+		this.db = db
+		this.cryptoService = new CryptoService(cryptoConfig)
+	}
 
 	/**
 	 * Generate a general compliance report
@@ -387,7 +394,6 @@ export class ComplianceReportingService {
 	 * Generate audit trail verification report
 	 */
 	async generateIntegrityVerificationReport(
-		//events: AuditLogEvent[],
 		criteria: ReportCriteria,
 		performVerification: boolean = true
 	): Promise<IntegrityVerificationReport> {
@@ -406,17 +412,19 @@ export class ComplianceReportingService {
 		const failures: IntegrityFailure[] = []
 		const hashAlgorithms: Record<string, number> = {}
 
+		let latency: number[] = []
+
 		if (performVerification) {
 			// Perform integrity verification on each event
 			for (const event of events) {
 				if (event.hash && event.hashAlgorithm) {
+					const startTime = Date.now()
 					// Track hash algorithms
 					hashAlgorithms[event.hashAlgorithm] = (hashAlgorithms[event.hashAlgorithm] || 0) + 1
 
-					// TODO Verify hash (simplified - in real implementation would use crypto service)
-					const isValid = await this.verifyEventIntegrity(event)
+					const computedHash = this.cryptoService.generateHash(event)
 
-					if (isValid) {
+					if (computedHash === event.hash) {
 						verificationResults.verifiedEvents++
 					} else {
 						verificationResults.failedVerifications++
@@ -424,12 +432,13 @@ export class ComplianceReportingService {
 							eventId: event.id || 0,
 							timestamp: event.timestamp,
 							expectedHash: event.hash,
-							actualHash: 'computed_hash_placeholder',
+							actualHash: computedHash,
 							hashAlgorithm: event.hashAlgorithm,
 							failureReason: 'Hash mismatch detected',
 							severity: 'HIGH',
 						})
 					}
+					latency.push(Date.now() - startTime)
 				} else {
 					verificationResults.unverifiedEvents++
 				}
@@ -441,6 +450,25 @@ export class ComplianceReportingService {
 					: 0
 		}
 
+		const verificationLatency = {
+			average:
+				latency.length > 0
+					? latency.reduce((total, current) => total + current, 0) / latency.length
+					: 0,
+			median: 0,
+			p95: 0,
+		}
+		if (latency.length > 0) {
+			// Calculate median
+			const sortedLatency = latency.sort((a, b) => a - b)
+			verificationLatency.median =
+				sortedLatency[Math.floor(sortedLatency.length / 2)] || verificationLatency.average
+
+			// Calculate 95th percentile
+			verificationLatency.p95 =
+				sortedLatency[Math.floor((sortedLatency.length - 1) * 0.95)] || verificationLatency.average
+		}
+
 		return {
 			verificationId,
 			verifiedAt,
@@ -448,12 +476,7 @@ export class ComplianceReportingService {
 			failures,
 			statistics: {
 				hashAlgorithms,
-				verificationLatency: {
-					// TODO: Replace with real values
-					average: 50, // Placeholder values
-					median: 45,
-					p95: 120,
-				},
+				verificationLatency,
 			},
 		}
 	}
@@ -645,7 +668,7 @@ export class ComplianceReportingService {
 				uniqueResources.add(`${event.targetResourceType}/${event.targetResourceId}`)
 			}
 
-			// Integrity violations (placeholder logic)
+			// TODO Integrity violations (placeholder logic)
 			if (event.status === 'failure' && event.action.includes('integrity')) {
 				integrityViolations++
 			}
@@ -876,10 +899,9 @@ export class ComplianceReportingService {
 	}
 
 	private async verifyEventIntegrity(event: AuditLogEvent): Promise<boolean> {
-		// Placeholder for actual integrity verification
-		// In real implementation, would use the crypto service
-		// TODO: Replace with actual integrity verification logic
-		return event.hash !== undefined && event.hash.length > 0
+		const hash = event.hash
+		if (!hash) return false
+		return this.cryptoService.verifyHash(event, hash)
 	}
 
 	/**
