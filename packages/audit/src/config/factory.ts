@@ -2,8 +2,6 @@
  * Configuration factory for creating environment-specific configurations
  */
 
-import { generateDefaultSecret } from '../crypto.js'
-
 import type { AuditConfig } from './types.js'
 
 /**

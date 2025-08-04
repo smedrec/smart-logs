@@ -8,6 +8,7 @@ import { EventEmitter } from 'events'
 import { existsSync, unwatchFile, watchFile } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { promisify } from 'util'
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { sql } from 'drizzle-orm'
 import { drizzle, PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
@@ -19,6 +20,7 @@ import type {
 	ConfigChangeEvent,
 	HotReloadConfig,
 	SecureStorageConfig,
+	StorageType,
 } from './types.js'
 
 const pbkdf2Async = promisify(pbkdf2)
@@ -29,15 +31,19 @@ const scryptAsync = promisify(scrypt)
  */
 export class ConfigurationManager extends EventEmitter {
 	private db: PostgresJsDatabase<any> | null = null
+	private s3: S3Client | null = null
 	private config: AuditConfig | null = null
 	private configPath: string
+	private storageType: StorageType
 	private hotReloadConfig: HotReloadConfig
 	private secureStorageConfig: SecureStorageConfig
 	private watcherActive = false
 	private encryptionKey: Buffer | null = null
+	private bucket: string
 
 	constructor(
 		configPath: string,
+		storageType: StorageType = 'file',
 		hotReloadConfig: HotReloadConfig = {
 			enabled: false,
 			reloadableFields: [],
@@ -47,6 +53,7 @@ export class ConfigurationManager extends EventEmitter {
 	) {
 		super()
 		this.configPath = configPath
+		this.storageType = storageType
 		this.hotReloadConfig = hotReloadConfig
 		this.secureStorageConfig = secureStorageConfig || {
 			enabled: false,
@@ -65,6 +72,11 @@ export class ConfigurationManager extends EventEmitter {
 			// Initialize encryption key if secure storage is enabled
 			if (this.secureStorageConfig.enabled) {
 				await this.initializeEncryption()
+			}
+
+			// Initialize S3 client
+			if (this.storageType === 's3') {
+				await this.initializeS3()
 			}
 
 			// Load initial configuration
@@ -162,7 +174,7 @@ export class ConfigurationManager extends EventEmitter {
 
 		// Record the change
 		const changeEvent: Omit<ConfigChangeEvent, 'id'> = {
-			timestamp: new Date().toISOString(),
+			timestamp: this.config.lastUpdated,
 			field: path,
 			previousValue,
 			newValue,
@@ -290,6 +302,38 @@ export class ConfigurationManager extends EventEmitter {
 		this.removeAllListeners()
 	}
 
+	/**
+	 * Initialize the S3 client
+	 */
+	private async initializeS3(): Promise<void> {
+		if (!process.env.S3_BUCKET) {
+			throw new Error('S3 bucket not configured')
+		}
+		if (!process.env.S3_ENDPOINT) {
+			throw new Error('S3 endpoint not configured')
+		}
+		if (!process.env.AWS_ACCESS_KEY_ID) {
+			throw new Error('AWS access key ID not configured')
+		}
+		if (!process.env.AWS_SECRET_ACCESS_KEY) {
+			throw new Error('AWS secret access key not configured')
+		}
+
+		this.bucket = process.env.S3_BUCKET
+
+		this.s3 = new S3Client({
+			region: process.env.S3_REGION || 'auto',
+			endpoint: process.env.S3_ENDPOINT,
+			credentials: {
+				accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+				secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+			},
+		})
+	}
+
+	/**
+	 * Initialize the database connection pool
+	 */
 	private async initializeDatabase(): Promise<void> {
 		if (!this.config?.database.url) {
 			throw new Error('Database URL not configured')
@@ -305,16 +349,42 @@ export class ConfigurationManager extends EventEmitter {
 	 * Load configuration from file
 	 */
 	private async loadConfiguration(): Promise<void> {
+		if (!this.s3 && this.storageType === 's3') {
+			throw new Error('S3 client not initialized')
+		}
+		if (!this.bucket && this.storageType === 's3') {
+			throw new Error('S3 bucket not configured')
+		}
+
 		try {
-			if (!existsSync(this.configPath)) {
-				throw new Error(`Configuration file not found: ${this.configPath}`)
+			if (this.storageType === 'file') {
+				if (!existsSync(this.configPath)) {
+					throw new Error(`Configuration file not found: ${this.configPath}`)
+				}
 			}
 
 			let configData: string
 			if (this.secureStorageConfig.enabled) {
 				configData = await this.decryptConfigFile()
 			} else {
-				configData = await readFile(this.configPath, 'utf-8')
+				// Load configuration from S3
+				if (this.storageType === 's3') {
+					// TODO: Add support for other storage providers
+					const s3Key = `${process.env.S3_BUCKET}/${this.configPath}`
+					const s3ParamsGetObject: any = {
+						Bucket: this.bucket,
+						Key: s3Key,
+					}
+					const command = new GetObjectCommand(s3ParamsGetObject)
+					const s3ResponseGetObject = await this.s3?.send(command)
+					const configuration = await s3ResponseGetObject?.Body?.transformToString()
+					if (!configuration) {
+						throw new Error('Configuration not found in S3')
+					}
+					configData = configuration
+				} else {
+					configData = await readFile(this.configPath, 'utf-8')
+				}
 			}
 
 			const parsedConfig = JSON.parse(configData) as AuditConfig
@@ -347,6 +417,12 @@ export class ConfigurationManager extends EventEmitter {
 		if (!this.config) {
 			throw new Error('No configuration to save')
 		}
+		if (!this.bucket && this.storageType === 's3') {
+			throw new Error('S3 bucket not configured')
+		}
+		if (!this.s3 && this.storageType === 's3') {
+			throw new Error('S3 client not initialized')
+		}
 
 		try {
 			const configData = JSON.stringify(this.config, null, 2)
@@ -354,7 +430,19 @@ export class ConfigurationManager extends EventEmitter {
 			if (this.secureStorageConfig.enabled) {
 				await this.encryptConfigFile(configData)
 			} else {
-				await writeFile(this.configPath, configData, 'utf-8')
+				if (this.storageType === 's3') {
+					// TODO: Add support for other storage providers
+					const s3Key = `${this.bucket}/${this.configPath}`
+					const s3ParamsPutObject: any = {
+						Bucket: this.bucket,
+						Key: s3Key,
+						Body: configData,
+					}
+					const command = new PutObjectCommand(s3ParamsPutObject)
+					await this.s3?.send(command)
+				} else {
+					await writeFile(this.configPath, configData, 'utf-8')
+				}
 			}
 		} catch (error) {
 			throw new Error(
@@ -394,6 +482,12 @@ export class ConfigurationManager extends EventEmitter {
 		if (!this.encryptionKey) {
 			throw new Error('Encryption key not initialized')
 		}
+		if (!this.bucket && this.storageType === 's3') {
+			throw new Error('S3 bucket not configured')
+		}
+		if (!this.s3 && this.storageType === 's3') {
+			throw new Error('S3 client not initialized')
+		}
 
 		const iv = randomBytes(16)
 		const cipher = createCipheriv(this.secureStorageConfig.algorithm, this.encryptionKey, iv)
@@ -412,7 +506,19 @@ export class ConfigurationManager extends EventEmitter {
 			encryptedData.authTag = (cipher as any).getAuthTag().toString('hex')
 		}
 
-		await writeFile(this.configPath, JSON.stringify(encryptedData), 'utf-8')
+		if (this.storageType === 's3') {
+			// TODO: Add support for other storage providers
+			const s3Key = `${this.bucket}/${this.configPath}`
+			const s3ParamsPutObject: any = {
+				Bucket: this.bucket,
+				Key: s3Key,
+				Body: JSON.stringify(encryptedData),
+			}
+			const command = new PutObjectCommand(s3ParamsPutObject)
+			await this.s3?.send(command)
+		} else {
+			await writeFile(this.configPath, JSON.stringify(encryptedData), 'utf-8')
+		}
 	}
 
 	/**
@@ -422,8 +528,33 @@ export class ConfigurationManager extends EventEmitter {
 		if (!this.encryptionKey) {
 			throw new Error('Encryption key not initialized')
 		}
+		if (!this.bucket && this.storageType === 's3') {
+			throw new Error('S3 bucket not configured')
+		}
+		if (!this.s3 && this.storageType === 's3') {
+			throw new Error('S3 client not initialized')
+		}
 
-		const encryptedData = JSON.parse(await readFile(this.configPath, 'utf-8'))
+		let encryptedData: any
+
+		if (this.storageType === 's3') {
+			// TODO: Add support for other storage providers
+			const s3Key = `${this.bucket}/${this.configPath}`
+			const s3ParamsGetObject: any = {
+				Bucket: this.bucket,
+				Key: s3Key,
+			}
+			const command = new GetObjectCommand(s3ParamsGetObject)
+			const s3ResponseGetObject = await this.s3?.send(command)
+			const encryptedString = await s3ResponseGetObject?.Body?.transformToString()
+			if (!encryptedString) {
+				throw new Error('Encrypted configuration not found in S3')
+			}
+			encryptedData = JSON.parse(encryptedString)
+		} else {
+			encryptedData = JSON.parse(await readFile(this.configPath, 'utf-8'))
+		}
+
 		const iv = Buffer.from(encryptedData.iv, 'hex')
 		const decipher = createDecipheriv(encryptedData.algorithm, this.encryptionKey, iv)
 
@@ -594,6 +725,7 @@ let defaultManager: ConfigurationManager | null = null
  */
 export function getConfigurationManager(
 	configPath?: string,
+	storageType?: StorageType,
 	hotReloadConfig?: HotReloadConfig,
 	secureStorageConfig?: SecureStorageConfig
 ): ConfigurationManager {
@@ -601,7 +733,12 @@ export function getConfigurationManager(
 		if (!configPath) {
 			throw new Error('Configuration path required for first initialization')
 		}
-		defaultManager = new ConfigurationManager(configPath, hotReloadConfig, secureStorageConfig)
+		defaultManager = new ConfigurationManager(
+			configPath,
+			storageType,
+			hotReloadConfig,
+			secureStorageConfig
+		)
 	}
 	return defaultManager
 }
@@ -611,10 +748,16 @@ export function getConfigurationManager(
  */
 export async function initializeConfig(
 	configPath: string,
+	storageType?: StorageType,
 	hotReloadConfig?: HotReloadConfig,
 	secureStorageConfig?: SecureStorageConfig
 ): Promise<ConfigurationManager> {
-	const manager = getConfigurationManager(configPath, hotReloadConfig, secureStorageConfig)
+	const manager = getConfigurationManager(
+		configPath,
+		storageType,
+		hotReloadConfig,
+		secureStorageConfig
+	)
 	await manager.initialize()
 	return manager
 }

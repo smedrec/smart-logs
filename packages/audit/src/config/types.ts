@@ -8,6 +8,8 @@ import type { DeadLetterConfig } from '../queue/dead-letter-queue.js'
 import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
 import type { RetryConfig } from '../retry.js'
 
+export type StorageType = 's3' | 'file'
+
 export interface AuditConfig {
 	/** Environment identifier */
 	environment: 'development' | 'staging' | 'production' | 'test'
