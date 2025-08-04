@@ -1,1 +1,0 @@
-ALTER TABLE "audit_preset" ADD COLUMN "action" varchar(255) NOT NULL;

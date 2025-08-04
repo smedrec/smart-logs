@@ -24,7 +24,7 @@ export const DEFAULT_CRYPTO_CONFIG: CryptoConfig = {
  * Generates a default secret key if none is provided
  * In production, this should be set via environment variables
  */
-function generateDefaultSecret(): string {
+export function generateDefaultSecret(): string {
 	console.warn(
 		'[CryptoService] No AUDIT_CRYPTO_SECRET provided, generating random secret. This should be set in production.'
 	)

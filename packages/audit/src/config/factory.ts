@@ -2,6 +2,8 @@
  * Configuration factory for creating environment-specific configurations
  */
 
+import { generateDefaultSecret } from '../crypto.js'
+
 import type { AuditConfig } from './types.js'
 
 /**
@@ -30,7 +32,7 @@ export function createDevelopmentConfig(): AuditConfig {
 		},
 		worker: {
 			concurrency: 2,
-			queueName: 'audit-events-dev',
+			queueName: 'audit-reliable-dev',
 			port: 3001,
 			gracefulShutdown: true,
 			shutdownTimeout: 10000,
@@ -41,6 +43,32 @@ export function createDevelopmentConfig(): AuditConfig {
 			maxDelay: 10000,
 			backoffStrategy: 'exponential',
 			retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'],
+		},
+		reliableProcessor: {
+			queueName: 'audit-reliable-dev',
+			concurrency: 2,
+			retryConfig: {
+				maxRetries: 3,
+				baseDelay: 1000,
+				maxDelay: 10000,
+				backoffStrategy: 'exponential',
+				retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'],
+			},
+			circuitBreakerConfig: {
+				failureThreshold: 5,
+				recoveryTimeout: 30000,
+				monitoringPeriod: 60000,
+				minimumThroughput: 10,
+			},
+			deadLetterConfig: {
+				queueName: 'audit-dead-letter-dev',
+				maxRetentionDays: 30,
+				alertThreshold: 10,
+				processingInterval: 3000,
+				archiveAfterDays: 30,
+			},
+			persistentStorage: true,
+			durabilityGuarantees: true,
 		},
 		circuitBreaker: {
 			failureThreshold: 5,
@@ -53,7 +81,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			maxRetentionDays: 30,
 			alertThreshold: 10,
 			processingInterval: 3000,
-			archiveAfterDays: 30, // 24 hours
+			archiveAfterDays: 30,
 		},
 		monitoring: {
 			enabled: true,
@@ -124,12 +152,32 @@ export function createStagingConfig(): AuditConfig {
 		worker: {
 			...baseConfig.worker,
 			concurrency: 4,
-			queueName: 'audit-events-staging',
+			queueName: 'audit-reliable-staging',
 			port: 3001,
 		},
 		retry: {
 			...baseConfig.retry,
 			maxRetries: 5,
+		},
+		reliableProcessor: {
+			...baseConfig.reliableProcessor,
+			queueName: 'audit-reliable-staging',
+			retryConfig: {
+				...baseConfig.reliableProcessor.retryConfig,
+				maxRetries: 5,
+			},
+			circuitBreakerConfig: {
+				...baseConfig.reliableProcessor.circuitBreakerConfig,
+				failureThreshold: 3,
+				recoveryTimeout: 60000,
+			},
+			deadLetterConfig: {
+				...baseConfig.reliableProcessor.deadLetterConfig,
+				queueName: 'audit-dead-letter-staging',
+				alertThreshold: 5,
+				processingInterval: 3000,
+				archiveAfterDays: 2, // 48 hours
+			},
 		},
 		circuitBreaker: {
 			...baseConfig.circuitBreaker,
@@ -140,7 +188,7 @@ export function createStagingConfig(): AuditConfig {
 			...baseConfig.deadLetter,
 			queueName: 'audit-dead-letter-staging',
 			alertThreshold: 5,
-			maxRetentionTime: 172800000, // 48 hours
+			processingInterval: 3000,
 		},
 		monitoring: {
 			...baseConfig.monitoring,
@@ -205,7 +253,7 @@ export function createProductionConfig(): AuditConfig {
 		worker: {
 			...baseConfig.worker,
 			concurrency: 8,
-			queueName: 'audit-events-prod',
+			queueName: 'audit-reliable-prod',
 			port: 3001,
 			shutdownTimeout: 30000,
 		},
@@ -214,6 +262,25 @@ export function createProductionConfig(): AuditConfig {
 			maxRetries: 5,
 			baseDelay: 2000,
 			maxDelay: 30000,
+		},
+		reliableProcessor: {
+			...baseConfig.reliableProcessor,
+			queueName: 'audit-reliable-prod',
+			retryConfig: {
+				...baseConfig.reliableProcessor.retryConfig,
+				maxRetries: 5,
+				baseDelay: 2000,
+				maxDelay: 30000,
+			},
+			circuitBreakerConfig: {
+				...baseConfig.reliableProcessor.circuitBreakerConfig,
+			},
+			deadLetterConfig: {
+				...baseConfig.reliableProcessor.deadLetterConfig,
+				queueName: 'audit-dead-letter-prod',
+				alertThreshold: 20,
+				archiveAfterDays: 7, // 7 days
+			},
 		},
 		circuitBreaker: {
 			...baseConfig.circuitBreaker,
@@ -291,18 +358,43 @@ export function createTestConfig(): AuditConfig {
 			baseDelay: 100,
 			maxDelay: 1000,
 		},
+		reliableProcessor: {
+			...baseConfig.reliableProcessor,
+			queueName: 'audit-reliable-test',
+			retryConfig: {
+				...baseConfig.reliableProcessor.retryConfig,
+				maxRetries: 1,
+				baseDelay: 100,
+				maxDelay: 1000,
+			},
+			circuitBreakerConfig: {
+				...baseConfig.reliableProcessor.circuitBreakerConfig,
+				failureThreshold: 10,
+				recoveryTimeout: 5000,
+				monitoringPeriod: 10000,
+				minimumThroughput: 5,
+			},
+			deadLetterConfig: {
+				...baseConfig.reliableProcessor.deadLetterConfig,
+				queueName: 'audit-dead-letter-test',
+				alertThreshold: 50,
+				processingInterval: 3000,
+				archiveAfterDays: 1,
+			},
+		},
 		circuitBreaker: {
 			...baseConfig.circuitBreaker,
 			failureThreshold: 10,
 			recoveryTimeout: 5000,
-			monitoringWindow: 10000,
-			minimumCalls: 5,
+			monitoringPeriod: 10000,
+			minimumThroughput: 5,
 		},
 		deadLetter: {
 			...baseConfig.deadLetter,
 			queueName: 'audit-dead-letter-test',
 			alertThreshold: 50,
-			maxRetentionTime: 3600000, // 1 hour
+			processingInterval: 3000,
+			archiveAfterDays: 1,
 		},
 		monitoring: {
 			...baseConfig.monitoring,

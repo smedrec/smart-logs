@@ -3,9 +3,9 @@
  * Uses existing types from the audit system to avoid duplication
  */
 
-import type { ComplianceConfig } from '@repo/audit-sdk'
-import type { CircuitBreakerConfig } from '../circuit-breaker.js'
-import type { DeadLetterConfig } from '../dead-letter-queue.js'
+import type { CircuitBreakerConfig } from '../queue/circuit-breaker.js'
+import type { DeadLetterConfig } from '../queue/dead-letter-queue.js'
+import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
 import type { RetryConfig } from '../retry.js'
 
 export interface AuditConfig {
@@ -29,6 +29,9 @@ export interface AuditConfig {
 
 	/** Retry configuration */
 	retry: RetryConfig
+
+	/** ReliableProcessor configuration */
+	reliableProcessor: ReliableProcessorConfig
 
 	/** Circuit breaker configuration */
 	circuitBreaker: CircuitBreakerConfig
@@ -179,7 +182,7 @@ export class ConfigValidationError extends Error {
  */
 export interface ConfigChangeEvent {
 	/** Unique identifier for the change */
-	id: string
+	id: number
 
 	/** Timestamp of the change */
 	timestamp: string
@@ -201,6 +204,12 @@ export interface ConfigChangeEvent {
 
 	/** Environment where change occurred */
 	environment: string
+
+	/** Previous version of the configuration */
+	previousVersion?: string
+
+	/** New version of the configuration */
+	newVersion?: string
 }
 
 /**
@@ -239,3 +248,102 @@ export interface SecureStorageConfig {
 	/** Number of iterations for key derivation */
 	iterations: number
 }
+
+/**
+ * Compliance configuration for regulatory requirements
+ */
+export interface ComplianceConfig {
+	/** Enable HIPAA compliance features */
+	hipaa: {
+		enabled: boolean
+		requiredFields?: string[]
+		retentionYears?: number
+	}
+
+	/** Enable GDPR compliance features */
+	gdpr: {
+		enabled: boolean
+		defaultLegalBasis?: string
+		retentionDays?: number
+	}
+
+	defaultRetentionDays: number
+	enableAutoArchival: boolean
+	enablePseudonymization: boolean
+	reportingSchedule: {
+		enabled: boolean
+		frequency: 'daily' | 'weekly' | 'monthly'
+		recipients: string[]
+		includeHIPAA: boolean
+		includeGDPR: boolean
+	}
+
+	/** Custom compliance rules */
+	custom?: Array<{
+		name: string
+		rules: ComplianceRule[]
+	}>
+}
+
+/**
+ * Custom compliance rule definition
+ */
+export interface ComplianceRule {
+	field: string
+	required?: boolean
+	validator?: (value: any) => boolean
+	message?: string
+}
+
+/**
+ * Comprehensive compliance configuration
+ */
+//export interface ComplianceConfig {
+/** HIPAA compliance configuration */
+//hipaa: HIPAAComplianceConfig
+
+/** GDPR compliance configuration */
+//gdpr: GDPRComplianceConfig
+
+/** Default data retention period in days */
+//defaultRetentionDays: number
+
+/** Enable automatic data archival */
+//enableAutoArchival: boolean
+
+/** Enable data pseudonymization */
+//enablePseudonymization: boolean
+
+/** Compliance reporting schedule */
+//reportingSchedule: {
+//enabled: boolean
+//frequency: 'daily' | 'weekly' | 'monthly'
+//recipients: string[]
+//includeHIPAA: boolean
+//includeGDPR: boolean
+//}
+
+/** Custom compliance rules */
+//customRules: ComplianceRule[]
+//}
+/**
+ * Custom compliance rule definition
+ */
+//export interface ComplianceRule {
+/** Rule identifier */
+//id: string
+/** Rule name */
+//name: string
+/** Rule description */
+//description: string
+/** Field path to validate */
+//field: string
+/** Whether field is required */
+//required: boolean
+/** Validation function */
+//validator?: (value: any) => boolean
+/** Error message when validation fails */
+//message: string
+/** Applicable compliance frameworks */
+//frameworks: Array<'HIPAA' | 'GDPR' | 'CUSTOM'>
+//}

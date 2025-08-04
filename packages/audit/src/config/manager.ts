@@ -8,6 +8,9 @@ import { EventEmitter } from 'events'
 import { existsSync, unwatchFile, watchFile } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { promisify } from 'util'
+import { sql } from 'drizzle-orm'
+import { drizzle, PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
 
 import { validateConfiguration } from './validator.js'
 
@@ -25,11 +28,11 @@ const scryptAsync = promisify(scrypt)
  * Configuration manager with hot-reloading, versioning, and secure storage
  */
 export class ConfigurationManager extends EventEmitter {
+	private db: PostgresJsDatabase<any> | null = null
 	private config: AuditConfig | null = null
 	private configPath: string
 	private hotReloadConfig: HotReloadConfig
 	private secureStorageConfig: SecureStorageConfig
-	private changeHistory: ConfigChangeEvent[] = []
 	private watcherActive = false
 	private encryptionKey: Buffer | null = null
 
@@ -70,6 +73,11 @@ export class ConfigurationManager extends EventEmitter {
 			// Start hot reloading if enabled
 			if (this.hotReloadConfig.enabled) {
 				await this.startHotReloading()
+			}
+
+			// Initialize the database connection pool
+			if (this.config?.database.url) {
+				await this.initializeDatabase()
 			}
 
 			this.emit('initialized', this.config)
@@ -138,6 +146,7 @@ export class ConfigurationManager extends EventEmitter {
 		}
 
 		const previousValue = target[lastKey]
+		const previousVersion = this.config.version
 
 		// Validate the new configuration
 		const testConfig = { ...this.config }
@@ -152,8 +161,7 @@ export class ConfigurationManager extends EventEmitter {
 		this.config.version = this.generateVersion()
 
 		// Record the change
-		const changeEvent: ConfigChangeEvent = {
-			id: randomBytes(16).toString('hex'),
+		const changeEvent: Omit<ConfigChangeEvent, 'id'> = {
 			timestamp: new Date().toISOString(),
 			field: path,
 			previousValue,
@@ -161,9 +169,30 @@ export class ConfigurationManager extends EventEmitter {
 			changedBy,
 			reason,
 			environment: this.config.environment,
+			previousVersion,
+			newVersion: this.config.version,
 		}
 
-		this.changeHistory.push(changeEvent)
+		// Persist the changeEvent to the database
+		if (this.db) {
+			await this.db.execute(sql`
+				INSERT INTO config_change_event (
+					timestamp, field, previous_value, new_value, changed_by, reason, environment, previous_version, new_version
+				) VALUES (
+					${changeEvent.timestamp}
+					${changeEvent.field},
+					${JSON.stringify(changeEvent.previousValue)},
+					${JSON.stringify(changeEvent.newValue)},
+					${changeEvent.changedBy},
+					${changeEvent.reason},
+					${changeEvent.environment}
+					${changeEvent.previousVersion},
+					${changeEvent.newVersion}
+				)
+			`)
+		} else {
+			console.error('[AuditConfigManager] 🔴 Database connection not initialized')
+		}
 
 		// Persist the configuration
 		await this.saveConfiguration()
@@ -180,9 +209,17 @@ export class ConfigurationManager extends EventEmitter {
 	/**
 	 * Get configuration change history
 	 */
-	getChangeHistory(limit?: number): ConfigChangeEvent[] {
-		const history = [...this.changeHistory].reverse()
-		return limit ? history.slice(0, limit) : history
+	async getChangeHistory(limit?: number): Promise<ConfigChangeEvent[]> {
+		const result = this.db
+			? await this.db.execute(sql`
+					SELECT * FROM config_change_event
+					ORDER BY timestamp DESC
+					LIMIT ${limit || 10}
+			  `)
+			: []
+
+		const rows = result || []
+		return rows.map(this.mapDatabaseChangeEventToChangeEvent)
 	}
 
 	/**
@@ -251,6 +288,17 @@ export class ConfigurationManager extends EventEmitter {
 			await this.stopHotReloading()
 		}
 		this.removeAllListeners()
+	}
+
+	private async initializeDatabase(): Promise<void> {
+		if (!this.config?.database.url) {
+			throw new Error('Database URL not configured')
+		}
+
+		const client = postgres(this.config.database.url, {
+			max: this.config.database.poolSize || 10,
+		})
+		this.db = drizzle(client)
 	}
 
 	/**
@@ -506,6 +554,32 @@ export class ConfigurationManager extends EventEmitter {
 			return urlObj.toString()
 		} catch {
 			return '***MASKED***'
+		}
+	}
+
+	/**
+	 * Map database change event record to ConfigChangeEvent interface
+	 */
+	private mapDatabaseChangeEventToChangeEvent(dbChangeEvent: any): ConfigChangeEvent {
+		return {
+			id: dbChangeEvent.id,
+			timestamp: dbChangeEvent.timestamp,
+			field: dbChangeEvent.field,
+			previousValue: {
+				...(typeof dbChangeEvent.previous_value === 'string'
+					? JSON.parse(dbChangeEvent.previous_value)
+					: dbChangeEvent.previous_value),
+			},
+			newValue: {
+				...(typeof dbChangeEvent.new_value === 'string'
+					? JSON.parse(dbChangeEvent.new_value)
+					: dbChangeEvent.new_value),
+			},
+			changedBy: dbChangeEvent.changed_by,
+			reason: dbChangeEvent.reason,
+			environment: dbChangeEvent.environment,
+			previousVersion: dbChangeEvent.previous_version,
+			newVersion: dbChangeEvent.new_version,
 		}
 	}
 }

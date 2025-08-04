@@ -294,7 +294,8 @@ export function getConfigSummary(config: AuditConfig): Record<string, any> {
 			logEncryption: config.security.enableLogEncryption,
 		},
 		compliance: {
-			gdpr: config.compliance.enableGDPR,
+			hipaa: config.compliance.hipaa.enabled,
+			gdpr: config.compliance.gdpr.enabled,
 			retentionDays: config.compliance.defaultRetentionDays,
 			autoArchival: config.compliance.enableAutoArchival,
 		},

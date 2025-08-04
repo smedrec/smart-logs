@@ -46,6 +46,7 @@
 // - [key: string]: any -> jsonb 'details' - OK (nullable)
 // This looks good.
 
+import { en } from '@faker-js/faker'
 import { sql } from 'drizzle-orm'
 import {
 	index,
@@ -597,6 +598,32 @@ export const archiveDLQEvent = pgTable(
 			index('dlq_event_last_failure_time_idx').on(table.lastFailureTime),
 			index('dlq_event_original_job_id_idx').on(table.originalJobId),
 			index('dlq_event_original_queue_name_idx').on(table.originalQueueName),
+		]
+	}
+)
+
+export const configChangeEvent = pgTable(
+	'config_change_event',
+	{
+		id: serial('id').primaryKey(),
+		timestamp: timestamp('timestamp', { withTimezone: true, mode: 'string' }).notNull(),
+		field: varchar('field', { length: 255 }).notNull(),
+		previousValue: jsonb('previous_value').notNull(),
+		newValue: jsonb('new_value').notNull(),
+		changedBy: varchar('changed_by', { length: 255 }).notNull(),
+		reason: varchar('reason', { length: 255 }),
+		environment: varchar('environment', { length: 255 }).notNull(),
+		previousVersion: varchar('previous_version', { length: 255 }),
+		newVersion: varchar('new_version', { length: 255 }),
+	},
+	(table) => {
+		return [
+			index('config_change_event_timestamp_idx').on(table.timestamp),
+			index('config_change_event_field_idx').on(table.field),
+			index('config_change_event_changed_by_idx').on(table.changedBy),
+			index('config_change_event_environment_idx').on(table.environment),
+			index('config_change_event_previous_version_idx').on(table.previousVersion),
+			index('config_change_event_new_version_idx').on(table.newVersion),
 		]
 	}
 )
