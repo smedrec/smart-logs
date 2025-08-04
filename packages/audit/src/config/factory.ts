@@ -21,7 +21,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			enableOfflineQueue: true,
 		},
 		database: {
-			url: process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_dev',
+			url: process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit_dev',
 			poolSize: 10,
 			connectionTimeout: 10000,
 			queryTimeout: 30000,
@@ -143,7 +143,7 @@ export function createStagingConfig(): AuditConfig {
 		},
 		database: {
 			...baseConfig.database,
-			url: process.env.DATABASE_URL || 'postgresql://postgres-staging:5432/audit_staging',
+			url: process.env.AUDIT_DB_URL || 'postgresql://postgres-staging:5432/audit_staging',
 			ssl: true,
 			poolSize: 15,
 		},
@@ -241,7 +241,7 @@ export function createProductionConfig(): AuditConfig {
 		},
 		database: {
 			...baseConfig.database,
-			url: process.env.DATABASE_URL || 'postgresql://postgres-prod:5432/audit_prod',
+			url: process.env.AUDIT_DB_URL || 'postgresql://postgres-prod:5432/audit_prod',
 			ssl: true,
 			poolSize: 25,
 			connectionTimeout: 5000,
@@ -341,7 +341,7 @@ export function createTestConfig(): AuditConfig {
 		},
 		database: {
 			...baseConfig.database,
-			url: process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_test',
+			url: process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit_test',
 			poolSize: 5,
 		},
 		worker: {
@@ -467,7 +467,7 @@ export function createMinimalConfig(
 			enableOfflineQueue: true,
 		},
 		database: {
-			url: process.env.DATABASE_URL || 'postgresql://localhost:5432/audit',
+			url: process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit',
 			poolSize: 10,
 			connectionTimeout: 10000,
 			queryTimeout: 30000,

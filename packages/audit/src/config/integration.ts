@@ -3,15 +3,17 @@
  * Provides seamless integration between configuration management and audit worker
  * Uses existing audit system types to avoid duplication
  */
+import 'dotenv/config'
 
 import { existsSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 
 import { createConfigForEnvironment } from './factory.js'
 import { getConfigurationManager } from './manager.js'
 
-import type { AuditConfig, HotReloadConfig, SecureStorageConfig } from './types.js'
+import type { AuditConfig, HotReloadConfig, SecureStorageConfig, StorageType } from './types.js'
 
 /**
  * Configuration integration options
@@ -19,6 +21,9 @@ import type { AuditConfig, HotReloadConfig, SecureStorageConfig } from './types.
 export interface ConfigIntegrationOptions {
 	/** Configuration file path */
 	configPath?: string
+
+	/** Configuration storage type */
+	storageType?: StorageType
 
 	/** Environment name */
 	environment?: string
@@ -69,6 +74,7 @@ export async function initializeAuditConfig(
 ): Promise<{ config: AuditConfig; manager: ReturnType<typeof getConfigurationManager> }> {
 	const {
 		configPath = getDefaultConfigPath(),
+		storageType = 'file',
 		environment = process.env.NODE_ENV || 'development',
 		enableHotReload = process.env.NODE_ENV !== 'production',
 		hotReloadConfig = {},
@@ -79,7 +85,7 @@ export async function initializeAuditConfig(
 
 	// Create default configuration if it doesn't exist
 	if (createDefaultIfMissing && !existsSync(configPath)) {
-		await createDefaultConfigFile(configPath, environment)
+		await createDefaultConfigFile(configPath, storageType, environment)
 	}
 
 	// Prepare hot reload configuration
@@ -106,6 +112,7 @@ export async function initializeAuditConfig(
 	// Initialize configuration manager
 	const manager = getConfigurationManager(
 		configPath,
+		storageType,
 		finalHotReloadConfig,
 		finalSecureStorageConfig
 	)
@@ -132,18 +139,51 @@ export function getDefaultConfigPath(): string {
  */
 export async function createDefaultConfigFile(
 	configPath: string,
+	storageType: StorageType,
 	environment: string
 ): Promise<void> {
 	const config = createConfigForEnvironment(environment)
 
-	// Ensure directory exists
-	const { dirname } = await import('path')
-	const { mkdir } = await import('fs/promises')
-	const configDir = dirname(configPath)
-	await mkdir(configDir, { recursive: true })
+	if (storageType === 's3') {
+		if (!process.env.S3_BUCKET) {
+			throw new Error('S3 bucket not configured')
+		}
+		if (!process.env.S3_ENDPOINT) {
+			throw new Error('S3 endpoint not configured')
+		}
+		if (!process.env.AWS_ACCESS_KEY_ID) {
+			throw new Error('AWS access key ID not configured')
+		}
+		if (!process.env.AWS_SECRET_ACCESS_KEY) {
+			throw new Error('AWS secret access key not configured')
+		}
+		// TODO: Add support for other storage providers
+		const s3Client = new S3Client({
+			region: process.env.S3_REGION || 'auto',
+			endpoint: process.env.S3_ENDPOINT!,
+			credentials: {
+				accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+				secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+			},
+		})
+		//const s3Key = `${process.env.S3_BUCKET}/${configPath}`
+		const s3ParamsPutObject: any = {
+			Bucket: process.env.S3_BUCKET,
+			Key: configPath,
+			Body: JSON.stringify(config, null, 2),
+		}
+		const command = new PutObjectCommand(s3ParamsPutObject)
+		await s3Client?.send(command)
+	} else {
+		// Ensure directory exists
+		const { dirname } = await import('path')
+		const { mkdir } = await import('fs/promises')
+		const configDir = dirname(configPath)
+		await mkdir(configDir, { recursive: true })
 
-	// Write configuration file
-	await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8')
+		// Write configuration file
+		await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8')
+	}
 }
 
 /**

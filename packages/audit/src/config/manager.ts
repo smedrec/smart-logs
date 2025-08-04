@@ -2,6 +2,7 @@
  * Configuration management system for the audit service
  * Provides environment-specific configuration, validation, hot-reloading, and secure storage
  */
+import 'dotenv/config'
 
 import { createCipheriv, createDecipheriv, createHash, pbkdf2, randomBytes, scrypt } from 'crypto'
 import { EventEmitter } from 'events'
@@ -39,7 +40,7 @@ export class ConfigurationManager extends EventEmitter {
 	private secureStorageConfig: SecureStorageConfig
 	private watcherActive = false
 	private encryptionKey: Buffer | null = null
-	private bucket: string
+	private bucket: string | null = null
 
 	constructor(
 		configPath: string,
@@ -59,7 +60,7 @@ export class ConfigurationManager extends EventEmitter {
 			enabled: false,
 			algorithm: 'AES-256-GCM',
 			kdf: 'PBKDF2',
-			salt: randomBytes(32).toString('hex'),
+			salt: process.env.AUDIT_CONFIG_SALT || randomBytes(32).toString('hex'),
 			iterations: 100000,
 		}
 	}
@@ -369,11 +370,9 @@ export class ConfigurationManager extends EventEmitter {
 			} else {
 				// Load configuration from S3
 				if (this.storageType === 's3') {
-					// TODO: Add support for other storage providers
-					const s3Key = `${process.env.S3_BUCKET}/${this.configPath}`
 					const s3ParamsGetObject: any = {
 						Bucket: this.bucket,
-						Key: s3Key,
+						Key: this.configPath,
 					}
 					const command = new GetObjectCommand(s3ParamsGetObject)
 					const s3ResponseGetObject = await this.s3?.send(command)
@@ -431,11 +430,9 @@ export class ConfigurationManager extends EventEmitter {
 				await this.encryptConfigFile(configData)
 			} else {
 				if (this.storageType === 's3') {
-					// TODO: Add support for other storage providers
-					const s3Key = `${this.bucket}/${this.configPath}`
 					const s3ParamsPutObject: any = {
 						Bucket: this.bucket,
-						Key: s3Key,
+						Key: this.configPath,
 						Body: configData,
 					}
 					const command = new PutObjectCommand(s3ParamsPutObject)
@@ -507,17 +504,15 @@ export class ConfigurationManager extends EventEmitter {
 		}
 
 		if (this.storageType === 's3') {
-			// TODO: Add support for other storage providers
-			const s3Key = `${this.bucket}/${this.configPath}`
 			const s3ParamsPutObject: any = {
 				Bucket: this.bucket,
-				Key: s3Key,
-				Body: JSON.stringify(encryptedData),
+				Key: this.configPath,
+				Body: JSON.stringify(encryptedData, null, 2),
 			}
 			const command = new PutObjectCommand(s3ParamsPutObject)
 			await this.s3?.send(command)
 		} else {
-			await writeFile(this.configPath, JSON.stringify(encryptedData), 'utf-8')
+			await writeFile(this.configPath, JSON.stringify(encryptedData, null, 2), 'utf-8')
 		}
 	}
 
@@ -538,11 +533,9 @@ export class ConfigurationManager extends EventEmitter {
 		let encryptedData: any
 
 		if (this.storageType === 's3') {
-			// TODO: Add support for other storage providers
-			const s3Key = `${this.bucket}/${this.configPath}`
 			const s3ParamsGetObject: any = {
 				Bucket: this.bucket,
-				Key: s3Key,
+				Key: this.configPath,
 			}
 			const command = new GetObjectCommand(s3ParamsGetObject)
 			const s3ResponseGetObject = await this.s3?.send(command)
