@@ -336,7 +336,7 @@ async function main() {
 	}
 
 	// 7. Configure reliable processor
-	const processorConfig: ReliableProcessorConfig = {
+	/**const processorConfig: ReliableProcessorConfig = {
 		...DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 		queueName: config.reliableProcessor.queueName,
 		concurrency: config.reliableProcessor.concurrency,
@@ -356,14 +356,14 @@ async function main() {
 			queueName: config.reliableProcessor.deadLetterConfig.queueName,
 			alertThreshold: config.reliableProcessor.deadLetterConfig.alertThreshold,
 		},
-	}
+	} */
 
 	// 8. Create and start the reliable event processor
 	reliableProcessor = new ReliableEventProcessor<AuditLogEvent>(
 		connection,
 		db,
 		processAuditEvent,
-		processorConfig
+		config.reliableProcessor
 	)
 
 	try {

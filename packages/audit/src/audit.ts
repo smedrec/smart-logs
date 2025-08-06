@@ -69,6 +69,7 @@ export class Audit {
 	 * it defaults to using the shared Redis connection from `@repo/redis-client`.
 	 *
 	 * @param queueName The name of the BullMQ queue for audit logs.
+	 * @param cryptoConfig Configuration for cryptographic operations.
 	 * @param redisOrUrlOrOptions Optional. Can be:
 	 *                          - A Redis connection URL (string).
 	 *                          - An existing IORedis connection instance.
@@ -77,15 +78,14 @@ export class Audit {
 	 * @param directConnectionOptions Optional. IORedis options, used if creating a new direct connection.
 	 *                                Merged with default options. Ignored if `redisOrUrl` is an IORedis instance
 	 *                                or if using the shared connection.
-	 * @param cryptoConfig Optional. Configuration for cryptographic operations.
 	 * @throws Error if a direct Redis URL is required (e.g., `AUDIT_REDIS_URL`) but cannot be resolved,
 	 *         or if there's an error during direct Redis client instantiation.
 	 */
 	constructor(
 		queueName: string,
+		cryptoConfig: Partial<CryptoConfig>,
 		redisOrUrlOrOptions?: string | RedisType | { url?: string; options?: RedisOptions },
-		directConnectionOptions?: RedisOptions,
-		cryptoConfig?: Partial<CryptoConfig>
+		directConnectionOptions?: RedisOptions
 	) {
 		this.queueName = queueName
 		this.isSharedConnection = false
@@ -103,7 +103,7 @@ export class Audit {
 		) {
 			// Scenario 1: An existing ioredis instance is provided
 			this.connection = redisOrUrlOrOptions
-			this.isSharedConnection = false // Assume externally managed, could be shared or not
+			this.isSharedConnection = true // Assume externally managed, could be shared or not
 			console.log(`[AuditService] Using provided Redis instance for queue "${this.queueName}".`)
 		} else if (
 			typeof redisOrUrlOrOptions === 'string' ||
@@ -187,7 +187,15 @@ export class Audit {
 			this.isSharedConnection = true
 		}
 
-		this.bullmq_queue = new Queue(this.queueName, { connection: this.connection })
+		//this.bullmq_queue = new Queue(this.queueName, { connection: this.connection })
+		this.bullmq_queue = new Queue<AuditLogEvent>(this.queueName, {
+			connection: this.connection,
+			defaultJobOptions: {
+				removeOnComplete: 100, // Keep up to 100 jobs
+				removeOnFail: false, // Keep failed jobs for dead letter processing
+				attempts: 1, // Reliable processor handles retries
+			},
+		})
 
 		// Attach listeners only if this instance created the connection (not shared and not provided externally)
 		// The shared connection manages its own listeners.
@@ -290,7 +298,7 @@ export class Audit {
 	 *   skipValidation: false
 	 * });
 	 * ```
-	 */
+	 
 	async log(
 		eventDetails: Omit<AuditLogEvent, 'timestamp'>,
 		options: {
@@ -395,6 +403,7 @@ export class Audit {
 			)
 		}
 	}
+		*/
 
 	/**
 	 * Logs an audit event with guaranteed delivery using the reliable event processor.
@@ -423,7 +432,7 @@ export class Audit {
 	 * });
 	 * ```
 	 */
-	async logWithGuaranteedDelivery(
+	async log(
 		eventDetails: Omit<AuditLogEvent, 'timestamp'>,
 		options: {
 			priority?: number
@@ -437,6 +446,21 @@ export class Audit {
 			validationConfig?: ValidationConfig
 		} = {}
 	): Promise<void> {
+		if (!this.bullmq_queue) {
+			throw new Error('[AuditService] Cannot log event: BullMQ queue is not initialized.')
+		}
+		// Check connection status before logging.
+		if (
+			!this.connection ||
+			(this.connection.status !== 'ready' &&
+				this.connection.status !== 'connecting' &&
+				this.connection.status !== 'reconnecting')
+		) {
+			console.warn(
+				`[AuditService] Attempting to log event for queue "${this.queueName}" while Redis connection status is '${this.connection?.status || 'unknown'}'. This might fail if Redis is unavailable.`
+			)
+		}
+
 		const timestamp = new Date().toISOString()
 		let event: AuditLogEvent = {
 			timestamp,
@@ -481,37 +505,24 @@ export class Audit {
 			event = { ...event, signature }
 		}
 
-		// Use reliable processor queue with durability guarantees
-		const reliableQueueName = `${this.queueName}-reliable`
-		const reliableQueue = new Queue<AuditLogEvent>(reliableQueueName, {
-			connection: this.connection,
-			defaultJobOptions: {
-				removeOnComplete: options.durabilityGuarantees ? false : 100,
-				removeOnFail: false, // Keep failed jobs for dead letter processing
-				attempts: 1, // Reliable processor handles retries
-			},
-		})
-
 		try {
-			await reliableQueue.add('reliable-audit-event', event, {
+			await this.bullmq_queue.add(this.queueName, event, {
 				priority: options.priority || 0,
 				delay: options.delay || 0,
+				removeOnComplete: options.durabilityGuarantees ? false : 100,
 			})
 
 			console.log(
-				`[AuditService] Event queued for reliable processing: ${event.action} (queue: ${reliableQueueName})`
+				`[AuditService] Event queued for reliable processing: ${event.action} (queue: ${this.queueName})`
 			)
 		} catch (error) {
 			console.error(
-				`[AuditService] Failed to add event to reliable processing queue "${reliableQueueName}":`,
+				`[AuditService] Failed to add event to reliable processing queue "${this.queueName}":`,
 				error
 			)
 			throw new Error(
 				`[AuditService] Failed to log audit event with guaranteed delivery. Error: ${error instanceof Error ? error.message : String(error)}`
 			)
-		} finally {
-			// Clean up the temporary queue reference
-			await reliableQueue.close()
 		}
 	}
 

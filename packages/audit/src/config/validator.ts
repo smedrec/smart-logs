@@ -296,7 +296,7 @@ const validationSchema: Record<string, ValidationRule> = {
 		type: 'boolean',
 	},
 	'security.encryptionKey': {
-		required: false,
+		required: true,
 		type: 'string',
 		custom: (value) => {
 			if (value && (typeof value !== 'string' || value.length < 32)) {

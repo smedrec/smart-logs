@@ -2,6 +2,8 @@
  * Configuration factory for creating environment-specific configurations
  */
 
+import { generateDefaultSecret } from '../crypto.js'
+
 import type { AuditConfig } from './types.js'
 
 /**
@@ -84,6 +86,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			enableIntegrityVerification: true,
 			hashAlgorithm: 'SHA-256',
 			enableEventSigning: false,
+			encryptionKey: process.env.AUDIT_CRYPTO_SECRET || generateDefaultSecret(),
 			enableLogEncryption: false,
 		},
 		compliance: {
@@ -180,7 +183,6 @@ export function createStagingConfig(): AuditConfig {
 			...baseConfig.security,
 			enableEventSigning: true,
 			enableLogEncryption: true,
-			encryptionKey: process.env.AUDIT_ENCRYPTION_KEY,
 		},
 		compliance: {
 			...baseConfig.compliance,
@@ -274,7 +276,6 @@ export function createProductionConfig(): AuditConfig {
 			hashAlgorithm: 'SHA-256',
 			enableEventSigning: true,
 			enableLogEncryption: true,
-			encryptionKey: process.env.AUDIT_ENCRYPTION_KEY,
 		},
 		compliance: {
 			...baseConfig.compliance,

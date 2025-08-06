@@ -5,24 +5,11 @@ import type { ValidationConfig } from '@repo/audit'
  * Configuration for the Audit SDK
  */
 export interface AuditSDKConfig {
-	/** Queue name for audit events */
-	queueName: string
+	/** Config Path */
+	configPath: string
 
-	/** Redis connection configuration */
-	redis?: {
-		url?: string
-		options?: RedisOptions
-	}
-
-	/** Database connection URL */
-	databaseUrl?: string
-
-	/** Cryptographic configuration */
-	crypto?: {
-		secretKey?: string
-		algorithm?: 'SHA-256'
-		enableSignatures?: boolean
-	}
+	/** Storage type */
+	storageType: 's3' | 'file'
 
 	/** Default validation configuration */
 	validation?: ValidationConfig

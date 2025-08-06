@@ -9,22 +9,16 @@ import { AuditSDK } from '../sdk'
 
 import type { AuditSDKConfig } from '../types'
 
+let auditSDK: AuditSDK | undefined = undefined
 const organizationId = 'QEPNtdiiamOqeVdojZUyoPl9eM9srHQl'
 // Configuration for the audit SDK
 const config: AuditSDKConfig = {
-	queueName: 'audit',
-	redis: {
-		url: process.env.REDIS_URL,
-	},
-	databaseUrl: process.env.AUDIT_DB_URL,
+	configPath: 'default/audit-development.json',
+	storageType: 's3',
 	defaults: {
 		dataClassification: 'INTERNAL',
 		generateHash: true,
 		generateSignature: true,
-	},
-	crypto: {
-		secretKey: process.env.AUDIT_CRYPTO_SECRET,
-		enableSignatures: true,
 	},
 	compliance: {
 		hipaa: {
@@ -40,12 +34,28 @@ const config: AuditSDKConfig = {
 }
 
 // Initialize the audit SDK
-const auditSDK = new AuditSDK(config)
+async function initAuditSDK() {
+	if (auditSDK) {
+		console.warn('Audit SDK already initialized')
+		return
+	}
+	auditSDK = new AuditSDK(config)
+	try {
+		await auditSDK.initialize()
+	} catch (error) {
+		console.error('❌ Error initializing audit SDK:', error)
+		process.exit(1)
+	}
+}
 
 /**
  * Example 1: Basic User Authentication Logging
  */
 export async function logUserAuthentication() {
+	if (!auditSDK) {
+		console.warn('Audit SDK not initialized')
+		throw new Error('Audit SDK not initialized')
+	}
 	console.log('=== User Authentication Examples ===')
 
 	// Successful login
@@ -95,6 +105,10 @@ export async function logUserAuthentication() {
  * Example 2: FHIR Resource Access Logging
  */
 export async function logFHIRResourceAccess() {
+	if (!auditSDK) {
+		console.warn('Audit SDK not initialized')
+		throw new Error('Audit SDK not initialized')
+	}
 	console.log('\n=== FHIR Resource Access Examples ===')
 
 	// Patient record access
@@ -162,6 +176,10 @@ export async function logFHIRResourceAccess() {
  * Example 3: Data Operations Logging
  */
 export async function logDataOperations() {
+	if (!auditSDK) {
+		console.warn('Audit SDK not initialized')
+		throw new Error('Audit SDK not initialized')
+	}
 	console.log('\n=== Data Operations Examples ===')
 
 	// Patient data update
@@ -213,6 +231,10 @@ export async function logDataOperations() {
  * Example 4: System Events Logging
  */
 export async function logSystemEvents() {
+	if (!auditSDK) {
+		console.warn('Audit SDK not initialized')
+		throw new Error('Audit SDK not initialized')
+	}
 	console.log('\n=== System Events Examples ===')
 
 	// System startup
@@ -264,6 +286,10 @@ export async function logSystemEvents() {
  * Example 5: Critical Events with Guaranteed Delivery
  */
 export async function logCriticalEvents() {
+	if (!auditSDK) {
+		console.warn('Audit SDK not initialized')
+		throw new Error('Audit SDK not initialized')
+	}
 	console.log('\n=== Critical Events Examples ===')
 
 	// Security breach detection
@@ -324,6 +350,10 @@ export async function logCriticalEvents() {
  * Example 6: Using Presets for Consistent Logging
  */
 export async function logWithPresets() {
+	if (!auditSDK) {
+		console.warn('Audit SDK not initialized')
+		throw new Error('Audit SDK not initialized')
+	}
 	console.log('\n=== Preset Usage Examples ===')
 
 	// Using authentication preset
@@ -387,6 +417,10 @@ export async function logWithPresets() {
  * Example 7: Health Monitoring
  */
 export async function monitorSystemHealth() {
+	if (!auditSDK) {
+		console.warn('Audit SDK not initialized')
+		throw new Error('Audit SDK not initialized')
+	}
 	console.log('\n=== System Health Monitoring ===')
 
 	const health = await auditSDK.getHealth()
@@ -419,6 +453,7 @@ export async function runAllExamples() {
 	try {
 		console.log('🏥 SMEDREC Audit SDK - Basic Usage Examples\n')
 
+		await initAuditSDK()
 		await logUserAuthentication()
 		await logFHIRResourceAccess()
 		await logDataOperations()
@@ -432,8 +467,10 @@ export async function runAllExamples() {
 		console.error('❌ Error running examples:', error)
 	} finally {
 		// Clean up connections
-		await auditSDK.close()
-		console.log('🔌 Audit SDK connections closed')
+		if (auditSDK) {
+			await auditSDK.close()
+			console.log('🔌 Audit SDK connections closed')
+		}
 	}
 }
 

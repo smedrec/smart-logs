@@ -14,10 +14,9 @@ export interface CryptoConfig {
 /**
  * Default cryptographic configuration
  */
-export const DEFAULT_CRYPTO_CONFIG: CryptoConfig = {
+export const DEFAULT_CRYPTO_CONFIG: Omit<CryptoConfig, 'secretKey'> = {
 	hashAlgorithm: 'SHA-256',
 	signatureAlgorithm: 'HMAC-SHA256',
-	secretKey: process.env.AUDIT_CRYPTO_SECRET || generateDefaultSecret(),
 }
 
 /**
@@ -48,7 +47,7 @@ export interface CryptographicService {
 export class CryptoService implements CryptographicService {
 	private config: CryptoConfig
 
-	constructor(config: Partial<CryptoConfig> = {}) {
+	constructor(config: Partial<CryptoConfig>) {
 		this.config = { ...DEFAULT_CRYPTO_CONFIG, ...config }
 
 		if (!this.config.secretKey) {
@@ -186,7 +185,9 @@ export class CryptoService implements CryptographicService {
  * Default instance of the cryptographic service
  * Uses environment configuration
  */
-export const defaultCryptoService = new CryptoService()
+export const defaultCryptoService = new CryptoService({
+	secretKey: generateDefaultSecret(),
+})
 
 /**
  * Utility functions for direct hash operations

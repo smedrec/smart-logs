@@ -120,16 +120,21 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 		this.deadLetterHandler.startWorker()
 
 		// Create and start main worker
-		this.worker = new Worker<T>(
-			this.config.queueName,
-			async (job: Job<T>) => {
-				await this.processJobWithReliability(job)
-			},
-			{
-				connection: this.connection,
-				concurrency: this.config.concurrency,
-			}
-		)
+		try {
+			this.worker = new Worker<T>(
+				this.config.queueName,
+				async (job: Job<T>) => {
+					await this.processJobWithReliability(job)
+				},
+				{
+					connection: this.connection,
+					concurrency: this.config.concurrency,
+				}
+			)
+		} catch (error) {
+			console.error('[ReliableProcessor] Error creating worker', error)
+			throw error
+		}
 
 		// Set up worker event handlers
 		this.worker.on('completed', async (job) => {

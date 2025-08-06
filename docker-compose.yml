@@ -8,12 +8,12 @@ services:
     ports:
       - ${AUDIT_WORKER_PORT}:${AUDIT_WORKER_PORT}
     environment:
-      - REDIS_URL=${REDIS_URL}
-      - AUDIT_QUEUE_NAME=${AUDIT_QUEUE_NAME}
-      - AUDIT_CRYPTO_SECRET=${AUDIT_CRYPTO_SECRET}
-      - AUDIT_DB_URL=${AUDIT_DB_URL}
+      - NODE_ENV=${NODE_ENV}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BUCKET}
       - LOG_LEVEL=${LOG_LEVEL}
-      - AUDIT_WORKER_PORT=${AUDIT_WORKER_PORT}
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:${AUDIT_WORKER_PORT}/healthz']
       interval: 10s

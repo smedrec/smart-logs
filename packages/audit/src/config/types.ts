@@ -3,8 +3,6 @@
  * Uses existing types from the audit system to avoid duplication
  */
 
-import type { CircuitBreakerConfig } from '../queue/circuit-breaker.js'
-import type { DeadLetterConfig } from '../queue/dead-letter-queue.js'
 import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
 import type { RetryConfig } from '../retry.js'
 
@@ -132,13 +130,13 @@ export interface SecurityConfig {
 	enableIntegrityVerification: boolean
 
 	/** Hash algorithm for integrity verification */
-	hashAlgorithm: 'SHA-256' | 'SHA-512'
+	hashAlgorithm: 'SHA-256'
 
 	/** Enable event signing */
 	enableEventSigning: boolean
 
 	/** Encryption key for sensitive data */
-	encryptionKey?: string
+	encryptionKey: string
 
 	/** Enable audit log encryption */
 	enableLogEncryption: boolean

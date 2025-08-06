@@ -1,5 +1,6 @@
-import { Audit, createDatabasePresetHandler } from '@repo/audit'
-import { AuditDb } from '@repo/audit-db'
+import { Audit, ConfigurationManager, createDatabasePresetHandler } from '@repo/audit'
+import { AuditDbWithConfig } from '@repo/audit-db'
+import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { validateCompliance } from './compliance.js'
 
@@ -11,30 +12,55 @@ import type { AuditSDKConfig } from './types.js'
  * with built-in compliance, security, and healthcare-specific features.
  */
 export class AuditSDK {
-	private audit: Audit
-	private auditDb: AuditDb
+	private configManager: ConfigurationManager | undefined = undefined
+	private audit: Audit | undefined = undefined
+	private auditDb: AuditDbWithConfig | undefined = undefined
 	private config: AuditSDKConfig
-	private presetsService: DatabasePresetHandler
+	private presetsService: DatabasePresetHandler | undefined = undefined
 
 	constructor(config: AuditSDKConfig) {
 		this.config = config
+	}
+
+	async initialize() {
+		// Initialize configuration manager
+		this.configManager = new ConfigurationManager(this.config.configPath, this.config.storageType)
+		try {
+			await this.configManager.initialize()
+		} catch (error) {
+			// Exit if initialization fails
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unknown error during configuration manager initialization'
+			console.error('[AuditSDK] Configuration manager initialization failed:', message)
+			throw new Error(message)
+		}
+		const config = this.configManager.getConfig()
+
+		// Initialize Redis connection
+		const connection = getSharedRedisConnectionWithConfig(config.redis)
 
 		// Initialize core audit service
-		this.audit = new Audit(
-			config.queueName,
-			config.redis?.url || config.redis,
-			config.redis?.options,
-			config.crypto
-		)
-
-		// Initialize database if URL provided
-		if (config.databaseUrl) {
-			this.auditDb = new AuditDb(config.databaseUrl)
-		} else {
-			this.auditDb = new AuditDb()
+		if (!this.audit) {
+			if (!config.redis) {
+				throw new Error('Redis connection not configured. Provide redis in config.')
+			}
+			this.audit = new Audit(
+				config.reliableProcessor.queueName,
+				{
+					secretKey: config.security.encryptionKey,
+				},
+				connection
+			)
+		}
+		if (!this.auditDb) {
+			this.auditDb = new AuditDbWithConfig(config.database)
 		}
 
-		this.presetsService = createDatabasePresetHandler(this.auditDb.getDrizzleInstance())
+		if (!this.presetsService) {
+			this.presetsService = createDatabasePresetHandler(this.auditDb.getDrizzleInstance())
+		}
 	}
 
 	/**
@@ -52,7 +78,7 @@ export class AuditSDK {
 		let enrichedEvent = { ...eventDetails }
 
 		// Apply preset if specified
-		if (options.preset) {
+		if (options.preset && this.presetsService) {
 			//const preset = AUDIT_PRESETS[options.preset]
 			const preset = await this.presetsService.getPreset(
 				options.preset,
@@ -91,12 +117,16 @@ export class AuditSDK {
 		}
 
 		// Log the event
-		await this.audit.logWithGuaranteedDelivery(enrichedEvent, {
-			generateHash: this.config.defaults?.generateHash ?? true,
-			generateSignature: this.config.defaults?.generateSignature ?? false,
-			skipValidation: options.skipValidation,
-			validationConfig: this.config.validation,
-		})
+		if (this.audit) {
+			await this.audit.log(enrichedEvent, {
+				generateHash: this.config.defaults?.generateHash ?? true,
+				generateSignature: this.config.defaults?.generateSignature ?? false,
+				skipValidation: options.skipValidation,
+				validationConfig: this.config.validation,
+			})
+		} else {
+			throw new Error('Audit service not initialized')
+		}
 	}
 
 	/**
@@ -230,7 +260,7 @@ export class AuditSDK {
 		let enrichedEvent = { ...eventDetails }
 
 		// Apply preset if specified
-		if (options.preset) {
+		if (options.preset && this.presetsService) {
 			const preset = await this.presetsService.getPreset(
 				options.preset,
 				eventDetails.organizationId || undefined
@@ -258,12 +288,16 @@ export class AuditSDK {
 			}
 		}
 
-		await this.audit.logWithGuaranteedDelivery(enrichedEvent, {
-			priority: options.priority || 1,
-			durabilityGuarantees: true,
-			generateHash: true,
-			generateSignature: true,
-		})
+		if (this.audit) {
+			await this.audit.log(enrichedEvent, {
+				priority: options.priority || 1,
+				durabilityGuarantees: true,
+				generateHash: true,
+				generateSignature: true,
+			})
+		} else {
+			throw new Error('Audit service not initialized')
+		}
 	}
 
 	/**

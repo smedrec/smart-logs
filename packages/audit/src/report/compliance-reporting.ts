@@ -287,7 +287,7 @@ export interface ScheduledReportConfig {
 export class ComplianceReportingService {
 	private db: PostgresJsDatabase<any>
 	private cryptoService: CryptoService
-	constructor(db: PostgresJsDatabase<any>, cryptoConfig?: Partial<CryptoConfig>) {
+	constructor(db: PostgresJsDatabase<any>, cryptoConfig: Partial<CryptoConfig>) {
 		this.db = db
 		this.cryptoService = new CryptoService(cryptoConfig)
 	}
