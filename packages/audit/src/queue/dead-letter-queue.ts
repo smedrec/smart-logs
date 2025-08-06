@@ -126,16 +126,23 @@ export class DeadLetterHandler {
 			return
 		}
 
-		this.dlWorker = new Worker<DeadLetterEvent>(
-			this.config.queueName,
-			async (job: Job<DeadLetterEvent>) => {
-				await this.processDeadLetterEvent(job)
-			},
-			{
-				connection: this.connection,
-				concurrency: 1, // Process DLQ events sequentially
-			}
-		)
+		try {
+			this.dlWorker = new Worker<DeadLetterEvent>(
+				this.config.queueName,
+				async (job: Job<DeadLetterEvent>) => {
+					await this.processDeadLetterEvent(job)
+				},
+				{
+					connection: this.connection,
+					concurrency: 1, // Process DLQ events sequentially
+				}
+			)
+		} catch (error) {
+			console.error('[DeadLetterHandler] Failed to start worker:', error)
+			throw new Error(
+				`[DeadLetterHandler] Failed to start worker for queue: ${this.config.queueName}: ${error instanceof Error ? error.message : String(error)}`
+			)
+		}
 
 		this.dlWorker.on('completed', (job) => {
 			console.log(`[DeadLetterHandler] Processed DLQ event: ${job.id}`)

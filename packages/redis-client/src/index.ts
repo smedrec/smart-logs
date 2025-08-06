@@ -1,4 +1,5 @@
 export {
+	getSharedRedisConnectionWithConfig,
 	getSharedRedisConnection,
 	closeSharedRedisConnection,
 	getRedisConnectionStatus,

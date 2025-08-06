@@ -6,6 +6,7 @@ import { pino } from 'pino'
 
 import {
 	CircuitBreakerHealthCheck,
+	ConfigurationManager,
 	ConsoleAlertHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
@@ -17,10 +18,11 @@ import {
 	ProcessingHealthCheck,
 	QueueHealthCheck,
 	RedisHealthCheck,
+	RedisMetricsCollector,
 	ReliableEventProcessor,
 } from '@repo/audit'
 import {
-	AuditDb,
+	AuditDbWithConfig,
 	auditLog as auditLogTableSchema,
 	errorAggregation,
 	errorLog,
@@ -28,56 +30,32 @@ import {
 import {
 	closeSharedRedisConnection,
 	getRedisConnectionStatus,
-	getSharedRedisConnection,
+	getSharedRedisConnectionWithConfig,
+	Redis,
 } from '@repo/redis-client'
 
 import type { LogLevel } from 'workers-tagged-logger'
 import type { AuditLogEvent, ReliableProcessorConfig } from '@repo/audit'
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
-const AUDIT_QUEUE_NAME = process.env.AUDIT_QUEUE_NAME || 'audit'
-// const REDIS_URL = process.env.AUDIT_REDIS_URL // No longer needed directly, shared client handles REDIS_URL
-
-// Check for REDIS_URL is now handled by the shared client,
-// but we might want a specific check for AUDIT_REDIS_URL if it were different.
-// For now, assuming REDIS_URL is the one used by the shared client.
-/*
-if (!process.env.REDIS_URL) { // Optional: Check if REDIS_URL (used by shared client) is set
-	console.error(
-		'🔴 REDIS_URL environment variable is not set for the shared Redis client. Please check your .env file or environment configuration.'
-	)
-	process.exit(1)
-}
-*/
 
 const logger = pino({ name: 'audit-worker', level: LOG_LEVEL })
 
-// Initialize Redis connection using the shared client
-// BullMQ recommends not using maxRetriesPerRequest: null in newer versions,
-// but rather relying on built-in retry mechanisms or handling errors appropriately.
-// The shared client's default options include maxRetriesPerRequest: null.
-const connection = getSharedRedisConnection()
+// Configuration manager
+let configManager: ConfigurationManager | undefined = undefined
 
-// Optional: Log connection status from the shared client
-logger.info(`Shared Redis connection status: ${getRedisConnectionStatus()}`)
+// Using configuration manager
+let connection: Redis | undefined = undefined
 
-// Events 'connect' and 'error' are handled within the shared client.
-// We can add listeners here too, but it might be redundant if the shared client's logging is sufficient.
-// For example, if specific actions for this worker are needed on 'error':
-connection.on('error', (err) => {
-	logger.error('🔴 Shared Redis connection error impacting BullMQ worker:', err)
-	// Consider if process should exit or if shared client's reconnection logic is sufficient.
-})
-
-// Using environment variable AUDIT_DB_URL
-let auditDbService: AuditDb | undefined = undefined
-export { auditDbService }
+// Using configuration manager
+let auditDbService: AuditDbWithConfig | undefined = undefined
 
 // Reliable event processor instance
 let reliableProcessor: ReliableEventProcessor<AuditLogEvent> | undefined = undefined
 
 // Monitoring and health check services
 let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
+let metricsCollector: RedisMetricsCollector | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
 
@@ -86,7 +64,6 @@ let errorHandler: ErrorHandler | undefined = undefined
 let databaseErrorLogger: DatabaseErrorLogger | undefined = undefined
 
 // Simple healthcheck server for audit worker
-const port = parseInt(process.env.AUDIT_WORKER_PORT!, 10) || 5600
 const app = new Hono()
 
 app.get('/healthz', async (c) => {
@@ -187,30 +164,74 @@ app.get('/health/:component', async (c) => {
 async function main() {
 	logger.info('🏁 Audit worker starting...')
 
-	if (!auditDbService) {
-		auditDbService = new AuditDb(process.env.AUDIT_DB_URL)
+	// 0. Initialize configuration manager
+	if (!configManager) {
+		logger.info('🔗 Initializing configuration manager...')
+		configManager = new ConfigurationManager('default/audit-development.json', 's3')
+		try {
+			await configManager.initialize()
+		} catch (error) {
+			// Exit if initialization fails
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unknown error during configuration manager initialization'
+			logger.error('🔴 Configuration manager initialization failed:', message)
+			throw new Error(message)
+		}
 	}
 
-	// 1. Check database connection
+	const config = configManager.getConfig()
+
+	// 1. Initialize Redis connection
+	try {
+		if (!connection) {
+			logger.info('🔗 Connecting to Redis...')
+			connection = getSharedRedisConnectionWithConfig(config.redis)
+		}
+	} catch (error) {
+		// TODO: Optionally, implement retry logic here or ensure process exits.
+		logger.error('🔴 Halting worker start due to redis connection failure.', error)
+		process.exit(1)
+	}
+
+	// Optional: Log connection status from the client
+	logger.info(`Redis connection status: ${getRedisConnectionStatus()}`)
+
+	// Events 'connect' and 'error' are handled within the shared client.
+	// We can add listeners here too, but it might be redundant if the shared client's logging is sufficient.
+	// For example, if specific actions for this worker are needed on 'error':
+	connection.on('error', (err) => {
+		logger.error('🔴 Redis connection error impacting BullMQ worker:', err)
+		// Consider if process should exit or if client's reconnection logic is sufficient.
+	})
+
+	// 2. Initialize database connection
+	if (!auditDbService) {
+		auditDbService = new AuditDbWithConfig(config.database)
+	}
+
+	// 3. Check database connection
 	const dbConnected = await auditDbService.checkAuditDbConnection()
 	if (!dbConnected) {
 		logger.error('🔴 Halting worker start due to database connection failure.')
-		// Optionally, implement retry logic here or ensure process exits.
+		// TODO: Optionally, implement retry logic here or ensure process exits.
 		// For simplicity, exiting if DB is not available on startup.
-		await closeSharedRedisConnection() // Use shared client's close function
+		await closeSharedRedisConnection() // Use client's close function
 		process.exit(1)
 	}
 
 	const db = auditDbService.getDrizzleInstance()
 
-	// 2. Initialize error handling services
+	// 4. Initialize error handling services
 
 	databaseErrorLogger = new DatabaseErrorLogger(db, errorLog, errorAggregation)
 	errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
 
-	// 3. Initialize monitoring and health check services
+	// 5. Initialize monitoring and health check services
 	databaseAlertHandler = new DatabaseAlertHandler(db)
-	monitoringService = new MonitoringService()
+	metricsCollector = new RedisMetricsCollector(connection)
+	monitoringService = new MonitoringService(undefined, metricsCollector)
 	monitoringService.addAlertHandler(new ConsoleAlertHandler())
 	monitoringService.addAlertHandler(databaseAlertHandler)
 
@@ -222,7 +243,7 @@ async function main() {
 	)
 	healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
 
-	// 3. Define the reliable event processor with monitoring integration
+	// 6. Define the reliable event processor with monitoring integration
 	const processAuditEvent = async (eventData: AuditLogEvent): Promise<void> => {
 		const startTime = Date.now()
 		logger.info(`Processing audit event for action: ${eventData.action}`)
@@ -304,30 +325,30 @@ async function main() {
 		}
 	}
 
-	// 3. Configure reliable processor
+	// 7. Configure reliable processor
 	const processorConfig: ReliableProcessorConfig = {
 		...DEFAULT_RELIABLE_PROCESSOR_CONFIG,
-		queueName: `${AUDIT_QUEUE_NAME}-reliable`,
-		concurrency: process.env.WORKER_CONCURRENCY ? parseInt(process.env.WORKER_CONCURRENCY, 10) : 5,
+		queueName: config.reliableProcessor.queueName,
+		concurrency: config.reliableProcessor.concurrency,
 		retryConfig: {
 			...DEFAULT_RELIABLE_PROCESSOR_CONFIG.retryConfig,
-			maxRetries: parseInt(process.env.MAX_RETRIES || '5', 10),
-			baseDelay: parseInt(process.env.RETRY_BASE_DELAY || '1000', 10),
-			maxDelay: parseInt(process.env.RETRY_MAX_DELAY || '30000', 10),
+			maxRetries: config.retry.maxRetries,
+			baseDelay: config.retry.baseDelay,
+			maxDelay: config.retry.maxDelay,
 		},
 		circuitBreakerConfig: {
 			...DEFAULT_RELIABLE_PROCESSOR_CONFIG.circuitBreakerConfig,
-			failureThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || '5', 10),
-			recoveryTimeout: parseInt(process.env.CIRCUIT_BREAKER_RECOVERY_TIMEOUT || '30000', 10),
+			failureThreshold: config.reliableProcessor.circuitBreakerConfig.failureThreshold,
+			recoveryTimeout: config.reliableProcessor.circuitBreakerConfig.recoveryTimeout,
 		},
 		deadLetterConfig: {
 			...DEFAULT_RELIABLE_PROCESSOR_CONFIG.deadLetterConfig,
-			queueName: `${AUDIT_QUEUE_NAME}-dead-letter`,
-			alertThreshold: parseInt(process.env.DEAD_LETTER_ALERT_THRESHOLD || '10', 10),
+			queueName: config.reliableProcessor.deadLetterConfig.queueName,
+			alertThreshold: config.reliableProcessor.deadLetterConfig.alertThreshold,
 		},
 	}
 
-	// 4. Create and start the reliable event processor
+	// 8. Create and start the reliable event processor
 	reliableProcessor = new ReliableEventProcessor<AuditLogEvent>(
 		connection,
 		db,
@@ -335,9 +356,14 @@ async function main() {
 		processorConfig
 	)
 
-	await reliableProcessor.start()
+	try {
+		await reliableProcessor.start()
+	} catch (error) {
+		logger.error('Failed to start reliable processor:', error)
+		process.exit(1)
+	}
 
-	// 5. Register additional health checks that depend on the processor
+	// 9. Register additional health checks that depend on the processor
 	healthCheckService.registerHealthCheck(
 		new QueueHealthCheck(
 			async () => {
@@ -362,14 +388,16 @@ async function main() {
 		})
 	)
 
-	logger.info(`👂 Reliable processor listening for jobs on queue: "${AUDIT_QUEUE_NAME}"`)
+	logger.info(
+		`👂 Reliable processor listening for jobs on queue: "${config.reliableProcessor.queueName}"`
+	)
 
 	const server = serve({
 		fetch: app.fetch,
-		port: port,
+		port: config.worker.port,
 	})
 
-	logger.info(`👂 Healthcheck server listening on port ${port}`)
+	logger.info(`👂 Healthcheck server listening on port ${config.worker.port}`)
 
 	// Graceful shutdown
 	const gracefulShutdown = async (signal: string) => {
@@ -378,7 +406,7 @@ async function main() {
 		if (reliableProcessor) {
 			await reliableProcessor.stop()
 		}
-		await closeSharedRedisConnection() // Use shared client's close function
+		await closeSharedRedisConnection() // Use client's close function
 		await auditDbService?.end()
 		logger.info('🚪 Reliable processor, Postgres and Redis connections closed. Exiting.')
 		process.exit(0)
@@ -392,6 +420,6 @@ async function main() {
 main().catch(async (error) => {
 	logger.error('💥 Unhandled error in main application scope:', error.message)
 	await auditDbService?.end()
-	// Ensure shared Redis connection is closed on fatal error
+	// Ensure Redis connection is closed on fatal error
 	void closeSharedRedisConnection().finally(() => process.exit(1))
 })

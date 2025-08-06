@@ -77,11 +77,23 @@ export class ConfigurationManager extends EventEmitter {
 
 			// Initialize S3 client
 			if (this.storageType === 's3') {
-				await this.initializeS3()
+				try {
+					await this.initializeS3()
+				} catch (error) {
+					throw new Error(
+						`Failed to initialize S3 client: ${error instanceof Error ? error.message : 'Unknown error'}`
+					)
+				}
 			}
 
 			// Load initial configuration
-			await this.loadConfiguration()
+			try {
+				await this.loadConfiguration()
+			} catch (error) {
+				throw new Error(
+					`Failed to load configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
+				)
+			}
 
 			// Start hot reloading if enabled
 			if (this.hotReloadConfig.enabled) {
@@ -96,7 +108,9 @@ export class ConfigurationManager extends EventEmitter {
 			this.emit('initialized', this.config)
 		} catch (error) {
 			this.emit('error', error)
-			throw error
+			throw new Error(
+				`Failed to load configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
 		}
 	}
 
@@ -389,7 +403,13 @@ export class ConfigurationManager extends EventEmitter {
 			const parsedConfig = JSON.parse(configData) as AuditConfig
 
 			// Validate configuration
-			await validateConfiguration(parsedConfig)
+			try {
+				await validateConfiguration(parsedConfig)
+			} catch (error) {
+				throw new Error(
+					`Failed to validate configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
+				)
+			}
 
 			// Set version if not present
 			if (!parsedConfig.version) {
@@ -403,6 +423,7 @@ export class ConfigurationManager extends EventEmitter {
 
 			this.config = parsedConfig
 		} catch (error) {
+			console.error('🔴 Failed to load configuration:', error)
 			throw new Error(
 				`Failed to load configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
 			)

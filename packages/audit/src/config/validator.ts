@@ -69,12 +69,12 @@ const validationSchema: Record<string, ValidationRule> = {
 		min: 1000,
 		max: 60000,
 	},
-	'redis.maxRetriesPerRequest': {
+	/**'redis.maxRetriesPerRequest': {
 		required: true,
 		type: 'number',
 		min: 0,
 		max: 10,
-	},
+	}, */
 	'redis.retryDelayOnFailover': {
 		required: true,
 		type: 'number',
@@ -145,7 +145,7 @@ const validationSchema: Record<string, ValidationRule> = {
 	'worker.port': {
 		required: true,
 		type: 'number',
-		min: 1024,
+		min: 3000,
 		max: 65535,
 	},
 	'worker.gracefulShutdown': {
@@ -195,25 +195,25 @@ const validationSchema: Record<string, ValidationRule> = {
 	},
 
 	// Circuit breaker configuration
-	'circuitBreaker.failureThreshold': {
+	'reliableProcessor.circuitBreakerConfig.failureThreshold': {
 		required: true,
 		type: 'number',
 		min: 1,
 		max: 100,
 	},
-	'circuitBreaker.recoveryTimeout': {
+	'reliableProcessor.circuitBreakerConfig.recoveryTimeout': {
 		required: true,
 		type: 'number',
 		min: 1000,
 		max: 300000,
 	},
-	'circuitBreaker.monitoringWindow': {
+	'reliableProcessor.circuitBreakerConfig.monitoringPeriod': {
 		required: true,
 		type: 'number',
 		min: 1000,
 		max: 3600000,
 	},
-	'circuitBreaker.minimumCalls': {
+	'reliableProcessor.circuitBreakerConfig.minimumThroughput': {
 		required: true,
 		type: 'number',
 		min: 1,
@@ -221,26 +221,22 @@ const validationSchema: Record<string, ValidationRule> = {
 	},
 
 	// Dead letter configuration
-	'deadLetter.queueName': {
+	'reliableProcessor.deadLetterConfig.queueName': {
 		required: true,
 		type: 'string',
 		pattern: /^[a-zA-Z0-9_-]+$/,
 	},
-	'deadLetter.alertThreshold': {
+	'reliableProcessor.deadLetterConfig.alertThreshold': {
 		required: true,
 		type: 'number',
 		min: 1,
 		max: 1000,
 	},
-	'deadLetter.maxRetentionTime': {
+	'reliableProcessor.deadLetterConfig.maxRetentionDays': {
 		required: true,
 		type: 'number',
-		min: 3600000, // 1 hour
-		max: 2592000000, // 30 days
-	},
-	'deadLetter.autoCleanup': {
-		required: true,
-		type: 'boolean',
+		min: 1, // 1 day
+		max: 365, // 1 year
 	},
 
 	// Monitoring configuration
@@ -315,7 +311,7 @@ const validationSchema: Record<string, ValidationRule> = {
 	},
 
 	// Compliance configuration
-	'compliance.enableGDPR': {
+	'compliance.gdpr.enabled': {
 		required: true,
 		type: 'boolean',
 	},

@@ -15,10 +15,11 @@ export function createDevelopmentConfig(): AuditConfig {
 		redis: {
 			url: process.env.REDIS_URL || 'redis://localhost:6379',
 			connectTimeout: 10000,
-			commandTimeout: 5000,
-			maxRetriesPerRequest: 3,
+			commandTimeout: 10000,
+			maxRetriesPerRequest: null,
 			retryDelayOnFailover: 100,
 			enableOfflineQueue: true,
+			enableAutoPipelining: true,
 		},
 		database: {
 			url: process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit_dev',
@@ -31,7 +32,7 @@ export function createDevelopmentConfig(): AuditConfig {
 		worker: {
 			concurrency: 2,
 			queueName: 'audit-reliable-dev',
-			port: 3001,
+			port: 5600,
 			gracefulShutdown: true,
 			shutdownTimeout: 10000,
 		},
@@ -67,19 +68,6 @@ export function createDevelopmentConfig(): AuditConfig {
 			},
 			persistentStorage: true,
 			durabilityGuarantees: true,
-		},
-		circuitBreaker: {
-			failureThreshold: 5,
-			recoveryTimeout: 30000,
-			monitoringPeriod: 60000,
-			minimumThroughput: 10,
-		},
-		deadLetter: {
-			queueName: 'audit-dead-letter-dev',
-			maxRetentionDays: 30,
-			alertThreshold: 10,
-			processingInterval: 3000,
-			archiveAfterDays: 30,
 		},
 		monitoring: {
 			enabled: true,
@@ -177,17 +165,6 @@ export function createStagingConfig(): AuditConfig {
 				archiveAfterDays: 2, // 48 hours
 			},
 		},
-		circuitBreaker: {
-			...baseConfig.circuitBreaker,
-			failureThreshold: 3,
-			recoveryTimeout: 60000,
-		},
-		deadLetter: {
-			...baseConfig.deadLetter,
-			queueName: 'audit-dead-letter-staging',
-			alertThreshold: 5,
-			processingInterval: 3000,
-		},
 		monitoring: {
 			...baseConfig.monitoring,
 			metricsInterval: 15000,
@@ -280,15 +257,6 @@ export function createProductionConfig(): AuditConfig {
 				archiveAfterDays: 7, // 7 days
 			},
 		},
-		circuitBreaker: {
-			...baseConfig.circuitBreaker,
-		},
-		deadLetter: {
-			...baseConfig.deadLetter,
-			queueName: 'audit-dead-letter-prod',
-			alertThreshold: 20,
-			archiveAfterDays: 7, // 7 days
-		},
 		monitoring: {
 			...baseConfig.monitoring,
 			metricsInterval: 10000,
@@ -380,20 +348,6 @@ export function createTestConfig(): AuditConfig {
 				archiveAfterDays: 1,
 			},
 		},
-		circuitBreaker: {
-			...baseConfig.circuitBreaker,
-			failureThreshold: 10,
-			recoveryTimeout: 5000,
-			monitoringPeriod: 10000,
-			minimumThroughput: 5,
-		},
-		deadLetter: {
-			...baseConfig.deadLetter,
-			queueName: 'audit-dead-letter-test',
-			alertThreshold: 50,
-			processingInterval: 3000,
-			archiveAfterDays: 1,
-		},
 		monitoring: {
 			...baseConfig.monitoring,
 			enabled: false,
@@ -465,6 +419,7 @@ export function createMinimalConfig(
 			maxRetriesPerRequest: 3,
 			retryDelayOnFailover: 100,
 			enableOfflineQueue: true,
+			enableAutoPipelining: true,
 		},
 		database: {
 			url: process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit',

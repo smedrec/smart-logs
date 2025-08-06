@@ -80,7 +80,7 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 		this.circuitBreaker = new CircuitBreaker(
 			connection,
 			config.circuitBreakerConfig,
-			`${config.queueName}-processor`
+			config.queueName
 		)
 
 		// Initialize dead letter handler

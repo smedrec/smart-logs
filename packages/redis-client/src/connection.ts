@@ -2,6 +2,29 @@ import Redis from 'ioredis'
 
 import type { Redis as RedisInstanceType, RedisOptions } from 'ioredis'
 
+interface RedisConfig {
+	/** Redis connection URL */
+	url: string
+
+	/** Connection timeout in milliseconds */
+	connectTimeout: number
+
+	/** Command timeout in milliseconds */
+	commandTimeout: number
+
+	/** Maximum number of retries */
+	maxRetriesPerRequest: number
+
+	/** Retry delay on failure */
+	retryDelayOnFailover: number
+
+	/** Enable offline queue */
+	enableOfflineQueue: boolean
+
+	/** Enable auto pipelining */
+	enableAutoPipelining: boolean
+}
+
 let redisConnection: RedisInstanceType | null = null
 
 /**
@@ -33,6 +56,71 @@ const DEFAULT_REDIS_OPTIONS: RedisOptions = {
 	// Add a default connection timeout to prevent hanging indefinitely
 	// if Redis is unavailable during initial connection.
 	connectTimeout: 10000, // 10 seconds
+}
+
+export function getSharedRedisConnectionWithConfig(redisConfig: RedisConfig): RedisInstanceType {
+	if (redisConnection) {
+		return redisConnection
+	}
+
+	const connectionOptions: RedisOptions = {
+		...DEFAULT_REDIS_OPTIONS,
+		maxRetriesPerRequest: redisConfig.maxRetriesPerRequest,
+		enableAutoPipelining: redisConfig.enableAutoPipelining,
+		connectTimeout: redisConfig.connectTimeout,
+		commandTimeout: redisConfig.commandTimeout,
+		enableOfflineQueue: redisConfig.enableOfflineQueue,
+	}
+
+	try {
+		console.log(
+			`[RedisClient] Attempting to connect to Redis at ${redisConfig.url.split('@').pop()}...`
+		) // Avoid logging credentials if present in URL
+		redisConnection = new Redis(redisConfig.url, connectionOptions)
+
+		redisConnection.on('connect', () => {
+			console.log('[RedisClient] Successfully connected to Redis.')
+		})
+
+		redisConnection.on('ready', () => {
+			console.log('[RedisClient] Redis connection ready.')
+		})
+
+		redisConnection.on('error', (err: Error) => {
+			console.error(`[RedisClient] Redis Connection Error: ${err.message}`, err)
+			// Depending on the error, ioredis might attempt to reconnect automatically.
+			// If the error is critical (e.g., authentication failure), it might not.
+			// For critical errors during initial connection, ioredis might throw, caught below.
+		})
+
+		redisConnection.on('close', () => {
+			console.log('[RedisClient] Redis connection closed.')
+			// Optionally, nullify redisConnection here if you want getSharedRedisConnection
+			// to be able to create a new one after a close.
+			// However, for a typical shared connection, 'close' often means the app is shutting down.
+			// redisConnection = null;
+		})
+
+		redisConnection.on('reconnecting', () => {
+			console.log('[RedisClient] Reconnecting to Redis...')
+		})
+
+		// Note: ioredis handles reconnections automatically.
+		// The 'error' event will fire for failed reconnection attempts.
+	} catch (error) {
+		// This typically catches synchronous errors during Redis instantiation (e.g., invalid options)
+		// or immediate connection failures if ioredis is configured to throw them.
+		console.error('[RedisClient] Failed to create Redis instance:', error)
+		redisConnection = null // Ensure connection is null if creation failed
+		if (error instanceof Error) {
+			throw new Error(
+				`[RedisClient] Failed to initialize Redis connection. Error: ${error.message}`
+			)
+		}
+		throw new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
+	}
+
+	return redisConnection
 }
 
 /**

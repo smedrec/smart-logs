@@ -35,12 +35,6 @@ export interface AuditConfig {
 	/** ReliableProcessor configuration */
 	reliableProcessor: ReliableProcessorConfig
 
-	/** Circuit breaker configuration */
-	circuitBreaker: CircuitBreakerConfig
-
-	/** Dead letter queue configuration */
-	deadLetter: DeadLetterConfig
-
 	/** Monitoring configuration */
 	monitoring: MonitoringConfig
 
@@ -65,13 +59,16 @@ export interface RedisConfig {
 	commandTimeout: number
 
 	/** Maximum number of retries */
-	maxRetriesPerRequest: number
+	maxRetriesPerRequest: number | null
 
 	/** Retry delay on failure */
 	retryDelayOnFailover: number
 
 	/** Enable offline queue */
 	enableOfflineQueue: boolean
+
+	/** Enable auto pipelining */
+	enableAutoPipelining: boolean
 }
 
 export interface DatabaseConfig {

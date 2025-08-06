@@ -12,7 +12,11 @@ export * from './queue/dead-letter-queue.js'
 export * from './queue/reliable-processor.js'
 
 // Export monitoring with explicit exports to avoid conflicts
-export { MonitoringService, ConsoleAlertHandler } from './monitor/monitoring.js'
+export {
+	MonitoringService,
+	ConsoleAlertHandler,
+	RedisMetricsCollector,
+} from './monitor/monitoring.js'
 export type { AlertHandler } from './monitor/monitoring.js'
 export type {
 	Alert,
@@ -57,3 +61,7 @@ export { DatabaseErrorLogger } from './error/database-error-logger.js'
 // Export archival services
 export * from './archival/archival-service.js'
 export * from './archival/postgres-archival-service.js'
+
+// Export configuration manager
+export { ConfigurationManager } from './config/manager.js'
+export * from './config/types.js'

@@ -1,10 +1,6 @@
 import { createDefaultConfigFile, getDefaultConfigPath } from '../config/integration.js'
 
 export class CommandUtils {
-	static getCommandName(command: any): string {
-		return command.constructor.name
-	}
-
 	async create(environment: string): Promise<void> {
 		try {
 			const configPath = getDefaultConfigPath()
@@ -23,7 +19,7 @@ export class CommandUtils {
 }
 
 /**
- * CLI utility for running migration operations
+ * CLI utility for running config commands
  */
 export async function runConfigCommand(command: string, environment: string): Promise<void> {
 	const configUtils = new CommandUtils()

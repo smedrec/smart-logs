@@ -1,6 +1,8 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
+import { DatabaseConfig } from '@repo/audit'
+
 import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
@@ -44,6 +46,58 @@ export class AuditDb {
 		const maxConnections = params?.maxConnections || 10
 		this.client = postgres(effectivePostgresUrl, {
 			max: maxConnections,
+		})
+		this.auditDb = drizzle(this.client, { schema })
+	}
+
+	/**
+	 * Provides access to the Drizzle ORM instance for database operations.
+	 * @returns The Drizzle ORM instance typed with the audit log schema.
+	 */
+	public getDrizzleInstance(): PostgresJsDatabase<typeof schema> {
+		return this.auditDb
+	}
+
+	/**
+	 * Checks the database connection by executing a simple query.
+	 * @returns true or false.
+	 */
+	public async checkAuditDbConnection() {
+		try {
+			await this.client`SELECT 1` // Simple query to check connection
+			//console.log('🟢 Database connection successful.')
+			return true
+		} catch (error) {
+			console.error('🔴 Database connection failed:', error)
+			// In a real app, you might want to throw the error or handle it more gracefully
+			// For the worker, if the DB isn't available, it might retry or exit.
+			// process.exit(1); // Consider if failure to connect on startup is fatal
+			return false
+		}
+	}
+
+	/**
+	 * Ends the client connection.
+	 * @returns void.
+	 */
+	public async end(): Promise<void> {
+		await this.client.end()
+	}
+}
+
+export class AuditDbWithConfig {
+	private client: Sql
+	private auditDb: PostgresJsDatabase<typeof schema>
+
+	/**
+	 * Constructs an AuditDb instance, establishing a connection to the PostgreSQL database
+	 * and initializing Drizzle ORM.
+	 * @param config The database configuration.
+	 */
+	constructor(config: DatabaseConfig) {
+		this.client = postgres(config.url, {
+			max: config.poolSize,
+			ssl: config.ssl,
 		})
 		this.auditDb = drizzle(this.client, { schema })
 	}
