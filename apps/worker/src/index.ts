@@ -192,7 +192,7 @@ async function main() {
 	} catch (error) {
 		// TODO: Optionally, implement retry logic here or ensure process exits.
 		logger.error('🔴 Halting worker start due to redis connection failure.', error)
-		process.exit(1)
+		throw error
 	}
 
 	// Optional: Log connection status from the client
@@ -224,24 +224,34 @@ async function main() {
 	const db = auditDbService.getDrizzleInstance()
 
 	// 4. Initialize error handling services
-
-	databaseErrorLogger = new DatabaseErrorLogger(db, errorLog, errorAggregation)
-	errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
+	if (!databaseErrorLogger) {
+		databaseErrorLogger = new DatabaseErrorLogger(db, errorLog, errorAggregation)
+	}
+	if (!errorHandler) {
+		errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
+	}
 
 	// 5. Initialize monitoring and health check services
-	databaseAlertHandler = new DatabaseAlertHandler(db)
-	metricsCollector = new RedisMetricsCollector(connection)
-	monitoringService = new MonitoringService(undefined, metricsCollector)
-	monitoringService.addAlertHandler(new ConsoleAlertHandler())
-	monitoringService.addAlertHandler(databaseAlertHandler)
+	if (!databaseAlertHandler) {
+		databaseAlertHandler = new DatabaseAlertHandler(db)
+	}
+	if (!metricsCollector) {
+		metricsCollector = new RedisMetricsCollector(connection)
+	}
+	if (!monitoringService) {
+		monitoringService = new MonitoringService(undefined, metricsCollector)
+		monitoringService.addAlertHandler(new ConsoleAlertHandler())
+		monitoringService.addAlertHandler(databaseAlertHandler)
+	}
 
-	healthCheckService = new HealthCheckService()
-
-	// Register health checks
-	healthCheckService.registerHealthCheck(
-		new DatabaseHealthCheck(() => auditDbService!.checkAuditDbConnection())
-	)
-	healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
+	if (!healthCheckService) {
+		healthCheckService = new HealthCheckService()
+		// Register health checks
+		healthCheckService.registerHealthCheck(
+			new DatabaseHealthCheck(() => auditDbService!.checkAuditDbConnection())
+		)
+		healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
+	}
 
 	// 6. Define the reliable event processor with monitoring integration
 	const processAuditEvent = async (eventData: AuditLogEvent): Promise<void> => {
@@ -360,7 +370,7 @@ async function main() {
 		await reliableProcessor.start()
 	} catch (error) {
 		logger.error('Failed to start reliable processor:', error)
-		process.exit(1)
+		throw error
 	}
 
 	// 9. Register additional health checks that depend on the processor

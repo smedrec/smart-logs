@@ -13,7 +13,7 @@ interface RedisConfig {
 	commandTimeout: number
 
 	/** Maximum number of retries */
-	maxRetriesPerRequest: number
+	maxRetriesPerRequest: number | null
 
 	/** Retry delay on failure */
 	retryDelayOnFailover: number
