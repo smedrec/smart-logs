@@ -220,6 +220,9 @@ importers:
       '@repo/hono-helpers':
         specifier: workspace:*
         version: link:../../packages/hono-helpers
+      '@repo/redis-client':
+        specifier: workspace:*
+        version: link:../../packages/redis-client
       '@repo/send-mail':
         specifier: workspace:*
         version: link:../../packages/send-mail

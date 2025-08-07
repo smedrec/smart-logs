@@ -1,6 +1,7 @@
 import {
 	Audit,
 	ComplianceReportingService,
+	ConfigurationManager,
 	createDatabasePresetHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
@@ -10,6 +11,7 @@ import {
 	HealthCheckService,
 	MonitoringService,
 	RedisHealthCheck,
+	RedisMetricsCollector,
 	ScheduledReportingService,
 } from '@repo/audit'
 import {
@@ -20,16 +22,18 @@ import {
 	reportTemplates,
 	scheduledReports,
 } from '@repo/audit-db'
-//import { InfisicalKmsClient } from '@repo/infisical-kms';
-
 import { auth } from '@repo/auth'
 import { db as authDb } from '@repo/auth/dist/db/index.js'
 import { ConsoleLogger } from '@repo/hono-helpers'
+import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import type { MiddlewareHandler } from 'hono'
 import type { DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
+import type { Redis } from '@repo/redis-client'
 //import {initCache} from "../cache";
 import type { HonoEnv } from '../hono/context.js'
+
+//import { InfisicalKmsClient } from '@repo/infisical-kms';
 
 /**
  * These maps persist between worker executions and are used for caching
@@ -39,6 +43,10 @@ import type { HonoEnv } from '../hono/context.js'
 let isolateId: string | undefined = undefined
 let isolateCreatedAt: number | undefined = undefined
 
+let configurationManager: ConfigurationManager | undefined = undefined
+
+let connection: Redis | undefined = undefined
+
 let auditDbInstance: AuditDb | undefined = undefined
 
 export { auditDbInstance }
@@ -47,6 +55,7 @@ let audit: Audit | undefined = undefined
 export { audit }
 
 // Alert and health check services
+let metricsCollector: RedisMetricsCollector | undefined = undefined
 let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
@@ -141,8 +150,15 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			defaultFields: { environment: c.env.ENVIRONMENT },
 		})
 
+		if (!configurationManager) {
+			configurationManager = new ConfigurationManager('default/audit-development.json', 's3')
+			await configurationManager.initialize()
+		}
+
+		const config = configurationManager.getConfig()
+
 		if (!auditDbInstance) {
-			auditDbInstance = new AuditDb(c.env.AUDIT_DB_URL)
+			auditDbInstance = new AuditDb(config.database.url)
 			// Check the database connection
 			const isConnected = await auditDbInstance.checkAuditDbConnection()
 			if (!isConnected) {
@@ -166,11 +182,21 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			//healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
 		}
 
-		if (!audit) audit = new Audit('audit')
+		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
+
+		if (!audit)
+			audit = new Audit(
+				config.reliableProcessor.queueName,
+				{
+					secretKey: config.security.encryptionKey,
+				},
+				connection
+			)
 
 		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db.audit)
 		if (!monitoringService) {
-			monitoringService = new MonitoringService()
+			if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
+			monitoringService = new MonitoringService(undefined, metricsCollector)
 			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 
@@ -180,7 +206,10 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
 		if (!errorHandler) errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
 
-		if (!reportingService) reportingService = new ComplianceReportingService(db.audit)
+		if (!reportingService)
+			reportingService = new ComplianceReportingService(db.audit, {
+				secretKey: config.security.encryptionKey,
+			})
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService)
 			scheduledReportingService = new ScheduledReportingService(

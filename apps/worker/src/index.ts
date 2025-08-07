@@ -359,18 +359,20 @@ async function main() {
 	} */
 
 	// 8. Create and start the reliable event processor
-	reliableProcessor = new ReliableEventProcessor<AuditLogEvent>(
-		connection,
-		db,
-		processAuditEvent,
-		config.reliableProcessor
-	)
+	if (!reliableProcessor) {
+		reliableProcessor = new ReliableEventProcessor<AuditLogEvent>(
+			connection,
+			db,
+			processAuditEvent,
+			config.reliableProcessor
+		)
 
-	try {
-		await reliableProcessor.start()
-	} catch (error) {
-		logger.error('Failed to start reliable processor:', error)
-		throw error
+		try {
+			await reliableProcessor.start()
+		} catch (error) {
+			logger.error('Failed to start reliable processor:', error)
+			throw error
+		}
 	}
 
 	// 9. Register additional health checks that depend on the processor

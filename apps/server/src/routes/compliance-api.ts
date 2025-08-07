@@ -258,7 +258,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 	 * Export audit events
 	 * POST /api/compliance/export/events
 	 */
-	app.post(
+	/**app.post(
 		'/export/events',
 		validator('json', (value, c) => {
 			const { criteria, config } = value
@@ -276,7 +276,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				const { criteria, config } = c.req.valid('json')
 
 				// Fetch audit events from database
-				const events = await fetchAuditEvents(db.audit, criteria)
+				const events = await compliance.report.getEvents(criteria)
 
 				// Convert to report events format
 				const reportEvents = events.map((event) => ({
@@ -323,7 +323,7 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				throw error
 			}
 		}
-	)
+	) */
 
 	/**
 	 * Create scheduled report
@@ -379,11 +379,12 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 				scheduledReports,
 			})
 		} catch (error) {
-			logger.error('Failed to get scheduled reports:', error)
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to get scheduled reports: ${message}`)
 			return c.json(
 				{
 					success: false,
-					error: error instanceof Error ? error.message : 'Unknown error',
+					error: message,
 				},
 				500
 			)

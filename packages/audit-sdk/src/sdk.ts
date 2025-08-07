@@ -1,10 +1,15 @@
-import { Audit, ConfigurationManager, createDatabasePresetHandler } from '@repo/audit'
+import {
+	Audit,
+	ConfigurationManager,
+	ConsoleLogger,
+	createDatabasePresetHandler,
+} from '@repo/audit'
 import { AuditDbWithConfig } from '@repo/audit-db'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { validateCompliance } from './compliance.js'
 
-import type { AuditLogEvent, DatabasePresetHandler } from '@repo/audit'
+import type { AuditLogEvent, DatabasePresetHandler, Logger } from '@repo/audit'
 import type { AuditSDKConfig } from './types.js'
 
 /**
@@ -17,9 +22,19 @@ export class AuditSDK {
 	private auditDb: AuditDbWithConfig | undefined = undefined
 	private config: AuditSDKConfig
 	private presetsService: DatabasePresetHandler | undefined = undefined
+	private logger: Logger
 
 	constructor(config: AuditSDKConfig) {
 		this.config = config
+		this.logger = new ConsoleLogger({
+			module: 'AuditSDK',
+			environment: 'development',
+			version: '0.1.0',
+			defaultFields: {
+				environment: 'development',
+				package: 'audit-sdk',
+			},
+		})
 	}
 
 	async initialize() {
@@ -33,7 +48,7 @@ export class AuditSDK {
 				error instanceof Error
 					? error.message
 					: 'Unknown error during configuration manager initialization'
-			console.error('[AuditSDK] Configuration manager initialization failed:', message)
+			this.logger.error('Configuration manager initialization failed:', { error: message })
 			throw new Error(message)
 		}
 		const config = this.configManager.getConfig()
@@ -44,6 +59,7 @@ export class AuditSDK {
 		// Initialize core audit service
 		if (!this.audit) {
 			if (!config.redis) {
+				this.logger.error('Redis connection not configured. Provide redis in config.')
 				throw new Error('Redis connection not configured. Provide redis in config.')
 			}
 			this.audit = new Audit(
@@ -125,6 +141,7 @@ export class AuditSDK {
 				validationConfig: this.config.validation,
 			})
 		} else {
+			this.logger.error('Audit service not initialized')
 			throw new Error('Audit service not initialized')
 		}
 	}
@@ -296,6 +313,7 @@ export class AuditSDK {
 				generateSignature: true,
 			})
 		} else {
+			this.logger.error('Audit service not initialized')
 			throw new Error('Audit service not initialized')
 		}
 	}
@@ -316,6 +334,7 @@ export class AuditSDK {
 		} = {}
 	) {
 		if (!this.auditDb) {
+			this.logger.error('Database not configured. Provide databaseUrl in config.')
 			throw new Error('Database not configured. Provide databaseUrl in config.')
 		}
 
@@ -337,6 +356,7 @@ export class AuditSDK {
 		}
 	) {
 		if (!this.auditDb) {
+			this.logger.error('Database not configured for reporting')
 			throw new Error('Database not configured for reporting')
 		}
 
@@ -355,6 +375,7 @@ export class AuditSDK {
 		} = {}
 	) {
 		if (!this.auditDb) {
+			this.logger.error('Database not configured for integrity verification')
 			throw new Error('Database not configured for integrity verification')
 		}
 
@@ -391,6 +412,7 @@ export class AuditSDK {
 	async close(): Promise<void> {
 		if (this.audit) {
 			await this.audit.closeConnection()
+			this.logger.info('Audit service closed')
 		}
 	}
 }

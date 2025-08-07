@@ -4,6 +4,7 @@ import { Redis as RedisInstance } from 'ioredis' // Renamed to avoid conflict
 import { getSharedRedisConnection } from '@repo/redis-client'
 
 import { CryptoService } from './crypto.js'
+import { ConsoleLogger, Logger } from './logs/index.js'
 import {
 	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 	ReliableEventProcessor,
@@ -54,6 +55,7 @@ export class Audit {
 	private bullmq_queue: Queue<AuditLogEvent, any, string>
 	private isSharedConnection: boolean
 	private cryptoService: CryptoService
+	private logger: Logger
 
 	/**
 	 * Constructs an `Audit` instance.
@@ -91,6 +93,16 @@ export class Audit {
 		this.isSharedConnection = false
 		this.cryptoService = new CryptoService(cryptoConfig)
 
+		this.logger = new ConsoleLogger({
+			module: 'AuditService',
+			environment: 'development',
+			version: '0.1.0',
+			defaultFields: {
+				environment: 'development',
+				package: 'audit',
+			},
+		})
+
 		const defaultDirectOptions: RedisOptions = {
 			maxRetriesPerRequest: null,
 			enableAutoPipelining: true,
@@ -103,8 +115,8 @@ export class Audit {
 		) {
 			// Scenario 1: An existing ioredis instance is provided
 			this.connection = redisOrUrlOrOptions
-			this.isSharedConnection = true // Assume externally managed, could be shared or not
-			console.log(`[AuditService] Using provided Redis instance for queue "${this.queueName}".`)
+			this.isSharedConnection = true // Assume shared, could be externally managed or not
+			this.logger.info(`Using provided Redis instance for queue "${this.queueName}".`)
 		} else if (
 			typeof redisOrUrlOrOptions === 'string' ||
 			(typeof redisOrUrlOrOptions === 'object' &&
@@ -134,14 +146,15 @@ export class Audit {
 			if (finalUrl) {
 				// If any URL (explicit, from object, or env) is found, attempt direct connection
 				try {
-					console.log(
+					this.logger.info(
 						`[AuditService] Creating new direct Redis connection to ${finalUrl.split('@').pop()} for queue "${this.queueName}".`
 					)
 					this.connection = new RedisInstance(finalUrl, options)
 				} catch (err) {
-					console.error(
+					const message = err instanceof Error ? err.message : String(err)
+					this.logger.error(
 						`[AuditService] Failed to create direct Redis instance for queue ${this.queueName}:`,
-						err
+						{ error: message }
 					)
 					throw new Error(
 						`[AuditService] Failed to initialize direct Redis connection for queue ${this.queueName}. Error: ${err instanceof Error ? err.message : String(err)}`
@@ -150,14 +163,16 @@ export class Audit {
 			} else if (url || redisOrUrlOrOptions || directConnectionOptions) {
 				// This case means an attempt for direct connection was made (e.g. empty string URL, or empty options object)
 				// but resulted in no usable URL, and AUDIT_REDIS_URL was also not set.
-				console.warn(
+				this.logger.warn(
 					`[AuditService] Attempted direct Redis connection for queue "${this.queueName}" but no valid URL could be determined (explicitly or via AUDIT_REDIS_URL). Falling back to shared connection.`
 				)
 				this.connection = getSharedRedisConnection()
 				this.isSharedConnection = true
 			} else {
 				// Scenario 3: No explicit direct connection info at all, and no env var, use the shared connection
-				console.log(`[AuditService] Using shared Redis connection for queue "${this.queueName}".`)
+				this.logger.info(
+					`[AuditService] Using shared Redis connection for queue "${this.queueName}".`
+				)
 				this.connection = getSharedRedisConnection()
 				this.isSharedConnection = true
 			}
@@ -167,14 +182,15 @@ export class Audit {
 			const envUrl = process.env['AUDIT_REDIS_URL']
 			const options: RedisOptions = { ...defaultDirectOptions } // directConnectionOptions is undefined here
 			try {
-				console.log(
+				this.logger.info(
 					`[AuditService] Creating new direct Redis connection using AUDIT_REDIS_URL to ${envUrl.split('@').pop()} for queue "${this.queueName}".`
 				)
 				this.connection = new RedisInstance(envUrl, options)
 			} catch (err) {
-				console.error(
+				const message = err instanceof Error ? err.message : String(err)
+				this.logger.error(
 					`[AuditService] Failed to create direct Redis instance using AUDIT_REDIS_URL for queue ${this.queueName}:`,
-					err
+					{ error: message }
 				)
 				throw new Error(
 					`[AuditService] Failed to initialize direct Redis connection using AUDIT_REDIS_URL for queue ${this.queueName}. Error: ${err instanceof Error ? err.message : String(err)}`
@@ -182,20 +198,31 @@ export class Audit {
 			}
 		} else {
 			// Scenario 3: No specific connection info at all, use the shared connection
-			console.log(`[AuditService] Using shared Redis connection for queue "${this.queueName}".`)
+			this.logger.info(
+				`[AuditService] Using shared Redis connection for queue "${this.queueName}".`
+			)
 			this.connection = getSharedRedisConnection()
 			this.isSharedConnection = true
 		}
 
 		//this.bullmq_queue = new Queue(this.queueName, { connection: this.connection })
-		this.bullmq_queue = new Queue<AuditLogEvent>(this.queueName, {
-			connection: this.connection,
-			defaultJobOptions: {
-				removeOnComplete: 100, // Keep up to 100 jobs
-				removeOnFail: false, // Keep failed jobs for dead letter processing
-				attempts: 1, // Reliable processor handles retries
-			},
-		})
+		try {
+			this.bullmq_queue = new Queue<AuditLogEvent>(this.queueName, {
+				connection: this.connection,
+				defaultJobOptions: {
+					removeOnComplete: 100, // Keep up to 100 jobs
+					removeOnFail: false, // Keep failed jobs for dead letter processing
+					attempts: 1, // Reliable processor handles retries
+				},
+			})
+		} catch (error) {
+			this.logger.error(`Failed to create BullMQ queue "${this.queueName}":`, {
+				error: error instanceof Error ? error.message : String(error),
+			})
+			throw new Error(
+				`Failed to create BullMQ queue "${this.queueName}". Error: ${error instanceof Error ? error.message : String(error)}`
+			)
+		}
 
 		// Attach listeners only if this instance created the connection (not shared and not provided externally)
 		// The shared connection manages its own listeners.
@@ -209,28 +236,28 @@ export class Audit {
 			)
 		) {
 			this.connection.on('error', (err: Error) => {
-				console.error(
+				this.logger.error(
 					`[AuditService] Redis Connection Error (direct connection for queue "${this.queueName}"): ${err.message}`,
-					err
+					{ error: err.message }
 				)
 			})
 			this.connection.on('connect', () => {
-				console.log(
+				this.logger.info(
 					`[AuditService] Successfully connected to Redis (direct connection for queue "${this.queueName}").`
 				)
 			})
 			this.connection.on('ready', () => {
-				console.log(
+				this.logger.info(
 					`[AuditService] Redis connection ready (direct connection for queue "${this.queueName}").`
 				)
 			})
 			this.connection.on('close', () => {
-				console.log(
+				this.logger.info(
 					`[AuditService] Redis connection closed (direct connection for queue "${this.queueName}").`
 				)
 			})
 			this.connection.on('reconnecting', () => {
-				console.log(
+				this.logger.info(
 					`[AuditService] Reconnecting to Redis (direct connection for queue "${this.queueName}")...`
 				)
 			})
@@ -456,7 +483,7 @@ export class Audit {
 				this.connection.status !== 'connecting' &&
 				this.connection.status !== 'reconnecting')
 		) {
-			console.warn(
+			this.logger.warn(
 				`[AuditService] Attempting to log event for queue "${this.queueName}" while Redis connection status is '${this.connection?.status || 'unknown'}'. This might fail if Redis is unavailable.`
 			)
 		}
@@ -512,13 +539,13 @@ export class Audit {
 				removeOnComplete: options.durabilityGuarantees ? false : 100,
 			})
 
-			console.log(
+			this.logger.info(
 				`[AuditService] Event queued for reliable processing: ${event.action} (queue: ${this.queueName})`
 			)
 		} catch (error) {
-			console.error(
+			this.logger.error(
 				`[AuditService] Failed to add event to reliable processing queue "${this.queueName}":`,
-				error
+				{ error: error instanceof Error ? error.message : String(error) }
 			)
 			throw new Error(
 				`[AuditService] Failed to log audit event with guaranteed delivery. Error: ${error instanceof Error ? error.message : String(error)}`
@@ -538,9 +565,11 @@ export class Audit {
 		if (this.bullmq_queue) {
 			try {
 				await this.bullmq_queue.close()
-				console.info(`[AuditService] BullMQ queue '${this.queueName}' closed successfully.`)
+				this.logger.info(`[AuditService] BullMQ queue '${this.queueName}' closed successfully.`)
 			} catch (err) {
-				console.error(`[AuditService] Error closing BullMQ queue '${this.queueName}':`, err)
+				this.logger.error(`[AuditService] Error closing BullMQ queue '${this.queueName}':`, {
+					error: err instanceof Error ? err.message : String(err),
+				})
 			}
 		}
 
@@ -549,24 +578,24 @@ export class Audit {
 			if ((this.connection.status as string) !== 'end') {
 				try {
 					await this.connection.quit()
-					console.info(
+					this.logger.info(
 						`[AuditService] Direct Redis connection for queue '${this.queueName}' quit gracefully.`
 					)
 				} catch (err) {
-					console.error(
+					this.logger.error(
 						`[AuditService] Error quitting direct Redis connection for queue '${this.queueName}':`,
-						err
+						{ error: err instanceof Error ? err.message : String(err) }
 					)
 					if (this.connection.status !== 'end') {
 						this.connection.disconnect()
-						console.info(
+						this.logger.info(
 							`[AuditService] Direct Redis connection for queue '${this.queueName}' disconnected forcefully.`
 						)
 					}
 				}
 			}
 		} else if (this.isSharedConnection) {
-			console.info(
+			this.logger.info(
 				`[AuditService] Using a shared Redis connection for queue '${this.queueName}'. Connection will not be closed by this instance.`
 			)
 		}

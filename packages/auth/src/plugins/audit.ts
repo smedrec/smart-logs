@@ -4,36 +4,28 @@ import AuditSDK from '@repo/audit-sdk'
 
 import type { BetterAuthPlugin } from 'better-auth'
 
-// Initialize the SDK
-const auditSDK = new AuditSDK({
-	queueName: 'audit',
-	redis: {
-		url: process.env.REDIS_URL,
-	},
-	databaseUrl: process.env.AUDIT_DB_URL,
-	defaults: {
-		dataClassification: 'INTERNAL',
-		generateHash: true,
-		generateSignature: true,
-	},
-	crypto: {
-		secretKey: process.env.AUDIT_CRYPTO_SECRET,
-		enableSignatures: true,
-	},
-	compliance: {
-		hipaa: {
-			enabled: true,
-			retentionYears: 6,
-		},
-		gdpr: {
-			enabled: true,
-			defaultLegalBasis: 'legitimate_interest',
-			retentionDays: 365,
-		},
-	},
-})
+let auditSDK: AuditSDK | undefined = undefined
 
-export const AuditSDKPlugin = () => {
+export const AuditSDKPlugin = async () => {
+	if (!auditSDK) {
+		// Initialize the SDK
+		auditSDK = new AuditSDK({
+			configPath: 'default/audit-development.json',
+			storageType: 's3',
+			compliance: {
+				hipaa: {
+					enabled: true,
+					retentionYears: 6,
+				},
+				gdpr: {
+					enabled: true,
+					defaultLegalBasis: 'legitimate_interest',
+					retentionDays: 365,
+				},
+			},
+		})
+		await auditSDK.initialize()
+	}
 	return {
 		id: 'audit-sdk-plugin',
 		hooks: {
@@ -69,7 +61,11 @@ export const AuditSDKPlugin = () => {
 											: 'unknown',
 								},
 							}
-							await auditSDK.logAuth(details)
+							if (auditSDK) {
+								await auditSDK.logAuth(details)
+							} else {
+								console.error('Audit SDK not initialized')
+							}
 							console.log('BEFORE LOGOUT - AFTER SESSION')
 						}
 					}),
@@ -105,7 +101,11 @@ export const AuditSDKPlugin = () => {
 											: 'unknown',
 								},
 							}
-							await auditSDK.logAuth(details)
+							if (auditSDK) {
+								await auditSDK.logAuth(details)
+							} else {
+								console.error('Audit SDK not initialized')
+							}
 						}
 					}),
 				},

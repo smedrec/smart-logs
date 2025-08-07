@@ -64,11 +64,10 @@ export function getSharedRedisConnectionWithConfig(redisConfig: RedisConfig): Re
 	}
 
 	const connectionOptions: RedisOptions = {
-		...DEFAULT_REDIS_OPTIONS,
-		maxRetriesPerRequest: redisConfig.maxRetriesPerRequest,
-		enableAutoPipelining: redisConfig.enableAutoPipelining,
 		connectTimeout: redisConfig.connectTimeout,
 		commandTimeout: redisConfig.commandTimeout,
+		maxRetriesPerRequest: redisConfig.maxRetriesPerRequest,
+		enableAutoPipelining: redisConfig.enableAutoPipelining,
 		enableOfflineQueue: redisConfig.enableOfflineQueue,
 	}
 

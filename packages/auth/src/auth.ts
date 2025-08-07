@@ -14,7 +14,7 @@ import { getRedisConnection } from './redis.js'
 import type { MailerSendOptions } from '@repo/send-mail'
 
 const redis = getRedisConnection()
-const email = new SendMail('mail')
+const email = new SendMail('mail', process.env.REDIS_URL)
 
 export const auth: ReturnType<typeof betterAuth> = betterAuth({
 	database: drizzleAdapter(db, {
@@ -185,7 +185,7 @@ export const auth: ReturnType<typeof betterAuth> = betterAuth({
 			},
 			enableMetadata: true,
 		}),
-		AuditSDKPlugin(),
+		await AuditSDKPlugin(),
 		openAPI(),
 	],
 })

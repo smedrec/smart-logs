@@ -599,7 +599,7 @@ export class RedisMetricsCollector implements MetricsCollector {
 		) {
 			// Scenario 1: An existing ioredis instance is provided
 			this.connection = redisOrUrlOrOptions
-			this.isSharedConnection = false // Assume externally managed, could be shared or not
+			this.isSharedConnection = true // Assume externally managed, could be shared or not
 			console.log(`[MonitorService] Using provided Redis instance for monitor.`)
 		} else if (
 			typeof redisOrUrlOrOptions === 'string' ||

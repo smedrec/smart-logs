@@ -65,3 +65,7 @@ export * from './archival/postgres-archival-service.js'
 // Export configuration manager
 export { ConfigurationManager } from './config/manager.js'
 export * from './config/types.js'
+
+// Export log helpers
+export { ConsoleLogger } from './logs/index.js'
+export type { Logger } from './logs/index.js'
