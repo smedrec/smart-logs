@@ -1,0 +1,22 @@
+{
+	"name": "@repo/logs",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsc --build",
+		"clean": "rm -rf dist node_modules",
+		"lint": "eslint . --ext .ts"
+	},
+	"dependencies": {
+		"zod": "^4.0.5"
+	},
+	"devDependencies": {
+		"@repo/eslint-config": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"eslint": "9.27.0",
+		"typescript": "5.8.2"
+	}
+}

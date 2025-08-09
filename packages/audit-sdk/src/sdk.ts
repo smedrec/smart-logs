@@ -1,15 +1,12 @@
-import {
-	Audit,
-	ConfigurationManager,
-	ConsoleLogger,
-	createDatabasePresetHandler,
-} from '@repo/audit'
+import { Audit, ConfigurationManager, createDatabasePresetHandler } from '@repo/audit'
 import { AuditDbWithConfig } from '@repo/audit-db'
+import { ConsoleLogger } from '@repo/logs'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { validateCompliance } from './compliance.js'
 
-import type { AuditLogEvent, DatabasePresetHandler, Logger } from '@repo/audit'
+import type { AuditLogEvent, DatabasePresetHandler } from '@repo/audit'
+import type { Logger } from '@repo/logs'
 import type { AuditSDKConfig } from './types.js'
 
 /**
@@ -27,12 +24,13 @@ export class AuditSDK {
 	constructor(config: AuditSDKConfig) {
 		this.config = config
 		this.logger = new ConsoleLogger({
-			module: 'AuditSDK',
 			environment: 'development',
+			application: 'web',
+			module: 'AuditSDK',
 			version: '0.1.0',
 			defaultFields: {
 				environment: 'development',
-				package: 'audit-sdk',
+				package: '@repo/audit-sdk',
 			},
 		})
 	}

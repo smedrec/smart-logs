@@ -1,10 +1,10 @@
 import { Queue } from 'bullmq'
 import { Redis as RedisInstance } from 'ioredis' // Renamed to avoid conflict
 
+import { ConsoleLogger } from '@repo/logs'
 import { getSharedRedisConnection } from '@repo/redis-client'
 
 import { CryptoService } from './crypto.js'
-import { ConsoleLogger, Logger } from './logs/index.js'
 import {
 	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 	ReliableEventProcessor,
@@ -12,6 +12,7 @@ import {
 import { DEFAULT_VALIDATION_CONFIG, validateAndSanitizeAuditEvent } from './validation.js'
 
 import type { RedisOptions, Redis as RedisType } from 'ioredis' // RedisType for type usage
+import type { Logger } from '@repo/logs'
 import type { CryptoConfig } from './crypto.js'
 import type { ReliableProcessorConfig } from './queue/reliable-processor.js'
 import type { AuditLogEvent } from './types.js'
@@ -94,12 +95,13 @@ export class Audit {
 		this.cryptoService = new CryptoService(cryptoConfig)
 
 		this.logger = new ConsoleLogger({
-			module: 'AuditService',
 			environment: 'development',
+			application: 'web',
+			module: 'Audit',
 			version: '0.1.0',
 			defaultFields: {
 				environment: 'development',
-				package: 'audit',
+				package: '@repo/audit',
 			},
 		})
 
@@ -533,19 +535,26 @@ export class Audit {
 		}
 
 		try {
-			await this.bullmq_queue.add(this.queueName, event, {
+			const job = await this.bullmq_queue.add(this.queueName, event, {
 				priority: options.priority || 0,
 				delay: options.delay || 0,
 				removeOnComplete: options.durabilityGuarantees ? false : 100,
 			})
-
+			const jobId = job.id
 			this.logger.info(
-				`[AuditService] Event queued for reliable processing: ${event.action} (queue: ${this.queueName})`
+				`[AuditService] Event queued for reliable processing: ${event.action} (queue: ${this.queueName})`,
+				{
+					queueName: this.queueName,
+					jobId,
+				}
 			)
 		} catch (error) {
 			this.logger.error(
 				`[AuditService] Failed to add event to reliable processing queue "${this.queueName}":`,
-				{ error: error instanceof Error ? error.message : String(error) }
+				{
+					queueName: this.queueName,
+					error: error instanceof Error ? error.message : String(error),
+				}
 			)
 			throw new Error(
 				`[AuditService] Failed to log audit event with guaranteed delivery. Error: ${error instanceof Error ? error.message : String(error)}`

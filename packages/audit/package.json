@@ -21,6 +21,7 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "3.859.0",
+		"@repo/logs": "workspace:*",
 		"@repo/redis-client": "workspace:*",
 		"bullmq": "5.56.4",
 		"dotenv": "17.2.0",

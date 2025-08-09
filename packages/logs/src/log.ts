@@ -1,9 +1,22 @@
+import { version } from 'os'
 import { z } from 'zod'
+
+export const logContext = z.object({
+	requestId: z.string(),
+	environment: z.enum(['VITEST', 'development', 'staging', 'production']),
+	application: z.enum(['api', 'inngest', 'web', 'docs', 'worker']),
+	module: z.string(),
+	version: z.string().optional(),
+	time: z.number(),
+})
 
 const commonFields = z.object({
 	environment: z.enum(['VITEST', 'development', 'staging', 'production']),
+	application: z.enum(['api', 'inngest', 'web', 'docs', 'worker']),
 	module: z.string(),
 	version: z.string().optional(),
+	isolateId: z.string().optional(),
+	requestId: z.string().optional(),
 	time: z.number(),
 })
 
