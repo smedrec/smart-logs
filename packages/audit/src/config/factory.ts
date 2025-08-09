@@ -97,6 +97,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			gdpr: {
 				enabled: true,
 				defaultLegalBasis: 'legitimate_interest',
+				retentionDays: 365,
 			},
 			defaultRetentionDays: 2555, // 7 years
 			enableAutoArchival: true,

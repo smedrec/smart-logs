@@ -219,6 +219,7 @@ export class Audit {
 			})
 		} catch (error) {
 			this.logger.error(`Failed to create BullMQ queue "${this.queueName}":`, {
+				queueName: this.queueName,
 				error: error instanceof Error ? error.message : String(error),
 			})
 			throw new Error(
@@ -476,7 +477,16 @@ export class Audit {
 		} = {}
 	): Promise<void> {
 		if (!this.bullmq_queue) {
-			throw new Error('[AuditService] Cannot log event: BullMQ queue is not initialized.')
+			this.logger.error(
+				`Cannot log event: BullMQ queue is not initialized for queue "${this.queueName}".`,
+				{
+					queueName: this.queueName,
+					error: 'BullMQ queue is not initialized',
+				}
+			)
+			throw new Error(
+				`[AuditService] Cannot log event: BullMQ queue is not initialized for queue "${this.queueName}".`
+			)
 		}
 		// Check connection status before logging.
 		if (
@@ -516,6 +526,10 @@ export class Audit {
 				const errorMessages = validationResult.validationErrors
 					.map((err) => `${err.field}: ${err.message} (${err.code})`)
 					.join('; ')
+				this.logger.error(`Validation Error for queue "${this.queueName}": ${errorMessages}`, {
+					queueName: this.queueName,
+					error: errorMessages,
+				})
 				throw new Error(`[AuditService] Validation Error: ${errorMessages}`)
 			}
 
@@ -542,7 +556,7 @@ export class Audit {
 			})
 			const jobId = job.id
 			this.logger.info(
-				`[AuditService] Event queued for reliable processing: ${event.action} (queue: ${this.queueName})`,
+				`Event queued for reliable processing: ${event.action} (queue: ${this.queueName})`,
 				{
 					queueName: this.queueName,
 					jobId,
