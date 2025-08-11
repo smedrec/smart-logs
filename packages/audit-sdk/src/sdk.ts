@@ -329,6 +329,7 @@ export class AuditSDK {
 			startDate?: Date
 			endDate?: Date
 			limit?: number
+			offset?: number
 		} = {}
 	) {
 		if (!this.auditDb) {

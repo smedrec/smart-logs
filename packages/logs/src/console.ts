@@ -1,3 +1,5 @@
+import chalk from 'chalk'
+
 import { Log } from './log.js'
 
 import type { Fields, Logger } from './interface.js'
@@ -47,19 +49,19 @@ export class ConsoleLogger implements Logger {
 	}
 
 	public debug(message: string, fields?: Fields): void {
-		console.debug(this.marshal('debug', message, fields))
+		console.debug(chalk.blue(this.marshal('debug', message, fields)))
 	}
 	public info(message: string, fields?: Fields): void {
-		console.info(this.marshal('info', message, fields))
+		console.info(chalk.green(this.marshal('info', message, fields)))
 	}
 	public warn(message: string, fields?: Fields): void {
-		console.warn(this.marshal('warn', message, fields))
+		console.warn(chalk.yellow(this.marshal('warn', message, fields)))
 	}
 	public error(message: string, fields?: Fields): void {
-		console.error(this.marshal('error', message, fields))
+		console.error(chalk.red(this.marshal('error', message, fields)))
 	}
 	public fatal(message: string, fields?: Fields): void {
-		console.error(this.marshal('fatal', message, fields))
+		console.error(chalk.red(this.marshal('fatal', message, fields)))
 	}
 
 	public setRequestId(requestId?: string): void {

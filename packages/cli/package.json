@@ -1,0 +1,57 @@
+{
+	"name": "@smart-logs/cli",
+	"version": "0.1.0",
+	"description": "Smart Logs CLI - Run Smart Logs utils",
+	"keywords": [
+		"smartlogs",
+		"audit",
+		"compliance",
+		"hipaa",
+		"cli",
+		"grpc"
+	],
+	"license": "Apache-2.0",
+	"author": "José Cordeiro <joseantgcordeiro@gmail.com>",
+	"type": "module",
+	"main": "dist/index.js",
+	"bin": {
+		"smart-logs": "dist/index.js"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --build",
+		"check:lint": "eslint . --ext .ts",
+		"check:types": "tsc --noEmit",
+		"clean": "rm -rf dist node_modules .turbo",
+		"prepublishOnly": "pnpm build"
+	},
+	"dependencies": {
+		"@repo/audit": "workspace:*",
+		"@repo/audit-db": "workspace:*",
+		"chalk": "^5.5.0",
+		"commander": "^14.0.0",
+		"dotenv": "^16.4.7",
+		"inquirer": "^12.9.1",
+		"listr2": "^9.0.1"
+	},
+	"devDependencies": {
+		"@repo/eslint-config": "workspace:*",
+		"@types/inquirer": "^9.0.9",
+		"@types/node": "24.0.13",
+		"typescript": "5.8.2"
+	},
+	"engines": {
+		"node": ">=16"
+	},
+	"turbo": {
+		"tasks": {
+			"build": {
+				"outputs": [
+					"dist/**"
+				]
+			}
+		}
+	}
+}

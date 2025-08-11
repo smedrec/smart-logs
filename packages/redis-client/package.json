@@ -12,6 +12,7 @@
 		"lint": "eslint . --ext .ts"
 	},
 	"dependencies": {
+		"@repo/logs": "workspace:*",
 		"ioredis": "5.6.1"
 	},
 	"devDependencies": {
