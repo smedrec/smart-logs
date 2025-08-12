@@ -3,6 +3,8 @@
  * Uses existing types from the audit system to avoid duplication
  */
 
+import { ArchiveConfig } from '../archival/archival-service.js'
+
 import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
 import type { RetryConfig } from '../retry.js'
 
@@ -41,6 +43,9 @@ export interface AuditConfig {
 
 	/** Compliance configuration */
 	compliance: ComplianceConfig
+
+	// Archival configuration
+	archive: ArchiveConfig
 
 	/** Logging configuration */
 	logging: LoggingConfig

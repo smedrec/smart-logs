@@ -1,5 +1,7 @@
 import { createGunzip, createInflate } from 'zlib'
 
+import { ConsoleLogger, Logger } from '@repo/logs'
+
 import { ArchivalService } from './archival-service.js'
 
 import type { ArchiveConfig, ArchiveRetrievalRequest } from './archival-service.js'
@@ -47,7 +49,8 @@ export class PostgresArchivalService extends ArchivalService {
 				lastRetrievedAt: archive.lastRetrievedAt,
 			})
 		} catch (error) {
-			console.error('Error storing archive:', error)
+			const message = error instanceof Error ? error.message : String(error)
+			this.logger.error(`Error storing archive: ${message}`, { error: message })
 			throw error
 		}
 	}
@@ -77,7 +80,10 @@ export class PostgresArchivalService extends ArchivalService {
 
 			return archive
 		} catch (error) {
-			console.error(`Error retrieving archive ${archiveId}:`, error)
+			const message = error instanceof Error ? error.message : String(error)
+			this.logger.error(`Error retrieving archive ${archiveId}: ${message}`, {
+				error: message,
+			})
 			throw error
 		}
 	}
@@ -133,7 +139,10 @@ export class PostgresArchivalService extends ArchivalService {
 				data: Buffer.from(archive.data, 'base64'),
 			}))
 		} catch (error) {
-			console.error('Error finding matching archives:', error)
+			const message = error instanceof Error ? error.message : String(error)
+			this.logger.error(`Error finding matching archives: ${message}`, {
+				error: message,
+			})
 			throw error
 		}
 	}
@@ -161,7 +170,10 @@ export class PostgresArchivalService extends ArchivalService {
 					throw new Error(`Unsupported compression algorithm: ${compressionAlgorithm}`)
 			}
 		} catch (error) {
-			console.error('Error decompressing archive data:', error)
+			const message = error instanceof Error ? error.message : String(error)
+			this.logger.error(`Error decompressing archive data: ${message}`, {
+				error: message,
+			})
 			throw error
 		}
 	}
@@ -213,7 +225,13 @@ export class PostgresArchivalService extends ArchivalService {
 				})
 				.where({ id: archiveId })
 		} catch (error) {
-			console.error(`Error updating retrieval statistics for archive ${archiveId}:`, error)
+			const message = error instanceof Error ? error.message : String(error)
+			this.logger.error(
+				`Error updating retrieval statistics for archive ${archiveId}: ${message}`,
+				{
+					error: message,
+				}
+			)
 			throw error
 		}
 	}

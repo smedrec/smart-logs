@@ -1,6 +1,8 @@
 import { createHash } from 'crypto'
 import { createDeflate, createGzip } from 'zlib'
 
+import { ConsoleLogger, Logger } from '@repo/logs'
+
 /**
  * Configuration options for archive creation and management
  */
@@ -67,6 +69,11 @@ export interface ArchiveRetrievalRequest {
 	 * Principal ID to filter records by
 	 */
 	principalId?: string
+
+	/**
+	 * Organization ID to filter records by
+	 */
+	organizationId?: string
 
 	/**
 	 * Date range to filter records by
@@ -404,6 +411,7 @@ export abstract class ArchivalService {
 	protected retentionPolicyTable: any
 	protected archiveTable: any
 	protected config: ArchiveConfig
+	protected logger: Logger
 
 	/**
 	 * Create a new ArchivalService
@@ -426,6 +434,16 @@ export abstract class ArchivalService {
 		this.retentionPolicyTable = retentionPolicyTable
 		this.archiveTable = archiveTable
 		this.config = { ...DEFAULT_ARCHIVE_CONFIG, ...config }
+		this.logger = new ConsoleLogger({
+			environment: 'development',
+			application: 'web',
+			module: 'ArchivalService',
+			version: '0.1.0',
+			defaultFields: {
+				environment: 'development',
+				package: '@repo/audit',
+			},
+		})
 	}
 
 	/**
@@ -528,12 +546,18 @@ export abstract class ArchivalService {
 						summary,
 					})
 				} catch (error) {
-					console.error(`Error processing policy ${policy.policyName}:`, error)
+					const message =
+						error instanceof Error
+							? error.message
+							: 'Unknown error during retention policy processing'
+					this.logger.error(`Error processing policy ${policy.policyName}:`, { error: message })
 					// Continue with next policy
 				}
 			}
 		} catch (error) {
-			console.error('Error retrieving retention policies:', error)
+			const message =
+				error instanceof Error ? error.message : 'Unknown error during retention policy processing'
+			this.logger.error('Error retrieving retention policies:', { error: message })
 		}
 
 		return results
@@ -606,6 +630,9 @@ export abstract class ArchivalService {
 					compressedData = Buffer.from(serializedData, 'utf8')
 					break
 				default:
+					this.logger.error('Unsupported compression algorithm', {
+						error: `Unsupported compression algorithm: ${this.config.compressionAlgorithm}`,
+					})
 					throw new Error(`Unsupported compression algorithm: ${this.config.compressionAlgorithm}`)
 			}
 
@@ -669,7 +696,9 @@ export abstract class ArchivalService {
 				processingTime,
 			}
 		} catch (error) {
-			console.error('Error creating archive:', error)
+			const message =
+				error instanceof Error ? error.message : 'Unknown error during archive creation'
+			this.logger.error('Error creating archive:', { error: message })
 			throw error
 		}
 	}
@@ -712,6 +741,9 @@ export abstract class ArchivalService {
 							.map((line) => JSON.parse(line))
 						break
 					default:
+						this.logger.error(`Unsupported archive format: ${archive.metadata.config?.format}`, {
+							error: `Unsupported archive format: ${archive.metadata.config?.format}`,
+						})
 						throw new Error(`Unsupported archive format: ${archive.metadata.config?.format}`)
 				}
 
@@ -743,7 +775,8 @@ export abstract class ArchivalService {
 				archives: processedArchives,
 			}
 		} catch (error) {
-			console.error('Error retrieving archived data:', error)
+			const message = error instanceof Error ? error.message : 'Unknown error during data retrieval'
+			this.logger.error('Error retrieving archived data:', { error: message })
 			throw error
 		}
 	}
@@ -756,6 +789,7 @@ export abstract class ArchivalService {
 	 */
 	public async secureDeleteData(criteria: {
 		principalId?: string
+		organizationId?: string
 		dateRange?: { start: string; end: string }
 		dataClassifications?: string[]
 		retentionPolicies?: string[]
@@ -767,6 +801,10 @@ export abstract class ArchivalService {
 
 			if (criteria.principalId) {
 				query = query.where({ principalId: criteria.principalId })
+			}
+
+			if (criteria.organizationId) {
+				query = query.where({ organizationId: criteria.organizationId })
 			}
 
 			if (criteria.dateRange) {
@@ -832,7 +870,9 @@ export abstract class ArchivalService {
 				verificationDetails,
 			}
 		} catch (error) {
-			console.error('Error deleting data:', error)
+			const message =
+				error instanceof Error ? error.message : 'Unknown error during secure deletion'
+			this.logger.error('Error during secure deletion:', { error: message })
 			throw error
 		}
 	}
@@ -905,7 +945,9 @@ export abstract class ArchivalService {
 				newestArchive: newestDate,
 			}
 		} catch (error) {
-			console.error('Error getting archive statistics:', error)
+			const message =
+				error instanceof Error ? error.message : 'Unknown error getting archive statistics'
+			this.logger.error('Error getting archive statistics:', { error: message })
 			throw error
 		}
 	}
@@ -960,7 +1002,9 @@ export abstract class ArchivalService {
 				cleanupTimestamp: new Date().toISOString(),
 			}
 		} catch (error) {
-			console.error('Error cleaning up old archives:', error)
+			const message =
+				error instanceof Error ? error.message : 'Unknown error during cleanup of old archives'
+			this.logger.error('Error cleaning up old archives:', { error: message })
 			throw error
 		}
 	}
@@ -1005,7 +1049,9 @@ export abstract class ArchivalService {
 				validationTimestamp: new Date().toISOString(),
 			}
 		} catch (error) {
-			console.error('Error validating archives:', error)
+			const message =
+				error instanceof Error ? error.message : 'Unknown error during validation of all archives'
+			this.logger.error('Error validating all archives:', { error: message })
 			throw error
 		}
 	}
@@ -1042,7 +1088,11 @@ export abstract class ArchivalService {
 
 			return actualOriginalChecksum === expectedOriginalChecksum
 		} catch (error) {
-			console.error(`Error verifying archive integrity for ${archiveId}:`, error)
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unknown error during archive integrity verification'
+			this.logger.error(`Error verifying archive integrity for ${archiveId}:`, { error: message })
 			return false
 		}
 	}

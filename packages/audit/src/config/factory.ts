@@ -110,6 +110,14 @@ export function createDevelopmentConfig(): AuditConfig {
 				includeHIPAA: false,
 			},
 		},
+		archive: {
+			compressionAlgorithm: 'gzip',
+			compressionLevel: 6,
+			format: 'json',
+			batchSize: 1000,
+			verifyIntegrity: true,
+			encryptArchive: false,
+		},
 		logging: {
 			level: 'debug',
 			structured: true,
@@ -194,6 +202,10 @@ export function createStagingConfig(): AuditConfig {
 				includeGDPR: true,
 				includeHIPAA: true,
 			},
+		},
+		archive: {
+			...baseConfig.archive,
+			encryptArchive: true,
 		},
 		logging: {
 			...baseConfig.logging,
@@ -288,6 +300,10 @@ export function createProductionConfig(): AuditConfig {
 				includeHIPAA: true,
 			},
 		},
+		archive: {
+			...baseConfig.archive,
+			encryptArchive: true,
+		},
 		logging: {
 			...baseConfig.logging,
 			level: 'warn',
@@ -374,6 +390,11 @@ export function createTestConfig(): AuditConfig {
 				includeGDPR: false,
 				includeHIPAA: false,
 			},
+		},
+		archive: {
+			...baseConfig.archive,
+			verifyIntegrity: false,
+			encryptArchive: false,
 		},
 		logging: {
 			...baseConfig.logging,
