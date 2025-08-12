@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
 
-import { PostgresArchivalService } from '@repo/audit'
+import { createDefaultConfigFile, PostgresArchivalService } from '@repo/audit'
 import { archiveStorage, AuditDb, auditLog, auditRetentionPolicy } from '@repo/audit-db'
+
+import type { StorageType } from '@repo/audit'
 
 /**
  * CLI tool for audit data archival and cleanup operations
@@ -11,10 +13,42 @@ import { archiveStorage, AuditDb, auditLog, auditRetentionPolicy } from '@repo/a
 
 const program = new Command()
 
+program.name('smart-logs').description('Smart Logs CLI tool').version('0.1.0')
+
+// Create configuration file
 program
-	.name('audit-archival')
-	.description('Audit data archival and cleanup CLI tool')
-	.version('1.0.0')
+	.command('config')
+	.description('Create configuration file for specified environment')
+	.option('-e, --environment <environment>', 'Environment name')
+	.option('-cp, --configPath <path>', 'Configuration path')
+	.option('-st, --storageType [storageType]', 'Storage type (s3, file)', 's3')
+	.action(async (options) => {
+		if (!options.environment) {
+			console.error('Environment required for configuration file creation')
+			process.exit(1)
+		}
+		if (!options.configPath || typeof options.configPath !== 'string') {
+			console.error('Configuration path required for configuration file creation')
+			process.exit(1)
+		}
+
+		try {
+			await createDefaultConfigFile(options.configPath, options.storageType, options.environment)
+
+			console.log(`Configuration file created: ${options.environment}`)
+		} catch (error) {
+			console.error('Configuration file creation failed:', error)
+			process.exit(1)
+		}
+	})
+	.addHelpText(
+		'after',
+		`
+Examples:
+  smart-logs config -e development -cp default/audit-development.json -st file
+  smart-logs config -e production -cp default/audit-production.json
+`
+	)
 
 // Create archival service instance
 function createArchivalService(): PostgresArchivalService {

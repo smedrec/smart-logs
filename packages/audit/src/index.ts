@@ -65,3 +65,4 @@ export * from './archival/postgres-archival-service.js'
 // Export configuration manager
 export { ConfigurationManager } from './config/manager.js'
 export * from './config/types.js'
+export { createDefaultConfigFile } from './config/integration.js'
