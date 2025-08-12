@@ -592,6 +592,9 @@ export abstract class ArchivalService {
 					serializedData = records.map((record) => JSON.stringify(record)).join('\\n')
 					break
 				default:
+					this.logger.error('Unsupported archive format', {
+						error: `Unsupported archive format: ${this.config.format}`,
+					})
 					throw new Error(`Unsupported archive format: ${this.config.format}`)
 			}
 
