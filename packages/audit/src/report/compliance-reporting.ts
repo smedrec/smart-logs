@@ -12,6 +12,7 @@
 import { sql } from 'drizzle-orm'
 
 import { CryptoConfig, CryptoService } from '../crypto.js'
+import { ReportTemplate } from './scheduled-reporting.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { AuditEventStatus, AuditLogEvent, DataClassification } from '../types.js'
@@ -75,7 +76,7 @@ export interface ComplianceReport {
 		generatedBy?: string
 		criteria: ReportCriteria
 		totalEvents: number
-		filteredEvents: number
+		//filteredEvents: number
 	}
 
 	/** Report summary statistics */
@@ -259,6 +260,7 @@ export interface ScheduledReportConfig {
 	name: string
 	description?: string
 	templateId?: string
+	reportType: ReportTemplate['reportType']
 	criteria: ReportCriteria
 	format: ReportFormat
 	schedule: {
@@ -274,6 +276,7 @@ export interface ScheduledReportConfig {
 		webhookUrl?: string
 		storageLocation?: string
 	}
+	export: ExportConfig
 	enabled: boolean
 	createdAt: string
 	createdBy: string
@@ -304,13 +307,13 @@ export class ComplianceReportingService {
 		const generatedAt = new Date().toISOString()
 
 		// Filter events based on criteria
-		const filteredEvents = this.filterEvents(events, criteria)
+		//const filteredEvents = this.filterEvents(events, criteria)
 
 		// Generate summary statistics
-		const summary = this.generateSummary(filteredEvents)
+		const summary = this.generateSummary(events)
 
 		// Convert to report format
-		const reportEvents = this.convertToReportEvents(filteredEvents)
+		const reportEvents = this.convertToReportEvents(events)
 
 		return {
 			metadata: {
@@ -319,7 +322,7 @@ export class ComplianceReportingService {
 				generatedAt,
 				criteria,
 				totalEvents: events.length,
-				filteredEvents: filteredEvents.length,
+				//filteredEvents: filteredEvents.length,
 			},
 			summary,
 			events: reportEvents,

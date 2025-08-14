@@ -4,6 +4,7 @@
  */
 
 import { ArchiveConfig } from '../archival/archival-service.js'
+import { DeliveryConfig } from '../report/scheduled-reporting.js'
 import { ValidationConfig } from '../validation.js'
 
 import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
@@ -47,6 +48,9 @@ export interface AuditConfig {
 
 	/** Validation configuration */
 	validation: ValidationConfig
+
+	/** Delivery configuration */
+	//delivery: DeliveryConfig
 
 	// Archival configuration
 	archive: ArchiveConfig

@@ -8,6 +8,20 @@
       "when": 1754267324684,
       "tag": "0000_burly_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1755167014994,
+      "tag": "0001_aberrant_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1755178211163,
+      "tag": "0002_tearful_blonde_phantom",
+      "breakpoints": true
     }
   ]
 }

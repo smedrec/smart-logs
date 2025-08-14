@@ -89,7 +89,7 @@ export class DataExportService {
 	 * Export compliance report in specified format
 	 */
 	async exportComplianceReport(
-		report: ComplianceReport,
+		report: ComplianceReport | HIPAAComplianceReport | GDPRComplianceReport,
 		config: ExportConfig
 	): Promise<ExportResult> {
 		const exportId = this.generateExportId()
@@ -179,7 +179,7 @@ export class DataExportService {
 				generatedAt: new Date().toISOString(),
 				criteria: metadata?.criteria || {},
 				totalEvents: events.length,
-				filteredEvents: events.length,
+				//filteredEvents: events.length,
 			},
 			summary: {
 				eventsByStatus: {},
@@ -203,7 +203,7 @@ export class DataExportService {
 	 * Export to JSON format
 	 */
 	private async exportToJSON(
-		report: ComplianceReport,
+		report: ComplianceReport | HIPAAComplianceReport | GDPRComplianceReport,
 		config: ExportConfig
 	): Promise<{ data: string; contentType: string; filename: string }> {
 		const exportData = {
@@ -229,7 +229,7 @@ export class DataExportService {
 	 * Export to CSV format
 	 */
 	private async exportToCSV(
-		report: ComplianceReport,
+		report: ComplianceReport | HIPAAComplianceReport | GDPRComplianceReport,
 		config: ExportConfig
 	): Promise<{ data: string; contentType: string; filename: string }> {
 		const headers = [
@@ -278,7 +278,6 @@ export class DataExportService {
 				`# Report Type: ${report.metadata.reportType}`,
 				`# Generated At: ${report.metadata.generatedAt}`,
 				`# Total Events: ${report.metadata.totalEvents}`,
-				`# Filtered Events: ${report.metadata.filteredEvents}`,
 				'#',
 				csvContent,
 			].join('\n')
@@ -296,7 +295,7 @@ export class DataExportService {
 	 * Export to XML format
 	 */
 	private async exportToXML(
-		report: ComplianceReport,
+		report: ComplianceReport | HIPAAComplianceReport | GDPRComplianceReport,
 		config: ExportConfig
 	): Promise<{ data: string; contentType: string; filename: string }> {
 		const xmlParts = ['<?xml version="1.0" encoding="UTF-8"?>']
@@ -309,7 +308,6 @@ export class DataExportService {
 			xmlParts.push(`    <reportType>${this.escapeXml(report.metadata.reportType)}</reportType>`)
 			xmlParts.push(`    <generatedAt>${this.escapeXml(report.metadata.generatedAt)}</generatedAt>`)
 			xmlParts.push(`    <totalEvents>${report.metadata.totalEvents}</totalEvents>`)
-			xmlParts.push(`    <filteredEvents>${report.metadata.filteredEvents}</filteredEvents>`)
 			xmlParts.push('  </metadata>')
 		}
 
@@ -467,7 +465,6 @@ export class DataExportService {
     <div class="summary">
         <h2>Summary</h2>
         <p>Total Events: ${report.metadata.totalEvents}</p>
-        <p>Filtered Events: ${report.metadata.filteredEvents}</p>
         <p>Unique Principals: ${report.summary.uniquePrincipals}</p>
         <p>Unique Resources: ${report.summary.uniqueResources}</p>
         <p>Integrity Violations: ${report.summary.integrityViolations}</p>

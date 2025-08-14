@@ -46,6 +46,7 @@
 // - [key: string]: any -> jsonb 'details' - OK (nullable)
 // This looks good.
 
+import { report } from 'process'
 import { en } from '@faker-js/faker'
 import { sql } from 'drizzle-orm'
 import {
@@ -438,10 +439,12 @@ export const scheduledReports = pgTable(
 		description: text('description'),
 		organizationId: varchar('organization_id', { length: 255 }).notNull(),
 		templateId: varchar('template_id', { length: 255 }), // Reference to report template
+		reportType: varchar('report_type', { length: 50 }).notNull(), // Report type
 		criteria: jsonb('criteria').notNull(), // ReportCriteria as JSON
 		format: varchar('format', { length: 50 }).notNull(), // ReportFormat
 		schedule: jsonb('schedule').notNull(), // Schedule configuration
 		delivery: jsonb('delivery').notNull(), // Delivery configuration
+		export: jsonb('export').notNull(), // Export configuration
 		enabled: varchar('enabled', { length: 10 }).notNull().default('true'),
 		lastRun: timestamp('last_run', { withTimezone: true, mode: 'string' }),
 		nextRun: timestamp('next_run', { withTimezone: true, mode: 'string' }),
@@ -537,6 +540,7 @@ export const reportExecutions = pgTable(
 		duration: integer('duration'), // in milliseconds
 		recordsProcessed: integer('records_processed'),
 		exportResult: jsonb('export_result'), // ExportResult as JSON
+		integrityReport: jsonb('integrity_report'), // IntegrityVerificationReport as JSON
 		deliveryAttempts: jsonb('delivery_attempts').notNull().default('[]'), // Array of DeliveryAttempt
 		error: text('error'),
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })

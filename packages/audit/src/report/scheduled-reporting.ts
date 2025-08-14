@@ -14,12 +14,16 @@ import { and, desc, eq, gte, lte } from 'drizzle-orm'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
+	ComplianceReportingService,
 	ExportConfig,
+	GDPRComplianceReport,
+	HIPAAComplianceReport,
+	IntegrityVerificationReport,
 	ReportCriteria,
 	ReportFormat,
 	ScheduledReportConfig,
 } from './compliance-reporting.js'
-import type { ExportResult } from './data-export.js'
+import type { DataExportService, ExportResult } from './data-export.js'
 
 /**
  * Delivery status for scheduled reports
@@ -53,6 +57,7 @@ export interface ReportExecution {
 	duration?: number
 	recordsProcessed?: number
 	exportResult?: ExportResult
+	integrityReport?: IntegrityVerificationReport
 	deliveryAttempts: DeliveryAttempt[]
 	error?: string
 }
@@ -127,6 +132,8 @@ export interface DeliveryConfig {
  * Scheduled Reporting Service
  */
 export class ScheduledReportingService {
+	private reportService: ComplianceReportingService
+	private exportService: DataExportService
 	private db: PostgresJsDatabase<any>
 	private scheduledReports: any
 	private reportTemplates: any
@@ -134,12 +141,16 @@ export class ScheduledReportingService {
 	private deliveryConfig: DeliveryConfig
 
 	constructor(
+		reportService: ComplianceReportingService,
+		exportService: DataExportService,
 		db: PostgresJsDatabase<any>,
 		scheduledReports: any,
 		reportTemplates: any,
 		reportExecutions: any,
 		deliveryConfig: DeliveryConfig
 	) {
+		this.reportService = reportService
+		this.exportService = exportService
 		this.db = db
 		this.scheduledReports = scheduledReports
 		this.reportTemplates = reportTemplates
@@ -162,10 +173,12 @@ export class ScheduledReportingService {
 			description: config.description || null,
 			organizationId: config.organizationId,
 			templateId: config.templateId || null,
+			reportType: config.reportType,
 			criteria: config.criteria,
 			format: config.format,
 			schedule: config.schedule,
 			delivery: config.delivery,
+			export: config.export,
 			enabled: config.enabled ? 'true' : 'false',
 			lastRun: null,
 			nextRun,
@@ -218,10 +231,12 @@ export class ScheduledReportingService {
 
 		if (updates.name) updateData.name = updates.name
 		if (updates.description !== undefined) updateData.description = updates.description
+		if (updates.reportType) updateData.reportType = updates.reportType
 		if (updates.criteria) updateData.criteria = updates.criteria
 		if (updates.format) updateData.format = updates.format
 		if (updates.schedule) updateData.schedule = updates.schedule
 		if (updates.delivery) updateData.delivery = updates.delivery
+		if (updates.export) updateData.export = updates.export
 		if (updates.enabled !== undefined) updateData.enabled = updates.enabled ? 'true' : 'false'
 		if (nextRun) updateData.nextRun = nextRun
 
@@ -241,10 +256,12 @@ export class ScheduledReportingService {
 			id: updated.id,
 			name: updated.name,
 			description: updated.description || undefined,
+			reportType: updated.reportType as ReportTemplate['reportType'],
 			criteria: updated.criteria as ReportCriteria,
 			format: updated.format as ReportFormat,
 			schedule: updated.schedule as ScheduledReportConfig['schedule'],
 			delivery: updated.delivery as ScheduledReportConfig['delivery'],
+			export: updated.export as ScheduledReportConfig['export'],
 			enabled: updated.enabled === 'true',
 			lastRun: updated.lastRun || undefined,
 			nextRun: updated.nextRun || undefined,
@@ -300,10 +317,12 @@ export class ScheduledReportingService {
 			id: record.id,
 			name: record.name,
 			description: record.description || undefined,
+			reportType: record.reportType as ReportTemplate['reportType'],
 			criteria: record.criteria as ReportCriteria,
 			format: record.format as ReportFormat,
 			schedule: record.schedule as ScheduledReportConfig['schedule'],
 			delivery: record.delivery as ScheduledReportConfig['delivery'],
+			export: record.export as ScheduledReportConfig['export'],
 			enabled: record.enabled === 'true',
 			lastRun: record.lastRun || undefined,
 			nextRun: record.nextRun || undefined,
@@ -330,10 +349,12 @@ export class ScheduledReportingService {
 			id: record.id,
 			name: record.name,
 			description: record.description || undefined,
+			reportType: record.reportType as ReportTemplate['reportType'],
 			criteria: record.criteria as ReportCriteria,
 			format: record.format as ReportFormat,
 			schedule: record.schedule as ScheduledReportConfig['schedule'],
 			delivery: record.delivery as ScheduledReportConfig['delivery'],
+			export: record.export as ScheduledReportConfig['export'],
 			enabled: record.enabled === 'true',
 			lastRun: record.lastRun || undefined,
 			nextRun: record.nextRun || undefined,
@@ -377,19 +398,30 @@ export class ScheduledReportingService {
 				duration: null,
 				recordsProcessed: null,
 				exportResult: null,
+				integrityReport: null,
 				deliveryAttempts: [],
 				error: null,
 			}
 
 			await this.db.insert(this.reportExecutions).values(dbExecution)
 
-			// TODO Generate the report (placeholder - would integrate with ComplianceReportingService)
+			// Generate the report
 			const reportResult = await this.generateReport(config)
-			execution.exportResult = reportResult
-			execution.recordsProcessed = reportResult.size // Placeholder
-
-			// Deliver the report
-			await this.deliverReport(config, reportResult, execution)
+			if (!reportResult) throw new Error('Failed to generate report')
+			if (reportResult && typeof reportResult === 'object' && 'exportId' in reportResult) {
+				execution.exportResult = reportResult as ExportResult
+				execution.recordsProcessed = (reportResult as ExportResult).size
+				// Deliver the report
+				await this.deliverReport(config, reportResult, execution)
+			} else if (
+				reportResult &&
+				typeof reportResult === 'object' &&
+				'verificationId' in reportResult
+			) {
+				execution.integrityReport = reportResult as IntegrityVerificationReport
+			} else {
+				throw new Error('Unexpected report result type')
+			}
 
 			execution.status = 'completed'
 			execution.duration = Date.now() - startTime
@@ -401,7 +433,8 @@ export class ScheduledReportingService {
 					status: 'completed',
 					duration: execution.duration,
 					recordsProcessed: execution.recordsProcessed,
-					exportResult: reportResult,
+					exportResult: execution.exportResult,
+					integrityReport: execution.integrityReport,
 					deliveryAttempts: execution.deliveryAttempts,
 				})
 				.where(eq(this.reportExecutions.id, executionId))
@@ -452,7 +485,8 @@ export class ScheduledReportingService {
 			status: record.status as 'running' | 'completed' | 'failed',
 			duration: record.duration || undefined,
 			recordsProcessed: record.recordsProcessed || undefined,
-			exportResult: record.exportResult as ExportResult | undefined,
+			exportResult: (record.exportResult as ExportResult) || undefined,
+			integrityReport: (record.integrityReport as IntegrityVerificationReport) || undefined,
 			deliveryAttempts: (record.deliveryAttempts as DeliveryAttempt[]) || [],
 			error: record.error || undefined,
 		}))
@@ -589,6 +623,7 @@ export class ScheduledReportingService {
 			description: overrides.description || template.description,
 			organizationId: overrides.organizationId,
 			templateId,
+			reportType: template.reportType,
 			criteria: {
 				...template.defaultCriteria,
 				...overrides.criteria,
@@ -603,6 +638,11 @@ export class ScheduledReportingService {
 			delivery: overrides.delivery || {
 				method: 'email',
 				recipients: [],
+			},
+			export: overrides.export || {
+				format: 'json',
+				includeMetadata: true,
+				includeIntegrityReport: false,
 			},
 			enabled: overrides.enabled !== undefined ? overrides.enabled : true,
 			createdBy: overrides.createdBy || 'system',
@@ -667,7 +707,9 @@ export class ScheduledReportingService {
 					status: executionRecord.status as 'running' | 'completed' | 'failed',
 					duration: executionRecord.duration || undefined,
 					recordsProcessed: executionRecord.recordsProcessed || undefined,
-					exportResult: executionRecord.exportResult as ExportResult | undefined,
+					exportResult: (executionRecord.exportResult as ExportResult) || undefined,
+					integrityReport:
+						(executionRecord.integrityReport as IntegrityVerificationReport) || undefined,
 					deliveryAttempts,
 					error: executionRecord.error || undefined,
 				}
@@ -739,34 +781,34 @@ export class ScheduledReportingService {
 		return nextRun.toISOString()
 	}
 
-	private async generateReport(config: ScheduledReportConfig): Promise<ExportResult> {
-		// TODO Placeholder implementation - would integrate with ComplianceReportingService and DataExportService
-		const exportResult: ExportResult = {
-			exportId: this.generateId('export'),
-			format: config.format,
-			exportedAt: new Date().toISOString(),
-			config: {
-				format: config.format,
-				includeMetadata: true,
-				includeIntegrityReport: false,
-			},
-			data: JSON.stringify(
-				{
-					reportName: config.name,
-					generatedAt: new Date().toISOString(),
-					criteria: config.criteria,
-					events: [], // Placeholder
-				},
-				null,
-				2
-			),
-			contentType: 'application/json',
-			filename: `${config.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.json`,
-			size: 1024, // Placeholder
-			checksum: 'placeholder-checksum',
+	private async generateReport(
+		config: ScheduledReportConfig
+	): Promise<ExportResult | IntegrityVerificationReport | undefined> {
+		let result: ExportResult | IntegrityVerificationReport | undefined = undefined
+
+		switch (config.reportType) {
+			case 'HIPAA_AUDIT_TRAIL':
+				result = await this.exportService.exportComplianceReport(
+					await this.reportService.generateHIPAAReport(config.criteria),
+					config.export
+				)
+				break
+			case 'GDPR_PROCESSING_ACTIVITIES':
+				result = await this.exportService.exportComplianceReport(
+					await this.reportService.generateGDPRReport(config.criteria),
+					config.export
+				)
+				break
+			case 'GENERAL_COMPLIANCE':
+				break
+			case 'INTEGRITY_VERIFICATION':
+				result = await this.reportService.generateIntegrityVerificationReport(config.criteria)
+				break
+			default:
+				throw new Error(`Unsupported report type: ${config.reportType}`)
 		}
 
-		return exportResult
+		return result
 	}
 
 	private async deliverReport(
