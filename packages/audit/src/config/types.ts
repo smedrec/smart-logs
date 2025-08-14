@@ -4,6 +4,7 @@
  */
 
 import { ArchiveConfig } from '../archival/archival-service.js'
+import { ValidationConfig } from '../validation.js'
 
 import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
 import type { RetryConfig } from '../retry.js'
@@ -43,6 +44,9 @@ export interface AuditConfig {
 
 	/** Compliance configuration */
 	compliance: ComplianceConfig
+
+	/** Validation configuration */
+	validation: ValidationConfig
 
 	// Archival configuration
 	archive: ArchiveConfig
@@ -270,6 +274,9 @@ export interface ComplianceConfig {
 	}
 
 	defaultRetentionDays: number
+	defaultDataClassification: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
+	generateHash: boolean
+	generateSignature: boolean
 	enableAutoArchival: boolean
 	enablePseudonymization: boolean
 	reportingSchedule: {

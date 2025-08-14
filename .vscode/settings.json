@@ -1,3 +1,7 @@
 {
-	"cSpell.words": ["handlemulti", "onmulti"]
+	"cSpell.words": ["handlemulti", "onmulti"],
+	"github.copilot.enable": {
+		"*": false
+	},
+	"github.copilot.nextEditSuggestions.enabled": false
 }

@@ -100,6 +100,9 @@ export function createDevelopmentConfig(): AuditConfig {
 				retentionDays: 365,
 			},
 			defaultRetentionDays: 2555, // 7 years
+			defaultDataClassification: 'INTERNAL',
+			generateHash: true,
+			generateSignature: true,
 			enableAutoArchival: true,
 			enablePseudonymization: true,
 			reportingSchedule: {
@@ -109,6 +112,13 @@ export function createDevelopmentConfig(): AuditConfig {
 				includeGDPR: false,
 				includeHIPAA: false,
 			},
+		},
+		validation: {
+			maxStringLength: 10000,
+			allowedDataClassifications: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'],
+			requiredFields: ['timestamp', 'action', 'status'],
+			maxCustomFieldDepth: 3,
+			allowedEventVersions: ['1.0', '1.1', '2.0'],
 		},
 		archive: {
 			compressionAlgorithm: 'gzip',
@@ -202,6 +212,9 @@ export function createStagingConfig(): AuditConfig {
 				includeGDPR: true,
 				includeHIPAA: true,
 			},
+		},
+		validation: {
+			...baseConfig.validation,
 		},
 		archive: {
 			...baseConfig.archive,
@@ -300,6 +313,9 @@ export function createProductionConfig(): AuditConfig {
 				includeHIPAA: true,
 			},
 		},
+		validation: {
+			...baseConfig.validation,
+		},
 		archive: {
 			...baseConfig.archive,
 			encryptArchive: true,
@@ -390,6 +406,9 @@ export function createTestConfig(): AuditConfig {
 				includeGDPR: false,
 				includeHIPAA: false,
 			},
+		},
+		validation: {
+			...baseConfig.validation,
 		},
 		archive: {
 			...baseConfig.archive,

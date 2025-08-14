@@ -1,79 +1,124 @@
 import { Audit, ConfigurationManager, createDatabasePresetHandler } from '@repo/audit'
 import { AuditDbWithConfig } from '@repo/audit-db'
 import { ConsoleLogger } from '@repo/logs'
+import { LogSchema } from '@repo/logs/dist/log.js'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { validateCompliance } from './compliance.js'
 
-import type { AuditLogEvent, DatabasePresetHandler } from '@repo/audit'
-import type { Logger } from '@repo/logs'
+import type { AuditConfig, AuditLogEvent, DatabasePresetHandler, StorageType } from '@repo/audit'
+import type { Fields, Logger } from '@repo/logs'
 import type { AuditSDKConfig } from './types.js'
+
+/**
+ * Represents an option function for configuring an AuditSDK instance.
+ * @param s - The AuditSDK instance to configure.
+ */
+type AuditSDKOption = (s: AuditSDK) => void
+
+/**
+ * Error thrown when the AuditSDK is not initialized before use.
+ */
+export class AuditSDKNotInitializedError extends Error {
+	constructor(message = 'AuditSDK has not been initialized.') {
+		super(message)
+		this.name = 'AuditSDKNotInitializedError'
+	}
+}
+
+/**
+ * Error thrown when an operation with the Audit SDK fails.
+ */
+export class AuditSDKError extends Error {
+	constructor(
+		message: string,
+		public readonly cause?: unknown
+	) {
+		super(message)
+		this.name = 'AuditSDKError'
+	}
+}
 
 /**
  * Main SDK class that provides a high-level interface for audit logging
  * with built-in compliance, security, and healthcare-specific features.
  */
 export class AuditSDK {
-	private configManager: ConfigurationManager | undefined = undefined
-	private audit: Audit | undefined = undefined
-	private auditDb: AuditDbWithConfig | undefined = undefined
-	private config: AuditSDKConfig
-	private presetsService: DatabasePresetHandler | undefined = undefined
-	private logger: Logger
+	private audit: Audit | undefined
+	private auditDb: AuditDbWithConfig | undefined
+	private config: AuditConfig | undefined
+	private presetsService: DatabasePresetHandler | undefined
+	private logger: Logger | undefined
 
-	constructor(config: AuditSDKConfig) {
-		this.config = config
-		this.logger = new ConsoleLogger({
-			environment: 'development',
-			application: 'web',
-			module: 'AuditSDK',
-			version: '0.1.0',
-			defaultFields: {
-				environment: 'development',
-				package: '@repo/audit-sdk',
-			},
-		})
+	constructor(...options: AuditSDKOption[]) {
+		// Initialize all properties to undefined
+		this.config = undefined
+		this.logger = undefined
+		this.audit = undefined
+		this.auditDb = undefined
+		this.presetsService = undefined
+		// Apply the options
+		for (const option of options) {
+			option(this)
+		}
 	}
 
-	async initialize() {
+	/**
+	 * Creates a configuration option to set logger details.
+	 * @param loggerOptions - The project options to configure.
+	 * @returns An AuditSDKOption function.
+	 *
+	 */
+	public static withLogger(opts: {
+		environment: LogSchema['environment']
+		application: LogSchema['application']
+		module: LogSchema['module']
+		version?: LogSchema['version']
+		requestId?: LogSchema['requestId']
+		defaultFields?: Fields
+	}): AuditSDKOption {
+		return (s: AuditSDK): void => {
+			s.logger = new ConsoleLogger(opts)
+		}
+	}
+
+	public static async initialize(options: AuditSDKConfig): Promise<any> {
 		// Initialize configuration manager
-		this.configManager = new ConfigurationManager(this.config.configPath, this.config.storageType)
+		const configManager = new ConfigurationManager(options.configPath, options.storageType)
 		try {
-			await this.configManager.initialize()
+			await configManager.initialize()
 		} catch (error) {
 			// Exit if initialization fails
 			const message =
 				error instanceof Error
 					? error.message
 					: 'Unknown error during configuration manager initialization'
-			this.logger.error('Configuration manager initialization failed:', { error: message })
-			throw new Error(message)
+			//this.logger.error('Configuration manager initialization failed:', { error: message })
+			throw new AuditSDKNotInitializedError(message)
 		}
-		const config = this.configManager.getConfig()
+		const config = configManager.getConfig()
 
 		// Initialize Redis connection
 		const connection = getSharedRedisConnectionWithConfig(config.redis)
 
 		// Initialize core audit service
-		if (!this.audit) {
-			if (!config.redis) {
-				this.logger.error('Redis connection not configured. Provide redis in config.')
-				throw new Error('Redis connection not configured. Provide redis in config.')
-			}
-			this.audit = new Audit(
-				config.reliableProcessor.queueName,
-				{
-					secretKey: config.security.encryptionKey,
-				},
-				connection
-			)
-		}
-		if (!this.auditDb) {
-			this.auditDb = new AuditDbWithConfig(config.database)
-		}
+		const audit = new Audit(
+			config.reliableProcessor.queueName,
+			{
+				secretKey: config.security.encryptionKey,
+			},
+			connection
+		)
 
-		if (!this.presetsService) {
-			this.presetsService = createDatabasePresetHandler(this.auditDb.getDrizzleInstance())
+		const auditDb = new AuditDbWithConfig(config.database)
+
+		const presetsService = createDatabasePresetHandler(auditDb.getDrizzleInstance())
+
+		return (s: AuditSDK): void => {
+			s.audit = audit
+			s.auditDb = auditDb
+			s.config = config
+			s.presetsService = presetsService
 		}
 	}
 
@@ -109,10 +154,10 @@ export class AuditSDK {
 		}
 
 		// Apply default values from config
-		if (this.config.defaults) {
+		if (this.config?.compliance) {
 			enrichedEvent = {
-				dataClassification: this.config.defaults.dataClassification,
-				retentionPolicy: this.config.defaults.retentionPolicy,
+				dataClassification: this.config.compliance.defaultDataClassification,
+				retentionPolicy: this.config.compliance.defaultRetentionDays,
 				...enrichedEvent,
 			}
 		}
@@ -124,7 +169,7 @@ export class AuditSDK {
 		}
 
 		// Validate compliance if specified
-		if (options.compliance && this.config.compliance) {
+		if (options.compliance && this.config?.compliance) {
 			for (const complianceType of options.compliance) {
 				validateCompliance(enrichedEvent, complianceType, this.config.compliance)
 			}
@@ -133,14 +178,14 @@ export class AuditSDK {
 		// Log the event
 		if (this.audit) {
 			await this.audit.log(enrichedEvent, {
-				generateHash: this.config.defaults?.generateHash ?? true,
-				generateSignature: this.config.defaults?.generateSignature ?? false,
+				generateHash: this.config?.compliance.generateHash ?? true,
+				generateSignature: this.config?.compliance.generateSignature ?? false,
 				skipValidation: options.skipValidation,
-				validationConfig: this.config.validation,
+				validationConfig: this.config?.validation,
 			})
 		} else {
-			this.logger.error('Audit service not initialized')
-			throw new Error('Audit service not initialized')
+			this.logger?.error('Audit service not initialized')
+			throw new AuditSDKError('Audit service not initialized')
 		}
 	}
 
@@ -297,7 +342,7 @@ export class AuditSDK {
 		}
 
 		// Validate compliance if specified
-		if (options.compliance && this.config.compliance) {
+		if (options.compliance && this.config?.compliance) {
 			for (const complianceType of options.compliance) {
 				validateCompliance(enrichedEvent, complianceType, this.config.compliance)
 			}
@@ -311,8 +356,8 @@ export class AuditSDK {
 				generateSignature: true,
 			})
 		} else {
-			this.logger.error('Audit service not initialized')
-			throw new Error('Audit service not initialized')
+			this.logger?.error('Audit service not initialized')
+			throw new AuditSDKError('Audit service not initialized')
 		}
 	}
 
@@ -333,14 +378,14 @@ export class AuditSDK {
 		} = {}
 	) {
 		if (!this.auditDb) {
-			this.logger.error('Database not configured. Provide databaseUrl in config.')
-			throw new Error('Database not configured. Provide databaseUrl in config.')
+			this.logger?.error('Database not configured. Provide databaseUrl in config.')
+			throw new AuditSDKError('Database not configured. Provide databaseUrl in config.')
 		}
 
 		const db = this.auditDb.getDrizzleInstance()
 		// TODO Implementation would use Drizzle ORM to query with filters
 		// This is a placeholder for the actual query implementation
-		throw new Error('Query implementation pending')
+		throw new AuditSDKError('Query implementation pending')
 	}
 
 	/**
@@ -355,12 +400,12 @@ export class AuditSDK {
 		}
 	) {
 		if (!this.auditDb) {
-			this.logger.error('Database not configured for reporting')
-			throw new Error('Database not configured for reporting')
+			this.logger?.error('Database not configured for reporting')
+			throw new AuditSDKError('Database not configured for reporting')
 		}
 
 		// TODO Implementation would generate compliance-specific reports
-		throw new Error('Compliance reporting implementation pending')
+		throw new AuditSDKError('Compliance reporting implementation pending')
 	}
 
 	/**
@@ -374,12 +419,12 @@ export class AuditSDK {
 		} = {}
 	) {
 		if (!this.auditDb) {
-			this.logger.error('Database not configured for integrity verification')
-			throw new Error('Database not configured for integrity verification')
+			this.logger?.error('Database not configured for integrity verification')
+			throw new AuditSDKError('Database not configured for integrity verification')
 		}
 
 		// TODO Implementation would verify hashes and signatures
-		throw new Error('Integrity verification implementation pending')
+		throw new AuditSDKError('Integrity verification implementation pending')
 	}
 
 	/**
@@ -411,7 +456,7 @@ export class AuditSDK {
 	async close(): Promise<void> {
 		if (this.audit) {
 			await this.audit.closeConnection()
-			this.logger.info('Audit service closed')
+			this.logger?.info('Audit service closed')
 		}
 	}
 }

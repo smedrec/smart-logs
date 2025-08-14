@@ -15,22 +15,6 @@ const organizationId = 'QEPNtdiiamOqeVdojZUyoPl9eM9srHQl'
 const config: AuditSDKConfig = {
 	configPath: 'default/audit-development.json',
 	storageType: 's3',
-	defaults: {
-		dataClassification: 'INTERNAL',
-		generateHash: true,
-		generateSignature: true,
-	},
-	compliance: {
-		hipaa: {
-			enabled: true,
-			retentionYears: 6,
-		},
-		gdpr: {
-			enabled: true,
-			defaultLegalBasis: 'legitimate_interest',
-			retentionDays: 365,
-		},
-	},
 }
 
 // Initialize the audit SDK
@@ -39,9 +23,21 @@ async function initAuditSDK() {
 		console.warn('Audit SDK already initialized')
 		return
 	}
-	auditSDK = new AuditSDK(config)
+
 	try {
-		await auditSDK.initialize()
+		auditSDK = new AuditSDK(
+			AuditSDK.withLogger({
+				environment: 'development',
+				application: 'api',
+				module: 'test',
+				version: '0.1.0',
+				defaultFields: {
+					package: '@repo/audit-sdk',
+					environment: 'development',
+				},
+			}),
+			await AuditSDK.initialize(config)
+		)
 	} catch (error) {
 		console.error('❌ Error initializing audit SDK:', error)
 		process.exit(1)
@@ -61,6 +57,7 @@ export async function logUserAuthentication() {
 	// Successful login
 	await auditSDK.logAuth({
 		principalId: 'user-12345',
+		organizationId: organizationId,
 		action: 'login',
 		status: 'success',
 		sessionContext: {

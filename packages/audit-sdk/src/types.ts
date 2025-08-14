@@ -10,20 +10,6 @@ export interface AuditSDKConfig {
 
 	/** Storage type */
 	storageType: 's3' | 'file'
-
-	/** Default validation configuration */
-	validation?: ValidationConfig
-
-	/** Compliance settings */
-	compliance?: ComplianceConfig
-
-	/** Default event options */
-	defaults?: {
-		dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
-		retentionPolicy?: string
-		generateHash?: boolean
-		generateSignature?: boolean
-	}
 }
 
 /**
