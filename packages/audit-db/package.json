@@ -8,7 +8,8 @@
 	"types": "dist/index.d.ts",
 	"bin": {
 		"audit-archival": "./dist/archival-cli.js",
-		"audit-db": "./dist/cli.js"
+		"audit-db": "./dist/cli.js",
+		"audit-db-performance": "./dist/performance-cli.js"
 	},
 	"files": [
 		"dist"
@@ -19,6 +20,11 @@
 		"audit-db:delete": "tsx src/archival-cli.ts delete",
 		"audit-db:generate": "drizzle-kit generate --config=drizzle-dev.config.ts",
 		"audit-db:migrate": "drizzle-kit migrate --config=drizzle-dev.config.ts",
+		"audit-db:monitor-summary": "tsx src/performance-cli.ts monitor summary",
+		"audit-db:optimize": "tsx src/performance-cli.ts client optimize",
+		"audit-db:partition-analyze": "tsx src/performance-cli.ts partition analyze",
+		"audit-db:partition-create": "tsx src/performance-cli.ts partition create",
+		"audit-db:performance": "tsx src/performance-cli.ts",
 		"audit-db:retrieve": "tsx src/archival-cli.ts retrieve",
 		"audit-db:rollback": "tsx src/cli.ts rollback",
 		"audit-db:seed-policies": "tsx src/cli.ts seed-policies",
@@ -38,6 +44,7 @@
 	},
 	"dependencies": {
 		"@repo/audit": "workspace:*",
+		"commander": "^12.1.0",
 		"drizzle-orm": "0.44.2",
 		"postgres": "3.4.7"
 	},

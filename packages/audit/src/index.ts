@@ -66,3 +66,6 @@ export * from './archival/postgres-archival-service.js'
 export { ConfigurationManager } from './config/manager.js'
 export * from './config/types.js'
 export { createDefaultConfigFile } from './config/integration.js'
+
+// Export observability and metrics
+export * from './observability/index.js'

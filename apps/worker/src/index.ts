@@ -5,21 +5,30 @@ import { Hono } from 'hono'
 import { pino } from 'pino'
 
 import {
+	AuditBottleneckAnalyzer,
+	AuditMonitoringDashboard,
+	// Observability imports
+	AuditTracer,
 	CircuitBreakerHealthCheck,
 	ConfigurationManager,
 	ConsoleAlertHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
 	DatabaseHealthCheck,
+	DEFAULT_DASHBOARD_CONFIG,
+	DEFAULT_OBSERVABILITY_CONFIG,
 	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 	ErrorHandler,
 	HealthCheckService,
 	MonitoringService,
+	PerformanceTimer,
 	ProcessingHealthCheck,
 	QueueHealthCheck,
+	RedisEnhancedMetricsCollector,
 	RedisHealthCheck,
 	RedisMetricsCollector,
 	ReliableEventProcessor,
+	trace,
 } from '@repo/audit'
 import {
 	AuditDbWithConfig,
@@ -58,6 +67,12 @@ let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
 let metricsCollector: RedisMetricsCollector | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
+
+// Observability services
+let tracer: AuditTracer | undefined = undefined
+let enhancedMetricsCollector: RedisEnhancedMetricsCollector | undefined = undefined
+let bottleneckAnalyzer: AuditBottleneckAnalyzer | undefined = undefined
+let dashboard: AuditMonitoringDashboard | undefined = undefined
 
 // Error handling services
 let errorHandler: ErrorHandler | undefined = undefined
@@ -158,6 +173,115 @@ app.get('/health/:component', async (c) => {
 	}
 })
 
+// Observability endpoints
+app.get('/observability/dashboard', async (c) => {
+	if (!dashboard) {
+		c.status(503)
+		return c.json({ error: 'Dashboard service not initialized' })
+	}
+
+	try {
+		const dashboardData = await dashboard.getDashboardData()
+		return c.json(dashboardData)
+	} catch (error) {
+		logger.error('Failed to get dashboard data:', error)
+		c.status(500)
+		return c.json({
+			error: 'Failed to get dashboard data',
+			message: error instanceof Error ? error.message : 'Unknown error',
+		})
+	}
+})
+
+app.get('/observability/metrics/enhanced', async (c) => {
+	if (!enhancedMetricsCollector) {
+		c.status(503)
+		return c.json({ error: 'Enhanced metrics collector not initialized' })
+	}
+
+	try {
+		const format = c.req.query('format') || 'json'
+		const metrics = await enhancedMetricsCollector.exportMetrics(format as 'json' | 'prometheus')
+
+		if (format === 'prometheus') {
+			c.header('Content-Type', 'text/plain')
+			return c.text(metrics)
+		}
+
+		return c.json(JSON.parse(metrics))
+	} catch (error) {
+		logger.error('Failed to export enhanced metrics:', error)
+		c.status(500)
+		return c.json({
+			error: 'Failed to export enhanced metrics',
+			message: error instanceof Error ? error.message : 'Unknown error',
+		})
+	}
+})
+
+app.get('/observability/bottlenecks', async (c) => {
+	if (!bottleneckAnalyzer) {
+		c.status(503)
+		return c.json({ error: 'Bottleneck analyzer not initialized' })
+	}
+
+	try {
+		const bottlenecks = (await dashboard?.getBottleneckAnalysis()) || []
+		return c.json(bottlenecks)
+	} catch (error) {
+		logger.error('Failed to get bottleneck analysis:', error)
+		c.status(500)
+		return c.json({
+			error: 'Failed to get bottleneck analysis',
+			message: error instanceof Error ? error.message : 'Unknown error',
+		})
+	}
+})
+
+app.get('/observability/traces', async (c) => {
+	if (!tracer) {
+		c.status(503)
+		return c.json({ error: 'Tracer not initialized' })
+	}
+
+	try {
+		const traceId = c.req.query('traceId')
+		if (traceId) {
+			const spans = tracer.getTraceSpans(traceId)
+			return c.json(spans)
+		}
+
+		const activeSpans = tracer.getActiveSpans()
+		return c.json(activeSpans)
+	} catch (error) {
+		logger.error('Failed to get trace data:', error)
+		c.status(500)
+		return c.json({
+			error: 'Failed to get trace data',
+			message: error instanceof Error ? error.message : 'Unknown error',
+		})
+	}
+})
+
+app.get('/observability/profiling', async (c) => {
+	if (!bottleneckAnalyzer) {
+		c.status(503)
+		return c.json({ error: 'Bottleneck analyzer not initialized' })
+	}
+
+	try {
+		const profilingResults = bottleneckAnalyzer.getProfilingResults()
+		return c.json(profilingResults)
+	} catch (error) {
+		logger.error('Failed to get profiling results:', error)
+		c.status(500)
+		return c.json({
+			error: 'Failed to get profiling results',
+			message: error instanceof Error ? error.message : 'Unknown error',
+		})
+	}
+})
+
 //const server = serve(app)
 
 // Main function to start the worker
@@ -244,6 +368,27 @@ async function main() {
 		monitoringService.addAlertHandler(databaseAlertHandler)
 	}
 
+	// 5.1. Initialize observability services
+	if (!tracer) {
+		tracer = new AuditTracer(DEFAULT_OBSERVABILITY_CONFIG.tracing)
+	}
+	if (!enhancedMetricsCollector) {
+		enhancedMetricsCollector = new RedisEnhancedMetricsCollector(
+			DEFAULT_OBSERVABILITY_CONFIG.metrics,
+			connection
+		)
+	}
+	if (!bottleneckAnalyzer) {
+		bottleneckAnalyzer = new AuditBottleneckAnalyzer()
+	}
+	if (!dashboard) {
+		dashboard = new AuditMonitoringDashboard(
+			enhancedMetricsCollector,
+			bottleneckAnalyzer,
+			DEFAULT_DASHBOARD_CONFIG
+		)
+	}
+
 	if (!healthCheckService) {
 		healthCheckService = new HealthCheckService()
 		// Register health checks
@@ -255,12 +400,42 @@ async function main() {
 
 	// 6. Define the reliable event processor with monitoring integration
 	const processAuditEvent = async (eventData: AuditLogEvent): Promise<void> => {
-		const startTime = Date.now()
-		logger.info(`Processing audit event for action: ${eventData.action}`)
+		const performanceTimer = new PerformanceTimer()
+		const span = tracer!.startSpan('process_audit_event')
 
 		try {
+			span.setTags({
+				'audit.action': eventData.action,
+				'audit.organizationId': eventData.organizationId,
+				'audit.principalId': eventData.principalId,
+				'audit.targetResourceType': eventData.targetResourceType,
+			})
+
+			logger.info(`Processing audit event for action: ${eventData.action}`)
+
+			// Validation phase
+			const validationTimer = new PerformanceTimer()
+			span.log('info', 'Starting event validation')
+
 			// Process event through monitoring service for pattern detection
 			await monitoringService!.processEvent(eventData)
+
+			const validationTime = validationTimer.stop()
+			span.log('info', 'Event validation completed', { validationTime })
+
+			// Hashing phase (if hash exists)
+			let hashingTime = 0
+			if (eventData.hash) {
+				const hashingTimer = new PerformanceTimer()
+				span.log('info', 'Processing event hash')
+				// Hash verification would happen here
+				hashingTime = hashingTimer.stop()
+				span.log('info', 'Hash processing completed', { hashingTime })
+			}
+
+			// Storage phase
+			const storageTimer = new PerformanceTimer()
+			span.log('info', 'Starting database storage')
 
 			// Extract known fields and prepare 'details' for the rest
 			const {
@@ -301,15 +476,73 @@ async function main() {
 				correlationId,
 				dataClassification,
 				retentionPolicy,
-				processingLatency: processingLatency || Date.now() - startTime,
+				processingLatency: processingLatency || performanceTimer.getCurrentDuration(),
 				archivedAt,
 				details: Object.keys(additionalDetails).length > 0 ? additionalDetails : null,
 			})
 
-			logger.info(`✅ Audit event processed successfully. Action '${action}' stored.`)
+			const storageTime = storageTimer.stop()
+			const totalTime = performanceTimer.stop()
+
+			span.log('info', 'Database storage completed', { storageTime })
+			span.setStatus('OK')
+
+			// Record detailed performance metrics
+			await enhancedMetricsCollector!.recordPerformanceMetrics({
+				eventProcessingTime: totalTime,
+				eventValidationTime: validationTime,
+				eventHashingTime: hashingTime,
+				eventStorageTime: storageTime,
+			})
+
+			// Record operation metrics
+			await enhancedMetricsCollector!.recordOperation({
+				operationType: 'CREATE',
+				operationName: 'process_audit_event',
+				duration: totalTime,
+				success: true,
+				metadata: {
+					action: eventData.action,
+					organizationId: eventData.organizationId,
+					validationTime,
+					hashingTime,
+					storageTime,
+				},
+				timestamp: new Date().toISOString(),
+				traceId: span.traceId,
+				spanId: span.spanId,
+			})
+
+			logger.info(
+				`✅ Audit event processed successfully. Action '${action}' stored in ${totalTime.toFixed(2)}ms`
+			)
 		} catch (error) {
-			// Use comprehensive error handling for better error tracking and logging
+			const totalTime = performanceTimer.stop()
 			const err = error instanceof Error ? error : new Error(String(error))
+
+			span.setStatus('ERROR', err.message)
+			span.log('error', 'Event processing failed', {
+				error: err.message,
+				stack: err.stack,
+				processingTime: totalTime,
+			})
+
+			// Record failed operation metrics
+			await enhancedMetricsCollector!.recordOperation({
+				operationType: 'CREATE',
+				operationName: 'process_audit_event',
+				duration: totalTime,
+				success: false,
+				errorType: err.constructor.name,
+				errorMessage: err.message,
+				metadata: {
+					action: eventData.action,
+					organizationId: eventData.organizationId,
+				},
+				timestamp: new Date().toISOString(),
+				traceId: span.traceId,
+				spanId: span.spanId,
+			})
 
 			if (errorHandler) {
 				await errorHandler.handleError(
@@ -323,6 +556,8 @@ async function main() {
 							targetResourceType: eventData.targetResourceType,
 							targetResourceId: eventData.targetResourceId,
 							eventData: eventData,
+							traceId: span.traceId,
+							spanId: span.spanId,
 						},
 					},
 					'audit-processor',
@@ -330,8 +565,10 @@ async function main() {
 				)
 			}
 
-			logger.error(`❌ Failed to process audit event: ${err.message}`)
+			logger.error(`❌ Failed to process audit event: ${err.message} (${totalTime.toFixed(2)}ms)`)
 			throw err // Re-throw to trigger retry mechanism
+		} finally {
+			tracer!.finishSpan(span)
 		}
 	}
 
