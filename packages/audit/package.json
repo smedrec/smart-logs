@@ -16,7 +16,17 @@
 		"clean": "rm -rf dist node_modules .turbo",
 		"config:create": "tsx src/cli.ts create development",
 		"test": "vitest run",
+		"test:all": "vitest run",
+		"test:chaos": "vitest run src/__tests__/chaos-engineering.test.ts",
 		"test:ci": "vitest run --coverage",
+		"test:ci-suite": "vitest run src/__tests__/ci-test-suite.test.ts",
+		"test:coverage": "vitest run --coverage",
+		"test:e2e": "vitest run src/__tests__/e2e-integration.test.ts",
+		"test:external-deps": "vitest run src/__tests__/external-dependencies-integration.test.ts",
+		"test:integration": "vitest run src/__tests__/integration.test.ts",
+		"test:load": "vitest run src/__tests__/load-testing.test.ts",
+		"test:runner": "./scripts/run-tests.sh",
+		"test:unit": "vitest run src/**/*.test.ts --exclude src/__tests__/*.test.ts",
 		"test:watch": "vitest"
 	},
 	"dependencies": {

@@ -28,6 +28,17 @@ export interface Span {
 	logs: SpanLog[]
 	status: SpanStatus
 	component: string
+
+	// Methods for span manipulation
+	setTag(key: string, value: any): void
+	setTags(tags: Record<string, any>): void
+	log(
+		level: 'debug' | 'info' | 'warn' | 'error',
+		message: string,
+		fields?: Record<string, any>
+	): void
+	setStatus(code: 'OK' | 'ERROR' | 'TIMEOUT' | 'CANCELLED', message?: string): void
+	finish(): void
 }
 
 /**

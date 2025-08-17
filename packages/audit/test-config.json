@@ -1,0 +1,163 @@
+{
+	"testSuites": {
+		"unit": {
+			"description": "Unit tests for individual components",
+			"pattern": "src/**/*.test.ts",
+			"exclude": [
+				"src/__tests__/e2e-integration.test.ts",
+				"src/__tests__/external-dependencies-integration.test.ts",
+				"src/__tests__/load-testing.test.ts",
+				"src/__tests__/chaos-engineering.test.ts",
+				"src/__tests__/ci-test-suite.test.ts"
+			],
+			"timeout": 10000,
+			"parallel": true
+		},
+		"integration": {
+			"description": "Integration tests for component interactions",
+			"pattern": "src/__tests__/integration.test.ts",
+			"timeout": 30000,
+			"parallel": false,
+			"requires": ["database", "redis"]
+		},
+		"e2e": {
+			"description": "End-to-end tests covering complete audit lifecycle",
+			"pattern": "src/__tests__/e2e-integration.test.ts",
+			"timeout": 120000,
+			"parallel": false,
+			"requires": ["database", "redis"],
+			"environment": "test"
+		},
+		"external-dependencies": {
+			"description": "Tests for external service integrations",
+			"pattern": "src/__tests__/external-dependencies-integration.test.ts",
+			"timeout": 60000,
+			"parallel": false,
+			"requires": ["database", "redis"]
+		},
+		"load": {
+			"description": "Load testing for high-volume scenarios",
+			"pattern": "src/__tests__/load-testing.test.ts",
+			"timeout": 300000,
+			"parallel": false,
+			"requires": ["database", "redis"],
+			"environment": "load-test",
+			"resources": {
+				"minMemory": "2GB",
+				"minCpu": "2 cores"
+			}
+		},
+		"chaos": {
+			"description": "Chaos engineering tests for resilience validation",
+			"pattern": "src/__tests__/chaos-engineering.test.ts",
+			"timeout": 180000,
+			"parallel": false,
+			"requires": ["database", "redis"],
+			"environment": "chaos-test"
+		},
+		"ci": {
+			"description": "Continuous integration test suite",
+			"pattern": "src/__tests__/ci-test-suite.test.ts",
+			"timeout": 90000,
+			"parallel": false,
+			"requires": ["database", "redis"],
+			"environment": "ci"
+		}
+	},
+	"environments": {
+		"test": {
+			"database": {
+				"url": "postgresql://localhost:5432/audit_test",
+				"maxConnections": 10,
+				"idleTimeout": 30000
+			},
+			"redis": {
+				"host": "localhost",
+				"port": 6379,
+				"db": 1
+			}
+		},
+		"ci": {
+			"database": {
+				"url": "${AUDIT_DB_URL:-postgresql://localhost:5432/audit_test}",
+				"maxConnections": 5,
+				"idleTimeout": 10000
+			},
+			"redis": {
+				"host": "${REDIS_HOST:-localhost}",
+				"port": "${REDIS_PORT:-6379}",
+				"db": "${REDIS_DB:-1}"
+			}
+		},
+		"load-test": {
+			"database": {
+				"url": "${LOAD_TEST_DB_URL:-postgresql://localhost:5432/audit_load_test}",
+				"maxConnections": 20,
+				"idleTimeout": 60000
+			},
+			"redis": {
+				"host": "${REDIS_HOST:-localhost}",
+				"port": "${REDIS_PORT:-6379}",
+				"db": "${REDIS_DB:-2}"
+			}
+		},
+		"chaos-test": {
+			"database": {
+				"url": "${CHAOS_TEST_DB_URL:-postgresql://localhost:5432/audit_chaos_test}",
+				"maxConnections": 15,
+				"idleTimeout": 45000
+			},
+			"redis": {
+				"host": "${REDIS_HOST:-localhost}",
+				"port": "${REDIS_PORT:-6379}",
+				"db": "${REDIS_DB:-3}"
+			}
+		}
+	},
+	"requirements": {
+		"database": {
+			"type": "postgresql",
+			"minVersion": "12.0",
+			"extensions": ["uuid-ossp"],
+			"tables": ["audit_log", "alerts", "audit_retention_policy", "audit_integrity_log"]
+		},
+		"redis": {
+			"type": "redis",
+			"minVersion": "6.0",
+			"modules": ["streams"]
+		}
+	},
+	"scripts": {
+		"test:unit": "vitest run --config vitest.config.ts src/**/*.test.ts --exclude src/__tests__/*.test.ts",
+		"test:integration": "vitest run --config vitest.config.ts src/__tests__/integration.test.ts",
+		"test:e2e": "vitest run --config vitest.config.ts src/__tests__/e2e-integration.test.ts",
+		"test:external-deps": "vitest run --config vitest.config.ts src/__tests__/external-dependencies-integration.test.ts",
+		"test:load": "vitest run --config vitest.config.ts src/__tests__/load-testing.test.ts",
+		"test:chaos": "vitest run --config vitest.config.ts src/__tests__/chaos-engineering.test.ts",
+		"test:ci": "vitest run --config vitest.config.ts src/__tests__/ci-test-suite.test.ts",
+		"test:all": "vitest run --config vitest.config.ts",
+		"test:watch": "vitest --config vitest.config.ts",
+		"test:coverage": "vitest run --coverage --config vitest.config.ts"
+	},
+	"coverage": {
+		"threshold": {
+			"global": {
+				"branches": 80,
+				"functions": 85,
+				"lines": 85,
+				"statements": 85
+			}
+		},
+		"exclude": ["src/__tests__/**", "src/examples/**", "src/types.ts", "src/index.ts"]
+	},
+	"reporting": {
+		"formats": ["text", "json", "html", "junit"],
+		"outputDir": "test-results",
+		"artifacts": {
+			"screenshots": false,
+			"videos": false,
+			"logs": true,
+			"metrics": true
+		}
+	}
+}
