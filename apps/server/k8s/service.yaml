@@ -1,0 +1,42 @@
+# Service for SMEDREC Audit Server
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-server
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: audit-server
+    app.kubernetes.io/component: api
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: audit-server
+
+---
+# Headless Service for StatefulSet (if needed for direct pod access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-server-headless
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: audit-server
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: audit-server

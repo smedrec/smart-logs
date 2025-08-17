@@ -1,0 +1,23 @@
+{
+	"server": {
+		"environment": "development"
+	},
+	"cors": {
+		"origin": "*"
+	},
+	"rateLimit": {
+		"maxRequests": 1000
+	},
+	"monitoring": {
+		"logLevel": "debug",
+		"enableTracing": false
+	},
+	"security": {
+		"enableApiKeyAuth": false
+	},
+	"performance": {
+		"enableCompression": false,
+		"compressionLevel": 1,
+		"enableCaching": false
+	}
+}

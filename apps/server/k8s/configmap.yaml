@@ -1,0 +1,17 @@
+# ConfigMap for SMEDREC Audit Server
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-server-config
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: audit-server
+    app.kubernetes.io/component: config
+data:
+  NODE_ENV: 'production'
+  PORT: '3000'
+  HOST: '0.0.0.0'
+  LOG_LEVEL: 'info'
+  CORS_ORIGIN: 'https://app.smedrec.com,https://admin.smedrec.com'
+  # Database and Redis URLs should be provided via secrets
+  # These are non-sensitive configuration values

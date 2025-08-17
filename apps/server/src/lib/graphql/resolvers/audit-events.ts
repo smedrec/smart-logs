@@ -1,0 +1,512 @@
+/**
+ * Audit Events GraphQL Resolvers
+ * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+ */
+
+import { GraphQLError } from 'graphql'
+
+import type {
+	AuditEvent,
+	AuditEventFilter,
+	CreateAuditEventInput,
+	GraphQLContext,
+	IntegrityVerificationResult,
+	PaginationInput,
+	SortInput,
+} from '../types'
+
+/**
+ * Helper function to convert database event to GraphQL AuditEvent
+ */
+function convertDbEventToGraphQL(dbEvent: any): AuditEvent {
+	return {
+		id: dbEvent.id.toString(),
+		timestamp: dbEvent.timestamp,
+		action: dbEvent.action,
+		targetResourceType: dbEvent.targetResourceType || undefined,
+		targetResourceId: dbEvent.targetResourceId || undefined,
+		principalId: dbEvent.principalId || undefined,
+		organizationId: dbEvent.organizationId || undefined,
+		status: dbEvent.status as 'attempt' | 'success' | 'failure',
+		outcomeDescription: dbEvent.outcomeDescription || undefined,
+		dataClassification: dbEvent.dataClassification as
+			| 'PUBLIC'
+			| 'INTERNAL'
+			| 'CONFIDENTIAL'
+			| 'PHI'
+			| undefined,
+		correlationId: dbEvent.correlationId || undefined,
+		retentionPolicy: dbEvent.retentionPolicy || undefined,
+		metadata: dbEvent.metadata || undefined,
+		hash: dbEvent.hash || undefined,
+		integrityStatus: dbEvent.hash ? 'verified' : 'not_checked',
+		sessionContext: dbEvent.sessionContext
+			? {
+					sessionId: dbEvent.sessionContext.sessionId,
+					ipAddress: dbEvent.sessionContext.ipAddress,
+					userAgent: dbEvent.sessionContext.userAgent,
+					geolocation: dbEvent.sessionContext.geolocation,
+				}
+			: undefined,
+	}
+}
+
+/**
+ * Helper function to build database query conditions from GraphQL filter
+ */
+async function buildQueryConditions(filter: AuditEventFilter | undefined, organizationId: string) {
+	const { eq, and, gte, lte, inArray, isNotNull } = await import('drizzle-orm')
+	const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
+
+	// Always enforce organization isolation
+	const conditions = [eq(auditLog.organizationId, organizationId)]
+
+	if (!filter) {
+		return and(...conditions)
+	}
+
+	if (filter.dateRange) {
+		conditions.push(gte(auditLog.timestamp, filter.dateRange.startDate))
+		conditions.push(lte(auditLog.timestamp, filter.dateRange.endDate))
+	}
+
+	if (filter.principalIds?.length) {
+		conditions.push(inArray(auditLog.principalId, filter.principalIds))
+	}
+
+	if (filter.actions?.length) {
+		conditions.push(inArray(auditLog.action, filter.actions))
+	}
+
+	if (filter.statuses?.length) {
+		const dbStatuses = filter.statuses.map((s) => s.toLowerCase())
+		conditions.push(inArray(auditLog.status, dbStatuses))
+	}
+
+	if (filter.dataClassifications?.length) {
+		conditions.push(inArray(auditLog.dataClassification, filter.dataClassifications))
+	}
+
+	if (filter.resourceTypes?.length) {
+		conditions.push(inArray(auditLog.targetResourceType, filter.resourceTypes))
+	}
+
+	if (filter.resourceIds?.length) {
+		conditions.push(inArray(auditLog.targetResourceId, filter.resourceIds))
+	}
+
+	if (filter.correlationIds?.length) {
+		conditions.push(inArray(auditLog.correlationId, filter.correlationIds))
+	}
+
+	if (filter.verifiedOnly) {
+		conditions.push(isNotNull(auditLog.hash))
+	}
+
+	return and(...conditions)
+}
+
+/**
+ * Helper function to convert cursor to offset
+ */
+function cursorToOffset(cursor: string | undefined): number {
+	if (!cursor) return 0
+	try {
+		return parseInt(Buffer.from(cursor, 'base64').toString('utf-8'))
+	} catch {
+		return 0
+	}
+}
+
+/**
+ * Helper function to convert offset to cursor
+ */
+function offsetToCursor(offset: number): string {
+	return Buffer.from(offset.toString()).toString('base64')
+}
+
+export const auditEventResolvers = {
+	Query: {
+		/**
+		 * Query audit events with flexible filtering and pagination
+		 * Requirements: 3.1, 3.2
+		 */
+		auditEvents: async (
+			_: any,
+			args: {
+				filter?: AuditEventFilter
+				pagination?: PaginationInput
+				sort?: SortInput
+			},
+			context: GraphQLContext
+		) => {
+			const { services } = context
+			const { db, logger, error } = services
+
+			// Check authentication
+			if (!context.session) {
+				throw new GraphQLError('Authentication required', {
+					extensions: { code: 'UNAUTHENTICATED' },
+				})
+			}
+
+			const organizationId = context.session.session.activeOrganizationId as string
+
+			try {
+				const { count, desc, asc } = await import('drizzle-orm')
+				const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
+
+				// Build query conditions
+				const whereClause = await buildQueryConditions(args.filter, organizationId)
+
+				// Handle pagination
+				const limit = args.pagination?.first || 50
+				const offset = args.pagination?.after ? cursorToOffset(args.pagination.after) : 0
+
+				// Handle sorting
+				const sortField = args.sort?.field?.toLowerCase() || 'timestamp'
+				const sortDirection = args.sort?.direction || 'DESC'
+				const orderBy =
+					sortDirection === 'ASC'
+						? asc(auditLog[sortField as keyof typeof auditLog])
+						: desc(auditLog[sortField as keyof typeof auditLog])
+
+				// Execute query
+				const events = await db.audit
+					.select()
+					.from(auditLog)
+					.where(whereClause)
+					.limit(limit)
+					.offset(offset)
+					.orderBy(orderBy)
+
+				// Get total count
+				const totalResult = await db.audit
+					.select({ count: count() })
+					.from(auditLog)
+					.where(whereClause)
+
+				const totalCount = totalResult[0]?.count || 0
+
+				// Convert to GraphQL format
+				const edges = events.map((event, index) => ({
+					node: convertDbEventToGraphQL(event),
+					cursor: offsetToCursor(offset + index),
+				}))
+
+				const pageInfo = {
+					hasNextPage: offset + limit < totalCount,
+					hasPreviousPage: offset > 0,
+					startCursor: edges.length > 0 ? edges[0].cursor : undefined,
+					endCursor: edges.length > 0 ? edges[edges.length - 1].cursor : undefined,
+				}
+
+				logger.info('GraphQL audit events queried successfully', {
+					organizationId,
+					resultCount: events.length,
+					totalCount,
+					filters: args.filter,
+				})
+
+				return {
+					edges,
+					pageInfo,
+					totalCount,
+				}
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to query audit events via GraphQL: ${message}`)
+
+				await error.handleError(
+					e as Error,
+					{
+						requestId: context.requestId,
+						userId: context.session.session.userId,
+						sessionId: context.session.session.id,
+						metadata: {
+							organizationId,
+							filter: args.filter,
+							pagination: args.pagination,
+							sort: args.sort,
+						},
+					},
+					'graphql-api',
+					'auditEvents'
+				)
+
+				throw new GraphQLError(`Failed to query audit events: ${message}`, {
+					extensions: { code: 'INTERNAL_ERROR' },
+				})
+			}
+		},
+
+		/**
+		 * Get a single audit event by ID
+		 * Requirements: 3.1, 3.2
+		 */
+		auditEvent: async (
+			_: any,
+			args: { id: string },
+			context: GraphQLContext
+		): Promise<AuditEvent | null> => {
+			const { services } = context
+			const { db, logger, error } = services
+
+			// Check authentication
+			if (!context.session) {
+				throw new GraphQLError('Authentication required', {
+					extensions: { code: 'UNAUTHENTICATED' },
+				})
+			}
+
+			const organizationId = context.session.session.activeOrganizationId as string
+
+			try {
+				const { eq, and } = await import('drizzle-orm')
+				const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
+
+				const event = await db.audit
+					.select()
+					.from(auditLog)
+					.where(
+						and(eq(auditLog.id, parseInt(args.id)), eq(auditLog.organizationId, organizationId))
+					)
+					.limit(1)
+
+				if (!event.length) {
+					return null
+				}
+
+				logger.info('GraphQL audit event retrieved successfully', {
+					eventId: args.id,
+					organizationId,
+				})
+
+				return convertDbEventToGraphQL(event[0])
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to get audit event via GraphQL: ${message}`)
+
+				await error.handleError(
+					e as Error,
+					{
+						requestId: context.requestId,
+						userId: context.session.session.userId,
+						sessionId: context.session.session.id,
+						metadata: {
+							organizationId,
+							eventId: args.id,
+						},
+					},
+					'graphql-api',
+					'auditEvent'
+				)
+
+				throw new GraphQLError(`Failed to get audit event: ${message}`, {
+					extensions: { code: 'INTERNAL_ERROR' },
+				})
+			}
+		},
+	},
+
+	Mutation: {
+		/**
+		 * Create a new audit event
+		 * Requirements: 3.1, 3.2
+		 */
+		createAuditEvent: async (
+			_: any,
+			args: { input: CreateAuditEventInput },
+			context: GraphQLContext
+		): Promise<AuditEvent> => {
+			const { services } = context
+			const { audit, logger, error } = services
+
+			// Check authentication
+			if (!context.session) {
+				throw new GraphQLError('Authentication required', {
+					extensions: { code: 'UNAUTHENTICATED' },
+				})
+			}
+
+			const organizationId = context.session.session.activeOrganizationId as string
+
+			try {
+				// Ensure organization isolation
+				const eventData = {
+					...args.input,
+					organizationId,
+					timestamp: new Date().toISOString(),
+					eventVersion: '1.0',
+				}
+
+				// Create audit event using the audit service
+				await audit.log(eventData)
+
+				logger.info('GraphQL audit event created successfully', {
+					action: args.input.action,
+					principalId: args.input.principalId,
+					organizationId,
+				})
+
+				// Return the created event (simplified for now)
+				return {
+					id: crypto.randomUUID(),
+					timestamp: eventData.timestamp,
+					action: eventData.action,
+					targetResourceType: eventData.targetResourceType,
+					targetResourceId: eventData.targetResourceId,
+					principalId: eventData.principalId,
+					organizationId: eventData.organizationId,
+					status: eventData.status,
+					outcomeDescription: eventData.outcomeDescription,
+					dataClassification: eventData.dataClassification,
+					sessionContext: eventData.sessionContext,
+					correlationId: eventData.correlationId,
+					retentionPolicy: eventData.retentionPolicy,
+					metadata: eventData.metadata,
+					integrityStatus: 'not_checked',
+				}
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to create audit event via GraphQL: ${message}`)
+
+				await error.handleError(
+					e as Error,
+					{
+						requestId: context.requestId,
+						userId: context.session.session.userId,
+						sessionId: context.session.session.id,
+						metadata: {
+							organizationId,
+							input: args.input,
+						},
+					},
+					'graphql-api',
+					'createAuditEvent'
+				)
+
+				throw new GraphQLError(`Failed to create audit event: ${message}`, {
+					extensions: { code: 'INTERNAL_ERROR' },
+				})
+			}
+		},
+
+		/**
+		 * Verify the cryptographic integrity of an audit event
+		 * Requirements: 3.1, 3.2
+		 */
+		verifyAuditEvent: async (
+			_: any,
+			args: { id: string },
+			context: GraphQLContext
+		): Promise<IntegrityVerificationResult> => {
+			const { services } = context
+			const { audit, db, logger, error } = services
+
+			// Check authentication
+			if (!context.session) {
+				throw new GraphQLError('Authentication required', {
+					extensions: { code: 'UNAUTHENTICATED' },
+				})
+			}
+
+			const organizationId = context.session.session.activeOrganizationId as string
+
+			try {
+				const { eq, and } = await import('drizzle-orm')
+				const { auditLog, auditIntegrityLog } = await import('@repo/audit-db/dist/db/schema.js')
+
+				// First, get the event to verify organization access
+				const event = await db.audit
+					.select()
+					.from(auditLog)
+					.where(
+						and(eq(auditLog.id, parseInt(args.id)), eq(auditLog.organizationId, organizationId))
+					)
+					.limit(1)
+
+				if (!event.length) {
+					throw new GraphQLError('Audit event not found', {
+						extensions: { code: 'NOT_FOUND' },
+					})
+				}
+
+				// Perform integrity verification
+				const auditEvent: any = {
+					...event[0],
+					ttl: event[0].ttl || undefined,
+					principalId: event[0].principalId || undefined,
+					organizationId: event[0].organizationId || undefined,
+					targetResourceType: event[0].targetResourceType || undefined,
+					targetResourceId: event[0].targetResourceId || undefined,
+					outcomeDescription: event[0].outcomeDescription || undefined,
+					hash: event[0].hash || undefined,
+					correlationId: event[0].correlationId || undefined,
+					dataClassification: event[0].dataClassification || 'INTERNAL',
+					retentionPolicy: event[0].retentionPolicy || 'standard',
+				}
+
+				const isValid = event[0].hash ? audit.verifyEventHash(auditEvent, event[0].hash) : false
+				const verificationResult: IntegrityVerificationResult = {
+					isValid,
+					expectedHash: event[0].hash || undefined,
+					computedHash: event[0].hash ? audit.generateEventHash(auditEvent) : undefined,
+					timestamp: new Date().toISOString(),
+					eventId: args.id,
+				}
+
+				// Log the verification attempt
+				await db.audit.insert(auditIntegrityLog).values({
+					auditLogId: parseInt(args.id),
+					verificationTimestamp: new Date().toISOString(),
+					verificationStatus: verificationResult.isValid ? 'success' : 'failure',
+					verificationDetails: verificationResult,
+					verifiedBy: context.session.session.userId,
+					hashVerified: event[0].hash,
+					expectedHash: verificationResult.expectedHash,
+				})
+
+				logger.info('GraphQL audit event verification completed', {
+					eventId: args.id,
+					organizationId,
+					isValid: verificationResult.isValid,
+					verifiedBy: context.session.session.userId,
+				})
+
+				return verificationResult
+			} catch (e) {
+				if (e instanceof GraphQLError) {
+					throw e
+				}
+
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to verify audit event via GraphQL: ${message}`)
+
+				await error.handleError(
+					e as Error,
+					{
+						requestId: context.requestId,
+						userId: context.session.session.userId,
+						sessionId: context.session.session.id,
+						metadata: {
+							organizationId,
+							eventId: args.id,
+						},
+					},
+					'graphql-api',
+					'verifyAuditEvent'
+				)
+
+				throw new GraphQLError(`Failed to verify audit event: ${message}`, {
+					extensions: { code: 'INTERNAL_ERROR' },
+				})
+			}
+		},
+	},
+
+	// Type resolvers for AuditEvent
+	AuditEvent: {
+		// Add any field-level resolvers if needed
+	},
+}

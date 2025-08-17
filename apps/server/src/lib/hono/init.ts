@@ -1,7 +1,6 @@
 import {
 	Audit,
 	ComplianceReportingService,
-	ConfigurationManager,
 	createDatabasePresetHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
@@ -27,13 +26,12 @@ import { db as authDb } from '@repo/auth/dist/db/index.js'
 import { ConsoleLogger } from '@repo/hono-helpers'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
+import { configManager } from '../config/index.js'
+
 import type { MiddlewareHandler } from 'hono'
 import type { DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
 import type { Redis } from '@repo/redis-client'
-//import {initCache} from "../cache";
 import type { HonoEnv } from '../hono/context.js'
-
-//import { InfisicalKmsClient } from '@repo/infisical-kms';
 
 /**
  * These maps persist between worker executions and are used for caching
@@ -42,8 +40,6 @@ import type { HonoEnv } from '../hono/context.js'
 
 let isolateId: string | undefined = undefined
 let isolateCreatedAt: number | undefined = undefined
-
-let configurationManager: ConfigurationManager | undefined = undefined
 
 let connection: Redis | undefined = undefined
 
@@ -70,48 +66,50 @@ let dataExportService: DataExportService | undefined = undefined
 let scheduledReportingService: ScheduledReportingService | undefined = undefined
 let presetDatabaseHandler: DatabasePresetHandler | undefined = undefined
 
-// Placeholder delivery config - in real implementation would come from environment
-const deliveryConfig: DeliveryConfig = {
-	email: {
-		smtpConfig: {
-			host: process.env.SMTP_HOST || 'localhost',
-			port: parseInt(process.env.SMTP_PORT || '587'),
-			secure: process.env.SMTP_SECURE === 'true',
-			auth: {
-				user: process.env.SMTP_USER || '',
-				pass: process.env.SMTP_PASS || '',
+/**
+ * Create delivery configuration from server config
+ */
+function createDeliveryConfig(externalServices: any): DeliveryConfig {
+	return {
+		email: {
+			smtpConfig: {
+				host: externalServices?.smtp?.host || 'localhost',
+				port: externalServices?.smtp?.port || 587,
+				secure: externalServices?.smtp?.secure || false,
+				auth: {
+					user: externalServices?.smtp?.user || '',
+					pass: externalServices?.smtp?.pass || '',
+				},
+			},
+			from: externalServices?.smtp?.from || 'audit@smedrec.com',
+			subject: 'Scheduled Audit Report',
+			bodyTemplate: 'Please find the attached audit report.',
+			attachmentName: 'audit-report',
+		},
+		webhook: {
+			url: externalServices?.webhook?.url || '',
+			method: externalServices?.webhook?.method || 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				...externalServices?.webhook?.headers,
+			},
+			timeout: externalServices?.webhook?.timeout || 30000,
+			retryConfig: {
+				maxRetries: externalServices?.webhook?.retryConfig?.maxRetries || 3,
+				backoffMultiplier: externalServices?.webhook?.retryConfig?.backoffMultiplier || 2,
+				maxBackoffDelay: externalServices?.webhook?.retryConfig?.maxBackoffDelay || 30000,
 			},
 		},
-		from: process.env.SMTP_FROM || 'audit@smedrec.com',
-		subject: 'Scheduled Audit Report',
-		bodyTemplate: 'Please find the attached audit report.',
-		attachmentName: 'audit-report',
-	},
-	webhook: {
-		url: process.env.WEBHOOK_URL || '',
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${process.env.WEBHOOK_TOKEN || ''}`,
+		storage: {
+			provider: externalServices?.storage?.provider || 'local',
+			config: externalServices?.storage?.config || { basePath: './reports' },
+			path: externalServices?.storage?.path || '/audit-reports',
+			retention: {
+				days: externalServices?.storage?.retention?.days || 90,
+				autoCleanup: externalServices?.storage?.retention?.autoCleanup || true,
+			},
 		},
-		timeout: 30000,
-		retryConfig: {
-			maxRetries: 3,
-			backoffMultiplier: 2,
-			maxBackoffDelay: 30000,
-		},
-	},
-	storage: {
-		provider: 'local',
-		config: {
-			basePath: process.env.STORAGE_PATH || './reports',
-		},
-		path: '/audit-reports',
-		retention: {
-			days: 90,
-			autoCleanup: true,
-		},
-	},
+	}
 }
 
 /**
@@ -142,20 +140,17 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		c.res.headers.set('x-application', application)
 		c.res.headers.set('x-version', version)
 
+		// Initialize configuration manager
+		await configManager.initialize()
+		const config = configManager.getConfig()
+
 		const logger = new ConsoleLogger({
 			requestId,
 			application,
-			environment: c.env.ENVIRONMENT as 'VITEST' | 'development' | 'staging' | 'production',
+			environment: config.server.environment as 'VITEST' | 'development' | 'staging' | 'production',
 			version,
-			defaultFields: { environment: c.env.ENVIRONMENT },
+			defaultFields: { environment: config.server.environment },
 		})
-
-		if (!configurationManager) {
-			configurationManager = new ConfigurationManager('default/audit-development.json', 's3')
-			await configurationManager.initialize()
-		}
-
-		const config = configurationManager.getConfig()
 
 		if (!auditDbInstance) {
 			auditDbInstance = new AuditDb(config.database.url)
@@ -186,7 +181,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!audit)
 			audit = new Audit(
-				config.reliableProcessor.queueName,
+				'audit-queue', // Default queue name - could be made configurable
 				{
 					secretKey: config.security.encryptionKey,
 				},
@@ -211,14 +206,18 @@ export function init(): MiddlewareHandler<HonoEnv> {
 				secretKey: config.security.encryptionKey,
 			})
 		if (!dataExportService) dataExportService = new DataExportService()
-		if (!scheduledReportingService)
+		if (!scheduledReportingService) {
+			const deliveryConfig = createDeliveryConfig(config.externalServices)
 			scheduledReportingService = new ScheduledReportingService(
+				reportingService,
+				dataExportService,
 				db.audit,
 				scheduledReports,
 				reportTemplates,
 				reportExecutions,
 				deliveryConfig
 			)
+		}
 		if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(db.audit)
 
 		const compliance = {

@@ -58,6 +58,12 @@ export type ServiceContext = {
 export type Variables = SharedHonoVariables & {
 	session: Session | null
 	services: ServiceContext
+	apiVersion?: {
+		requested: string
+		resolved: string
+		isDeprecated: boolean
+		isSupported: boolean
+	}
 }
 
 export interface HonoEnv extends HonoApp {

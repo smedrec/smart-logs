@@ -1,0 +1,91 @@
+# Development Dockerfile for SMEDREC Audit Server
+# Optimized for development workflow with hot reloading
+
+FROM node:22-alpine AS base
+
+# Install development tools and security updates
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
+    dumb-init \
+    curl \
+    ca-certificates \
+    git && \
+    rm -rf /var/cache/apk/*
+
+# Enable pnpm
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+# Create non-root user for security (even in development)
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 --ingroup nodejs auditserver
+
+WORKDIR /app
+
+# Copy workspace configuration files
+COPY pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+COPY package.json ./
+COPY tsconfig.json ./
+COPY tsconfig.build.json ./
+COPY turbo.json ./
+
+# Copy package.json files for workspace dependency resolution
+COPY apps/server/package.json ./apps/server/
+COPY packages/audit/package.json ./packages/audit/
+COPY packages/audit-db/package.json ./packages/audit-db/
+COPY packages/audit-sdk/package.json ./packages/audit-sdk/
+COPY packages/audit-client/package.json ./packages/audit-client/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/hono-helpers/package.json ./packages/hono-helpers/
+COPY packages/redis-client/package.json ./packages/redis-client/
+COPY packages/send-mail/package.json ./packages/send-mail/
+COPY packages/logs/package.json ./packages/logs/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+
+# Install all dependencies (including dev dependencies)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# Copy source code
+COPY apps/server ./apps/server
+COPY packages/audit ./packages/audit
+COPY packages/audit-db ./packages/audit-db
+COPY packages/audit-sdk ./packages/audit-sdk
+COPY packages/audit-client ./packages/audit-client
+COPY packages/auth ./packages/auth
+COPY packages/hono-helpers ./packages/hono-helpers
+COPY packages/redis-client ./packages/redis-client
+COPY packages/send-mail ./packages/send-mail
+COPY packages/logs ./packages/logs
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/eslint-config ./packages/eslint-config
+
+# Change ownership to non-root user
+RUN chown -R auditserver:nodejs /app
+
+# Switch to non-root user
+USER auditserver
+
+# Set development environment
+ENV NODE_ENV=development
+ENV PORT=3000
+ENV HOST=0.0.0.0
+
+# Set working directory to server app
+WORKDIR /app/apps/server
+
+# Expose port
+EXPOSE 3000
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start development server with hot reloading
+CMD ["pnpm", "dev"]

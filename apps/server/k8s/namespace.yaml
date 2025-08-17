@@ -1,0 +1,9 @@
+# Kubernetes Namespace for SMEDREC Audit Server
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smedrec-audit
+  labels:
+    name: smedrec-audit
+    app.kubernetes.io/name: smedrec-audit
+    app.kubernetes.io/component: namespace

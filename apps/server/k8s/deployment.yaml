@@ -1,0 +1,162 @@
+# Deployment for SMEDREC Audit Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-server
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: audit-server
+    app.kubernetes.io/component: api
+    app.kubernetes.io/version: '1.0.0'
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audit-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audit-server
+        app.kubernetes.io/component: api
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3000'
+        prometheus.io/path: '/metrics'
+    spec:
+      # Security Context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Service Account
+      serviceAccountName: audit-server
+
+      # Init Containers (for database migrations, etc.)
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432 -U audit_user; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready!"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: audit-server-secrets
+                  key: POSTGRES_PASSWORD
+
+      containers:
+        - name: audit-server
+          image: smedrec/audit-server:latest
+          imagePullPolicy: Always
+
+          # Security Context
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop:
+                - ALL
+
+          # Ports
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          # Environment Variables
+          envFrom:
+            - configMapRef:
+                name: audit-server-config
+            - secretRef:
+                name: audit-server-secrets
+
+          # Resource Limits
+          resources:
+            requests:
+              memory: '256Mi'
+              cpu: '250m'
+            limits:
+              memory: '1Gi'
+              cpu: '1000m'
+
+          # Health Checks
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
+
+          # Startup Probe
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+            successThreshold: 1
+
+          # Volume Mounts
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: var-cache
+              mountPath: /var/cache
+
+          # Lifecycle Hooks
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - sleep 15
+
+      # Volumes
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: var-cache
+          emptyDir: {}
+
+      # Termination Grace Period
+      terminationGracePeriodSeconds: 30
+
+      # DNS Policy
+      dnsPolicy: ClusterFirst
+
+      # Restart Policy
+      restartPolicy: Always
