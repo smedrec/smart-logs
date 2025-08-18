@@ -19,6 +19,7 @@ import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
 //import type { cerbos } from '../cerbos/index.js'
 import type { HonoApp, Logger } from '@repo/hono-helpers'
 import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
+import type { Redis } from '@repo/redis-client'
 
 export type Env = SharedHonoEnv & {
 	// add additional Bindings here
@@ -36,7 +37,7 @@ export type ServiceContext = {
 		audit: PostgresJsDatabase<typeof auditSchema>
 	}
 	//kms: InfisicalKmsClient
-	//redis:  Redis,
+	redis: Redis
 	health: HealthCheckService
 	compliance: {
 		report: ComplianceReportingService

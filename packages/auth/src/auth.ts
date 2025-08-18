@@ -27,6 +27,7 @@ const email = new SendMail('mail', process.env.REDIS_URL)
 
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
+	private db: ReturnType<typeof initDrizzle>['db']
 	/**
 	 * Constructs an Better Auth instance
 	 * @param config The environment config. If not provided, it attempts to use
@@ -44,6 +45,7 @@ class Auth {
 
 		// Using environment variable AUTH_DB_URL
 		const { db } = initDrizzle(config.auth.dbUrl, config.auth.poolSize)
+		this.db = db
 
 		// TODO - see who to fix the async question
 		//if (await authDbService.checkAuthDbConnection()) {
@@ -237,6 +239,14 @@ class Auth {
 	 */
 	public getAuthInstance(): ReturnType<typeof betterAuth> {
 		return this.auth
+	}
+
+	/**
+	 * Provides access to the database instance for database operations.
+	 * @returns The database instance typed with the ReturnType<typeof initDrizzle>['db'] schema.
+	 */
+	public getDbInstance(): ReturnType<typeof initDrizzle>['db'] {
+		return this.db
 	}
 }
 

@@ -21,10 +21,10 @@ import {
 	reportTemplates,
 	scheduledReports,
 } from '@repo/audit-db'
-import { db as authDb } from '@repo/auth/dist/db/index.js'
 import { ConsoleLogger } from '@repo/hono-helpers'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
+import { getAuthDb } from '../auth.js'
 import { configManager } from '../config/index.js'
 
 import type { MiddlewareHandler } from 'hono'
@@ -161,6 +161,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			}
 		}
 
+		const authDb = await getAuthDb()
 		// Get the Drizzle ORM instance
 		const db = {
 			auth: authDb,
@@ -241,7 +242,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			//fhir,
 			db,
 			//kms,
-			//redis,
+			redis: connection,
 			health: healthCheckService,
 			compliance,
 			monitor,

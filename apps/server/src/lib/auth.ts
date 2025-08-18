@@ -20,3 +20,10 @@ export async function getAuthInstance() {
 	}
 	return authInstance.getAuthInstance()
 }
+
+export async function getAuthDb() {
+	if (!authInstance) {
+		authInstance = await initializeAuth()
+	}
+	return authInstance.getDbInstance()
+}
