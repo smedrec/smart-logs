@@ -181,7 +181,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!audit)
 			audit = new Audit(
-				'audit-queue', // Default queue name - could be made configurable
+				'audit-reliable-dev', // Default queue name - could be made configurable
 				{
 					secretKey: config.security.encryptionKey,
 				},

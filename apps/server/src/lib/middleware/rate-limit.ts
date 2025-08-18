@@ -5,7 +5,7 @@
  * - IP-based rate limiting
  * - User-based rate limiting
  * - Session-based rate limiting
- * - In-memory storage for simplicity (can be extended to Redis)
+ * - Redis-based storage for distributed rate limiting
  *
  * Requirements: 2.4, 2.5
  */
@@ -15,6 +15,7 @@ import { createMiddleware } from 'hono/factory'
 
 import type { HonoEnv } from '@/lib/hono/context'
 import type { Context } from 'hono'
+import type { Redis } from '@repo/redis-client'
 
 export interface RateLimitConfig {
 	windowMs: number
@@ -39,36 +40,23 @@ interface RateLimitEntry {
 	resetTime: number
 }
 
-// In-memory rate limit store
-const rateLimitStore = new Map<string, RateLimitEntry>()
-
-// Cleanup expired entries periodically
-setInterval(() => {
-	const now = Date.now()
-	for (const [key, entry] of rateLimitStore.entries()) {
-		if (entry.resetTime <= now) {
-			rateLimitStore.delete(key)
-		}
-	}
-}, 60000) // Cleanup every minute
-
 /**
  * Rate limiting middleware factory
  */
 export function rateLimit(config: RateLimitConfig) {
 	return createMiddleware<HonoEnv>(async (c, next) => {
-		const { logger } = c.get('services')
+		const { logger, redis } = c.get('services')
 
 		try {
 			// Generate rate limit key
 			const key = generateRateLimitKey(c, config.keyGenerator)
 
-			// Get current count from store
-			const current = getCurrentCount(key, config.windowMs)
+			// Get current count from Redis
+			const current = await getCurrentCount(redis, key, config.windowMs)
 
 			// Check if limit exceeded
 			if (current >= config.maxRequests) {
-				const resetTime = getResetTime(key, config.windowMs)
+				const resetTime = await getResetTime(redis, key, config.windowMs)
 
 				// Set rate limit headers
 				if (config.headers !== false) {
@@ -105,11 +93,11 @@ export function rateLimit(config: RateLimitConfig) {
 			const shouldIncrement = !config.skipSuccessfulRequests || c.res.status >= 400
 
 			if (shouldIncrement) {
-				const newCount = incrementCount(key, config.windowMs)
+				const newCount = await incrementCount(redis, key, config.windowMs)
 
 				// Set rate limit headers
 				if (config.headers !== false) {
-					const resetTime = getResetTime(key, config.windowMs)
+					const resetTime = await getResetTime(redis, key, config.windowMs)
 					setRateLimitHeaders(
 						c,
 						{
@@ -195,51 +183,133 @@ function getClientIP(c: Context): string {
 }
 
 /**
- * Get current request count from store
+ * Get current request count from Redis
  */
-function getCurrentCount(key: string, windowMs: number): number {
-	const entry = rateLimitStore.get(key)
-	const now = Date.now()
+async function getCurrentCount(redis: Redis, key: string, windowMs: number): Promise<number> {
+	try {
+		const data = await redis.get(key)
+		if (!data) {
+			return 0
+		}
 
-	if (!entry || entry.resetTime <= now) {
+		const entry: RateLimitEntry = JSON.parse(data)
+		const now = Date.now()
+
+		if (entry.resetTime <= now) {
+			// Entry expired, clean it up
+			await redis.del(key)
+			return 0
+		}
+
+		return entry.count
+	} catch (error) {
+		// If Redis fails, return 0 to allow request
 		return 0
 	}
-
-	return entry.count
 }
 
 /**
- * Increment request count in store
+ * Increment request count in Redis using atomic operations
  */
-function incrementCount(key: string, windowMs: number): number {
-	const now = Date.now()
-	const resetTime = now + windowMs
-	const entry = rateLimitStore.get(key)
+async function incrementCount(redis: Redis, key: string, windowMs: number): Promise<number> {
+	try {
+		const now = Date.now()
+		const resetTime = now + windowMs
+		const ttlSeconds = Math.ceil(windowMs / 1000)
 
-	if (!entry || entry.resetTime <= now) {
-		// Create new entry
-		rateLimitStore.set(key, { count: 1, resetTime })
-		return 1
-	} else {
-		// Increment existing entry
-		entry.count++
-		rateLimitStore.set(key, entry)
-		return entry.count
+		// Use Lua script for atomic operation to avoid race conditions
+		const luaScript = `
+			local key = KEYS[1]
+			local now = tonumber(ARGV[1])
+			local resetTime = tonumber(ARGV[2])
+			local ttl = tonumber(ARGV[3])
+			
+			local current = redis.call('GET', key)
+			local entry
+			
+			if current == false then
+				-- No existing entry, create new one
+				entry = { count = 1, resetTime = resetTime }
+			else
+				entry = cjson.decode(current)
+				if entry.resetTime <= now then
+					-- Entry expired, create new one
+					entry = { count = 1, resetTime = resetTime }
+				else
+					-- Increment existing entry
+					entry.count = entry.count + 1
+				end
+			end
+			
+			redis.call('SETEX', key, ttl, cjson.encode(entry))
+			return entry.count
+		`
+
+		const result = (await redis.eval(
+			luaScript,
+			1,
+			key,
+			now.toString(),
+			resetTime.toString(),
+			ttlSeconds.toString()
+		)) as number
+		return result
+	} catch (error) {
+		// Fallback to non-atomic operation if Lua script fails
+		try {
+			const now = Date.now()
+			const resetTime = now + windowMs
+			const ttlSeconds = Math.ceil(windowMs / 1000)
+
+			// Get current entry
+			const data = await redis.get(key)
+			let entry: RateLimitEntry
+
+			if (!data) {
+				// Create new entry
+				entry = { count: 1, resetTime }
+			} else {
+				const existingEntry: RateLimitEntry = JSON.parse(data)
+
+				if (existingEntry.resetTime <= now) {
+					// Entry expired, create new one
+					entry = { count: 1, resetTime }
+				} else {
+					// Increment existing entry
+					entry = { count: existingEntry.count + 1, resetTime: existingEntry.resetTime }
+				}
+			}
+
+			// Set the entry with TTL
+			await redis.setex(key, ttlSeconds, JSON.stringify(entry))
+			return entry.count
+		} catch (fallbackError) {
+			// If Redis completely fails, return 1 to allow request
+			return 1
+		}
 	}
 }
 
 /**
- * Get reset time for rate limit window
+ * Get reset time for rate limit window from Redis
  */
-function getResetTime(key: string, windowMs: number): Date {
-	const entry = rateLimitStore.get(key)
+async function getResetTime(redis: Redis, key: string, windowMs: number): Promise<Date> {
+	try {
+		const data = await redis.get(key)
 
-	if (entry && entry.resetTime > Date.now()) {
-		return new Date(entry.resetTime)
+		if (data) {
+			const entry: RateLimitEntry = JSON.parse(data)
+			if (entry.resetTime > Date.now()) {
+				return new Date(entry.resetTime)
+			}
+		}
+
+		// If no entry or expired, calculate based on window
+		return new Date(Date.now() + windowMs)
+	} catch (error) {
+		// If Redis fails, return current time + window
+		return new Date(Date.now() + windowMs)
 	}
-
-	// If no entry or expired, calculate based on window
-	return new Date(Date.now() + windowMs)
 }
 
 /**
@@ -348,4 +418,66 @@ export function adaptiveRateLimit() {
 
 		return middleware(c, next)
 	})
+}
+
+/**
+ * Utility functions for Redis-based rate limiting
+ */
+export const rateLimitUtils = {
+	/**
+	 * Clear rate limit for a specific key
+	 */
+	async clearRateLimit(redis: Redis, key: string): Promise<boolean> {
+		try {
+			const result = await redis.del(key)
+			return result > 0
+		} catch (error) {
+			return false
+		}
+	},
+
+	/**
+	 * Get rate limit info for a specific key
+	 */
+	async getRateLimitInfo(redis: Redis, key: string): Promise<RateLimitInfo | null> {
+		try {
+			const data = await redis.get(key)
+			if (!data) {
+				return null
+			}
+
+			const entry: RateLimitEntry = JSON.parse(data)
+			const now = Date.now()
+
+			if (entry.resetTime <= now) {
+				// Entry expired
+				await redis.del(key)
+				return null
+			}
+
+			return {
+				limit: 0, // This would need to be passed in or stored separately
+				current: entry.count,
+				remaining: 0, // This would need to be calculated with the limit
+				resetTime: new Date(entry.resetTime),
+			}
+		} catch (error) {
+			return null
+		}
+	},
+
+	/**
+	 * Clear all rate limits matching a pattern
+	 */
+	async clearRateLimitPattern(redis: Redis, pattern: string): Promise<number> {
+		try {
+			const keys = await redis.keys(pattern)
+			if (keys.length === 0) {
+				return 0
+			}
+			return await redis.del(...keys)
+		} catch (error) {
+			return 0
+		}
+	},
 }
