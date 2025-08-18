@@ -232,7 +232,7 @@ Pagination information is included in the response:
 
 	// Mount API routes
 	app.route('/audit', createAuditAPI())
-	app.route('/compliance', createEnhancedComplianceAPI(app))
+	app.route('/compliance', createComplianceAPI())
 	app.route('/metrics', createMetricsAPI())
 
 	// Swagger UI
@@ -302,16 +302,4 @@ Pagination information is included in the response:
 	})
 
 	return app
-}
-
-/**
- * Enhanced compliance API with OpenAPI integration
- */
-function createEnhancedComplianceAPI(parentApp: OpenAPIHono<HonoEnv>): OpenAPIHono<HonoEnv> {
-	// Import the existing compliance API and enhance it with OpenAPI
-	const complianceRouter = createComplianceAPI(parentApp)
-
-	// The existing compliance API already has the routes, we just need to return it
-	// In a real implementation, we would convert the existing routes to use OpenAPI
-	return complianceRouter as any
 }

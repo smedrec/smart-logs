@@ -13,7 +13,6 @@ import { newApp } from './lib/hono/'
 import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
 import { appRouter } from './routers/index'
-import { createComplianceAPI } from './routes/compliance-api'
 
 // Global server instance for graceful shutdown
 let server: ReturnType<typeof serve> | null = null
@@ -67,10 +66,6 @@ async function startServer() {
 		const { createRestAPI } = await import('./routes/rest-api.js')
 		const restAPI = createRestAPI()
 		app.route(`${config.api.restPath}/v1`, restAPI)
-
-		// Legacy compliance API for backward compatibility
-		const complianceAPI = createComplianceAPI(app)
-		app.route(`${config.api.restPath}/compliance`, complianceAPI)
 	}
 
 	// Configure GraphQL endpoint if enabled
@@ -124,14 +119,6 @@ async function startServer() {
 			})
 		})
 	}
-
-	app.get('/session', (c) => {
-		return c.json(c.get('session'))
-	})
-
-	app.get('/', (c) => {
-		return c.text('OK')
-	})
 
 	// Start server with Hono's Node.js adapter
 	server = serve(

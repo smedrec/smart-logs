@@ -9,368 +9,830 @@
  *
  * Requirements: 4.1, 4.4, 8.1
  */
+
 import { ApiError } from '@/lib/errors'
-import { validator } from 'hono/validator'
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 import { DEFAULT_VALIDATION_CONFIG } from '@repo/audit'
 
 import type { HonoEnv } from '@/lib/hono/context'
-import type { Hono } from 'hono'
-import type { AuditPreset, ExportConfig, ReportCriteria, ScheduledReportConfig } from '@repo/audit'
+
+// Zod schemas for request/response validation
+const ReportCriteriaSchema = z.object({
+	startDate: z.string().datetime().optional(),
+	endDate: z.string().datetime().optional(),
+	principalIds: z.array(z.string()).optional(),
+	organizationIds: z.array(z.string()).optional(),
+	actions: z.array(z.string()).optional(),
+	statuses: z.array(z.enum(['attempt', 'success', 'failure'])).optional(),
+	dataClassifications: z.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'])).optional(),
+	resourceTypes: z.array(z.string()).optional(),
+})
+
+const ExportConfigSchema = z.object({
+	format: z.enum(['json', 'csv', 'pdf', 'xml']),
+	includeMetadata: z.boolean().optional(),
+	compression: z.enum(['none', 'gzip', 'zip']).optional(),
+	encryption: z
+		.object({
+			enabled: z.boolean(),
+			algorithm: z.string().optional(),
+		})
+		.optional(),
+})
+
+const ScheduledReportConfigSchema = z.object({
+	name: z.string().min(1).max(100),
+	description: z.string().max(500).optional(),
+	reportType: z.enum(['hipaa', 'gdpr', 'general', 'integrity']),
+	criteria: ReportCriteriaSchema,
+	schedule: z.object({
+		frequency: z.enum(['daily', 'weekly', 'monthly']),
+		time: z.string(),
+		timezone: z.string().optional(),
+	}),
+	delivery: z.object({
+		method: z.enum(['email', 'webhook', 'storage']),
+		recipients: z.array(z.string()).optional(),
+		webhookUrl: z.string().url().optional(),
+		storageLocation: z.string().optional(),
+	}),
+	enabled: z.boolean().optional(),
+})
+
+const AuditPresetSchema = z.object({
+	name: z.string().min(1).max(50),
+	description: z.string().max(200).optional(),
+	action: z.string().min(1).max(100),
+	dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']),
+	requiredFields: z.array(z.string()).optional(),
+	defaultValues: z.record(z.string(), z.any()).optional(),
+	validation: z
+		.object({
+			enabled: z.boolean(),
+			rules: z
+				.array(
+					z.object({
+						field: z.string(),
+						type: z.enum(['required', 'format', 'range']),
+						value: z.any(),
+					})
+				)
+				.optional(),
+		})
+		.optional(),
+})
+
+const ComplianceReportSchema = z.object({
+	metadata: z.object({
+		reportId: z.string().uuid(),
+		reportType: z.string(),
+		generatedAt: z.string().datetime(),
+		criteria: ReportCriteriaSchema,
+		organizationId: z.string(),
+	}),
+	summary: z.object({
+		totalEvents: z.number(),
+		complianceScore: z.number(),
+		violations: z.number(),
+		recommendations: z.array(z.string()),
+	}),
+	sections: z.array(
+		z.object({
+			title: z.string(),
+			content: z.any(),
+		})
+	),
+})
+
+const IntegrityReportSchema = z.object({
+	verificationId: z.string().uuid(),
+	timestamp: z.string().datetime(),
+	criteria: ReportCriteriaSchema,
+	results: z.object({
+		totalEvents: z.number(),
+		verifiedEvents: z.number(),
+		failedVerifications: z.number(),
+		integrityScore: z.number(),
+	}),
+	details: z.array(
+		z.object({
+			eventId: z.string(),
+			status: z.enum(['verified', 'failed', 'missing']),
+			details: z.string().optional(),
+		})
+	),
+})
+
+const ErrorResponseSchema = z.object({
+	code: z.string(),
+	message: z.string(),
+	details: z.record(z.string(), z.any()).optional(),
+	timestamp: z.string().datetime(),
+	requestId: z.string(),
+	path: z.string().optional(),
+})
+
+// Route definitions
+const generateHIPAAReportRoute = createRoute({
+	method: 'post',
+	path: '/reports/hipaa',
+	tags: ['Compliance Reports'],
+	summary: 'Generate HIPAA compliance report',
+	description: 'Generates a HIPAA compliance report based on the provided criteria.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: z.object({
+						criteria: ReportCriteriaSchema,
+					}),
+				},
+			},
+		},
+	},
+	responses: {
+		200: {
+			description: 'HIPAA report generated successfully',
+			content: {
+				'application/json': {
+					schema: ComplianceReportSchema,
+				},
+			},
+		},
+		400: {
+			description: 'Invalid request data',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const generateGDPRReportRoute = createRoute({
+	method: 'post',
+	path: '/reports/gdpr',
+	tags: ['Compliance Reports'],
+	summary: 'Generate GDPR compliance report',
+	description: 'Generates a GDPR compliance report based on the provided criteria.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: z.object({
+						criteria: ReportCriteriaSchema,
+					}),
+				},
+			},
+		},
+	},
+	responses: {
+		200: {
+			description: 'GDPR report generated successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						success: z.boolean(),
+						report: ComplianceReportSchema,
+					}),
+				},
+			},
+		},
+		400: {
+			description: 'Invalid request data',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const generateIntegrityReportRoute = createRoute({
+	method: 'post',
+	path: '/reports/integrity',
+	tags: ['Compliance Reports'],
+	summary: 'Generate integrity verification report',
+	description: 'Generates an integrity verification report for audit events.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: z.object({
+						criteria: ReportCriteriaSchema,
+						performVerification: z.boolean().optional(),
+					}),
+				},
+			},
+		},
+	},
+	responses: {
+		200: {
+			description: 'Integrity report generated successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						success: z.boolean(),
+						report: IntegrityReportSchema,
+					}),
+				},
+			},
+		},
+		400: {
+			description: 'Invalid request data',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const exportReportRoute = createRoute({
+	method: 'post',
+	path: '/export/report',
+	tags: ['Export'],
+	summary: 'Export compliance report',
+	description: 'Exports a compliance report in the specified format.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: z.object({
+						report: ComplianceReportSchema,
+						config: ExportConfigSchema,
+					}),
+				},
+			},
+		},
+	},
+	responses: {
+		200: {
+			description: 'Report exported successfully',
+			content: {
+				'application/octet-stream': {
+					schema: z.string(),
+				},
+			},
+			headers: z.object({
+				'Content-Type': z.string(),
+				'Content-Disposition': z.string(),
+				'Content-Length': z.string(),
+				'X-Export-ID': z.string(),
+				'X-Checksum': z.string(),
+			}),
+		},
+		400: {
+			description: 'Invalid request data',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const createScheduledReportRoute = createRoute({
+	method: 'post',
+	path: '/scheduled-reports',
+	tags: ['Scheduled Reports'],
+	summary: 'Create scheduled report',
+	description: 'Creates a new scheduled compliance report.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: ScheduledReportConfigSchema,
+				},
+			},
+		},
+	},
+	responses: {
+		201: {
+			description: 'Scheduled report created successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						success: z.boolean(),
+						scheduledReport: ScheduledReportConfigSchema.extend({
+							id: z.string().uuid(),
+							createdAt: z.string().datetime(),
+							nextRun: z.string().datetime(),
+						}),
+					}),
+				},
+			},
+		},
+		400: {
+			description: 'Invalid request data',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const getScheduledReportsRoute = createRoute({
+	method: 'get',
+	path: '/scheduled-reports',
+	tags: ['Scheduled Reports'],
+	summary: 'Get all scheduled reports',
+	description: 'Retrieves all scheduled compliance reports.',
+	responses: {
+		200: {
+			description: 'Scheduled reports retrieved successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						success: z.boolean(),
+						scheduledReports: z.array(
+							ScheduledReportConfigSchema.extend({
+								id: z.string().uuid(),
+								createdAt: z.string().datetime(),
+								nextRun: z.string().datetime(),
+							})
+						),
+					}),
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const getScheduledReportRoute = createRoute({
+	method: 'get',
+	path: '/scheduled-reports/{id}',
+	tags: ['Scheduled Reports'],
+	summary: 'Get scheduled report by ID',
+	description: 'Retrieves a specific scheduled report by its ID.',
+	request: {
+		params: z.object({
+			id: z.string().uuid(),
+		}),
+	},
+	responses: {
+		200: {
+			description: 'Scheduled report retrieved successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						success: z.boolean(),
+						scheduledReport: ScheduledReportConfigSchema.extend({
+							id: z.string().uuid(),
+							createdAt: z.string().datetime(),
+							nextRun: z.string().datetime(),
+						}),
+					}),
+				},
+			},
+		},
+		404: {
+			description: 'Scheduled report not found',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const getAuditPresetsRoute = createRoute({
+	method: 'get',
+	path: '/audit-presets',
+	tags: ['Audit Presets'],
+	summary: 'Get all audit presets',
+	description: 'Retrieves all audit presets for the organization.',
+	responses: {
+		200: {
+			description: 'Audit presets retrieved successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						success: z.boolean(),
+						presets: z.array(
+							AuditPresetSchema.extend({
+								organizationId: z.string(),
+								createdBy: z.string(),
+								createdAt: z.string().datetime(),
+							})
+						),
+					}),
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
+
+const createAuditPresetRoute = createRoute({
+	method: 'post',
+	path: '/audit-presets',
+	tags: ['Audit Presets'],
+	summary: 'Create audit preset',
+	description: 'Creates a new audit preset for the organization.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: z.object({
+						preset: AuditPresetSchema,
+					}),
+				},
+			},
+		},
+	},
+	responses: {
+		201: {
+			description: 'Audit preset created successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						success: z.boolean(),
+						preset: AuditPresetSchema.extend({
+							organizationId: z.string(),
+							createdBy: z.string(),
+							createdAt: z.string().datetime(),
+						}),
+					}),
+				},
+			},
+		},
+		400: {
+			description: 'Invalid request data',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		401: {
+			description: 'Unauthorized',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+		500: {
+			description: 'Internal server error',
+			content: {
+				'application/json': {
+					schema: ErrorResponseSchema,
+				},
+			},
+		},
+	},
+})
 
 /**
  * Create compliance API router
  */
-export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
-	/**
-	 * Generate general compliance report
-	 * POST /api/compliance/reports/generate
-	 */
-	/**app.post(
-		'/reports/generate',
-		validator('json', (value, c) => {
-			const { criteria, reportType } = value
-			if (!criteria || typeof criteria !== 'object') {
-				return c.text('Invalid criteria', 400)
-			}
-			return { criteria: criteria as ReportCriteria, reportType: reportType as string }
-		}),
-		async (c) => {
-			const { compliance, db, logger } = c.get('services')
-			try {
-				const { criteria, reportType } = c.req.valid('json')
+export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
+	const app = new OpenAPIHono<HonoEnv>()
+	// Generate HIPAA compliance report
+	app.openapi(generateHIPAAReportRoute, async (c) => {
+		const { compliance, logger } = c.get('services')
+		const session = c.get('session')
 
-				// Fetch audit events from database based on criteria
-				const events = await fetchAuditEvents(db.audit, criteria)
-
-				// Generate report
-				const report = await compliance.report.generateComplianceReport(
-					events,
-					criteria,
-					reportType
-				)
-
-				logger.info(`Generated compliance report: ${report.metadata.reportId}`)
-
-				return c.json({
-					success: true,
-					report,
-				})
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to generate compliance report: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
 		}
-	)*/
 
-	/**
-	 * Generate HIPAA compliance report
-	 * POST /api/compliance/reports/hipaa
-	 */
-	app.post(
-		'/reports/hipaa',
-		validator('json', (value, c) => {
-			const { criteria } = value
-			if (!criteria || typeof criteria !== 'object') {
-				return c.text('Invalid criteria', 400)
+		try {
+			const { criteria } = c.req.valid('json')
+
+			const criteriaWithOrganizationId = {
+				...criteria,
+				organizationIds: [session.session.activeOrganizationId as string],
 			}
-			return { criteria: criteria as ReportCriteria }
-		}),
-		async (c) => {
-			const { compliance, db, logger } = c.get('services')
-			const session = c.get('session')
-			try {
-				const { criteria } = c.req.valid('json')
 
-				// Fetch audit events from database
-				//const events = await fetchAuditEvents(db.audit, criteria)
-				const criteriaWithOrganizationId = {
-					...criteria,
-					organizationIds: [session?.session.activeOrganizationId as string],
-				}
+			// Generate HIPAA report
+			const report = await compliance.report.generateHIPAAReport(criteriaWithOrganizationId)
 
-				// Generate HIPAA report
-				const report = await compliance.report.generateHIPAAReport(criteriaWithOrganizationId)
+			logger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
 
-				logger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
+			return c.json(report)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to generate HIPAA report: ${message}`)
 
-				return c.json(report)
-				/**return c.json({
-					success: true,
-					report,
-				})*/
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to generate HIPAA report: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
 		}
-	)
+	})
 
-	/**
-	 * Generate GDPR compliance report
-	 * POST /api/compliance/reports/gdpr
-	 */
-	app.post(
-		'/reports/gdpr',
-		validator('json', (value, c) => {
-			const { criteria } = value
-			if (!criteria || typeof criteria !== 'object') {
-				return c.text('Invalid criteria', 400)
-			}
-			return { criteria: criteria as ReportCriteria }
-		}),
-		async (c) => {
-			const { compliance, db, logger } = c.get('services')
-			const session = c.get('session')
-			try {
-				const { criteria } = c.req.valid('json')
+	// Generate GDPR compliance report
+	app.openapi(generateGDPRReportRoute, async (c) => {
+		const { compliance, logger } = c.get('services')
+		const session = c.get('session')
 
-				// Fetch audit events from database
-				//const events = await fetchAuditEvents(db.audit, criteria)
-				const criteriaWithOrganizationId = {
-					...criteria,
-					organizationIds: [session?.session.activeOrganizationId as string],
-				}
-
-				// Generate GDPR report
-				const report = await compliance.report.generateGDPRReport(criteriaWithOrganizationId)
-
-				logger.info(`Generated GDPR report: ${report.metadata.reportId}`)
-
-				return c.json({
-					success: true,
-					report,
-				})
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to generate GDPR report: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
 		}
-	)
 
-	/**
-	 * Generate integrity verification report
-	 * POST /api/compliance/reports/integrity
-	 */
-	app.post(
-		'/reports/integrity',
-		validator('json', (value, c) => {
-			const { criteria, performVerification } = value
-			if (!criteria || typeof criteria !== 'object') {
-				return c.text('Invalid criteria', 400)
+		try {
+			const { criteria } = c.req.valid('json')
+
+			const criteriaWithOrganizationId = {
+				...criteria,
+				organizationIds: [session.session.activeOrganizationId as string],
 			}
-			return {
-				criteria: criteria as ReportCriteria,
-				performVerification: performVerification as boolean,
-			}
-		}),
-		async (c) => {
-			const { compliance, db, logger } = c.get('services')
-			try {
-				const { criteria, performVerification = true } = c.req.valid('json')
 
-				// Fetch audit events from database
-				//const events = await fetchAuditEvents(db.audit, criteria)
+			// Generate GDPR report
+			const report = await compliance.report.generateGDPRReport(criteriaWithOrganizationId)
 
-				// Generate integrity verification report
-				const report = await compliance.report.generateIntegrityVerificationReport(
-					criteria,
-					performVerification
-				)
+			logger.info(`Generated GDPR report: ${report.metadata.reportId}`)
 
-				logger.info(`Generated integrity verification report: ${report.verificationId}`)
+			return c.json({
+				success: true,
+				report,
+			})
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to generate GDPR report: ${message}`)
 
-				return c.json({
-					success: true,
-					report,
-				})
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to generate integrity verification report: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
 		}
-	)
+	})
 
-	/**
-	 * Export compliance report
-	 * POST /api/compliance/export/report
-	 */
-	app.post(
-		'/export/report',
-		validator('json', (value, c) => {
-			const { report, config } = value
-			if (!report || !config) {
-				return c.text('Missing report or export config', 400)
-			}
-			return { report, config: config as ExportConfig }
-		}),
-		async (c) => {
-			const { compliance, logger } = c.get('services')
-			try {
-				const { report, config } = c.req.valid('json')
+	// Generate integrity verification report
+	app.openapi(generateIntegrityReportRoute, async (c) => {
+		const { compliance, logger } = c.get('services')
+		const session = c.get('session')
 
-				// Export the report
-				const exportResult = await compliance.export.exportComplianceReport(report, config)
-
-				logger.info(`Exported report: ${exportResult.exportId}`)
-
-				// Set appropriate headers for file download
-				c.header('Content-Type', exportResult.contentType)
-				c.header('Content-Disposition', `attachment; filename="${exportResult.filename}"`)
-				c.header('Content-Length', exportResult.size.toString())
-				c.header('X-Export-ID', exportResult.exportId)
-				c.header('X-Checksum', exportResult.checksum)
-
-				return c.body(exportResult.data)
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to export report: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
 		}
-	)
 
-	/**
-	 * Export audit events
-	 * POST /api/compliance/export/events
-	 */
-	/**app.post(
-		'/export/events',
-		validator('json', (value, c) => {
-			const { criteria, config } = value
-			if (!criteria || !config) {
-				return c.text('Missing criteria or export config', 400)
-			}
-			return {
-				criteria: criteria as ReportCriteria,
-				config: config as ExportConfig,
-			}
-		}),
-		async (c) => {
-			const { compliance, db, logger } = c.get('services')
-			try {
-				const { criteria, config } = c.req.valid('json')
+		try {
+			const { criteria, performVerification = true } = c.req.valid('json')
 
-				// Fetch audit events from database
-				const events = await compliance.report.getEvents(criteria)
+			// Generate integrity verification report
+			const report = await compliance.report.generateIntegrityVerificationReport(
+				criteria,
+				performVerification
+			)
 
-				// Convert to report events format
-				const reportEvents = events.map((event) => ({
-					id: event.id,
-					timestamp: event.timestamp,
-					principalId: event.principalId,
-					organizationId: event.organizationId,
-					action: event.action,
-					targetResourceType: event.targetResourceType,
-					targetResourceId: event.targetResourceId,
-					status: event.status,
-					outcomeDescription: event.outcomeDescription,
-					dataClassification: event.dataClassification,
-					sessionContext: event.sessionContext,
-					integrityStatus: (event.hash ? 'verified' : 'not_checked') as
-						| 'verified'
-						| 'not_checked'
-						| 'failed',
-					correlationId: event.correlationId,
-				}))
+			logger.info(`Generated integrity verification report: ${report.verificationId}`)
 
-				// Export the events
-				const exportResult = await compliance.export.exportAuditEvents(reportEvents, config, {
-					criteria,
-				})
+			return c.json({
+				success: true,
+				report,
+			})
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to generate integrity verification report: ${message}`)
 
-				logger.info(`Exported ${reportEvents.length} audit events: ${exportResult.exportId}`)
-
-				// Set appropriate headers for file download
-				c.header('Content-Type', exportResult.contentType)
-				c.header('Content-Disposition', `attachment; filename="${exportResult.filename}"`)
-				c.header('Content-Length', exportResult.size.toString())
-				c.header('X-Export-ID', exportResult.exportId)
-				c.header('X-Checksum', exportResult.checksum)
-
-				return c.body(exportResult.data)
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to export audit events: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
 		}
-	) */
+	})
 
-	/**
-	 * Create scheduled report
-	 * POST /api/compliance/scheduled-reports
-	 */
-	app.post(
-		'/scheduled-reports',
-		validator('json', (value, c) => {
-			const config = value as Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> & {
-				organizationId: string
+	// Export compliance report
+	app.openapi(exportReportRoute, async (c) => {
+		const { compliance, logger } = c.get('services')
+		const session = c.get('session')
+
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
+		try {
+			const { report, config } = c.req.valid('json')
+
+			// Export the report
+			const exportResult = await compliance.export.exportComplianceReport(report, config)
+
+			logger.info(`Exported report: ${exportResult.exportId}`)
+
+			// Set appropriate headers for file download
+			c.header('Content-Type', exportResult.contentType)
+			c.header('Content-Disposition', `attachment; filename="${exportResult.filename}"`)
+			c.header('Content-Length', exportResult.size.toString())
+			c.header('X-Export-ID', exportResult.exportId)
+			c.header('X-Checksum', exportResult.checksum)
+
+			return c.body(exportResult.data)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to export report: ${message}`)
+
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+		}
+	})
+
+	// Create scheduled report
+	app.openapi(createScheduledReportRoute, async (c) => {
+		const { compliance, logger } = c.get('services')
+		const session = c.get('session')
+
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
+		try {
+			const config = c.req.valid('json')
+
+			const configWithOrganization = {
+				...config,
+				organizationId: session.session.activeOrganizationId as string,
 			}
-			if (!config.name || !config.criteria || !config.schedule || !config.delivery) {
-				return c.text('Missing required fields', 400)
-			}
-			return config
-		}),
-		async (c) => {
-			const { compliance, logger } = c.get('services')
-			try {
-				const config = c.req.valid('json')
 
-				const scheduledReport = await compliance.scheduled.createScheduledReport(config)
+			const scheduledReport =
+				await compliance.scheduled.createScheduledReport(configWithOrganization)
 
-				logger.info(`Created scheduled report: ${scheduledReport.id}`)
+			logger.info(`Created scheduled report: ${scheduledReport.id}`)
 
-				return c.json({
+			return c.json(
+				{
 					success: true,
 					scheduledReport,
-				})
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to create scheduled report: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
-		}
-	)
+				},
+				201
+			)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to create scheduled report: ${message}`)
 
-	/**
-	 * Get all scheduled reports
-	 * GET /api/compliance/scheduled-reports
-	 */
-	app.get('/scheduled-reports', async (c) => {
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+		}
+	})
+
+	// Get all scheduled reports
+	app.openapi(getScheduledReportsRoute, async (c) => {
 		const { compliance, logger } = c.get('services')
+		const session = c.get('session')
+
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
 		try {
 			const scheduledReports = await compliance.scheduled.getScheduledReports()
 
@@ -381,382 +843,143 @@ export function createComplianceAPI(app: Hono<HonoEnv>): Hono<HonoEnv> {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to get scheduled reports: ${message}`)
-			return c.json(
-				{
-					success: false,
-					error: message,
-				},
-				500
-			)
+
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
 		}
 	})
 
-	/**
-	 * Get specific scheduled report
-	 * GET /api/compliance/scheduled-reports/:id
-	 */
-	app.get('/scheduled-reports/:id', async (c) => {
+	// Get specific scheduled report
+	app.openapi(getScheduledReportRoute, async (c) => {
 		const { compliance, logger } = c.get('services')
+		const session = c.get('session')
+
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
 		try {
-			const reportId = c.req.param('id')
-			const scheduledReport = await compliance.scheduled.getScheduledReport(reportId)
+			const { id } = c.req.valid('param')
+			const scheduledReport = await compliance.scheduled.getScheduledReport(id)
 
 			if (!scheduledReport) {
-				return c.json(
-					{
-						success: false,
-						error: 'Scheduled report not found',
-					},
-					404
-				)
+				throw new ApiError({
+					code: 'NOT_FOUND',
+					message: 'Scheduled report not found',
+				})
 			}
 
 			return c.json({
 				success: true,
 				scheduledReport,
 			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to get scheduled report: ${message}`)
-			const error = new ApiError({
-				code: 'INTERNAL_SERVER_ERROR',
-				message,
-			})
-			throw error
-		}
-	})
-
-	/**
-	 * Update scheduled report
-	 * PUT /api/compliance/scheduled-reports/:id
-	 */
-	app.put(
-		'/scheduled-reports/:id',
-		validator('json', (value, c) => {
-			return value as Partial<ScheduledReportConfig>
-		}),
-		async (c) => {
-			const { compliance, logger } = c.get('services')
-			try {
-				const reportId = c.req.param('id')
-				const updates = c.req.valid('json')
-
-				const updatedReport = await compliance.scheduled.updateScheduledReport(reportId, updates)
-
-				logger.info(`Updated scheduled report: ${reportId}`)
-
-				return c.json({
-					success: true,
-					scheduledReport: updatedReport,
-				})
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to update scheduled report: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
+		} catch (error) {
+			if (error instanceof ApiError) {
 				throw error
 			}
-		}
-	)
 
-	/**
-	 * Delete scheduled report
-	 * DELETE /api/compliance/scheduled-reports/:id
-	 */
-	app.delete('/scheduled-reports/:id', async (c) => {
-		const { compliance, logger } = c.get('services')
-		try {
-			const reportId = c.req.param('id')
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to get scheduled report: ${message}`)
 
-			await compliance.scheduled.deleteScheduledReport(reportId)
-
-			logger.info(`Deleted scheduled report: ${reportId}`)
-
-			return c.json({
-				success: true,
-				message: 'Scheduled report deleted successfully',
-			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to delete scheduled report: ${message}`)
-			const error = new ApiError({
+			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
 				message,
 			})
-			throw error
 		}
 	})
 
-	/**
-	 * Execute scheduled report immediately
-	 * POST /api/compliance/scheduled-reports/:id/execute
-	 */
-	app.post('/scheduled-reports/:id/execute', async (c) => {
-		const { compliance, logger } = c.get('services')
-		try {
-			const reportId = c.req.param('id')
-
-			const execution = await compliance.scheduled.executeReport(reportId)
-
-			logger.info(`Executed scheduled report: ${reportId}`)
-
-			return c.json({
-				success: true,
-				execution,
-			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to execute scheduled report: ${message}`)
-			const error = new ApiError({
-				code: 'INTERNAL_SERVER_ERROR',
-				message,
-			})
-			throw error
-		}
-	})
-
-	/**
-	 * Get execution history for scheduled report
-	 * GET /api/compliance/scheduled-reports/:id/executions
-	 */
-	app.get('/scheduled-reports/:id/executions', async (c) => {
-		const { compliance, logger } = c.get('services')
-		try {
-			const reportId = c.req.param('id')
-			const limit = parseInt(c.req.query('limit') || '50')
-
-			const executions = await compliance.scheduled.getExecutionHistory(reportId, limit)
-
-			return c.json({
-				success: true,
-				executions,
-			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to get execution history: ${message}`)
-			const error = new ApiError({
-				code: 'INTERNAL_SERVER_ERROR',
-				message,
-			})
-			throw error
-		}
-	})
-
-	/**
-	 * Get report templates
-	 * GET /api/compliance/templates
-	 */
-	app.get('/templates', async (c) => {
-		const { compliance, logger } = c.get('services')
-		try {
-			const templates = await compliance.scheduled.getReportTemplates()
-
-			return c.json({
-				success: true,
-				templates,
-			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to get report templates: ${message}`)
-			const error = new ApiError({
-				code: 'INTERNAL_SERVER_ERROR',
-				message,
-			})
-			throw error
-		}
-	})
-
-	/**
-	 * Get all audit presets
-	 * GET /api/compliance/audit-presets
-	 */
-	app.get('/audit-presets', async (c) => {
+	// Get all audit presets
+	app.openapi(getAuditPresetsRoute, async (c) => {
 		const { compliance, logger } = c.get('services')
 		const session = c.get('session')
+
 		if (!session) {
-			throw new Error('Session required')
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
 		}
-		const organizationId = session.session.activeOrganizationId as string
+
 		try {
+			const organizationId = session.session.activeOrganizationId as string
 			const presets = await compliance.preset.getPresets(organizationId)
+
 			return c.json({
 				success: true,
 				presets,
 			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to get all audit presets: ${message}`)
-			const error = new ApiError({
+
+			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
 				message,
 			})
-			throw error
 		}
 	})
 
-	/**
-	 * Get specific audit preset
-	 * GET /api/compliance/audit-presets/:name
-	 */
-	app.get('/audit-presets/:name', async (c) => {
+	// Create audit preset
+	app.openapi(createAuditPresetRoute, async (c) => {
 		const { compliance, logger } = c.get('services')
 		const session = c.get('session')
-		if (!session) {
-			throw new Error('Session required')
-		}
-		const organizationId = session.session.activeOrganizationId as string
-		try {
-			const name = c.req.param('name')
-			const preset = await compliance.preset.getPreset(name, organizationId)
-			if (!preset) {
-				return c.json(
-					{
-						success: false,
-						error: 'Audit preset not found',
-					},
-					404
-				)
-			}
-			return c.json({
-				success: true,
-				preset,
-			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to get audit preset: ${message}`)
-			const error = new ApiError({
-				code: 'INTERNAL_SERVER_ERROR',
-				message,
-			})
-			throw error
-		}
-	})
 
-	/**
-	 * Create audit preset
-	 * POST /api/compliance/audit-presets
-	 */
-	app.post(
-		'/audit-presets',
-		validator('json', (value, c) => {
-			const { preset } = value
-			if (!preset || typeof preset !== 'object') {
-				return c.text('Invalid preset', 400)
-			}
-			return { preset: preset as Omit<AuditPreset, 'organizationId'> }
-		}),
-		async (c) => {
-			const { compliance, logger } = c.get('services')
-			const session = c.get('session')
-			if (!session) {
-				throw new Error('Session required')
-			}
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
+		try {
+			const { preset } = c.req.valid('json')
 			const userId = session.session.userId
 			const organizationId = session.session.activeOrganizationId as string
-			const { preset } = c.req.valid('json')
-			try {
-				const {
-					name,
-					description,
-					action,
-					dataClassification,
-					requiredFields,
-					defaultValues,
-					validation,
-				} = preset
-				const newPreset = await compliance.preset.createPreset({
-					name,
-					description,
-					organizationId,
-					action,
-					dataClassification,
-					requiredFields,
-					defaultValues,
-					validation: validation || DEFAULT_VALIDATION_CONFIG,
-					createdBy: userId,
-				})
-				logger.info(`Created audit preset: ${preset.name}`)
-				return c.json({
+
+			const {
+				name,
+				description,
+				action,
+				dataClassification,
+				requiredFields,
+				defaultValues,
+				validation,
+			} = preset
+
+			const newPreset = await compliance.preset.createPreset({
+				name,
+				description,
+				organizationId,
+				action,
+				dataClassification,
+				requiredFields,
+				defaultValues,
+				validation: validation || DEFAULT_VALIDATION_CONFIG,
+				createdBy: userId,
+			})
+
+			logger.info(`Created audit preset: ${preset.name}`)
+
+			return c.json(
+				{
 					success: true,
 					preset: newPreset,
-				})
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to create audit preset: ${message}`)
-				const error = new ApiError({
-					code: 'INTERNAL_SERVER_ERROR',
-					message,
-				})
-				throw error
-			}
-		}
-	)
+				},
+				201
+			)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to create audit preset: ${message}`)
 
-	/**
-	 * Update audit preset
-	 * PUT /api/compliance/audit-presets/:name
-	 */
-	/**app.put(
-					"/audit-presets/:name",
-					async (c) => {
-							const { compliance, logger } = c.get("services");
-							try {
-									const name = c.req.param("name");
-									const { description, action, dataClassification, requiredFields, defaultValues, validation } = c.req.body;
-									const preset = await compliance.preset.updatePreset(name, {
-											description,
-											action,
-											dataClassification,
-											requiredFields,
-											defaultValues,
-											validation,
-									});
-									logger.info(`Updated audit preset: ${name}`);
-									return c.json({
-											success: true,
-											preset,
-									});
-							} catch (e) {
-									const message = e instanceof Error ? e.message : "Unknown error";
-									logger.error(`Failed to update audit preset: ${message}`);
-									const error = new ApiError({
-											code: "INTERNAL_SERVER_ERROR",
-											message,
-									});
-									throw error;
-							}
-					}
-			); */
-
-	/**
-	 * Delete audit preset
-	 * DELETE /api/compliance/audit-presets/:name
-	 */
-	app.delete('/audit-presets/:name', async (c) => {
-		const { compliance, logger } = c.get('services')
-		const session = c.get('session')
-		if (!session) {
-			throw new Error('Session required')
-		}
-		const organizationId = session.session.activeOrganizationId as string
-		try {
-			const name = c.req.param('name')
-			await compliance.preset.deletePreset(name, organizationId)
-			logger.info(`Deleted audit preset: ${name}`)
-			return c.json({
-				success: true,
-				message: 'Audit preset deleted successfully',
-			})
-		} catch (e) {
-			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(`Failed to delete audit preset: ${message}`)
-			const error = new ApiError({
+			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
 				message,
 			})
-			throw error
 		}
 	})
 
