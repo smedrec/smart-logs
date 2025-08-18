@@ -21,7 +21,6 @@ import {
 	reportTemplates,
 	scheduledReports,
 } from '@repo/audit-db'
-import { auth } from '@repo/auth'
 import { db as authDb } from '@repo/auth/dist/db/index.js'
 import { ConsoleLogger } from '@repo/hono-helpers'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
@@ -237,7 +236,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		//const cache = null
 
 		c.set('services', {
-			auth,
+			//auth,
 			//cerbos,
 			//fhir,
 			db,

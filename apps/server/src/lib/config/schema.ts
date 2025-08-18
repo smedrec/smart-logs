@@ -46,6 +46,8 @@ export interface ServerConfig {
 		trustedOrigins: string[]
 		betterAuthUrl: string
 		redisUrl?: string
+		dbUrl?: string
+		poolSize?: number
 	}
 	monitoring: {
 		enableMetrics: boolean

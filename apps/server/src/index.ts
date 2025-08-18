@@ -1,13 +1,12 @@
 import 'dotenv/config'
 
-import { createServer } from 'node:http'
 import { serve } from '@hono/node-server'
 import { trpcServer } from '@hono/trpc-server'
 import { cors } from 'hono/cors'
 
-import { auth } from '@repo/auth'
 import { useConsoleLogger } from '@repo/hono-helpers'
 
+import { getAuthInstance } from './lib/auth.js'
 import { configManager } from './lib/config/index.js'
 import { handleGraphQLRequest } from './lib/graphql/index'
 import { newApp } from './lib/hono/'
@@ -17,7 +16,7 @@ import { appRouter } from './routers/index'
 import { createComplianceAPI } from './routes/compliance-api'
 
 // Global server instance for graceful shutdown
-let server: ReturnType<typeof createServer> | null = null
+let server: ReturnType<typeof serve> | null = null
 let isShuttingDown = false
 
 async function startServer() {
@@ -30,6 +29,8 @@ async function startServer() {
 	if (!configManager.isProduction()) {
 		app.use('*', nodeEnv())
 	}
+
+	const auth = await getAuthInstance()
 
 	app.use('*', init())
 	app.use(useConsoleLogger())
@@ -132,44 +133,48 @@ async function startServer() {
 		return c.text('OK')
 	})
 
-	// Create HTTP server for better control over shutdown
-	server = createServer(app.fetch)
+	// Start server with Hono's Node.js adapter
+	server = serve(
+		{
+			fetch: app.fetch,
+			port: config.server.port,
+			hostname: config.server.host,
+		},
+		() => {
+			console.log(`🚀 Server is running on http://${config.server.host}:${config.server.port}`)
+			console.log(`📊 Environment: ${config.server.environment}`)
+			console.log(
+				`🔧 Health check: http://${config.server.host}:${config.server.port}${config.monitoring.healthCheckPath}`
+			)
+			console.log(`✅ Readiness check: http://${config.server.host}:${config.server.port}/ready`)
 
-	// Start server with configuration
-	server.listen(config.server.port, config.server.host, () => {
-		console.log(`🚀 Server is running on http://${config.server.host}:${config.server.port}`)
-		console.log(`📊 Environment: ${config.server.environment}`)
-		console.log(
-			`🔧 Health check: http://${config.server.host}:${config.server.port}${config.monitoring.healthCheckPath}`
-		)
-		console.log(`✅ Readiness check: http://${config.server.host}:${config.server.port}/ready`)
-
-		// API endpoints
-		if (config.api.enableTrpc) {
-			console.log(
-				`🔌 TRPC API: http://${config.server.host}:${config.server.port}${config.api.trpcPath}`
-			)
-		}
-		if (config.api.enableRest) {
-			console.log(
-				`🌐 REST API: http://${config.server.host}:${config.server.port}${config.api.restPath}`
-			)
-		}
-		if (config.api.enableGraphql) {
-			console.log(
-				`🎯 GraphQL API: http://${config.server.host}:${config.server.port}${config.api.graphqlPath}`
-			)
-			if (configManager.isDevelopment()) {
+			// API endpoints
+			if (config.api.enableTrpc) {
 				console.log(
-					`🎮 GraphQL Playground: http://${config.server.host}:${config.server.port}${config.api.graphqlPath}`
+					`🔌 TRPC API: http://${config.server.host}:${config.server.port}${config.api.trpcPath}`
 				)
 			}
-		}
+			if (config.api.enableRest) {
+				console.log(
+					`🌐 REST API: http://${config.server.host}:${config.server.port}${config.api.restPath}`
+				)
+			}
+			if (config.api.enableGraphql) {
+				console.log(
+					`🎯 GraphQL API: http://${config.server.host}:${config.server.port}${config.api.graphqlPath}`
+				)
+				if (configManager.isDevelopment()) {
+					console.log(
+						`🎮 GraphQL Playground: http://${config.server.host}:${config.server.port}${config.api.graphqlPath}`
+					)
+				}
+			}
 
-		if (configManager.isDevelopment()) {
-			console.log(`⚙️  Configuration: http://${config.server.host}:${config.server.port}/config`)
+			if (configManager.isDevelopment()) {
+				console.log(`⚙️  Configuration: http://${config.server.host}:${config.server.port}/config`)
+			}
 		}
-	})
+	)
 
 	return server
 }

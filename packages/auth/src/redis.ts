@@ -18,16 +18,15 @@ const DEFAULT_REDIS_OPTIONS: RedisOptions = {
  *
  * The Redis URL is sourced from the `BETTER_AUTH_REDIS_URL` environment variable.
  *
+ * @param redisUrl Optional. The Redis URL to connect to. If not provided, the function will attempt to use the `BETTER_AUTH_REDIS_URL` environment variable.
  * @param options Optional. Custom IORedis options to override or merge with defaults.
  * @returns A connected IORedis instance.
  * @throws Error if the Redis connection cannot be established.
  */
-export function getRedisConnection(options?: RedisOptions): RedisInstanceType {
+export function getRedisConnection(redisUrl?: string, options?: RedisOptions): RedisInstanceType {
 	if (redisConnection) {
 		return redisConnection
 	}
-
-	const redisUrl = process.env.BETTER_AUTH_REDIS_URL
 
 	if (!redisUrl) {
 		// This case should ideally not be reached if defaultValue is set for getEnv,

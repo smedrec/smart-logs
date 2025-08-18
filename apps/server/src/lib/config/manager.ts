@@ -179,6 +179,9 @@ export class ConfigurationManager {
 		if (sanitized.auth?.sessionSecret) {
 			sanitized.auth.sessionSecret = '[REDACTED]'
 		}
+		if (sanitized.auth?.dbUrl) {
+			sanitized.auth.dbUrl = this.sanitizeUrl(sanitized.auth.dbUrl)
+		}
 		if (sanitized.security?.encryptionKey) {
 			sanitized.security.encryptionKey = '[REDACTED]'
 		}

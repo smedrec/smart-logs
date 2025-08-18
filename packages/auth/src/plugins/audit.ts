@@ -9,22 +9,22 @@ let auditSDK: AuditSDK | undefined = undefined
 export const AuditSDKPlugin = async () => {
 	if (!auditSDK) {
 		// Initialize the SDK
-		auditSDK = new AuditSDK({
-			configPath: 'default/audit-development.json',
-			storageType: 's3',
-			compliance: {
-				hipaa: {
-					enabled: true,
-					retentionYears: 6,
+		auditSDK = new AuditSDK(
+			AuditSDK.withLogger({
+				environment: 'development',
+				application: 'api',
+				module: 'auth',
+				version: '0.1.0',
+				defaultFields: {
+					package: '@repo/auth',
+					environment: 'development',
 				},
-				gdpr: {
-					enabled: true,
-					defaultLegalBasis: 'legitimate_interest',
-					retentionDays: 365,
-				},
-			},
-		})
-		await auditSDK.initialize()
+			}),
+			await AuditSDK.initialize({
+				configPath: 'default/audit-development.json',
+				storageType: 's3',
+			})
+		)
 	}
 	return {
 		id: 'audit-sdk-plugin',

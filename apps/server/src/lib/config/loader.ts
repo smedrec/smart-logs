@@ -45,6 +45,8 @@ interface EnvVarMapping {
 	BETTER_AUTH_SECRET?: string
 	BETTER_AUTH_URL?: string
 	BETTER_AUTH_REDIS_URL?: string
+	BETTER_AUTH_DB_URL?: string
+	BETTER_AUTH_DB_POOL_SIZE?: number
 	SESSION_MAX_AGE?: number
 
 	// Security configuration
@@ -284,6 +286,8 @@ export class ConfigurationLoader {
 		parsed.BETTER_AUTH_SECRET = env.BETTER_AUTH_SECRET
 		parsed.BETTER_AUTH_URL = env.BETTER_AUTH_URL
 		parsed.BETTER_AUTH_REDIS_URL = env.BETTER_AUTH_REDIS_URL
+		parsed.BETTER_AUTH_DB_URL = env.BETTER_AUTH_DB_URL
+		parsed.BETTER_AUTH_DB_POOL_SIZE = parseNumber(env.BETTER_AUTH_DB_POOL_SIZE)
 		parsed.SESSION_MAX_AGE = parseNumber(env.SESSION_MAX_AGE)
 
 		parsed.ENCRYPTION_KEY = env.ENCRYPTION_KEY
@@ -404,6 +408,8 @@ export class ConfigurationLoader {
 		if (
 			envVars.BETTER_AUTH_SECRET !== undefined ||
 			envVars.BETTER_AUTH_URL !== undefined ||
+			envVars.BETTER_AUTH_DB_URL !== undefined ||
+			envVars.BETTER_AUTH_DB_POOL_SIZE !== undefined ||
 			envVars.BETTER_AUTH_REDIS_URL !== undefined ||
 			envVars.SESSION_MAX_AGE !== undefined
 		) {
@@ -412,6 +418,12 @@ export class ConfigurationLoader {
 					sessionSecret: envVars.BETTER_AUTH_SECRET,
 				}),
 				...(envVars.BETTER_AUTH_URL !== undefined && { betterAuthUrl: envVars.BETTER_AUTH_URL }),
+				...(envVars.BETTER_AUTH_DB_URL !== undefined && {
+					dbUrl: envVars.BETTER_AUTH_DB_URL,
+				}),
+				...(envVars.BETTER_AUTH_DB_POOL_SIZE !== undefined && {
+					dbPoolSize: envVars.BETTER_AUTH_DB_POOL_SIZE,
+				}),
 				...(envVars.BETTER_AUTH_REDIS_URL !== undefined && {
 					redisUrl: envVars.BETTER_AUTH_REDIS_URL,
 				}),

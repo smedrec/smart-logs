@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { prettyJSON } from 'hono/pretty-json'
 
-import { auth } from '@repo/auth'
 import { useNotFound } from '@repo/hono-helpers'
 
+import { getAuthInstance } from '../auth.js'
 import { handleError, handleZodError } from '../errors/index.js'
 
 import type { Context as GenericContext } from 'hono'
@@ -33,6 +33,7 @@ export function newApp() {
 		)
 		c.set('userAgent', c.req.header('User-Agent'))
 
+		const auth = await getAuthInstance()
 		const session = await auth.api.getSession({
 			query: {
 				disableCookieCache: true,
