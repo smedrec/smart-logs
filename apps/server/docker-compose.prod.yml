@@ -89,7 +89,7 @@ services:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
-      - ./redis.prod.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./docker/redis.prod.conf:/usr/local/etc/redis/redis.conf:ro
     command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       - audit-network
@@ -118,7 +118,7 @@ services:
       - '80:80'
       - '443:443'
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - audit-server
