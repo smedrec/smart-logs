@@ -230,7 +230,7 @@ const getAuditEventRoute = createRoute({
 	description: 'Retrieves a specific audit event by its ID.',
 	request: {
 		params: z.object({
-			id: z.string().uuid(),
+			id: z.string(),
 		}),
 	},
 	responses: {
@@ -277,7 +277,7 @@ const verifyAuditEventRoute = createRoute({
 	description: 'Verifies the cryptographic integrity of an audit event.',
 	request: {
 		params: z.object({
-			id: z.string().uuid(),
+			id: z.string(),
 		}),
 	},
 	responses: {
@@ -458,7 +458,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					status: event.status,
 					outcomeDescription: event.outcomeDescription || undefined,
 					dataClassification: event.dataClassification || 'INTERNAL',
-					sessionContext: event.sessionContext || undefined,
+					sessionContext: event.details?.sessionContext || undefined,
 					metadata: event.details || undefined,
 					hash: event.hash || undefined,
 					correlationId: event.correlationId || undefined,

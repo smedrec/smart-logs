@@ -3,7 +3,7 @@
 	"type": "module",
 	"main": "src/index.ts",
 	"scripts": {
-		"build": "tsdown",
+		"build": "tsc --build",
 		"check-types": "tsc --noEmit",
 		"clean": "rm -rf dist node_modules .turbo",
 		"compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",

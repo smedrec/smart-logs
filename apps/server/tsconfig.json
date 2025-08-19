@@ -1,24 +1,34 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "verbatimModuleSyntax": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["./src/*"]
-          },
-    "outDir": "./dist",
-    "types": [
-      "node"
-    ],
-    "composite": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
-  },
-  "tsc-alias": {
-    "resolveFullPaths": true
-  }
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"verbatimModuleSyntax": true,
+		"strict": true,
+		"skipLibCheck": true,
+		"baseUrl": "./src",
+		"paths": {
+			"@/*": ["*"]
+		},
+		"outDir": "./dist",
+		"rootDir": "src",
+		"types": ["node"],
+		"composite": true,
+		"jsx": "react-jsx",
+		"jsxImportSource": "hono/jsx"
+	},
+	"tsc-alias": {
+		"resolveFullPaths": true
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"config",
+		"docker",
+		"init-scripts",
+		"k8s",
+		"scripts",
+		"src/**/*.test.ts"
+	]
 }

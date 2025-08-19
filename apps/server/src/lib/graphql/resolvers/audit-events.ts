@@ -5,6 +5,7 @@
 
 import { GraphQLError } from 'graphql'
 
+import type { AuditEventStatus, DataClassification } from '@repo/audit'
 import type {
 	AuditEvent,
 	AuditEventFilter,
@@ -27,25 +28,26 @@ function convertDbEventToGraphQL(dbEvent: any): AuditEvent {
 		targetResourceId: dbEvent.targetResourceId || undefined,
 		principalId: dbEvent.principalId || undefined,
 		organizationId: dbEvent.organizationId || undefined,
-		status: dbEvent.status as 'attempt' | 'success' | 'failure',
+		status: dbEvent.status as AuditEventStatus,
 		outcomeDescription: dbEvent.outcomeDescription || undefined,
-		dataClassification: dbEvent.dataClassification as
-			| 'PUBLIC'
-			| 'INTERNAL'
-			| 'CONFIDENTIAL'
-			| 'PHI'
-			| undefined,
+		dataClassification: dbEvent.dataClassification as DataClassification | undefined,
 		correlationId: dbEvent.correlationId || undefined,
 		retentionPolicy: dbEvent.retentionPolicy || undefined,
 		metadata: dbEvent.metadata || undefined,
 		hash: dbEvent.hash || undefined,
 		integrityStatus: dbEvent.hash ? 'verified' : 'not_checked',
-		sessionContext: dbEvent.sessionContext
+		ttl: dbEvent.ttl || undefined,
+		eventVersion: dbEvent.eventVersion || undefined,
+		hashAlgorithm: dbEvent.hashAlgorithm as 'SHA-256' | undefined,
+		signature: dbEvent.signature || undefined,
+		processingLatency: dbEvent.processingLatency || undefined,
+		queueDepth: dbEvent.queueDepth || undefined,
+		sessionContext: dbEvent.details?.sessionContext
 			? {
-					sessionId: dbEvent.sessionContext.sessionId,
-					ipAddress: dbEvent.sessionContext.ipAddress,
-					userAgent: dbEvent.sessionContext.userAgent,
-					geolocation: dbEvent.sessionContext.geolocation,
+					sessionId: dbEvent.details.sessionContext.sessionId,
+					ipAddress: dbEvent.details.sessionContext.ipAddress,
+					userAgent: dbEvent.details.sessionContext.userAgent,
+					geolocation: dbEvent.details.sessionContext.geolocation,
 				}
 			: undefined,
 	}
@@ -79,8 +81,7 @@ async function buildQueryConditions(filter: AuditEventFilter | undefined, organi
 	}
 
 	if (filter.statuses?.length) {
-		const dbStatuses = filter.statuses.map((s) => s.toLowerCase())
-		conditions.push(inArray(auditLog.status, dbStatuses))
+		conditions.push(inArray(auditLog.status, filter.statuses))
 	}
 
 	if (filter.dataClassifications?.length) {
@@ -332,12 +333,13 @@ export const auditEventResolvers = {
 			const organizationId = context.session.session.activeOrganizationId as string
 
 			try {
-				// Ensure organization isolation
-				const eventData = {
+				// Create audit event data compatible with AuditLogEvent interface
+				const eventData: Partial<import('@repo/audit').AuditLogEvent> = {
 					...args.input,
 					organizationId,
 					timestamp: new Date().toISOString(),
 					eventVersion: '1.0',
+					hashAlgorithm: 'SHA-256',
 				}
 
 				// Create audit event using the audit service
@@ -349,16 +351,16 @@ export const auditEventResolvers = {
 					organizationId,
 				})
 
-				// Return the created event (simplified for now)
+				// Return the created event
 				return {
 					id: crypto.randomUUID(),
-					timestamp: eventData.timestamp,
-					action: eventData.action,
+					timestamp: eventData.timestamp!,
+					action: eventData.action!,
 					targetResourceType: eventData.targetResourceType,
 					targetResourceId: eventData.targetResourceId,
-					principalId: eventData.principalId,
-					organizationId: eventData.organizationId,
-					status: eventData.status,
+					principalId: eventData.principalId!,
+					organizationId: eventData.organizationId!,
+					status: eventData.status!,
 					outcomeDescription: eventData.outcomeDescription,
 					dataClassification: eventData.dataClassification,
 					sessionContext: eventData.sessionContext,
@@ -366,6 +368,8 @@ export const auditEventResolvers = {
 					retentionPolicy: eventData.retentionPolicy,
 					metadata: eventData.metadata,
 					integrityStatus: 'not_checked',
+					eventVersion: eventData.eventVersion,
+					hashAlgorithm: eventData.hashAlgorithm,
 				}
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'

@@ -24,6 +24,15 @@ export class DatabasePresetHandler implements PresetHandler {
         ORDER BY name
       `)
 			const rows = result || []
+			if (rows.length === 0) {
+				const result = await this.db.execute(sql`
+					SELECT * FROM audit_preset
+					WHERE organization_id = '*'
+					ORDER BY name
+				`)
+				const rows = result || []
+				return rows.map(this.mapDatabasePresetToPreset)
+			}
 			return rows.map(this.mapDatabasePresetToPreset)
 		} catch (error) {
 			throw new Error(`Failed to retrieve presets: ${error}`)

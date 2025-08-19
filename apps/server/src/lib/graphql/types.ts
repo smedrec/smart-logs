@@ -3,14 +3,24 @@
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
  */
 
+// Import types from audit package for compatibility
+import type {
+	AuditEventStatus,
+	AuditLogEvent,
+	SessionContext as AuditSessionContext,
+	DataClassification,
+} from '@repo/audit'
+import type { Session } from '@repo/auth'
+import type { ServiceContext } from '../hono/context.js'
+
 // Base types for GraphQL operations
 export interface GraphQLContext {
-	services: any
-	session: any
+	services: ServiceContext
+	session: Session
 	requestId: string
 }
 
-// Audit Event types
+// Audit Event types - compatible with audit package
 export interface AuditEvent {
 	id: string
 	timestamp: string
@@ -19,23 +29,26 @@ export interface AuditEvent {
 	targetResourceId?: string
 	principalId?: string
 	organizationId?: string
-	status: 'attempt' | 'success' | 'failure'
+	status: AuditEventStatus
 	outcomeDescription?: string
-	dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
+	dataClassification?: DataClassification
 	sessionContext?: SessionContext
 	correlationId?: string
 	retentionPolicy?: string
 	metadata?: Record<string, any>
 	hash?: string
 	integrityStatus?: 'verified' | 'failed' | 'not_checked'
+	// Additional fields from audit package
+	ttl?: string
+	eventVersion?: string
+	hashAlgorithm?: 'SHA-256'
+	signature?: string
+	processingLatency?: number
+	queueDepth?: number
 }
 
-export interface SessionContext {
-	sessionId: string
-	ipAddress: string
-	userAgent: string
-	geolocation?: string
-}
+// Use the SessionContext from audit package for compatibility
+export interface SessionContext extends AuditSessionContext {}
 
 // Filter and pagination types
 export interface AuditEventFilter {
@@ -46,8 +59,8 @@ export interface AuditEventFilter {
 	principalIds?: string[]
 	organizationIds?: string[]
 	actions?: string[]
-	statuses?: ('attempt' | 'success' | 'failure')[]
-	dataClassifications?: ('PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI')[]
+	statuses?: AuditEventStatus[]
+	dataClassifications?: DataClassification[]
 	resourceTypes?: string[]
 	resourceIds?: string[]
 	verifiedOnly?: boolean
@@ -223,7 +236,7 @@ export interface AuditPreset {
 
 export interface PresetConfiguration {
 	actions: string[]
-	dataClassifications: ('PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI')[]
+	dataClassifications: DataClassification[]
 	retentionPolicy: string
 	encryptionEnabled: boolean
 	integrityCheckEnabled: boolean
@@ -333,9 +346,9 @@ export interface CreateAuditEventInput {
 	targetResourceId?: string
 	principalId: string
 	organizationId: string
-	status: 'attempt' | 'success' | 'failure'
+	status: AuditEventStatus
 	outcomeDescription?: string
-	dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
+	dataClassification?: DataClassification
 	sessionContext?: SessionContextInput
 	correlationId?: string
 	retentionPolicy?: string
@@ -398,7 +411,7 @@ export interface CreateAuditPresetInput {
 
 export interface PresetConfigurationInput {
 	actions: string[]
-	dataClassifications: ('PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI')[]
+	dataClassifications: DataClassification[]
 	retentionPolicy: string
 	encryptionEnabled: boolean
 	integrityCheckEnabled: boolean

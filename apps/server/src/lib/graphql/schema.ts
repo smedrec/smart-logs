@@ -10,9 +10,9 @@ export const typeDefs = `#graphql
 
   # Enums
   enum AuditEventStatus {
-    ATTEMPT
-    SUCCESS
-    FAILURE
+    attempt
+    success
+    failure
   }
 
   enum DataClassification {
@@ -265,6 +265,13 @@ export const typeDefs = `#graphql
     metadata: JSON
     hash: String
     integrityStatus: String
+    # Additional fields from audit package
+    ttl: String
+    eventVersion: String
+    hashAlgorithm: String
+    signature: String
+    processingLatency: Float
+    queueDepth: Int
   }
 
   type PageInfo {

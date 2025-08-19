@@ -6,6 +6,8 @@
 import { makeExecutableSchema } from '@graphql-tools/schema'
 import { createYoga } from 'graphql-yoga'
 
+import { logger } from '@repo/hono-helpers/dist/helpers/logger'
+
 import { resolvers } from './resolvers/index'
 import { typeDefs } from './schema'
 
@@ -61,10 +63,18 @@ export const createGraphQLServer = () => {
 
 		// Logging configuration
 		logging: {
-			debug: process.env.NODE_ENV === 'development',
-			info: true,
-			warn: true,
-			error: true,
+			debug(...args) {
+				logger.debug(...args)
+			},
+			info(...args) {
+				logger.info(...args)
+			},
+			warn(...args) {
+				logger.warn(...args)
+			},
+			error(...args) {
+				logger.error(...args)
+			},
 		},
 
 		// Error masking for production
