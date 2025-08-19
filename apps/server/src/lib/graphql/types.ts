@@ -426,3 +426,44 @@ export interface IntegrityVerificationResult {
 	eventId: string
 	verificationChain?: IntegrityVerificationResult[]
 }
+
+// GDPR types
+export interface GDPRExportInput {
+	principalId: string
+	format: 'json' | 'csv' | 'xml'
+	dateRange?: {
+		startDate: string
+		endDate: string
+	}
+	includeMetadata?: boolean
+}
+
+export interface GDPRExportResult {
+	requestId: string
+	principalId: string
+	recordCount: number
+	dataSize: number
+	format: string
+	exportTimestamp: string
+	metadata: {
+		dateRange: {
+			start: string
+			end: string
+		}
+		categories: string[]
+		retentionPolicies: string[]
+		exportedBy: string
+	}
+	data: string // Base64 encoded data
+}
+
+export interface GDPRPseudonymizeInput {
+	principalId: string
+	strategy: 'hash' | 'token' | 'encryption'
+}
+
+export interface GDPRPseudonymizeResult {
+	pseudonymId: string
+	recordsAffected: number
+	timestamp: string
+}

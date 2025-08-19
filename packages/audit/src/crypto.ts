@@ -140,13 +140,13 @@ export class CryptoService implements CryptographicService {
 			targetResourceId: event.targetResourceId || null,
 			outcomeDescription: event.outcomeDescription || null,
 			// Include practitioner-specific fields if present
-			practitionerId: (event as any).practitionerId || null,
+			/**practitionerId: (event as any).practitionerId || null,
 			licenseNumber: (event as any).licenseNumber || null,
 			jurisdiction: (event as any).jurisdiction || null,
 			oldStatus: (event as any).oldStatus || null,
 			newStatus: (event as any).newStatus || null,
 			oldRole: (event as any).oldRole || null,
-			newRole: (event as any).newRole || null,
+			newRole: (event as any).newRole || null,*/
 		}
 	}
 

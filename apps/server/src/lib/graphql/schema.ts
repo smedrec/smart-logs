@@ -222,6 +222,24 @@ export const typeDefs = `#graphql
     dateRange: TimeRangeInput
   }
 
+  # GDPR input types
+  input GDPRExportInput {
+    principalId: String!
+    format: String!
+    dateRange: TimeRangeInput
+    includeMetadata: Boolean
+  }
+
+  input GDPRPseudonymizeInput {
+    principalId: String!
+    strategy: String!
+  }
+
+  input GDPRDeleteInput {
+    principalId: String!
+    preserveComplianceAudits: Boolean
+  }
+
   # Object types
   type SessionContext {
     sessionId: String!
@@ -486,6 +504,37 @@ export const typeDefs = `#graphql
     verificationChain: [IntegrityVerificationResult!]
   }
 
+  # GDPR types
+  type GDPRExportMetadata {
+    dateRange: TimeRange!
+    categories: [String!]!
+    retentionPolicies: [String!]!
+    exportedBy: String!
+  }
+
+  type GDPRExportResult {
+    requestId: String!
+    principalId: String!
+    recordCount: Int!
+    dataSize: Int!
+    format: String!
+    exportTimestamp: DateTime!
+    metadata: GDPRExportMetadata!
+    data: String! # Base64 encoded data
+  }
+
+  type GDPRPseudonymizeResult {
+    pseudonymId: String!
+    recordsAffected: Int!
+    timestamp: DateTime!
+  }
+
+  type GDPRDeleteResult {
+    recordsDeleted: Int!
+    complianceRecordsPreserved: Int!
+    timestamp: DateTime!
+  }
+
   # Query type
   type Query {
     # Health and system status
@@ -554,6 +603,11 @@ export const typeDefs = `#graphql
     # Alert operations
     acknowledgeAlert(id: ID!): Alert!
     resolveAlert(id: ID!, resolution: String!): Alert!
+
+    # GDPR operations
+    gdprExportUserData(input: GDPRExportInput!): GDPRExportResult!
+    gdprPseudonymizeUserData(input: GDPRPseudonymizeInput!): GDPRPseudonymizeResult!
+    gdprDeleteUserData(input: GDPRDeleteInput!): GDPRDeleteResult!
   }
 
   # Subscription type

@@ -641,6 +641,11 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 
 			const criteriaWithOrganizationId = {
 				...criteria,
+				dateRange: {
+					startDate:
+						criteria.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+					endDate: criteria.endDate || new Date().toISOString(),
+				},
 				organizationIds: [session.session.activeOrganizationId as string],
 			}
 
@@ -678,6 +683,11 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 
 			const criteriaWithOrganizationId = {
 				...criteria,
+				dateRange: {
+					startDate:
+						criteria.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+					endDate: criteria.endDate || new Date().toISOString(),
+				},
 				organizationIds: [session.session.activeOrganizationId as string],
 			}
 
@@ -716,9 +726,19 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const { criteria, performVerification = true } = c.req.valid('json')
 
+			const criteriaWithDateRange = {
+				...criteria,
+				dateRange: {
+					startDate:
+						criteria.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+					endDate: criteria.endDate || new Date().toISOString(),
+				},
+				organizationIds: [session.session.activeOrganizationId as string],
+			}
+
 			// Generate integrity verification report
 			const report = await compliance.report.generateIntegrityVerificationReport(
-				criteria,
+				criteriaWithDateRange,
 				performVerification
 			)
 

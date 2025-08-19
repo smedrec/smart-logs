@@ -9,6 +9,7 @@ import { alertResolvers } from './alerts'
 import { auditEventResolvers } from './audit-events'
 import { auditPresetResolvers } from './audit-presets'
 import { complianceResolvers } from './compliance'
+import { gdprResolvers } from './gdpr'
 import { healthResolvers } from './health'
 import { metricsResolvers } from './metrics'
 import { scheduledReportResolvers } from './scheduled-reports'
@@ -90,6 +91,7 @@ export const resolvers = {
 		...scheduledReportResolvers.Mutation,
 		...auditPresetResolvers.Mutation,
 		...alertResolvers.Mutation,
+		...gdprResolvers.Mutation,
 	},
 
 	// Subscription resolvers

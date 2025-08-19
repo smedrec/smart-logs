@@ -45,7 +45,7 @@ async function startServer() {
 		})
 	)
 
-	app.on(['POST', 'GET'], '/api/auth/**', (c) => auth.handler(c.req.raw))
+	app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
 
 	// Configure TRPC with path from configuration
 	if (config.api.enableTrpc) {
