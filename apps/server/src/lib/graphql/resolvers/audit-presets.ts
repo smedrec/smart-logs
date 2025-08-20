@@ -5,12 +5,33 @@
 
 import { GraphQLError } from 'graphql'
 
-import type {
-	AuditPreset,
-	CreateAuditPresetInput,
-	GraphQLContext,
-	UpdateAuditPresetInput,
-} from '../types'
+import type { AuditPreset, DataClassification, ValidationConfig } from '@repo/audit'
+import type { GraphQLContext } from '../types'
+
+// Extended AuditPreset interface that includes the database ID
+interface AuditPresetWithId extends AuditPreset {
+	id?: string
+}
+
+// GraphQL input types that match the audit package structure
+interface CreateAuditPresetInput {
+	name: string
+	description?: string
+	action: string
+	dataClassification: DataClassification
+	requiredFields: string[]
+	defaultValues?: Record<string, any>
+	validation?: Partial<ValidationConfig>
+}
+
+interface UpdateAuditPresetInput {
+	description?: string
+	action?: string
+	dataClassification?: DataClassification
+	requiredFields?: string[]
+	defaultValues?: Record<string, any>
+	validation?: Partial<ValidationConfig>
+}
 
 export const auditPresetResolvers = {
 	Query: {
@@ -18,7 +39,11 @@ export const auditPresetResolvers = {
 		 * Get all audit presets
 		 * Requirements: 3.1, 3.2
 		 */
-		auditPresets: async (_: any, __: any, context: GraphQLContext): Promise<AuditPreset[]> => {
+		auditPresets: async (
+			_: any,
+			__: any,
+			context: GraphQLContext
+		): Promise<AuditPresetWithId[]> => {
 			const { services } = context
 			const { compliance, logger, error } = services
 
@@ -34,34 +59,12 @@ export const auditPresetResolvers = {
 			try {
 				const presets = await compliance.preset.getPresets(organizationId)
 
-				const auditPresets: AuditPreset[] = presets.map((preset: any) => ({
-					name: preset.name,
-					description: preset.description,
-					configuration: {
-						actions: preset.configuration.actions,
-						dataClassifications: preset.configuration.dataClassifications,
-						retentionPolicy: preset.configuration.retentionPolicy,
-						encryptionEnabled: preset.configuration.encryptionEnabled,
-						integrityCheckEnabled: preset.configuration.integrityCheckEnabled,
-						alertThresholds: preset.configuration.alertThresholds
-							? {
-									errorRate: preset.configuration.alertThresholds.errorRate,
-									responseTime: preset.configuration.alertThresholds.responseTime,
-									volumeThreshold: preset.configuration.alertThresholds.volumeThreshold,
-								}
-							: undefined,
-					},
-					isActive: preset.isActive,
-					createdAt: preset.createdAt,
-					updatedAt: preset.updatedAt,
-				}))
-
 				logger.info('GraphQL audit presets retrieved', {
 					organizationId,
-					presetCount: auditPresets.length,
+					presetCount: presets.length,
 				})
 
-				return auditPresets
+				return presets
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
 				logger.error(`Failed to get audit presets via GraphQL: ${message}`)
@@ -94,7 +97,7 @@ export const auditPresetResolvers = {
 			_: any,
 			args: { name: string },
 			context: GraphQLContext
-		): Promise<AuditPreset | null> => {
+		): Promise<AuditPresetWithId | null> => {
 			const { services } = context
 			const { compliance, logger, error } = services
 
@@ -110,38 +113,12 @@ export const auditPresetResolvers = {
 			try {
 				const preset = await compliance.preset.getPreset(args.name, organizationId)
 
-				if (!preset) {
-					return null
-				}
-
-				const auditPreset: AuditPreset = {
-					name: preset.name,
-					description: preset.description,
-					configuration: {
-						actions: preset.configuration.actions,
-						dataClassifications: preset.configuration.dataClassifications,
-						retentionPolicy: preset.configuration.retentionPolicy,
-						encryptionEnabled: preset.configuration.encryptionEnabled,
-						integrityCheckEnabled: preset.configuration.integrityCheckEnabled,
-						alertThresholds: preset.configuration.alertThresholds
-							? {
-									errorRate: preset.configuration.alertThresholds.errorRate,
-									responseTime: preset.configuration.alertThresholds.responseTime,
-									volumeThreshold: preset.configuration.alertThresholds.volumeThreshold,
-								}
-							: undefined,
-					},
-					isActive: preset.isActive,
-					createdAt: preset.createdAt,
-					updatedAt: preset.updatedAt,
-				}
-
 				logger.info('GraphQL audit preset retrieved', {
 					organizationId,
 					presetName: args.name,
 				})
 
-				return auditPreset
+				return preset
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
 				logger.error(`Failed to get audit preset via GraphQL: ${message}`)
@@ -177,7 +154,7 @@ export const auditPresetResolvers = {
 			_: any,
 			args: { input: CreateAuditPresetInput },
 			context: GraphQLContext
-		): Promise<AuditPreset> => {
+		): Promise<AuditPresetWithId> => {
 			const { services } = context
 			const { compliance, logger, error } = services
 
@@ -189,38 +166,23 @@ export const auditPresetResolvers = {
 			}
 
 			const organizationId = context.session.session.activeOrganizationId as string
+			const userId = context.session.session.userId
 
 			try {
-				const preset = await compliance.preset.createPreset(args.input, organizationId)
-
-				const auditPreset: AuditPreset = {
-					name: preset.name,
-					description: preset.description,
-					configuration: {
-						actions: preset.configuration.actions,
-						dataClassifications: preset.configuration.dataClassifications,
-						retentionPolicy: preset.configuration.retentionPolicy,
-						encryptionEnabled: preset.configuration.encryptionEnabled,
-						integrityCheckEnabled: preset.configuration.integrityCheckEnabled,
-						alertThresholds: preset.configuration.alertThresholds
-							? {
-									errorRate: preset.configuration.alertThresholds.errorRate,
-									responseTime: preset.configuration.alertThresholds.responseTime,
-									volumeThreshold: preset.configuration.alertThresholds.volumeThreshold,
-								}
-							: undefined,
-					},
-					isActive: preset.isActive,
-					createdAt: preset.createdAt,
-					updatedAt: preset.updatedAt,
+				const presetData: AuditPreset & { createdBy: string } = {
+					...args.input,
+					organizationId,
+					createdBy: userId,
 				}
+
+				const preset = await compliance.preset.createPreset(presetData)
 
 				logger.info('GraphQL audit preset created', {
 					organizationId,
-					presetName: auditPreset.name,
+					presetName: preset.name,
 				})
 
-				return auditPreset
+				return preset
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
 				logger.error(`Failed to create audit preset via GraphQL: ${message}`)
@@ -254,7 +216,7 @@ export const auditPresetResolvers = {
 			_: any,
 			args: { name: string; input: UpdateAuditPresetInput },
 			context: GraphQLContext
-		): Promise<AuditPreset> => {
+		): Promise<AuditPresetWithId> => {
 			const { services } = context
 			const { compliance, logger, error } = services
 
@@ -266,44 +228,34 @@ export const auditPresetResolvers = {
 			}
 
 			const organizationId = context.session.session.activeOrganizationId as string
+			const userId = context.session.session.userId
 
 			try {
-				const preset = await compliance.preset.updatePreset(args.name, args.input, organizationId)
+				// First get the existing preset to get its ID
+				const existingPreset = await compliance.preset.getPreset(args.name, organizationId)
 
-				if (!preset) {
+				if (!existingPreset) {
 					throw new GraphQLError('Audit preset not found', {
 						extensions: { code: 'NOT_FOUND' },
 					})
 				}
 
-				const auditPreset: AuditPreset = {
-					name: preset.name,
-					description: preset.description,
-					configuration: {
-						actions: preset.configuration.actions,
-						dataClassifications: preset.configuration.dataClassifications,
-						retentionPolicy: preset.configuration.retentionPolicy,
-						encryptionEnabled: preset.configuration.encryptionEnabled,
-						integrityCheckEnabled: preset.configuration.integrityCheckEnabled,
-						alertThresholds: preset.configuration.alertThresholds
-							? {
-									errorRate: preset.configuration.alertThresholds.errorRate,
-									responseTime: preset.configuration.alertThresholds.responseTime,
-									volumeThreshold: preset.configuration.alertThresholds.volumeThreshold,
-								}
-							: undefined,
-					},
-					isActive: preset.isActive,
-					createdAt: preset.createdAt,
-					updatedAt: preset.updatedAt,
-				}
+				// Create update data with required fields
+				const updateData = {
+					...existingPreset,
+					...args.input,
+					id: existingPreset.id || args.name, // Use ID if available, fallback to name
+					updatedBy: userId,
+				} as AuditPreset & { id: string; updatedBy: string }
+
+				const preset = await compliance.preset.updatePreset(updateData)
 
 				logger.info('GraphQL audit preset updated', {
 					organizationId,
 					presetName: args.name,
 				})
 
-				return auditPreset
+				return preset
 			} catch (e) {
 				if (e instanceof GraphQLError) {
 					throw e
@@ -333,7 +285,6 @@ export const auditPresetResolvers = {
 				})
 			}
 		},
-
 		/**
 		 * Delete an audit preset
 		 * Requirements: 3.1, 3.2
@@ -356,15 +307,15 @@ export const auditPresetResolvers = {
 			const organizationId = context.session.session.activeOrganizationId as string
 
 			try {
-				const success = await compliance.preset.deletePreset(args.name, organizationId)
+				const result = await compliance.preset.deletePreset(args.name, organizationId)
 
 				logger.info('GraphQL audit preset deleted', {
 					organizationId,
 					presetName: args.name,
-					success,
+					success: result.success,
 				})
 
-				return success
+				return result.success
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
 				logger.error(`Failed to delete audit preset via GraphQL: ${message}`)

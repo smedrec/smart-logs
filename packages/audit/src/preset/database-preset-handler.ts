@@ -15,7 +15,7 @@ export class DatabasePresetHandler implements PresetHandler {
 	/**
 	 * Get all presets
 	 */
-	async getPresets(organizationId?: string): Promise<AuditPreset[]> {
+	async getPresets(organizationId?: string): Promise<(AuditPreset & { id?: string })[]> {
 		const orgId = organizationId || '*'
 		try {
 			const result = await this.db.execute(sql`
@@ -42,7 +42,10 @@ export class DatabasePresetHandler implements PresetHandler {
 	/**
 	 * Get a preset by name
 	 */
-	async getPreset(name: string, organizationId?: string): Promise<AuditPreset | null> {
+	async getPreset(
+		name: string,
+		organizationId?: string
+	): Promise<(AuditPreset & { id?: string }) | null> {
 		const orgId = organizationId || '*'
 		try {
 			const result = await this.db.execute(sql`
@@ -66,7 +69,7 @@ export class DatabasePresetHandler implements PresetHandler {
 	/**
 	 * Get default preset by name
 	 */
-	async getDefaultPreset(name: string): Promise<AuditPreset | null> {
+	async getDefaultPreset(name: string): Promise<(AuditPreset & { id?: string }) | null> {
 		try {
 			const result = await this.db.execute(sql`
 				SELECT * FROM audit_preset
@@ -89,7 +92,9 @@ export class DatabasePresetHandler implements PresetHandler {
 	/**
 	 * Create a preset
 	 */
-	async createPreset(preset: AuditPreset & { createdBy: string }): Promise<AuditPreset> {
+	async createPreset(
+		preset: AuditPreset & { createdBy: string }
+	): Promise<AuditPreset & { id?: string }> {
 		try {
 			const result = await this.db.execute(sql`
 				INSERT INTO audit_preset (
@@ -121,7 +126,7 @@ export class DatabasePresetHandler implements PresetHandler {
 
 	async updatePreset(
 		preset: AuditPreset & { id: string; updatedBy: string }
-	): Promise<AuditPreset> {
+	): Promise<AuditPreset & { id?: string }> {
 		const now = new Date().toISOString()
 		try {
 			const result = await this.db.execute(sql`
@@ -167,7 +172,7 @@ export class DatabasePresetHandler implements PresetHandler {
 	/**
 	 * Map database preset record to AuditPreset interface
 	 */
-	private mapDatabasePresetToPreset(dbPreset: any): AuditPreset {
+	private mapDatabasePresetToPreset(dbPreset: any): AuditPreset & { id?: string } {
 		return {
 			name: dbPreset.name,
 			description: dbPreset.description,
@@ -188,6 +193,7 @@ export class DatabasePresetHandler implements PresetHandler {
 					? JSON.parse(dbPreset.validation)
 					: dbPreset.validation),
 			},
+			id: dbPreset.id?.toString(), // Include the database ID
 		}
 	}
 }

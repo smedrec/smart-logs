@@ -447,7 +447,7 @@ export class Audit {
 	 *
 	 * @example
 	 * ```typescript
-	 * await auditService.logWithGuaranteedDelivery({
+	 * await auditService.log({
 	 *   principalId: 'user-xyz',
 	 *   action: 'criticalDataUpdate',
 	 *   targetResourceType: 'Patient',

@@ -205,14 +205,28 @@ export const typeDefs = `#graphql
   input CreateAuditPresetInput {
     name: String!
     description: String
-    configuration: PresetConfigurationInput!
-    isActive: Boolean
+    action: String!
+    dataClassification: DataClassification!
+    requiredFields: [String!]!
+    defaultValues: JSON
+    validation: ValidationConfigInput
   }
 
   input UpdateAuditPresetInput {
     description: String
-    configuration: PresetConfigurationInput
-    isActive: Boolean
+    action: String
+    dataClassification: DataClassification
+    requiredFields: [String!]
+    defaultValues: JSON
+    validation: ValidationConfigInput
+  }
+
+  input ValidationConfigInput {
+    maxStringLength: Int
+    allowedDataClassifications: [DataClassification!]
+    requiredFields: [String!]
+    maxCustomFieldDepth: Int
+    allowedEventVersions: [String!]
   }
 
   input AlertFilter {
@@ -431,12 +445,23 @@ export const typeDefs = `#graphql
   }
 
   type AuditPreset {
+    id: String
     name: String!
     description: String
-    configuration: PresetConfiguration!
-    isActive: Boolean!
-    createdAt: DateTime!
-    updatedAt: DateTime!
+    organizationId: String!
+    action: String!
+    dataClassification: DataClassification!
+    requiredFields: [String!]!
+    defaultValues: JSON
+    validation: ValidationConfig
+  }
+
+  type ValidationConfig {
+    maxStringLength: Int
+    allowedDataClassifications: [DataClassification!]
+    requiredFields: [String!]
+    maxCustomFieldDepth: Int
+    allowedEventVersions: [String!]
   }
 
   type Alert {

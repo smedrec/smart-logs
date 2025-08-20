@@ -69,16 +69,11 @@ const AuditPresetSchema = z.object({
 	defaultValues: z.record(z.string(), z.any()).optional(),
 	validation: z
 		.object({
-			enabled: z.boolean(),
-			rules: z
-				.array(
-					z.object({
-						field: z.string(),
-						type: z.enum(['required', 'format', 'range']),
-						value: z.any(),
-					})
-				)
-				.optional(),
+			maxStringLength: z.number(),
+			allowedDataClassifications: z.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'])),
+			requiredFields: z.array(z.string()),
+			maxCustomFieldDepth: z.number(),
+			allowedEventVersions: z.array(z.string()),
 		})
 		.optional(),
 })
@@ -384,7 +379,7 @@ const createScheduledReportRoute = createRoute({
 					schema: z.object({
 						success: z.boolean(),
 						scheduledReport: ScheduledReportConfigSchema.extend({
-							id: z.string().uuid(),
+							id: z.string(),
 							createdAt: z.string().datetime(),
 							nextRun: z.string().datetime(),
 						}),
@@ -434,7 +429,7 @@ const getScheduledReportsRoute = createRoute({
 						success: z.boolean(),
 						scheduledReports: z.array(
 							ScheduledReportConfigSchema.extend({
-								id: z.string().uuid(),
+								id: z.string(),
 								createdAt: z.string().datetime(),
 								nextRun: z.string().datetime(),
 							})
@@ -481,7 +476,7 @@ const getScheduledReportRoute = createRoute({
 					schema: z.object({
 						success: z.boolean(),
 						scheduledReport: ScheduledReportConfigSchema.extend({
-							id: z.string().uuid(),
+							id: z.string(),
 							createdAt: z.string().datetime(),
 							nextRun: z.string().datetime(),
 						}),
@@ -977,7 +972,7 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 				organizationId,
 				action,
 				dataClassification,
-				requiredFields,
+				requiredFields: requiredFields || [],
 				defaultValues,
 				validation: validation || DEFAULT_VALIDATION_CONFIG,
 				createdBy: userId,
