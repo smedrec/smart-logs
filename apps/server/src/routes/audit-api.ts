@@ -17,7 +17,7 @@ import type { HonoEnv } from '@/lib/hono/context'
 
 // Zod schemas for request/response validation
 const AuditEventSchema = z.object({
-	id: z.string().uuid(),
+	id: z.string(),
 	timestamp: z.string().datetime(),
 	action: z.string(),
 	targetResourceType: z.string(),
