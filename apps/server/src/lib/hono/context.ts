@@ -20,6 +20,9 @@ import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
 import type { HonoApp, Logger } from '@repo/hono-helpers'
 import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
 import type { Redis } from '@repo/redis-client'
+import type { AlertingService } from '../services/alerting.js'
+import type { StructuredLogger } from '../services/logging.js'
+import type { MetricsCollectionService } from '../services/metrics.js'
 
 export type Env = SharedHonoEnv & {
 	// add additional Bindings here
@@ -48,9 +51,11 @@ export type ServiceContext = {
 	monitor: {
 		alert: DatabaseAlertHandler
 		metrics: MonitoringService
+		metricsCollection: MetricsCollectionService
 	}
 	audit: Audit
 	logger: Logger
+	structuredLogger: StructuredLogger
 	error: ErrorHandler
 }
 

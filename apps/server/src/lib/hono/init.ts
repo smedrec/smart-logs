@@ -26,6 +26,8 @@ import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { getAuthDb } from '../auth.js'
 import { configManager } from '../config/index.js'
+import { LoggerFactory, StructuredLogger } from '../services/logging.js'
+import { MetricsCollectionService } from '../services/metrics.js'
 
 import type { MiddlewareHandler } from 'hono'
 import type { DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
@@ -54,6 +56,10 @@ let metricsCollector: RedisMetricsCollector | undefined = undefined
 let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
+
+// Enhanced monitoring services
+let metricsCollectionService: MetricsCollectionService | undefined = undefined
+let structuredLogger: StructuredLogger | undefined = undefined
 
 // Error handling services
 let errorHandler: ErrorHandler | undefined = undefined
@@ -143,6 +149,25 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		await configManager.initialize()
 		const config = configManager.getConfig()
 
+		// Initialize enhanced structured logger
+		if (!structuredLogger) {
+			LoggerFactory.setDefaultConfig({
+				level: config.monitoring.logLevel,
+				enablePerformanceLogging: true,
+				enableErrorTracking: true,
+				enableMetrics: config.monitoring.enableMetrics,
+				format: config.server.environment === 'development' ? 'pretty' : 'json',
+				outputs: ['console'],
+			})
+
+			structuredLogger = LoggerFactory.createLogger({
+				requestId,
+				application,
+				environment: config.server.environment,
+				version,
+			})
+		}
+
 		const logger = new ConsoleLogger({
 			requestId,
 			application,
@@ -179,6 +204,11 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
 
+		// Initialize enhanced monitoring services
+		if (!metricsCollectionService) {
+			metricsCollectionService = new MetricsCollectionService(connection, structuredLogger)
+		}
+
 		if (!audit)
 			audit = new Audit(
 				'audit-reliable-dev', // Default queue name - could be made configurable
@@ -195,7 +225,12 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 
-		const monitor = { alert: databaseAlertHandler, metrics: monitoringService }
+		const monitor = {
+			alert: databaseAlertHandler,
+			metrics: monitoringService,
+			// Enhanced monitoring services
+			metricsCollection: metricsCollectionService,
+		}
 
 		if (!databaseErrorLogger)
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
@@ -248,6 +283,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			monitor,
 			audit,
 			logger,
+			structuredLogger,
 			error: errorHandler,
 			//cache,
 		})

@@ -22,6 +22,9 @@ interface DatabaseAlert {
 	source: string
 	correlation_id: string | null
 	metadata: any
+	acknowledged: string
+	acknowledged_at: string | null
+	acknowledged_by: string | null
 	resolved: string
 	resolved_at: string | null
 	resolved_by: string | null
@@ -35,6 +38,7 @@ interface DatabaseAlert {
  */
 export interface AlertQueryFilters {
 	organizationId: string
+	acknowledged?: boolean
 	resolved?: boolean
 	severity?: AlertSeverity
 	type?: AlertType
@@ -72,6 +76,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 				INSERT INTO alerts (
 					id, organization_id, severity, type, title, description, source,
 					correlation_id, metadata, resolved, resolved_at, resolved_by,
+					acknowledged, acknowledged_at, acknowledged_by,
 					resolution_notes, created_at, updated_at
 				) VALUES (
 					${alert.id},
@@ -83,6 +88,9 @@ export class DatabaseAlertHandler implements AlertHandler {
 					${alert.source},
 					${alert.correlationId || null},
 					${JSON.stringify(alert.metadata)},
+					${alert.acknowledged ? 'true' : 'false'},
+					${alert.acknowledgedAt || null},
+					${alert.acknowledgedBy || null},
 					${alert.resolved ? 'true' : 'false'},
 					${alert.resolvedAt || null},
 					${alert.resolvedBy || null},
@@ -93,6 +101,34 @@ export class DatabaseAlertHandler implements AlertHandler {
 			`)
 		} catch (error) {
 			throw new Error(`Failed to persist alert to database: ${error}`)
+		}
+	}
+
+	/**
+	 * Acknowledge alert in database
+	 */
+	async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }> {
+		const now = new Date().toISOString()
+
+		try {
+			const result = await this.db.execute(sql`
+				UPDATE alerts 
+				SET 
+					acknowledged = 'true',
+					acknowledged_at = ${now},
+					acknowledged_by = ${acknowledgedBy},
+					updated_at = ${now}
+				WHERE id = ${alertId}
+				RETURNING id
+			`)
+
+			// Check if any rows were affected by the UPDATE
+			if (result.length === 0) {
+				throw new Error(`Alert with ID ${alertId} not found`)
+			}
+			return { success: true }
+		} catch (error) {
+			throw new Error(`Failed to acknowledge alert in database: ${error}`)
 		}
 	}
 
@@ -162,6 +198,10 @@ export class DatabaseAlertHandler implements AlertHandler {
 			let query = `SELECT * FROM alerts WHERE organization_id = '${filters.organizationId}'`
 
 			// Add optional filters
+			if (filters.acknowledged !== undefined) {
+				query += ` AND acknowledged = '${filters.acknowledged ? 'true' : 'false'}'`
+			}
+
 			if (filters.resolved !== undefined) {
 				query += ` AND resolved = '${filters.resolved ? 'true' : 'false'}'`
 			}
@@ -246,6 +286,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 	async getAlertStatistics(organizationId: string): Promise<{
 		total: number
 		active: number
+		acknowledged: number
 		resolved: number
 		bySeverity: Record<AlertSeverity, number>
 		byType: Record<AlertType, number>
@@ -254,6 +295,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			const result = await this.db.execute(sql`
 				SELECT 
 					COUNT(*) as total,
+					COUNT(CASE WHEN acknowledged = 'true' THEN 1 END) as acknowledged,
 					COUNT(CASE WHEN resolved = 'false' THEN 1 END) as active,
 					COUNT(CASE WHEN resolved = 'true' THEN 1 END) as resolved,
 					COUNT(CASE WHEN severity = 'LOW' THEN 1 END) as low_severity,
@@ -264,6 +306,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 					COUNT(CASE WHEN type = 'COMPLIANCE' THEN 1 END) as compliance_type,
 					COUNT(CASE WHEN type = 'PERFORMANCE' THEN 1 END) as performance_type,
 					COUNT(CASE WHEN type = 'SYSTEM' THEN 1 END) as system_type
+					COUNT(CASE WHEN type = 'METRICS' THEN 1 END) as metrics_type
 				FROM alerts 
 				WHERE organization_id = ${organizationId}
 			`)
@@ -274,6 +317,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			return {
 				total: parseInt(row.total as string),
 				active: parseInt(row.active as string),
+				acknowledged: parseInt(row.acknowledged as string),
 				resolved: parseInt(row.resolved as string),
 				bySeverity: {
 					LOW: parseInt(row.low_severity as string),
@@ -286,6 +330,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 					COMPLIANCE: parseInt(row.compliance_type as string),
 					PERFORMANCE: parseInt(row.performance_type as string),
 					SYSTEM: parseInt(row.system_type as string),
+					METRICS: parseInt(row.metrics_type as string),
 				},
 			}
 		} catch (error) {
@@ -331,6 +376,9 @@ export class DatabaseAlertHandler implements AlertHandler {
 				...(typeof dbAlert.metadata === 'string' ? JSON.parse(dbAlert.metadata) : dbAlert.metadata),
 				organizationId: dbAlert.organization_id,
 			},
+			acknowledged: dbAlert.acknowledged === 'true',
+			acknowledgedAt: dbAlert.acknowledged_at || undefined,
+			acknowledgedBy: dbAlert.acknowledged_by || undefined,
 			resolved: dbAlert.resolved === 'true',
 			resolvedAt: dbAlert.resolved_at || undefined,
 			resolvedBy: dbAlert.resolved_by || undefined,

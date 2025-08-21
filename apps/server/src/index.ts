@@ -12,6 +12,11 @@ import { handleGraphQLRequest } from './lib/graphql/index'
 import { newApp } from './lib/hono/'
 import { init } from './lib/hono/init'
 import { nodeEnv } from './lib/hono/node-env'
+import {
+	errorRateMonitoring,
+	performanceMonitoring,
+	requestMetrics,
+} from './lib/middleware/monitoring.js'
 import { appRouter } from './routers/index'
 
 // Global server instance for graceful shutdown
@@ -33,6 +38,11 @@ async function startServer() {
 
 	app.use('*', init())
 	app.use(useConsoleLogger())
+
+	// Add monitoring middleware
+	app.use('*', requestMetrics())
+	app.use('*', performanceMonitoring({ threshold: 1000, alertOnSlow: true }))
+	app.use('*', errorRateMonitoring({ windowSize: 300000, threshold: 0.1 }))
 
 	// Configure CORS with settings from configuration
 	app.use(
@@ -68,6 +78,18 @@ async function startServer() {
 		app.route(`${config.api.restPath}/v1`, restAPI)
 	}
 
+	// Mount health check API
+	const { createHealthAPI } = await import('./routes/health-api.js')
+	const healthAPI = createHealthAPI()
+	app.route('', healthAPI)
+
+	// Mount metrics API if enabled
+	if (config.monitoring.enableMetrics) {
+		const { createMetricsAPI } = await import('./routes/metrics-api.js')
+		const metricsAPI = createMetricsAPI()
+		app.route('/metrics', metricsAPI)
+	}
+
 	// Configure GraphQL endpoint if enabled
 	if (config.api.enableGraphql) {
 		app.all(`${config.api.graphqlPath}/*`, async (c) => {
@@ -78,7 +100,7 @@ async function startServer() {
 		})
 	}
 
-	// Health check endpoint
+	// Legacy health check endpoint (for backward compatibility)
 	app.get(config.monitoring.healthCheckPath, (c) => {
 		if (isShuttingDown) {
 			return c.json({ status: 'shutting_down' }, 503)
@@ -88,25 +110,6 @@ async function startServer() {
 			timestamp: new Date().toISOString(),
 			environment: config.server.environment,
 			version: c.get('version'),
-		})
-	})
-
-	// Readiness check endpoint for Kubernetes
-	app.get('/ready', (c) => {
-		if (isShuttingDown) {
-			return c.json({ status: 'not_ready', reason: 'shutting_down' }, 503)
-		}
-
-		// Check if all services are ready
-		const services = c.get('services')
-		if (!services) {
-			return c.json({ status: 'not_ready', reason: 'services_not_initialized' }, 503)
-		}
-
-		return c.json({
-			status: 'ready',
-			timestamp: new Date().toISOString(),
-			environment: config.server.environment,
 		})
 	})
 

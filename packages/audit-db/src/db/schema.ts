@@ -383,6 +383,9 @@ export const alerts = pgTable(
 		source: varchar('source', { length: 100 }).notNull(), // Component that generated the alert
 		correlationId: varchar('correlation_id', { length: 255 }), // Link to related events
 		metadata: jsonb('metadata').notNull().default('{}'), // Additional alert context
+		acknowledged: varchar('acknowledged', { length: 10 }).notNull().default('false'), // Boolean as string
+		acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true, mode: 'string' }),
+		acknowledgedBy: varchar('acknowledged_by', { length: 255 }), // User who acknowledged the alert
 		resolved: varchar('resolved', { length: 10 }).notNull().default('false'), // Boolean as string
 		resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'string' }),
 		resolvedBy: varchar('resolved_by', { length: 255 }), // User who resolved the alert
@@ -398,6 +401,7 @@ export const alerts = pgTable(
 		return [
 			// Primary indexes for multi-organizational queries
 			index('alerts_organization_id_idx').on(table.organizationId),
+			index('alerts_organization_acknowledged_idx').on(table.organizationId, table.acknowledged),
 			index('alerts_organization_resolved_idx').on(table.organizationId, table.resolved),
 			index('alerts_organization_severity_idx').on(table.organizationId, table.severity),
 			index('alerts_organization_type_idx').on(table.organizationId, table.type),
@@ -405,6 +409,7 @@ export const alerts = pgTable(
 			// Performance indexes
 			index('alerts_created_at_idx').on(table.createdAt),
 			index('alerts_updated_at_idx').on(table.updatedAt),
+			index('alerts_acknowledged_at_idx').on(table.acknowledgedAt),
 			index('alerts_resolved_at_idx').on(table.resolvedAt),
 			index('alerts_severity_idx').on(table.severity),
 			index('alerts_type_idx').on(table.type),

@@ -11,7 +11,9 @@
  */
 
 import { ApiError } from '@/lib/errors'
+import { MetricsCollectionService } from '@/lib/services/metrics'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
+import { QueryBuilder } from 'drizzle-orm/singlestore-core'
 
 import type { HonoEnv } from '@/lib/hono/context'
 
@@ -48,8 +50,16 @@ const SystemMetricsSchema = z.object({
 })
 
 const AuditMetricsSchema = z.object({
-	timestamp: z.string().datetime(),
 	eventsProcessed: z.number(),
+	processingLatency: z.number(),
+	queueDepth: z.number(),
+	errorsGenerated: z.number(),
+	errorRate: z.number(),
+	integrityViolations: z.number(),
+	timestamp: z.string().datetime(),
+	alertsGenerated: z.number(),
+	suspiciousPatterns: z.number(),
+	/*
 	processingLatency: z.object({
 		average: z.number(),
 		p95: z.number(),
@@ -65,6 +75,7 @@ const AuditMetricsSchema = z.object({
 		scheduled: z.number(),
 		failed: z.number(),
 	}),
+	*/
 })
 
 const HealthStatusSchema = z.object({
@@ -83,13 +94,15 @@ const HealthStatusSchema = z.object({
 })
 
 const AlertSchema = z.object({
-	id: z.string().uuid(),
-	severity: z.enum(['low', 'medium', 'high', 'critical']),
+	id: z.string(),
+	severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+	type: z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS']),
 	title: z.string(),
 	description: z.string(),
 	timestamp: z.string().datetime(),
-	status: z.enum(['active', 'acknowledged', 'resolved']),
 	source: z.string(),
+	acknowledged: z.boolean(),
+	resolved: z.boolean(),
 	metadata: z.record(z.string(), z.any()).optional(),
 })
 
@@ -101,8 +114,10 @@ const MetricsQuerySchema = z.object({
 })
 
 const AlertQuerySchema = z.object({
-	severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-	status: z.enum(['active', 'acknowledged', 'resolved']).optional(),
+	acknowledged: z.boolean().optional(),
+	resolved: z.boolean().optional(),
+	severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+	type: z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS']).optional(),
 	source: z.string().optional(),
 	limit: z
 		.string()
@@ -112,6 +127,8 @@ const AlertQuerySchema = z.object({
 		.string()
 		.optional()
 		.transform((val) => (val ? parseInt(val) : 0)),
+	orderBy: z.enum(['createdAt', 'updatedAt', 'severity']).optional(),
+	sortOrder: z.enum(['asc', 'desc']).optional(),
 })
 
 const ErrorResponseSchema = z.object({
@@ -293,7 +310,7 @@ const acknowledgeAlertRoute = createRoute({
 	description: 'Acknowledges an active alert.',
 	request: {
 		params: z.object({
-			id: z.string().uuid(),
+			id: z.string(),
 		}),
 	},
 	responses: {
@@ -394,10 +411,23 @@ const resolveAlertRoute = createRoute({
 export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 	const app = new OpenAPIHono<HonoEnv>()
 
+	// Initialize metrics service
+	let metricsService: MetricsCollectionService | null = null
+
+	// Middleware to initialize metrics service
+	app.use('*', async (c, next) => {
+		if (!metricsService) {
+			const { redis, logger } = c.get('services')
+			metricsService = new MetricsCollectionService(redis, logger)
+		}
+		await next()
+	})
+
 	// Get system metrics
 	app.openapi(getSystemMetricsRoute, async (c) => {
-		const { monitor, logger } = c.get('services')
+		const { logger } = c.get('services')
 		const session = c.get('session')
+		const requestId = c.get('requestId')
 
 		if (!session) {
 			throw new ApiError({
@@ -407,45 +437,23 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 		}
 
 		try {
-			// Get system metrics
-			// For now, return placeholder metrics
-			const metrics = {
-				timestamp: new Date().toISOString(),
-				server: {
-					uptime: process.uptime(),
-					memoryUsage: {
-						used: process.memoryUsage().heapUsed,
-						total: process.memoryUsage().heapTotal,
-						percentage: (process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100,
-					},
-					cpuUsage: {
-						percentage: 0,
-						loadAverage: [0, 0, 0],
-					},
-				},
-				database: {
-					connectionCount: 1,
-					activeQueries: 0,
-					averageQueryTime: 10,
-				},
-				redis: {
-					connectionCount: 1,
-					memoryUsage: 1024 * 1024,
-					keyCount: 100,
-				},
-				api: {
-					requestsPerSecond: 10,
-					averageResponseTime: 50,
-					errorRate: 0.01,
-				},
+			if (!metricsService) {
+				throw new Error('Metrics service not initialized')
 			}
 
-			logger.info('Retrieved system metrics')
+			// Get comprehensive system metrics
+			const metrics = await metricsService.getSystemMetrics()
+
+			logger.info('Retrieved system metrics', { requestId, userId: session.session.userId })
 
 			return c.json(metrics)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error(`Failed to get system metrics: ${message}`)
+			logger.error('Failed to get system metrics', {
+				requestId,
+				error: message,
+				userId: session?.session.userId,
+			})
 
 			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
@@ -458,6 +466,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 	app.openapi(getAuditMetricsRoute, async (c) => {
 		const { monitor, logger } = c.get('services')
 		const session = c.get('session')
+		const requestId = c.get('requestId')
 
 		if (!session) {
 			throw new ApiError({
@@ -469,34 +478,27 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const query = c.req.valid('query')
 
-			// Get audit metrics
-			// For now, return placeholder metrics
-			const metrics = {
-				timestamp: new Date().toISOString(),
-				eventsProcessed: 1000,
-				processingLatency: {
-					average: 25,
-					p95: 50,
-					p99: 100,
-				},
-				integrityVerifications: {
-					total: 100,
-					passed: 98,
-					failed: 2,
-				},
-				complianceReports: {
-					generated: 10,
-					scheduled: 5,
-					failed: 0,
-				},
+			if (!metricsService) {
+				throw new Error('Metrics service not initialized')
 			}
 
-			logger.info('Retrieved audit metrics')
+			// Get audit-specific metrics
+			const metrics = await monitor.metrics.getMetrics()
+
+			logger.info('Retrieved audit metrics', {
+				requestId,
+				timeRange: query.timeRange,
+				userId: session.session.userId,
+			})
 
 			return c.json(metrics)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error(`Failed to get audit metrics: ${message}`)
+			logger.error('Failed to get audit metrics', {
+				requestId,
+				error: message,
+				userId: session?.session.userId,
+			})
 
 			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
@@ -547,6 +549,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 	app.openapi(getAlertsRoute, async (c) => {
 		const { monitor, logger } = c.get('services')
 		const session = c.get('session')
+		const requestId = c.get('requestId')
 
 		if (!session) {
 			throw new ApiError({
@@ -555,28 +558,51 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			})
 		}
 
+		const organizationId = session.session.activeOrganizationId
+		if (!organizationId) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'No active organization',
+			})
+		}
+
 		try {
 			const query = c.req.valid('query')
 
 			// Get alerts
-			// For now, return placeholder alerts
+			const alerts = await monitor.alert.getAlerts({
+				organizationId,
+				...query,
+			})
+
+			const total = alerts.length
+
 			const result = {
-				alerts: [],
+				alerts,
 				pagination: {
-					total: 0,
+					total,
 					limit: query.limit || 50,
 					offset: query.offset || 0,
-					hasNext: false,
-					hasPrevious: false,
+					hasNext: query.offset + query.limit < total,
+					hasPrevious: query.offset > 0,
 				},
 			}
 
-			logger.info(`Retrieved ${result.alerts.length} alerts`)
+			logger.info('Retrieved alerts', {
+				requestId,
+				count: alerts.length,
+				total,
+				userId: session.session.userId,
+			})
 
 			return c.json(result)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error(`Failed to get alerts: ${message}`)
+			logger.error('Failed to get alerts', {
+				requestId,
+				error: message,
+				userId: session?.session.userId,
+			})
 
 			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
@@ -589,6 +615,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 	app.openapi(acknowledgeAlertRoute, async (c) => {
 		const { monitor, logger } = c.get('services')
 		const session = c.get('session')
+		const requestId = c.get('requestId')
 
 		if (!session) {
 			throw new ApiError({
@@ -600,17 +627,8 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const { id } = c.req.valid('param')
 
-			// Acknowledge alert
-			// For now, return placeholder alert
-			const alert = {
-				id,
-				severity: 'medium' as const,
-				title: 'Sample Alert',
-				description: 'This is a sample alert',
-				timestamp: new Date().toISOString(),
-				status: 'acknowledged' as const,
-				source: 'system',
-			}
+			// Acknowledge alert using enhanced alerting service
+			const alert = await monitor.alert.acknowledgeAlert(id, session.session.userId)
 
 			if (!alert) {
 				throw new ApiError({
@@ -619,7 +637,11 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 				})
 			}
 
-			logger.info(`Acknowledged alert: ${id}`)
+			logger.info('Alert acknowledged', {
+				requestId,
+				alertId: id,
+				userId: session.session.userId,
+			})
 
 			return c.json(alert)
 		} catch (error) {
@@ -628,7 +650,12 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error(`Failed to acknowledge alert: ${message}`)
+			logger.error('Failed to acknowledge alert', {
+				requestId,
+				alertId: c.req.param('id'),
+				error: message,
+				userId: session?.session.userId,
+			})
 
 			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
@@ -641,6 +668,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 	app.openapi(resolveAlertRoute, async (c) => {
 		const { monitor, logger } = c.get('services')
 		const session = c.get('session')
+		const requestId = c.get('requestId')
 
 		if (!session) {
 			throw new ApiError({
@@ -649,21 +677,17 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			})
 		}
 
+		const userId = session?.session.userId
+
 		try {
 			const { id } = c.req.valid('param')
 			const { resolution } = c.req.valid('json')
 
 			// Resolve alert
-			// For now, return placeholder alert
-			const alert = {
-				id,
-				severity: 'medium' as const,
-				title: 'Sample Alert',
-				description: 'This is a sample alert',
-				timestamp: new Date().toISOString(),
-				status: 'resolved' as const,
-				source: 'system',
-			}
+			const alert = await monitor.alert.resolveAlert(id, userId, {
+				resolvedBy: userId,
+				resolutionNotes: resolution,
+			})
 
 			if (!alert) {
 				throw new ApiError({
@@ -672,7 +696,12 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 				})
 			}
 
-			logger.info(`Resolved alert: ${id}`)
+			logger.info('Alert resolved', {
+				requestId,
+				alertId: id,
+				resolution,
+				userId: session.session.userId,
+			})
 
 			return c.json(alert)
 		} catch (error) {
@@ -681,7 +710,12 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error(`Failed to resolve alert: ${message}`)
+			logger.error('Failed to resolve alert', {
+				requestId,
+				alertId: c.req.param('id'),
+				error: message,
+				userId: session?.session.userId,
+			})
 
 			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',

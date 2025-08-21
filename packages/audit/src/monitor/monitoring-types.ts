@@ -47,7 +47,7 @@ export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 /**
  * Alert types for categorization
  */
-export type AlertType = 'SECURITY' | 'COMPLIANCE' | 'PERFORMANCE' | 'SYSTEM'
+export type AlertType = 'SECURITY' | 'COMPLIANCE' | 'PERFORMANCE' | 'SYSTEM' | 'METRICS'
 
 /**
  * Alert interface
@@ -61,6 +61,9 @@ export interface Alert {
 	timestamp: string
 	source: string
 	metadata: Record<string, any>
+	acknowledged: boolean
+	acknowledgedAt?: string
+	acknowledgedBy?: string
 	resolved: boolean
 	resolvedAt?: string
 	resolvedBy?: string

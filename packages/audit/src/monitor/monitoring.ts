@@ -84,6 +84,7 @@ export interface SuspiciousPattern {
  */
 export interface AlertHandler {
 	sendAlert(alert: Alert): Promise<void>
+	acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }>
 	resolveAlert(
 		alertId: string,
 		resolvedBy: string,
@@ -147,6 +148,13 @@ export class MonitoringService {
 	 */
 	addAlertHandler(handler: AlertHandler): void {
 		this.alertHandlers.push(handler)
+	}
+
+	/**
+	 * Send external alert
+	 */
+	async sendExternalAlert(alert: Alert): Promise<void> {
+		await this.generateAlert(alert)
 	}
 
 	/**
@@ -472,6 +480,7 @@ export class MonitoringService {
 				organizationId: organizationId,
 				...pattern.metadata,
 			},
+			acknowledged: false,
 			resolved: false,
 		}
 	}
@@ -491,6 +500,50 @@ export class MonitoringService {
 				console.error('Failed to send alert through handler:', error)
 			}
 		}
+
+		// Send notifications
+		await this.sendNotifications(alert)
+	}
+
+	/**
+	 * Send notifications based on alert severity
+	 */
+	private async sendNotifications(alert: Alert): Promise<void> {
+		try {
+			// Log notification (in a real implementation, this would integrate with external systems)
+			console.info('Alert notification', {
+				alertId: alert.id,
+				severity: alert.severity,
+				title: alert.title,
+				description: alert.description,
+				source: alert.source,
+			})
+
+			// For critical alerts, you might want to send immediate notifications
+			if (alert.severity === 'CRITICAL') {
+				await this.sendCriticalAlertNotification(alert)
+			}
+		} catch (error) {
+			console.error('Failed to send alert notifications', {
+				alertId: alert.id,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+		}
+	}
+
+	/**
+	 * Send critical alert notification
+	 */
+	private async sendCriticalAlertNotification(alert: Alert): Promise<void> {
+		// This would integrate with external notification systems
+		// For now, just log at error level
+		console.error('CRITICAL ALERT', {
+			alertId: alert.id,
+			title: alert.title,
+			description: alert.description,
+			source: alert.source,
+			metadata: alert.metadata,
+		})
 	}
 
 	/**
@@ -524,6 +577,27 @@ export class MonitoringService {
 					await handler.resolveAlert(alertId, resolvedBy)
 				} catch (error) {
 					console.error('Failed to resolve alert through handler:', error)
+				}
+			}
+		}
+	}
+
+	/**
+	 * Acknowledge an alert
+	 */
+	async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<void> {
+		const alert = this.alerts.find((a) => a.id === alertId)
+		if (alert) {
+			alert.acknowledged = true
+			alert.acknowledgedAt = new Date().toISOString()
+			alert.acknowledgedBy = acknowledgedBy
+
+			// Notify handlers
+			for (const handler of this.alertHandlers) {
+				try {
+					await handler.acknowledgeAlert(alertId, acknowledgedBy)
+				} catch (error) {
+					console.error('Failed to acknowledge alert through handler:', error)
 				}
 			}
 		}
@@ -860,6 +934,11 @@ export class ConsoleAlertHandler implements AlertHandler {
 
 	async resolveAlert(alertId: string, resolvedBy: string): Promise<{ success: boolean }> {
 		console.log(`✅ Alert ${alertId} resolved by ${resolvedBy}`)
+		return { success: true }
+	}
+
+	async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }> {
+		console.log(`✅ Alert ${alertId} acknowledged by ${acknowledgedBy}`)
 		return { success: true }
 	}
 
