@@ -11,6 +11,7 @@
  */
 
 import type { HonoEnv } from '@/lib/hono/context'
+import type { Alert } from '@repo/audit'
 
 export interface HealthCheck {
 	name: string
@@ -398,7 +399,7 @@ export class EnhancedHealthService {
 
 		try {
 			// Test audit service functionality
-			const testResult = await this.services.health.checkHealth()
+			const testResult = await this.services.health.checkAllComponents()
 
 			return {
 				name: 'Audit Service',
@@ -593,17 +594,24 @@ export class EnhancedHealthService {
 		for (const [serviceName, check] of Object.entries(services)) {
 			if (check.status === 'unhealthy') {
 				try {
-					await this.services.monitor.alert.createAlert({
-						severity: 'critical',
+					const alert: Alert = {
+						id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+						severity: 'CRITICAL',
+						type: 'METRICS',
 						title: `${serviceName} Service Unhealthy`,
 						description: check.message || `${serviceName} service is not responding`,
+						timestamp: new Date().toISOString(),
 						source: 'health-monitor',
 						metadata: {
+							organizationId: 'system',
 							service: serviceName,
 							responseTime: check.responseTime,
 							details: check.details,
 						},
-					})
+						acknowledged: false,
+						resolved: false,
+					}
+					await this.services.monitor.metrics.sendExternalAlert(alert)
 				} catch (error) {
 					this.services.logger.error('Failed to create health alert', {
 						service: serviceName,

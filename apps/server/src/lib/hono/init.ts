@@ -1,14 +1,20 @@
 import {
 	Audit,
+	AuditBottleneckAnalyzer,
+	AuditMonitoringDashboard,
+	AuditTracer,
 	ComplianceReportingService,
 	createDatabasePresetHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
 	DatabaseHealthCheck,
 	DataExportService,
+	DEFAULT_DASHBOARD_CONFIG,
+	DEFAULT_OBSERVABILITY_CONFIG,
 	ErrorHandler,
 	HealthCheckService,
 	MonitoringService,
+	RedisEnhancedMetricsCollector,
 	RedisHealthCheck,
 	RedisMetricsCollector,
 	ScheduledReportingService,
@@ -56,6 +62,12 @@ let metricsCollector: RedisMetricsCollector | undefined = undefined
 let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
+
+// Observability services
+let tracer: AuditTracer | undefined = undefined
+let enhancedMetricsCollector: RedisEnhancedMetricsCollector | undefined = undefined
+let bottleneckAnalyzer: AuditBottleneckAnalyzer | undefined = undefined
+let dashboard: AuditMonitoringDashboard | undefined = undefined
 
 // Enhanced monitoring services
 let metricsCollectionService: MetricsCollectionService | undefined = undefined
@@ -232,6 +244,33 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			metricsCollection: metricsCollectionService,
 		}
 
+		if (!tracer) {
+			tracer = new AuditTracer(DEFAULT_OBSERVABILITY_CONFIG.tracing)
+		}
+		if (!enhancedMetricsCollector) {
+			enhancedMetricsCollector = new RedisEnhancedMetricsCollector(
+				DEFAULT_OBSERVABILITY_CONFIG.metrics,
+				connection
+			)
+		}
+		if (!bottleneckAnalyzer) {
+			bottleneckAnalyzer = new AuditBottleneckAnalyzer()
+		}
+		if (!dashboard) {
+			dashboard = new AuditMonitoringDashboard(
+				enhancedMetricsCollector,
+				bottleneckAnalyzer,
+				DEFAULT_DASHBOARD_CONFIG
+			)
+		}
+
+		const observability = {
+			tracer,
+			metrics: enhancedMetricsCollector,
+			bottleneck: bottleneckAnalyzer,
+			dashboard,
+		}
+
 		if (!databaseErrorLogger)
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
 		if (!errorHandler) errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
@@ -281,6 +320,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			health: healthCheckService,
 			compliance,
 			monitor,
+			observability,
 			audit,
 			logger,
 			structuredLogger,

@@ -94,7 +94,7 @@ export function requestMetrics() {
 				userAgent: c.req.header('user-agent'),
 				ip: getClientIP(c),
 				userId: session?.session.userId,
-				organizationId: session?.session.activeOrganizationId,
+				organizationId: session?.session.activeOrganizationId || undefined,
 				contentLength: getContentLength(c),
 				errorCode,
 			}
@@ -181,7 +181,7 @@ export function performanceMonitoring(options: { threshold?: number; alertOnSlow
 					timestamp: new Date().toISOString(),
 					source: 'performance-monitor',
 					metadata: {
-						organizationId: c.get('session')?.session.activeOrganizationId || 'unknown',
+						organizationId: c.get('session')?.session.activeOrganizationId || 'system',
 						requestId,
 						endpoint: c.req.path,
 						method: c.req.method,

@@ -20,6 +20,7 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import { createAuditAPI } from './audit-api'
 import { createComplianceAPI } from './compliance-api'
 import { createMetricsAPI } from './metrics-api'
+import { createObservabilityAPI } from './observability-api'
 
 import type { HonoEnv } from '@/lib/hono/context'
 
@@ -234,6 +235,7 @@ Pagination information is included in the response:
 	app.route('/audit', createAuditAPI())
 	app.route('/compliance', createComplianceAPI())
 	app.route('/metrics', createMetricsAPI())
+	app.route('/observability', createObservabilityAPI())
 
 	// Swagger UI
 	app.get(

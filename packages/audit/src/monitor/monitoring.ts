@@ -106,12 +106,16 @@ export interface MetricsCollector {
 	resetMetrics(): Promise<void>
 	recordSuspiciousPattern(suspiciousPatterns: number): Promise<void>
 	recordAlertGenerated(): Promise<void>
+	setCooldown(cooldownKey: string, cooldownPeriod: number): Promise<void>
+	isOnCooldown(cooldownKey: string): Promise<boolean>
 }
 
 /**
  * Real-time monitoring service
  */
 export class MonitoringService {
+	private readonly alertPrefix = 'alerts:'
+	private readonly cooldownPrefix = 'alert_cooldown:'
 	private events: AuditLogEvent[] = []
 	private alerts: Alert[] = []
 	private config: PatternDetectionConfig
@@ -489,6 +493,13 @@ export class MonitoringService {
 	 * Generate and send alert
 	 */
 	private async generateAlert(alert: Alert): Promise<void> {
+		// Check for duplicate alerts
+		const isDuplicate = await this.checkDuplicateAlert(alert)
+		if (isDuplicate) {
+			console.debug('Duplicate alert suppressed', { alertId: alert.id, title: alert.title })
+			return
+		}
+
 		this.alerts.push(alert)
 		this.metricsCollector.recordAlertGenerated()
 
@@ -503,6 +514,39 @@ export class MonitoringService {
 
 		// Send notifications
 		await this.sendNotifications(alert)
+	}
+
+	/**
+	 * Check for duplicate alerts
+	 */
+	private async checkDuplicateAlert(alert: Alert): Promise<boolean> {
+		try {
+			// Create a hash of the alert content for deduplication
+			const alertHash = this.createAlertHash(alert)
+			const cooldownKey = `${this.alertPrefix}${this.cooldownPrefix}${alertHash}`
+
+			const exists = await this.metricsCollector.isOnCooldown(cooldownKey)
+			if (exists) {
+				return true
+			}
+
+			// Set cooldown period (5 minutes for similar alerts)
+			await this.metricsCollector.setCooldown(cooldownKey, 300)
+			return false
+		} catch (error) {
+			console.error('Failed to check duplicate alert', {
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+			return false
+		}
+	}
+
+	/**
+	 * Create alert hash for deduplication
+	 */
+	private createAlertHash(alert: Alert): string {
+		const content = `${alert.source}:${alert.title}:${alert.severity}`
+		return Buffer.from(content).toString('base64')
 	}
 
 	/**
@@ -860,6 +904,16 @@ export class RedisMetricsCollector implements MetricsCollector {
 	async recordSuspiciousPattern(suspiciousPatterns: number): Promise<void> {
 		await this.connection.incrby(`${this.key}:suspiciousPatterns`, suspiciousPatterns)
 		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
+	}
+
+	// Set cooldown period (5 minutes for similar alerts)
+	async setCooldown(cooldownKey: string, cooldownPeriod = 300): Promise<void> {
+		await this.connection.setex(cooldownKey, cooldownPeriod, '1')
+	}
+
+	// Check if an alert is on cooldown
+	async isOnCooldown(cooldownKey: string): Promise<boolean> {
+		return (await this.connection.exists(cooldownKey)) === 1
 	}
 }
 

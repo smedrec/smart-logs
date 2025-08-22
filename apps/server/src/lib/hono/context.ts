@@ -1,6 +1,9 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
 	Audit,
+	AuditBottleneckAnalyzer,
+	AuditMonitoringDashboard,
+	AuditTracer,
 	ComplianceReportingService,
 	DatabaseAlertHandler,
 	DatabasePresetHandler,
@@ -8,6 +11,7 @@ import type {
 	ErrorHandler,
 	HealthCheckService,
 	MonitoringService,
+	RedisEnhancedMetricsCollector,
 	ScheduledReportingService,
 } from '@repo/audit'
 import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
@@ -52,6 +56,12 @@ export type ServiceContext = {
 		alert: DatabaseAlertHandler
 		metrics: MonitoringService
 		metricsCollection: MetricsCollectionService
+	}
+	observability: {
+		tracer: AuditTracer
+		metrics: RedisEnhancedMetricsCollector
+		bottleneck: AuditBottleneckAnalyzer
+		dashboard: AuditMonitoringDashboard
 	}
 	audit: Audit
 	logger: Logger
