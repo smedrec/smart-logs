@@ -2,13 +2,10 @@
  * Real-time monitoring and alerting system for audit events
  * Implements suspicious pattern detection, alert generation, and metrics collection
  */
-import { Redis as RedisInstance } from 'ioredis'
-
-import { getSharedRedisConnection } from '@repo/redis-client'
 
 import { AlertResolution } from './database-alert-handler.js'
+import { MetricsCollector, RedisMetricsCollector } from './metrics-collector.js'
 
-import type { RedisOptions, Redis as RedisType } from 'ioredis'
 import type { AuditLogEvent } from '../types.js'
 import type {
 	Alert,
@@ -17,6 +14,8 @@ import type {
 	AlertType,
 	AuditMetrics,
 	HealthStatus,
+	PerformanceMetrics,
+	RequestMetrics,
 } from './monitoring-types.js'
 
 /**
@@ -95,23 +94,6 @@ export interface AlertHandler {
 	getActiveAlerts(organizationId?: string): Promise<Alert[]>
 	numberOfActiveAlerts(organizationId?: string): Promise<number>
 	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
-}
-
-/**
- * Metrics collector interface
- */
-export interface MetricsCollector {
-	recordEvent(): Promise<void>
-	recordProcessingLatency(latency: number): Promise<void>
-	recordError(): Promise<void>
-	recordIntegrityViolation(): Promise<void>
-	recordQueueDepth(depth: number): Promise<void>
-	getMetrics(): Promise<AuditMetrics>
-	resetMetrics(): Promise<void>
-	recordSuspiciousPattern(suspiciousPatterns: number): Promise<void>
-	recordAlertGenerated(): Promise<void>
-	setCooldown(cooldownKey: string, cooldownPeriod: number): Promise<void>
-	isOnCooldown(cooldownKey: string): Promise<boolean>
 }
 
 /**
@@ -743,231 +725,119 @@ export class MonitoringService {
 			timestamp: now,
 		}
 	}
-}
 
-/**
- * Redis metrics collector
- */
-export class RedisMetricsCollector implements MetricsCollector {
-	private key = 'metrics'
-	private connection: RedisType
-	private isSharedConnection: boolean
+	/**
+	 * Store request metrics for aggregation
+	 */
+	async storeRequestMetrics(metrics: RequestMetrics): Promise<void> {
+		try {
+			// Store in Redis for real-time metrics using enhanced metrics service
+			const key = `requests:${Date.now()}`
+			await this.metricsCollector.storeMetric(key, metrics, 3600) // 1 hour TTL
 
-	constructor(
-		redisOrUrlOrOptions?: string | RedisType | { url?: string; options?: RedisOptions },
-		directConnectionOptions?: RedisOptions
-	) {
-		this.isSharedConnection = false
-
-		const defaultDirectOptions: RedisOptions = {
-			maxRetriesPerRequest: null,
-			enableAutoPipelining: true,
+			// Update endpoint performance metrics
+			await this.updateEndpointMetrics(metrics)
+		} catch (error) {
+			console.error('Failed to store request metrics:', error)
 		}
+	}
 
-		if (
-			redisOrUrlOrOptions &&
-			typeof redisOrUrlOrOptions === 'object' &&
-			'status' in redisOrUrlOrOptions
-		) {
-			// Scenario 1: An existing ioredis instance is provided
-			this.connection = redisOrUrlOrOptions
-			this.isSharedConnection = true // Assume externally managed, could be shared or not
-			console.log(`[MonitorService] Using provided Redis instance for monitor.`)
-		} else if (
-			typeof redisOrUrlOrOptions === 'string' ||
-			(typeof redisOrUrlOrOptions === 'object' &&
-				(redisOrUrlOrOptions.url || redisOrUrlOrOptions.options)) ||
-			directConnectionOptions
-		) {
-			// Scenario 2: URL string, options object, or directConnectionOptions are provided for a direct connection
-			this.isSharedConnection = false
-			let url: string | undefined
-			let options: RedisOptions = { ...defaultDirectOptions, ...directConnectionOptions }
+	/**
+	 * Update endpoint performance metrics
+	 */
+	async updateEndpointMetrics(metrics: RequestMetrics): Promise<void> {
+		const endpointKey = `${metrics.method}:${metrics.path}`
+		const metricsKey = `metrics:endpoints:${endpointKey}`
 
-			if (typeof redisOrUrlOrOptions === 'string') {
-				url = redisOrUrlOrOptions
-			} else if (
-				typeof redisOrUrlOrOptions === 'object' &&
-				(redisOrUrlOrOptions.url || redisOrUrlOrOptions.options)
-			) {
-				// Check this condition specifically for object with url/options
-				url = redisOrUrlOrOptions.url
-				options = { ...options, ...redisOrUrlOrOptions.options }
-			}
-			// Note: directConnectionOptions are already merged into options
+		try {
+			// Get existing metrics using enhanced metrics service
+			const existing = await this.metricsCollector.getMetric(metricsKey)
+			const now = new Date().toISOString()
 
-			const envUrl = process.env['MONITOR_REDIS_URL']
-			const finalUrl = url || envUrl // Prioritize explicitly passed URL/options object over env var
-
-			if (finalUrl) {
-				// If any URL (explicit, from object, or env) is found, attempt direct connection
-				try {
-					console.log(
-						`[MonitorService] Creating new direct Redis connection to ${finalUrl.split('@').pop()} for monitor.`
-					)
-					this.connection = new RedisInstance(finalUrl, options)
-				} catch (err) {
-					console.error(`[MonitorService] Failed to create direct Redis instance for monitor:`, err)
-					throw new Error(
-						`[MonitorService] Failed to initialize direct Redis connection for monitor. Error: ${err instanceof Error ? err.message : String(err)}`
-					)
+			if (existing) {
+				// Update existing metrics
+				const updated: PerformanceMetrics = {
+					endpoint: metrics.path,
+					method: metrics.method,
+					count: existing.count + 1,
+					averageResponseTime:
+						(existing.averageResponseTime * existing.count + metrics.responseTime) /
+						(existing.count + 1),
+					p95ResponseTime: existing.p95ResponseTime, // Will be calculated separately
+					p99ResponseTime: existing.p99ResponseTime, // Will be calculated separately
+					errorRate:
+						metrics.statusCode >= 400
+							? (existing.errorRate * existing.count + 1) / (existing.count + 1)
+							: (existing.errorRate * existing.count) / (existing.count + 1),
+					lastUpdated: now,
 				}
-			} else if (url || redisOrUrlOrOptions || directConnectionOptions) {
-				// This case means an attempt for direct connection was made (e.g. empty string URL, or empty options object)
-				// but resulted in no usable URL, and MONITOR_REDIS_URL was also not set.
-				console.warn(
-					`[MonitorService] Attempted direct Redis connection for monitor but no valid URL could be determined (explicitly or via MONITOR_REDIS_URL). Falling back to shared connection.`
-				)
-				this.connection = getSharedRedisConnection()
-				this.isSharedConnection = true
+
+				await this.metricsCollector.storeMetric(metricsKey, updated, 86400) // 24 hours TTL
 			} else {
-				// Scenario 3: No explicit direct connection info at all, and no env var, use the shared connection
-				console.log(`[MonitorService] Using shared Redis connection for monitor.`)
-				this.connection = getSharedRedisConnection()
-				this.isSharedConnection = true
+				// Create new metrics
+				const newMetrics: PerformanceMetrics = {
+					endpoint: metrics.path,
+					method: metrics.method,
+					count: 1,
+					averageResponseTime: metrics.responseTime,
+					p95ResponseTime: metrics.responseTime,
+					p99ResponseTime: metrics.responseTime,
+					errorRate: metrics.statusCode >= 400 ? 1 : 0,
+					lastUpdated: now,
+				}
+
+				await this.metricsCollector.storeMetric(metricsKey, newMetrics, 86400) // 24 hours TTL
 			}
-		} else if (process.env['MONITOR_REDIS_URL']) {
-			// Scenario 2b: Only MONITOR_REDIS_URL is provided (no redisOrUrlOrOptions or directConnectionOptions)
-			this.isSharedConnection = false
-			const envUrl = process.env['MONITOR_REDIS_URL']
-			const options: RedisOptions = { ...defaultDirectOptions } // directConnectionOptions is undefined here
-			try {
-				console.log(
-					`[MonitorService] Creating new direct Redis connection using MONITOR_REDIS_URL to ${envUrl.split('@').pop()} for monitor.`
-				)
-				this.connection = new RedisInstance(envUrl, options)
-			} catch (err) {
-				console.error(
-					`[MonitorService] Failed to create direct Redis instance using MONITOR_REDIS_URL for monitor:`,
-					err
-				)
-				throw new Error(
-					`[MonitorService] Failed to initialize direct Redis connection using MONITOR_REDIS_URL for monitor. Error: ${err instanceof Error ? err.message : String(err)}`
-				)
+		} catch (error) {
+			console.error('Failed to update endpoint metrics:', error)
+		}
+	}
+
+	/**
+	 * Track request outcome for error rate calculation
+	 */
+	async trackRequestOutcome(
+		path: string,
+		method: string,
+		outcome: 'success' | 'error'
+	): Promise<void> {
+		const key = `outcomes:${method}:${path}:${Date.now()}`
+		await this.metricsCollector.storeMetric(key, { outcome, timestamp: Date.now() }, 3600) // 1 hour TTL
+	}
+
+	/**
+	 * Calculate error rate for an endpoint
+	 */
+	async calculateErrorRate(path: string, method: string, windowSize: number): Promise<number> {
+		const now = Date.now()
+		const windowStart = now - windowSize
+
+		try {
+			// Get all outcomes in the time window
+			const pattern = `outcomes:${method}:${path}:*`
+			const outcomes = await this.metricsCollector.getMetricsByPattern(pattern)
+
+			if (!outcomes || outcomes.length === 0) {
+				return 0
 			}
-		} else {
-			// Scenario 3: No specific connection info at all, use the shared connection
-			console.log(`[AuditService] Using shared Redis connection for monitor.`)
-			this.connection = getSharedRedisConnection()
-			this.isSharedConnection = true
+
+			// Filter outcomes within the time window
+			const recentOutcomes = outcomes.filter((outcome: any) => {
+				const timestamp = outcome.timestamp || 0
+				return timestamp >= windowStart
+			})
+
+			if (recentOutcomes.length === 0) {
+				return 0
+			}
+
+			// Calculate error rate
+			const errorCount = recentOutcomes.filter((outcome: any) => outcome.outcome === 'error').length
+			return errorCount / recentOutcomes.length
+		} catch (error) {
+			console.error('Failed to calculate error rate:', error)
+			return 0
 		}
-	}
-
-	async getMetrics(): Promise<AuditMetrics> {
-		const metrics: AuditMetrics = {
-			eventsProcessed: parseInt(
-				(await this.connection.get(`${this.key}:eventsProcessed`)) || '0',
-				10
-			),
-			processingLatency: parseFloat(
-				(await this.connection.get(`${this.key}:processingLatency`)) || '0'
-			),
-			queueDepth: parseInt((await this.connection.get(`${this.key}:queueDepth`)) || '0', 10),
-			errorsGenerated: parseInt(
-				(await this.connection.get(`${this.key}:errorsGenerated`)) || '0',
-				10
-			),
-			errorRate: parseFloat((await this.connection.get(`${this.key}:errorRate`)) || '0'),
-			integrityViolations: parseInt(
-				(await this.connection.get(`${this.key}:integrityViolations`)) || '0',
-				10
-			),
-			timestamp: (await this.connection.get(`${this.key}:timestamp`)) || new Date().toISOString(),
-			alertsGenerated: parseInt(
-				(await this.connection.get(`${this.key}:alertsGenerated`)) || '0',
-				10
-			),
-			suspiciousPatterns: parseInt(
-				(await this.connection.get(`${this.key}:suspiciousPatterns`)) || '0',
-				10
-			),
-		}
-
-		return metrics
-	}
-
-	async resetMetrics(): Promise<void> {
-		await this.connection.del(`${this.key}`)
-
-		const metrics: AuditMetrics = {
-			eventsProcessed: 0,
-			processingLatency: 0,
-			queueDepth: 0,
-			errorsGenerated: 0,
-			errorRate: 0,
-			integrityViolations: 0,
-			timestamp: new Date().toISOString(),
-			alertsGenerated: 0,
-			suspiciousPatterns: 0,
-		}
-		await this.connection.set(`${this.key}`, JSON.stringify(metrics))
-	}
-
-	async recordQueueDepth(depth: number): Promise<void> {
-		await this.connection.set(`${this.key}:queueDepth`, depth.toString())
-		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
-	}
-
-	async recordEvent(): Promise<void> {
-		await this.connection.incr(`${this.key}:eventsProcessed`)
-		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
-	}
-
-	async recordProcessingLatency(latency: number): Promise<void> {
-		const currentLatency = parseFloat(
-			(await this.connection.get(`${this.key}:processingLatency`)) || '0'
-		)
-		const newLatency = (currentLatency + latency) / 2 // Calculate new average latency
-		await this.connection.set(`${this.key}:processingLatency`, newLatency.toString())
-		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
-	}
-
-	async recordError(): Promise<void> {
-		await this.connection.incr(`${this.key}:errorsGenerated`)
-
-		const currentErrorsGenerated = parseInt(
-			(await this.connection.get(`${this.key}:errorsGenerated`)) || '0',
-			10
-		)
-		const currentEventsProcessed = parseInt(
-			(await this.connection.get(`${this.key}:eventsProcessed`)) || '0',
-			10
-		)
-
-		let newErrorRate: number
-		if (currentEventsProcessed === 0) {
-			newErrorRate = 0.0
-		} else {
-			newErrorRate = currentErrorsGenerated / currentEventsProcessed
-		}
-
-		await this.connection.set(`${this.key}:errorRate`, newErrorRate.toString())
-		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
-	}
-
-	async recordIntegrityViolation(): Promise<void> {
-		await this.connection.incr(`${this.key}:integrityViolations`)
-		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
-	}
-
-	async recordAlertGenerated(): Promise<void> {
-		await this.connection.incr(`${this.key}:alertsGenerated`)
-		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
-	}
-
-	async recordSuspiciousPattern(suspiciousPatterns: number): Promise<void> {
-		await this.connection.incrby(`${this.key}:suspiciousPatterns`, suspiciousPatterns)
-		await this.connection.set(`${this.key}:timestamp`, new Date().toISOString())
-	}
-
-	// Set cooldown period (5 minutes for similar alerts)
-	async setCooldown(cooldownKey: string, cooldownPeriod = 300): Promise<void> {
-		await this.connection.setex(cooldownKey, cooldownPeriod, '1')
-	}
-
-	// Check if an alert is on cooldown
-	async isOnCooldown(cooldownKey: string): Promise<boolean> {
-		return (await this.connection.exists(cooldownKey)) === 1
 	}
 }
 

@@ -15,33 +15,7 @@ import { createMiddleware } from 'hono/factory'
 
 import type { HonoEnv } from '@/lib/hono/context'
 import type { Context } from 'hono'
-import type { Alert } from '@repo/audit'
-
-export interface RequestMetrics {
-	requestId: string
-	method: string
-	path: string
-	statusCode: number
-	responseTime: number
-	timestamp: string
-	userAgent?: string
-	ip?: string
-	userId?: string
-	organizationId?: string
-	contentLength?: number
-	errorCode?: string
-}
-
-export interface PerformanceMetrics {
-	endpoint: string
-	method: string
-	count: number
-	averageResponseTime: number
-	p95ResponseTime: number
-	p99ResponseTime: number
-	errorRate: number
-	lastUpdated: string
-}
+import type { Alert, RequestMetrics } from '@repo/audit'
 
 /**
  * Request metrics collection middleware
@@ -108,7 +82,7 @@ export function requestMetrics() {
 
 			// Store metrics for aggregation
 			try {
-				await storeRequestMetrics(metrics, monitor)
+				await monitor.metrics.storeRequestMetrics(metrics)
 			} catch (metricsError) {
 				logger.error('Failed to store request metrics', {
 					error: metricsError instanceof Error ? metricsError.message : 'Unknown error',
@@ -269,17 +243,21 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 
 			// Track successful requests
 			if (c.res.status < 400) {
-				await trackRequestOutcome(c.req.path, c.req.method, 'success', monitor)
+				await monitor.metrics.trackRequestOutcome(c.req.path, c.req.method, 'success')
 			} else {
-				await trackRequestOutcome(c.req.path, c.req.method, 'error', monitor)
+				await monitor.metrics.trackRequestOutcome(c.req.path, c.req.method, 'error')
 			}
 		} catch (error) {
 			// Track failed requests
-			await trackRequestOutcome(c.req.path, c.req.method, 'error', monitor)
+			await monitor.metrics.trackRequestOutcome(c.req.path, c.req.method, 'error')
 
 			// Check error rate and create alert if threshold exceeded
 			try {
-				const errorRate = await calculateErrorRate(c.req.path, c.req.method, windowSize, monitor)
+				const errorRate = await monitor.metrics.calculateErrorRate(
+					c.req.path,
+					c.req.method,
+					windowSize
+				)
 				if (errorRate > threshold) {
 					const alert: Alert = {
 						id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -312,126 +290,6 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 			throw error
 		}
 	})
-}
-
-/**
- * Store request metrics for aggregation
- */
-async function storeRequestMetrics(metrics: RequestMetrics, monitor: any): Promise<void> {
-	try {
-		// Store in Redis for real-time metrics using enhanced metrics service
-		const key = `requests:${Date.now()}`
-		await monitor.metricsCollection.storeMetric(key, metrics, 3600) // 1 hour TTL
-
-		// Update endpoint performance metrics
-		await updateEndpointMetrics(metrics, monitor)
-	} catch (error) {
-		console.error('Failed to store request metrics:', error)
-	}
-}
-
-/**
- * Update endpoint performance metrics
- */
-async function updateEndpointMetrics(metrics: RequestMetrics, monitor: any): Promise<void> {
-	const endpointKey = `${metrics.method}:${metrics.path}`
-	const metricsKey = `metrics:endpoints:${endpointKey}`
-
-	try {
-		// Get existing metrics using enhanced metrics service
-		const existing = await monitor.metricsCollection.getMetric(metricsKey)
-		const now = new Date().toISOString()
-
-		if (existing) {
-			// Update existing metrics
-			const updated: PerformanceMetrics = {
-				endpoint: metrics.path,
-				method: metrics.method,
-				count: existing.count + 1,
-				averageResponseTime:
-					(existing.averageResponseTime * existing.count + metrics.responseTime) /
-					(existing.count + 1),
-				p95ResponseTime: existing.p95ResponseTime, // Will be calculated separately
-				p99ResponseTime: existing.p99ResponseTime, // Will be calculated separately
-				errorRate:
-					metrics.statusCode >= 400
-						? (existing.errorRate * existing.count + 1) / (existing.count + 1)
-						: (existing.errorRate * existing.count) / (existing.count + 1),
-				lastUpdated: now,
-			}
-
-			await monitor.metricsCollection.storeMetric(metricsKey, updated, 86400) // 24 hours TTL
-		} else {
-			// Create new metrics
-			const newMetrics: PerformanceMetrics = {
-				endpoint: metrics.path,
-				method: metrics.method,
-				count: 1,
-				averageResponseTime: metrics.responseTime,
-				p95ResponseTime: metrics.responseTime,
-				p99ResponseTime: metrics.responseTime,
-				errorRate: metrics.statusCode >= 400 ? 1 : 0,
-				lastUpdated: now,
-			}
-
-			await monitor.metricsCollection.storeMetric(metricsKey, newMetrics, 86400) // 24 hours TTL
-		}
-	} catch (error) {
-		console.error('Failed to update endpoint metrics:', error)
-	}
-}
-
-/**
- * Track request outcome for error rate calculation
- */
-async function trackRequestOutcome(
-	path: string,
-	method: string,
-	outcome: 'success' | 'error',
-	monitor: any
-): Promise<void> {
-	const key = `outcomes:${method}:${path}:${Date.now()}`
-	await monitor.metricsCollection.storeMetric(key, { outcome, timestamp: Date.now() }, 3600) // 1 hour TTL
-}
-
-/**
- * Calculate error rate for an endpoint
- */
-async function calculateErrorRate(
-	path: string,
-	method: string,
-	windowSize: number,
-	monitor: any
-): Promise<number> {
-	const now = Date.now()
-	const windowStart = now - windowSize
-
-	try {
-		// Get all outcomes in the time window
-		const pattern = `outcomes:${method}:${path}:*`
-		const outcomes = await monitor.metricsCollection.getMetricsByPattern(pattern)
-
-		if (!outcomes || outcomes.length === 0) {
-			return 0
-		}
-
-		// Filter outcomes within the time window
-		const recentOutcomes = outcomes.filter((outcome: any) => {
-			const timestamp = outcome.timestamp || 0
-			return timestamp >= windowStart
-		})
-
-		if (recentOutcomes.length === 0) {
-			return 0
-		}
-
-		// Calculate error rate
-		const errorCount = recentOutcomes.filter((outcome: any) => outcome.outcome === 'error').length
-		return errorCount / recentOutcomes.length
-	} catch (error) {
-		console.error('Failed to calculate error rate:', error)
-		return 0
-	}
 }
 
 /**

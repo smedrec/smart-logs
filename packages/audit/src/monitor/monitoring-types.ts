@@ -88,3 +88,29 @@ export interface AlertStatistics {
 	bySeverity: Record<AlertSeverity, number>
 	byType: Record<AlertType, number>
 }
+
+export interface RequestMetrics {
+	requestId: string
+	method: string
+	path: string
+	statusCode: number
+	responseTime: number
+	timestamp: string
+	userAgent?: string
+	ip?: string
+	userId?: string
+	organizationId?: string
+	contentLength?: number
+	errorCode?: string
+}
+
+export interface PerformanceMetrics {
+	endpoint: string
+	method: string
+	count: number
+	averageResponseTime: number
+	p95ResponseTime: number
+	p99ResponseTime: number
+	errorRate: number
+	lastUpdated: string
+}

@@ -77,10 +77,22 @@ const DashboardDataSchema = z.object({
 	}),
 	alerts: z.object({
 		total: z.number(),
-		critical: z.number(),
-		high: z.number(),
-		medium: z.number(),
-		low: z.number(),
+		active: z.number(),
+		acknowledged: z.number(),
+		resolved: z.number(),
+		bySeverity: z.object({
+			LOW: z.number(),
+			MEDIUM: z.number(),
+			HIGH: z.number(),
+			CRITICAL: z.number(),
+		}),
+		byType: z.object({
+			SECURITY: z.number(),
+			COMPLIANCE: z.number(),
+			PERFORMANCE: z.number(),
+			SYSTEM: z.number(),
+			METRICS: z.number(),
+		}),
 		recent: z.array(
 			z.object({
 				id: z.string(),

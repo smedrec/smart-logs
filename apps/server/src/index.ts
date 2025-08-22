@@ -37,7 +37,7 @@ async function startServer() {
 	const auth = await getAuthInstance()
 
 	app.use('*', init())
-	app.use(useConsoleLogger())
+	//app.use(useConsoleLogger())
 
 	// Add monitoring middleware
 	app.use('*', requestMetrics())
