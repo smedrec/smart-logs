@@ -11,9 +11,7 @@
  */
 
 import { ApiError } from '@/lib/errors'
-import { MetricsCollectionService } from '@/lib/services/metrics'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
-import { QueryBuilder } from 'drizzle-orm/singlestore-core'
 
 import type { HonoEnv } from '@/lib/hono/context'
 
@@ -411,21 +409,9 @@ const resolveAlertRoute = createRoute({
 export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 	const app = new OpenAPIHono<HonoEnv>()
 
-	// Initialize metrics service
-	let metricsService: MetricsCollectionService | null = null
-
-	// Middleware to initialize metrics service
-	app.use('*', async (c, next) => {
-		if (!metricsService) {
-			const { redis, logger } = c.get('services')
-			metricsService = new MetricsCollectionService(redis, logger)
-		}
-		await next()
-	})
-
 	// Get system metrics
 	app.openapi(getSystemMetricsRoute, async (c) => {
-		const { logger } = c.get('services')
+		const { monitor, logger } = c.get('services')
 		const session = c.get('session')
 		const requestId = c.get('requestId')
 
@@ -437,12 +423,8 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 		}
 
 		try {
-			if (!metricsService) {
-				throw new Error('Metrics service not initialized')
-			}
-
 			// Get comprehensive system metrics
-			const metrics = await metricsService.getSystemMetrics()
+			const metrics = await monitor.metricsCollection.getSystemMetrics()
 
 			logger.info('Retrieved system metrics', { requestId, userId: session.session.userId })
 
@@ -478,12 +460,8 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const query = c.req.valid('query')
 
-			if (!metricsService) {
-				throw new Error('Metrics service not initialized')
-			}
-
 			// Get audit-specific metrics
-			const metrics = await monitor.metrics.getMetrics()
+			const metrics = await monitor.metricsCollection.getAuditMetrics()
 
 			logger.info('Retrieved audit metrics', {
 				requestId,

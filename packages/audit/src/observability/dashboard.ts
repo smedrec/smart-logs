@@ -1,6 +1,9 @@
 /**
  * Monitoring dashboard for audit system health and performance visualization
  */
+import { AlertSeverity, AlertStatistics, AlertType } from '../monitor/monitoring-types.js'
+import { MonitoringService } from '../monitor/monitoring.js'
+
 import type { BottleneckAnalyzer } from './bottleneck-analyzer.js'
 import type { EnhancedMetricsCollector } from './metrics-collector.js'
 import type {
@@ -95,10 +98,11 @@ export interface HealthData {
  */
 export interface AlertSummary {
 	total: number
-	critical: number
-	high: number
-	medium: number
-	low: number
+	active: number
+	acknowledged: number
+	resolved: number
+	bySeverity: Record<AlertSeverity, number>
+	byType: Record<AlertType, number>
 	recent: AlertInfo[]
 }
 
@@ -107,7 +111,7 @@ export interface AlertSummary {
  */
 export interface AlertInfo {
 	id: string
-	severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+	severity: AlertSeverity
 	title: string
 	timestamp: string
 	component: string
@@ -155,6 +159,7 @@ export interface DashboardConfig {
  * Audit system monitoring dashboard implementation
  */
 export class AuditMonitoringDashboard implements DashboardDataProvider {
+	private monitor: MonitoringService
 	private metricsCollector: EnhancedMetricsCollector
 	private bottleneckAnalyzer: BottleneckAnalyzer
 	private config: DashboardConfig
@@ -162,10 +167,12 @@ export class AuditMonitoringDashboard implements DashboardDataProvider {
 	private readonly cacheTimeout = 30000 // 30 seconds
 
 	constructor(
+		monitor: MonitoringService,
 		metricsCollector: EnhancedMetricsCollector,
 		bottleneckAnalyzer: BottleneckAnalyzer,
 		config: DashboardConfig
 	) {
+		this.monitor = monitor
 		this.metricsCollector = metricsCollector
 		this.bottleneckAnalyzer = bottleneckAnalyzer
 		this.config = config
@@ -262,54 +269,11 @@ export class AuditMonitoringDashboard implements DashboardDataProvider {
 		const cached = this.getFromCache(cacheKey)
 		if (cached) return cached
 
-		// This would typically come from an alert service
-		// For now, we'll generate mock data based on system state
-		const componentHealth = await this.getComponentHealth()
-		const bottlenecks = await this.getBottleneckAnalysis()
-
-		const alerts: AlertInfo[] = []
-
-		// Generate alerts from unhealthy components
-		for (const component of componentHealth) {
-			if (component.status === 'UNHEALTHY') {
-				alerts.push({
-					id: `health-${component.name}-${Date.now()}`,
-					severity: 'CRITICAL',
-					title: `Component ${component.name} is unhealthy`,
-					timestamp: component.lastCheck,
-					component: component.name,
-				})
-			} else if (component.status === 'DEGRADED') {
-				alerts.push({
-					id: `health-${component.name}-${Date.now()}`,
-					severity: 'HIGH',
-					title: `Component ${component.name} is degraded`,
-					timestamp: component.lastCheck,
-					component: component.name,
-				})
-			}
-		}
-
-		// Generate alerts from bottlenecks
-		for (const bottleneck of bottlenecks) {
-			if (bottleneck.severity === 'CRITICAL' || bottleneck.severity === 'HIGH') {
-				alerts.push({
-					id: `bottleneck-${bottleneck.component}-${Date.now()}`,
-					severity: bottleneck.severity,
-					title: `Performance bottleneck in ${bottleneck.component}`,
-					timestamp: bottleneck.timestamp,
-					component: bottleneck.component,
-				})
-			}
-		}
+		const alertStatistics: AlertStatistics = await this.monitor.getAlertStatistics()
 
 		const summary: AlertSummary = {
-			total: alerts.length,
-			critical: alerts.filter((a) => a.severity === 'CRITICAL').length,
-			high: alerts.filter((a) => a.severity === 'HIGH').length,
-			medium: alerts.filter((a) => a.severity === 'MEDIUM').length,
-			low: alerts.filter((a) => a.severity === 'LOW').length,
-			recent: alerts.slice(0, 10), // Last 10 alerts
+			...alertStatistics,
+			recent: [], // Last 10 alerts
 		}
 
 		this.setCache(cacheKey, summary)

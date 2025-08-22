@@ -76,3 +76,15 @@ export interface Alert {
 export interface OrganizationalAlert extends Alert {
 	organizationId: string
 }
+
+/**
+ * Alert statisctics interface
+ */
+export interface AlertStatistics {
+	total: number
+	active: number
+	acknowledged: number
+	resolved: number
+	bySeverity: Record<AlertSeverity, number>
+	byType: Record<AlertType, number>
+}

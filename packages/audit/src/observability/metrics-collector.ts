@@ -7,6 +7,8 @@ import { Redis as RedisInstance } from 'ioredis'
 
 import { getSharedRedisConnection } from '@repo/redis-client'
 
+import { MonitoringService } from '../monitor/monitoring.js'
+
 import type { RedisOptions, Redis as RedisType } from 'ioredis'
 import type {
 	AuditOperationMetrics,
@@ -56,14 +58,17 @@ export interface EnhancedMetricsCollector {
 export class RedisEnhancedMetricsCollector implements EnhancedMetricsCollector {
 	private connection: RedisType
 	private isSharedConnection: boolean
+	private monitor: MonitoringService
 	private keyPrefix = 'audit:observability'
 	private config: ObservabilityConfig['metrics']
 
 	constructor(
+		monitor: MonitoringService,
 		config: ObservabilityConfig['metrics'],
 		redisOrUrlOrOptions?: string | RedisType | { url?: string; options?: RedisOptions },
 		directConnectionOptions?: RedisOptions
 	) {
+		this.monitor = monitor
 		this.config = config
 		this.isSharedConnection = false
 
@@ -350,6 +355,8 @@ export class RedisEnhancedMetricsCollector implements EnhancedMetricsCollector {
 		)
 		const eventsPerSecond = lastMinuteEvents.length / 60
 
+		const activeAlerts = await this.monitor.numberOfActiveAlerts()
+
 		return {
 			totalEvents,
 			eventsPerSecond,
@@ -366,7 +373,7 @@ export class RedisEnhancedMetricsCollector implements EnhancedMetricsCollector {
 				},
 				{} as Record<string, ComponentHealthMetrics>
 			),
-			activeAlerts: 0, // Would come from alert system
+			activeAlerts,
 			suspiciousPatterns: 0, // Would come from monitoring system
 			timeSeriesData,
 			timestamp: new Date().toISOString(),
@@ -452,14 +459,15 @@ export class RedisEnhancedMetricsCollector implements EnhancedMetricsCollector {
 			try {
 				const systemMetrics = await this.collectSystemMetrics()
 				await this.recordSystemMetrics(systemMetrics)
+				const auditMetrics = await this.monitor.getMetrics()
 
 				// Record time series data
 				const timeSeriesData: TimeSeriesMetrics = {
 					timestamp: systemMetrics.timestamp,
-					eventsProcessed: 0, // Would be updated by actual event processing
-					processingLatency: 0, // Would be updated by actual processing
-					errorRate: 0, // Would be calculated from recent operations
-					queueDepth: 0, // Would be updated by queue monitoring
+					eventsProcessed: auditMetrics.eventsProcessed,
+					processingLatency: auditMetrics.processingLatency,
+					errorRate: auditMetrics.errorRate,
+					queueDepth: auditMetrics.queueDepth,
 					cpuUsage: systemMetrics.cpu.usage,
 					memoryUsage: (systemMetrics.memory.used / systemMetrics.memory.total) * 100,
 				}

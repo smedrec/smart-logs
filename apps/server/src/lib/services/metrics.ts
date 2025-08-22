@@ -10,6 +10,7 @@
  * Requirements: 6.2, 6.3, 6.4
  */
 
+import type { MonitoringService } from '@repo/audit'
 import type { Redis } from '@repo/redis-client'
 
 export interface SystemMetrics {
@@ -44,9 +45,16 @@ export interface SystemMetrics {
 }
 
 export interface AuditMetrics {
-	timestamp: string
 	eventsProcessed: number
-	processingLatency: {
+	processingLatency: number
+	queueDepth: number
+	errorsGenerated: number
+	errorRate: number
+	integrityViolations: number
+	timestamp: string
+	alertsGenerated: number
+	suspiciousPatterns: number
+	/**processingLatency: {
 		average: number
 		p95: number
 		p99: number
@@ -60,7 +68,7 @@ export interface AuditMetrics {
 		generated: number
 		scheduled: number
 		failed: number
-	}
+	}*/
 }
 
 export interface EndpointMetrics {
@@ -89,7 +97,8 @@ export class MetricsCollectionService {
 
 	constructor(
 		private redis: Redis,
-		private logger: any
+		private logger: any,
+		private monitor: MonitoringService
 	) {}
 
 	/**
@@ -138,7 +147,7 @@ export class MetricsCollectionService {
 	 */
 	async getAuditMetrics(timeRange?: string): Promise<AuditMetrics> {
 		try {
-			const [processingMetrics, verificationMetrics, reportMetrics] = await Promise.allSettled([
+			/**const [processingMetrics, verificationMetrics, reportMetrics] = await Promise.allSettled([
 				this.getProcessingMetrics(timeRange),
 				this.getVerificationMetrics(timeRange),
 				this.getReportMetrics(timeRange),
@@ -160,6 +169,19 @@ export class MetricsCollectionService {
 					reportMetrics.status === 'fulfilled'
 						? reportMetrics.value
 						: { generated: 0, scheduled: 0, failed: 0 },
+			
+			}*/
+			const metrics = await this.monitor.getMetrics()
+			return {
+				timestamp: new Date().toISOString(),
+				eventsProcessed: metrics.eventsProcessed,
+				processingLatency: metrics.processingLatency,
+				queueDepth: metrics.queueDepth,
+				errorsGenerated: metrics.errorsGenerated,
+				errorRate: metrics.errorRate,
+				integrityViolations: metrics.integrityViolations,
+				alertsGenerated: metrics.alertsGenerated,
+				suspiciousPatterns: metrics.suspiciousPatterns,
 			}
 		} catch (error) {
 			this.logger.error('Failed to collect audit metrics', {
@@ -169,9 +191,13 @@ export class MetricsCollectionService {
 			return {
 				timestamp: new Date().toISOString(),
 				eventsProcessed: 0,
-				processingLatency: { average: 0, p95: 0, p99: 0 },
-				integrityVerifications: { total: 0, passed: 0, failed: 0 },
-				complianceReports: { generated: 0, scheduled: 0, failed: 0 },
+				processingLatency: 0,
+				queueDepth: 0,
+				errorsGenerated: 0,
+				errorRate: 0,
+				integrityViolations: 0,
+				alertsGenerated: 0,
+				suspiciousPatterns: 0,
 			}
 		}
 	}

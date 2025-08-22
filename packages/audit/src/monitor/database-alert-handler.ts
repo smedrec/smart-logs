@@ -6,7 +6,7 @@
 import { sql } from 'drizzle-orm'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { Alert, AlertSeverity, AlertType } from './monitoring-types.js'
+import type { Alert, AlertSeverity, AlertStatistics, AlertType } from './monitoring-types.js'
 import type { AlertHandler } from './monitoring.js'
 
 /**
@@ -61,8 +61,17 @@ export interface AlertResolution {
  * Database alert handler implementation
  */
 export class DatabaseAlertHandler implements AlertHandler {
+	private readonly name = 'DatabaseAlertHandler'
 	constructor(private db: PostgresJsDatabase<any>) {}
 
+	/**
+	 * Get handler name
+	 *
+	 * @returns name of the handler
+	 */
+	public handlerName(): string {
+		return this.name
+	}
 	/**
 	 * Send (persist) alert to database
 	 */
@@ -190,6 +199,22 @@ export class DatabaseAlertHandler implements AlertHandler {
 	}
 
 	/**
+	 * Get the number of active alerts for organization
+	 */
+	async numberOfActiveAlerts(organizationId?: string): Promise<number> {
+		let query = `SELECT COUNT(*) FROM alerts WHERE resolved = 'false'`
+		if (organizationId !== undefined) {
+			query += ` AND organization_id = ${organizationId}`
+		}
+		try {
+			const result = await this.db.execute(sql.raw(query))
+			return Number(result[0].count)
+		} catch (error) {
+			throw new Error(`Failed to retrieve number of active alerts: ${error}`)
+		}
+	}
+
+	/**
 	 * Get alerts with filters for organization
 	 */
 	async getAlerts(filters: AlertQueryFilters): Promise<Alert[]> {
@@ -283,16 +308,8 @@ export class DatabaseAlertHandler implements AlertHandler {
 	/**
 	 * Get alert statistics for organization
 	 */
-	async getAlertStatistics(organizationId: string): Promise<{
-		total: number
-		active: number
-		acknowledged: number
-		resolved: number
-		bySeverity: Record<AlertSeverity, number>
-		byType: Record<AlertType, number>
-	}> {
-		try {
-			const result = await this.db.execute(sql`
+	async getAlertStatistics(organizationId?: string): Promise<AlertStatistics> {
+		let query = `
 				SELECT 
 					COUNT(*) as total,
 					COUNT(CASE WHEN acknowledged = 'true' THEN 1 END) as acknowledged,
@@ -305,11 +322,15 @@ export class DatabaseAlertHandler implements AlertHandler {
 					COUNT(CASE WHEN type = 'SECURITY' THEN 1 END) as security_type,
 					COUNT(CASE WHEN type = 'COMPLIANCE' THEN 1 END) as compliance_type,
 					COUNT(CASE WHEN type = 'PERFORMANCE' THEN 1 END) as performance_type,
-					COUNT(CASE WHEN type = 'SYSTEM' THEN 1 END) as system_type
+					COUNT(CASE WHEN type = 'SYSTEM' THEN 1 END) as system_type,
 					COUNT(CASE WHEN type = 'METRICS' THEN 1 END) as metrics_type
-				FROM alerts 
-				WHERE organization_id = ${organizationId}
-			`)
+				FROM alerts
+			`
+		if (organizationId !== undefined) {
+			query += ` WHERE organization_id = ${organizationId}`
+		}
+		try {
+			const result = await this.db.execute(sql.raw(query))
 
 			const rows = result || []
 			const row = rows[0]

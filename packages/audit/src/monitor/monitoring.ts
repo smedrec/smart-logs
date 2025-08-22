@@ -13,6 +13,7 @@ import type { AuditLogEvent } from '../types.js'
 import type {
 	Alert,
 	AlertSeverity,
+	AlertStatistics,
 	AlertType,
 	AuditMetrics,
 	HealthStatus,
@@ -83,6 +84,7 @@ export interface SuspiciousPattern {
  * Alert handler interface
  */
 export interface AlertHandler {
+	handlerName(): string
 	sendAlert(alert: Alert): Promise<void>
 	acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }>
 	resolveAlert(
@@ -91,6 +93,8 @@ export interface AlertHandler {
 		resolutionData?: AlertResolution
 	): Promise<{ success: boolean }>
 	getActiveAlerts(organizationId?: string): Promise<Alert[]>
+	numberOfActiveAlerts(organizationId?: string): Promise<number>
+	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
 }
 
 /**
@@ -606,6 +610,56 @@ export class MonitoringService {
 	}
 
 	/**
+	 * Get number of active alerts
+	 */
+	async numberOfActiveAlerts(organizationId?: string): Promise<number> {
+		for (const handler of this.alertHandlers) {
+			try {
+				if (handler.handlerName() === 'DatabaseAlertHandler') {
+					return await handler.numberOfActiveAlerts(organizationId)
+				}
+			} catch (error) {
+				console.error('Failed to count the active alerts:', error)
+			}
+		}
+		return 0
+	}
+
+	/**
+	 * Get alert statistics
+	 */
+	async getAlertStatistics(organizationId?: string): Promise<AlertStatistics> {
+		for (const handler of this.alertHandlers) {
+			try {
+				if (handler.handlerName() === 'DatabaseAlertHandler') {
+					return await handler.getAlertStatistics(organizationId)
+				}
+			} catch (error) {
+				console.error('Failed to count the active alerts:', error)
+			}
+		}
+		return {
+			total: 0,
+			active: 0,
+			acknowledged: 0,
+			resolved: 0,
+			bySeverity: {
+				LOW: 0,
+				MEDIUM: 0,
+				HIGH: 0,
+				CRITICAL: 0,
+			},
+			byType: {
+				SECURITY: 0,
+				COMPLIANCE: 0,
+				PERFORMANCE: 0,
+				SYSTEM: 0,
+				METRICS: 0,
+			},
+		}
+	}
+
+	/**
 	 * Resolve an alert
 	 */
 	async resolveAlert(alertId: string, resolvedBy: string): Promise<void> {
@@ -978,6 +1032,10 @@ export class DefaultMetricsCollector implements MetricsCollector {
  * Console alert handler for development/testing
  */
 export class ConsoleAlertHandler implements AlertHandler {
+	handlerName(): string {
+		return 'ConsoleAlertHandler'
+	}
+
 	async sendAlert(alert: Alert): Promise<void> {
 		console.log(`🚨 ALERT [${alert.severity}]: ${alert.title}`)
 		console.log(`   Description: ${alert.description}`)
@@ -1002,5 +1060,41 @@ export class ConsoleAlertHandler implements AlertHandler {
 			`📋 Getting active alerts${organizationId ? ` for organization ${organizationId}` : ''}`
 		)
 		return []
+	}
+
+	async numberOfActiveAlerts(organizationId?: string): Promise<number> {
+		// Console handler doesn't store alerts
+		console.log(
+			`📋 Getting number of active alerts${
+				organizationId ? ` for organization ${organizationId}` : ''
+			}`
+		)
+		return 0
+	}
+
+	async getAlertStatistics(organizationId?: string): Promise<AlertStatistics> {
+		// Console handler doesn't store alerts
+		console.log(
+			`📊 Getting alert statistics${organizationId ? ` for organization ${organizationId}` : ''}`
+		)
+		return {
+			total: 0,
+			active: 0,
+			acknowledged: 0,
+			resolved: 0,
+			bySeverity: {
+				LOW: 0,
+				MEDIUM: 0,
+				HIGH: 0,
+				CRITICAL: 0,
+			},
+			byType: {
+				SECURITY: 0,
+				COMPLIANCE: 0,
+				PERFORMANCE: 0,
+				SYSTEM: 0,
+				METRICS: 0,
+			},
+		}
 	}
 }

@@ -374,6 +374,7 @@ async function main() {
 	}
 	if (!enhancedMetricsCollector) {
 		enhancedMetricsCollector = new RedisEnhancedMetricsCollector(
+			monitoringService,
 			DEFAULT_OBSERVABILITY_CONFIG.metrics,
 			connection
 		)
@@ -383,6 +384,7 @@ async function main() {
 	}
 	if (!dashboard) {
 		dashboard = new AuditMonitoringDashboard(
+			monitoringService,
 			enhancedMetricsCollector,
 			bottleneckAnalyzer,
 			DEFAULT_DASHBOARD_CONFIG

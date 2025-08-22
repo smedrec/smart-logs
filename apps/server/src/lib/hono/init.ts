@@ -216,11 +216,6 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
 
-		// Initialize enhanced monitoring services
-		if (!metricsCollectionService) {
-			metricsCollectionService = new MetricsCollectionService(connection, structuredLogger)
-		}
-
 		if (!audit)
 			audit = new Audit(
 				'audit-reliable-dev', // Default queue name - could be made configurable
@@ -237,6 +232,15 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 
+		// Initialize enhanced monitoring services
+		if (!metricsCollectionService) {
+			metricsCollectionService = new MetricsCollectionService(
+				connection,
+				structuredLogger,
+				monitoringService
+			)
+		}
+
 		const monitor = {
 			alert: databaseAlertHandler,
 			metrics: monitoringService,
@@ -249,6 +253,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		}
 		if (!enhancedMetricsCollector) {
 			enhancedMetricsCollector = new RedisEnhancedMetricsCollector(
+				monitoringService,
 				DEFAULT_OBSERVABILITY_CONFIG.metrics,
 				connection
 			)
@@ -258,6 +263,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		}
 		if (!dashboard) {
 			dashboard = new AuditMonitoringDashboard(
+				monitoringService,
 				enhancedMetricsCollector,
 				bottleneckAnalyzer,
 				DEFAULT_DASHBOARD_CONFIG
