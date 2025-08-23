@@ -130,6 +130,19 @@ const validationSchema: Record<string, ValidationRule> = {
 		max: 10,
 	},
 
+	// Server configuration
+	'server.port': {
+		required: true,
+		type: 'number',
+		min: 3000,
+		max: 65535,
+	},
+	'server.host': {
+		required: true,
+		type: 'string',
+		pattern: /^(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/,
+	},
+
 	// Worker configuration
 	'worker.concurrency': {
 		required: true,

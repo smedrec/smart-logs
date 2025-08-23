@@ -478,7 +478,7 @@ async function main() {
 				correlationId,
 				dataClassification,
 				retentionPolicy,
-				processingLatency: processingLatency || performanceTimer.getCurrentDuration(),
+				processingLatency: processingLatency || Math.floor(performanceTimer.getCurrentDuration()),
 				archivedAt,
 				details: Object.keys(additionalDetails).length > 0 ? additionalDetails : null,
 			})
