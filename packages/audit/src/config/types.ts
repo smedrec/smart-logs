@@ -11,10 +11,11 @@ import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
 import type { RetryConfig } from '../retry.js'
 
 export type StorageType = 's3' | 'file'
+export type Environment = 'development' | 'staging' | 'production' | 'test'
 
 export interface AuditConfig {
 	/** Environment identifier */
-	environment: 'development' | 'staging' | 'production' | 'test'
+	environment: Environment
 
 	/** Configuration version for tracking changes */
 	version: string
@@ -27,6 +28,9 @@ export interface AuditConfig {
 
 	/** Database configuration */
 	database: DatabaseConfig
+
+	/** Server configuration */
+	server: ServerConfig
 
 	/** Worker configuration */
 	worker: WorkerConfig
@@ -117,6 +121,100 @@ export interface WorkerConfig {
 
 	/** Shutdown timeout in milliseconds */
 	shutdownTimeout: number
+}
+
+export interface ServerConfig {
+	/** Server port */
+	port: number
+
+	/** Server host */
+	host: string
+
+	/** Server environment */
+	environment: Environment
+
+	cors: {
+		origin: string | string[]
+		credentials: boolean
+		allowedMethods: string[]
+		allowedHeaders: string[]
+	}
+	rateLimit: {
+		windowMs: number
+		maxRequests: number
+		skipSuccessfulRequests: boolean
+		keyGenerator: 'ip' | 'user' | 'session'
+	}
+	auth: {
+		sessionSecret: string
+		sessionMaxAge: number
+		trustedOrigins: string[]
+		betterAuthUrl: string
+		redisUrl?: string
+		dbUrl?: string
+		poolSize?: number
+	}
+	monitoring: {
+		enableMetrics: boolean
+		metricsPath: string
+		healthCheckPath: string
+		logLevel: 'debug' | 'info' | 'warn' | 'error'
+		enableTracing: boolean
+		tracingEndpoint?: string
+	}
+	security: {
+		apiKeyHeader: string
+		enableApiKeyAuth: boolean
+		trustedProxies: string[]
+		maxRequestSize: string
+	}
+	performance: {
+		enableCompression: boolean
+		compressionLevel: number
+		enableCaching: boolean
+		cacheMaxAge: number
+		enableEtag: boolean
+	}
+	api: {
+		enableTrpc: boolean
+		enableRest: boolean
+		enableGraphql: boolean
+		trpcPath: string
+		restPath: string
+		graphqlPath: string
+		enableOpenApi: boolean
+		openApiPath: string
+	}
+	externalServices: {
+		smtp?: {
+			host: string
+			port: number
+			secure: boolean
+			user: string
+			pass: string
+			from: string
+		}
+		webhook?: {
+			url: string
+			method: 'GET' | 'POST' | 'PUT' | 'PATCH'
+			headers: Record<string, string>
+			timeout: number
+			retryConfig: {
+				maxRetries: number
+				backoffMultiplier: number
+				maxBackoffDelay: number
+			}
+		}
+		storage?: {
+			provider: 'local' | 's3' | 'gcs'
+			config: Record<string, any>
+			path: string
+			retention: {
+				days: number
+				autoCleanup: boolean
+			}
+		}
+	}
 }
 
 export interface MonitoringConfig {

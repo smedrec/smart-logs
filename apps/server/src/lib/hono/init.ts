@@ -4,6 +4,7 @@ import {
 	AuditMonitoringDashboard,
 	AuditTracer,
 	ComplianceReportingService,
+	ConfigurationManager,
 	createDatabasePresetHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
@@ -31,12 +32,11 @@ import { ConsoleLogger } from '@repo/hono-helpers'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { getAuthDb } from '../auth.js'
-import { configManager } from '../config/index.js'
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { MetricsCollectionService } from '../services/metrics.js'
 
 import type { MiddlewareHandler } from 'hono'
-import type { DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
+import type { AuditConfig, DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
 import type { Redis } from '@repo/redis-client'
 import type { HonoEnv } from '../hono/context.js'
 
@@ -134,7 +134,7 @@ function createDeliveryConfig(externalServices: any): DeliveryConfig {
  *
  * Call this once before any hono handlers run.
  */
-export function init(): MiddlewareHandler<HonoEnv> {
+export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 	return async (c, next) => {
 		if (!isolateId) {
 			isolateId = crypto.randomUUID()
@@ -157,28 +157,24 @@ export function init(): MiddlewareHandler<HonoEnv> {
 		c.res.headers.set('x-application', application)
 		c.res.headers.set('x-version', version)
 
-		// Initialize configuration manager
-		await configManager.initialize()
-		const config = configManager.getConfig()
-
 		// Initialize enhanced structured logger
-		if (!structuredLogger) {
+		/**if (!structuredLogger) {
 			LoggerFactory.setDefaultConfig({
-				level: config.monitoring.logLevel,
+				level: config.server.monitoring.logLevel,
 				enablePerformanceLogging: true,
 				enableErrorTracking: true,
-				enableMetrics: config.monitoring.enableMetrics,
-				format: config.server.environment === 'development' ? 'pretty' : 'json',
+				enableMetrics: config.server.monitoring.enableMetrics,
+				format: config.server.server.environment === 'development' ? 'pretty' : 'json',
 				outputs: ['console'],
 			})
 
 			structuredLogger = LoggerFactory.createLogger({
 				requestId,
 				application,
-				environment: config.server.environment,
+				environment: config.server.server.environment,
 				version,
 			})
-		}
+		}*/
 
 		const logger = new ConsoleLogger({
 			requestId,
@@ -198,7 +194,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			}
 		}
 
-		const authDb = await getAuthDb()
+		const authDb = await getAuthDb(config)
 		// Get the Drizzle ORM instance
 		const db = {
 			auth: authDb,
@@ -218,7 +214,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		if (!audit)
 			audit = new Audit(
-				'audit-reliable-dev', // Default queue name - could be made configurable
+				config.reliableProcessor.queueName,
 				{
 					secretKey: config.security.encryptionKey,
 				},
@@ -234,11 +230,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 
 		// Initialize enhanced monitoring services
 		if (!metricsCollectionService) {
-			metricsCollectionService = new MetricsCollectionService(
-				connection,
-				structuredLogger,
-				monitoringService
-			)
+			metricsCollectionService = new MetricsCollectionService(connection, logger, monitoringService)
 		}
 
 		const monitor = {
@@ -287,7 +279,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			})
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService) {
-			const deliveryConfig = createDeliveryConfig(config.externalServices)
+			const deliveryConfig = createDeliveryConfig(config.server.externalServices)
 			scheduledReportingService = new ScheduledReportingService(
 				reportingService,
 				dataExportService,
@@ -329,7 +321,7 @@ export function init(): MiddlewareHandler<HonoEnv> {
 			observability,
 			audit,
 			logger,
-			structuredLogger,
+			//structuredLogger,
 			error: errorHandler,
 			//cache,
 		})

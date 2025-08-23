@@ -4,10 +4,10 @@ import { serve } from '@hono/node-server'
 import { trpcServer } from '@hono/trpc-server'
 import { cors } from 'hono/cors'
 
+import { ConfigurationManager } from '@repo/audit'
 import { useConsoleLogger } from '@repo/hono-helpers'
 
 import { getAuthInstance } from './lib/auth.js'
-import { configManager } from './lib/config/index.js'
 import { handleGraphQLRequest } from './lib/graphql/index'
 import { newApp } from './lib/hono/'
 import { init } from './lib/hono/init'
@@ -19,13 +19,31 @@ import {
 } from './lib/middleware/monitoring.js'
 import { appRouter } from './routers/index'
 
+// Configuration manager
+let configManager: ConfigurationManager | undefined = undefined
+export { configManager }
+
 // Global server instance for graceful shutdown
 let server: ReturnType<typeof serve> | null = null
 let isShuttingDown = false
 
 async function startServer() {
 	// Initialize configuration
-	await configManager.initialize()
+	if (!configManager) {
+		console.info('🔗 Initializing configuration manager...')
+		configManager = new ConfigurationManager('default/audit-development.json', 's3')
+		try {
+			await configManager.initialize()
+		} catch (error) {
+			// Exit if initialization fails
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unknown error during configuration manager initialization'
+			console.error('🔴 Configuration manager initialization failed:', message)
+			throw new Error(message)
+		}
+	}
 	const config = configManager.getConfig()
 
 	const app = newApp()
@@ -34,9 +52,9 @@ async function startServer() {
 		app.use('*', nodeEnv())
 	}
 
-	const auth = await getAuthInstance()
+	const auth = await getAuthInstance(config)
 
-	app.use('*', init())
+	app.use('*', init(config))
 	//app.use(useConsoleLogger())
 
 	// Add monitoring middleware
@@ -48,18 +66,18 @@ async function startServer() {
 	app.use(
 		'/*',
 		cors({
-			origin: config.cors.origin,
-			allowMethods: config.cors.allowedMethods,
-			allowHeaders: config.cors.allowedHeaders,
-			credentials: config.cors.credentials,
+			origin: config.server.cors.origin,
+			allowMethods: config.server.cors.allowedMethods,
+			allowHeaders: config.server.cors.allowedHeaders,
+			credentials: config.server.cors.credentials,
 		})
 	)
 
 	app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
 
 	// Configure TRPC with path from configuration
-	if (config.api.enableTrpc) {
-		app.use(`${config.api.trpcPath}/*`, async (c, next) =>
+	if (config.server.api.enableTrpc) {
+		app.use(`${config.server.api.trpcPath}/*`, async (c, next) =>
 			trpcServer({
 				router: appRouter,
 				createContext: () => ({
@@ -72,10 +90,10 @@ async function startServer() {
 	}
 
 	// Mount REST API routes if enabled
-	if (config.api.enableRest) {
+	if (config.server.api.enableRest) {
 		const { createRestAPI } = await import('./routes/rest-api.js')
 		const restAPI = createRestAPI()
-		app.route(`${config.api.restPath}/v1`, restAPI)
+		app.route(`${config.server.api.restPath}/v1`, restAPI)
 	}
 
 	// Mount health check API
@@ -84,24 +102,24 @@ async function startServer() {
 	app.route('', healthAPI)
 
 	// Mount metrics API if enabled
-	if (config.monitoring.enableMetrics) {
+	if (config.server.monitoring.enableMetrics) {
 		const { createMetricsAPI } = await import('./routes/metrics-api.js')
 		const metricsAPI = createMetricsAPI()
 		app.route('/metrics', metricsAPI)
 	}
 
 	// Configure GraphQL endpoint if enabled
-	if (config.api.enableGraphql) {
-		app.all(`${config.api.graphqlPath}/*`, async (c) => {
+	if (config.server.api.enableGraphql) {
+		app.all(`${config.server.api.graphqlPath}/*`, async (c) => {
 			return handleGraphQLRequest(c)
 		})
-		app.all(config.api.graphqlPath, async (c) => {
+		app.all(config.server.api.graphqlPath, async (c) => {
 			return handleGraphQLRequest(c)
 		})
 	}
 
 	// Legacy health check endpoint (for backward compatibility)
-	app.get(config.monitoring.healthCheckPath, (c) => {
+	app.get(config.server.monitoring.healthCheckPath, (c) => {
 		if (isShuttingDown) {
 			return c.json({ status: 'shutting_down' }, 503)
 		}
@@ -116,6 +134,9 @@ async function startServer() {
 	// Configuration endpoint (development only)
 	if (configManager.isDevelopment()) {
 		app.get('/config', (c) => {
+			if (!configManager) {
+				return c.json({ error: 'Configuration manager not initialized' }, 500)
+			}
 			return c.json({
 				environment: configManager.getEnvironment(),
 				config: JSON.parse(configManager.toJSON()),
@@ -134,33 +155,33 @@ async function startServer() {
 			console.log(`🚀 Server is running on http://${config.server.host}:${config.server.port}`)
 			console.log(`📊 Environment: ${config.server.environment}`)
 			console.log(
-				`🔧 Health check: http://${config.server.host}:${config.server.port}${config.monitoring.healthCheckPath}`
+				`🔧 Health check: http://${config.server.host}:${config.server.port}${config.server.monitoring.healthCheckPath}`
 			)
 			console.log(`✅ Readiness check: http://${config.server.host}:${config.server.port}/ready`)
 
 			// API endpoints
-			if (config.api.enableTrpc) {
+			if (config.server.api.enableTrpc) {
 				console.log(
-					`🔌 TRPC API: http://${config.server.host}:${config.server.port}${config.api.trpcPath}`
+					`🔌 TRPC API: http://${config.server.host}:${config.server.port}${config.server.api.trpcPath}`
 				)
 			}
-			if (config.api.enableRest) {
+			if (config.server.api.enableRest) {
 				console.log(
-					`🌐 REST API: http://${config.server.host}:${config.server.port}${config.api.restPath}`
+					`🌐 REST API: http://${config.server.host}:${config.server.port}${config.server.api.restPath}`
 				)
 			}
-			if (config.api.enableGraphql) {
+			if (config.server.api.enableGraphql) {
 				console.log(
-					`🎯 GraphQL API: http://${config.server.host}:${config.server.port}${config.api.graphqlPath}`
+					`🎯 GraphQL API: http://${config.server.host}:${config.server.port}${config.server.api.graphqlPath}`
 				)
-				if (configManager.isDevelopment()) {
+				if (configManager?.isDevelopment()) {
 					console.log(
-						`🎮 GraphQL Playground: http://${config.server.host}:${config.server.port}${config.api.graphqlPath}`
+						`🎮 GraphQL Playground: http://${config.server.host}:${config.server.port}${config.server.api.graphqlPath}`
 					)
 				}
 			}
 
-			if (configManager.isDevelopment()) {
+			if (configManager?.isDevelopment()) {
 				console.log(`⚙️  Configuration: http://${config.server.host}:${config.server.port}/config`)
 			}
 		}

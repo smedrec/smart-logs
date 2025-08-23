@@ -19,6 +19,7 @@ import { validateConfiguration } from './validator.js'
 import type {
 	AuditConfig,
 	ConfigChangeEvent,
+	Environment,
 	HotReloadConfig,
 	SecureStorageConfig,
 	StorageType,
@@ -122,6 +123,35 @@ export class ConfigurationManager extends EventEmitter {
 			throw new Error('Configuration not initialized. Call initialize() first.')
 		}
 		return { ...this.config }
+	}
+
+	/**
+	 * Get current environment
+	 */
+	getEnvironment(): Environment {
+		//return this.loader.getEnvironment()
+		return this.config?.environment || this.detectEnvironment()
+	}
+
+	/**
+	 * Check if running in production
+	 */
+	isProduction(): boolean {
+		return this.getEnvironment() === 'production'
+	}
+
+	/**
+	 * Check if running in development
+	 */
+	isDevelopment(): boolean {
+		return this.getEnvironment() === 'development'
+	}
+
+	/**
+	 * Check if running in test mode
+	 */
+	isTest(): boolean {
+		return this.getEnvironment() === 'test'
 	}
 
 	/**
@@ -282,6 +312,18 @@ export class ConfigurationManager extends EventEmitter {
 	}
 
 	/**
+	 * Get configuration as JSON string (for debugging)
+	 */
+	toJSON(): string {
+		if (!this.config) {
+			return '{}'
+		}
+		// Remove sensitive information from output
+		const sanitizedConfig = this.sanitizeConfig(this.config)
+		return JSON.stringify(sanitizedConfig, null, 2)
+	}
+
+	/**
 	 * Export configuration (with sensitive data masked)
 	 */
 	exportConfig(includeSensitive = false): Partial<AuditConfig> {
@@ -302,6 +344,7 @@ export class ConfigurationManager extends EventEmitter {
 			if (exported.security?.encryptionKey) {
 				exported.security.encryptionKey = '***MASKED***'
 			}
+			// TODO mask server configuration
 		}
 
 		return exported
@@ -726,6 +769,51 @@ export class ConfigurationManager extends EventEmitter {
 			previousVersion: dbChangeEvent.previous_version,
 			newVersion: dbChangeEvent.new_version,
 		}
+	}
+
+	/**
+	 * Remove sensitive information from configuration for logging/debugging
+	 */
+	private sanitizeConfig(config: AuditConfig): any {
+		const sanitized = JSON.parse(JSON.stringify(config))
+
+		// Remove sensitive fields
+		if (sanitized.server.auth?.sessionSecret) {
+			sanitized.server.auth.sessionSecret = '***MASKED***'
+		}
+		if (sanitized.server.auth?.dbUrl) {
+			sanitized.server.auth.dbUrl = this.maskSensitiveUrl(sanitized.server.auth.dbUrl)
+		}
+		if (sanitized.server.auth?.redisUrl) {
+			sanitized.server.auth.redisUrl = this.maskSensitiveUrl(sanitized.server.auth.redisUrl)
+		}
+		if (sanitized.security?.encryptionKey) {
+			sanitized.security.encryptionKey = '***MASKED***'
+		}
+		if (sanitized.database?.url) {
+			sanitized.database.url = this.maskSensitiveUrl(sanitized.database.url)
+		}
+		if (sanitized.redis?.url) {
+			sanitized.redis.url = this.maskSensitiveUrl(sanitized.redis.url)
+		}
+		if (sanitized.server.externalServices?.smtp?.pass) {
+			sanitized.server.externalServices.smtp.pass = '***MASKED***'
+		}
+		if (sanitized.server.externalServices?.webhook?.headers?.Authorization) {
+			sanitized.server.externalServices.webhook.headers.Authorization = '***MASKED***'
+		}
+
+		return sanitized
+	}
+
+	/**
+	 * Detect environment from NODE_ENV or default to development
+	 */
+	private detectEnvironment(): Environment {
+		const nodeEnv = process.env.NODE_ENV as Environment
+		return ['development', 'staging', 'production', 'test'].includes(nodeEnv)
+			? nodeEnv
+			: 'development'
 	}
 }
 

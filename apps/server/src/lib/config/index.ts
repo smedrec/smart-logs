@@ -2,6 +2,10 @@
  * Configuration module exports
  */
 
+import { ConfigurationManager } from './manager.js'
+
+import type { ServerConfig } from './schema.js'
+
 // Schema exports
 export {
 	validateConfig,

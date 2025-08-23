@@ -23,8 +23,6 @@ interface EnvConfig {
 	poolSize?: number
 }
 
-const email = new SendMail('mail', process.env.REDIS_URL)
-
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
 	private db: ReturnType<typeof initDrizzle>['db']
@@ -41,10 +39,10 @@ class Auth {
 			throw new Error('Auth: Better auth environment variables not found.')
 		}*/
 
-		const redis = getRedisConnection(config.auth.redisUrl)
+		const redis = getRedisConnection(config.server.auth.redisUrl)
 
 		// Using environment variable AUTH_DB_URL
-		const { db } = initDrizzle(config.auth.dbUrl, config.auth.poolSize)
+		const { db } = initDrizzle(config.server.auth.dbUrl, config.server.auth.poolSize)
 		this.db = db
 
 		// TODO - see who to fix the async question
@@ -63,7 +61,7 @@ class Auth {
 				provider: 'pg',
 				schema: schema,
 			}),
-			trustedOrigins: config.auth.trustedOrigins,
+			trustedOrigins: config.server.auth.trustedOrigins,
 			emailAndPassword: {
 				enabled: true,
 				minPasswordLength: 8,
@@ -116,8 +114,8 @@ class Auth {
 					})
 				},
 			},
-			secret: config.auth.sessionSecret,
-			baseURL: config.auth.betterAuthUrl,
+			secret: config.server.auth.sessionSecret,
+			baseURL: config.server.auth.betterAuthUrl,
 			databaseHooks: {
 				session: {
 					create: {

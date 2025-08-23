@@ -34,11 +34,14 @@ export interface ServerConfig {
 	}
 	redis: {
 		url: string
-		maxRetriesPerRequest: number
-		retryDelayOnFailover: number
 		connectTimeout: number
-		lazyConnect: boolean
-		keepAlive: number
+		commandTimeout: number
+		maxRetriesPerRequest: number | null
+		retryDelayOnFailover: number
+		enableOfflineQueue: boolean
+		enableAutoPipelining: boolean
+		//lazyConnect: boolean
+		//keepAlive: number
 	}
 	auth: {
 		sessionSecret: string

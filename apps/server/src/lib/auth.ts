@@ -1,29 +1,25 @@
+import { type AuditConfig } from '@repo/audit'
 import { Auth } from '@repo/auth'
-
-import { configManager } from './config/manager.js'
 
 let authInstance: Auth | undefined = undefined
 
-export async function initializeAuth() {
+export async function initializeAuth(config: AuditConfig) {
 	if (!authInstance) {
-		// Initialize configuration
-		await configManager.initialize()
-		const config = configManager.getConfig()
 		authInstance = new Auth(config)
 	}
 	return authInstance
 }
 
-export async function getAuthInstance() {
+export async function getAuthInstance(config: AuditConfig) {
 	if (!authInstance) {
-		authInstance = await initializeAuth()
+		authInstance = await initializeAuth(config)
 	}
 	return authInstance.getAuthInstance()
 }
 
-export async function getAuthDb() {
+export async function getAuthDb(config: AuditConfig) {
 	if (!authInstance) {
-		authInstance = await initializeAuth()
+		authInstance = await initializeAuth(config)
 	}
 	return authInstance.getDbInstance()
 }

@@ -65,7 +65,7 @@ export type ServiceContext = {
 	}
 	audit: Audit
 	logger: Logger
-	structuredLogger: StructuredLogger
+	//structuredLogger: StructuredLogger
 	error: ErrorHandler
 }
 

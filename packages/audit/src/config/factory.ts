@@ -31,6 +31,70 @@ export function createDevelopmentConfig(): AuditConfig {
 			ssl: false,
 			maxConnectionAttempts: 3,
 		},
+		server: {
+			port: 3000,
+			host: '0.0.0.0',
+			environment: 'development',
+			cors: {
+				origin: '*',
+				credentials: true,
+				allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+				allowedHeaders: [
+					'Content-Type',
+					'Authorization',
+					'x-application',
+					'x-requestid',
+					'x-version',
+				],
+			},
+			rateLimit: {
+				windowMs: 60000,
+				maxRequests: 100,
+				skipSuccessfulRequests: false,
+				keyGenerator: 'ip',
+			},
+			auth: {
+				sessionSecret:
+					process.env.BETTER_AUTH_SECRET || 'your-session-secret-key-here-min-32-chars',
+				sessionMaxAge: 86400,
+				trustedOrigins: ['http://localhost:3001'],
+				betterAuthUrl: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+				redisUrl: process.env.BETTER_AUTH_REDIS_URL || 'redis://localhost:6379',
+				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://localhost:5432/auth_dev',
+				poolSize: 10,
+			},
+			monitoring: {
+				enableMetrics: true,
+				metricsPath: '/metrics',
+				healthCheckPath: '/health',
+				logLevel: 'info',
+				enableTracing: false,
+			},
+			performance: {
+				enableCompression: true,
+				compressionLevel: 6,
+				enableCaching: true,
+				cacheMaxAge: 300,
+				enableEtag: true,
+			},
+			api: {
+				enableTrpc: true,
+				enableRest: true,
+				enableGraphql: true,
+				trpcPath: '/trpc',
+				restPath: '/api',
+				graphqlPath: '/graphql',
+				enableOpenApi: true,
+				openApiPath: '/api/docs',
+			},
+			security: {
+				apiKeyHeader: 'x-api-key',
+				enableApiKeyAuth: false,
+				trustedProxies: [],
+				maxRequestSize: '10mb',
+			},
+			externalServices: {},
+		},
 		worker: {
 			concurrency: 2,
 			queueName: 'audit-reliable-dev',
@@ -157,11 +221,20 @@ export function createStagingConfig(): AuditConfig {
 			ssl: true,
 			poolSize: 15,
 		},
+		server: {
+			...baseConfig.server,
+			environment: 'staging',
+			auth: {
+				...baseConfig.server.auth,
+				sessionSecret: process.env.BETTER_AUTH_SECRET || generateDefaultSecret(),
+				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://postgres-staging:5432/auth_staging',
+				redisUrl: process.env.BETTER_AUTH_REDIS_URL || 'redis://redis-staging:6379',
+			},
+		},
 		worker: {
 			...baseConfig.worker,
 			concurrency: 4,
 			queueName: 'audit-reliable-staging',
-			port: 3001,
 		},
 		retry: {
 			...baseConfig.retry,
@@ -252,6 +325,17 @@ export function createProductionConfig(): AuditConfig {
 			connectionTimeout: 5000,
 			queryTimeout: 60000,
 			maxConnectionAttempts: 5,
+		},
+		server: {
+			...baseConfig.server,
+			environment: 'production',
+			auth: {
+				...baseConfig.server.auth,
+				sessionSecret: process.env.BETTER_AUTH_SECRET || generateDefaultSecret(),
+				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://postgres-staging:5432/auth_staging',
+				redisUrl: process.env.BETTER_AUTH_REDIS_URL || 'redis://redis-staging:6379',
+				poolSize: 20,
+			},
 		},
 		worker: {
 			...baseConfig.worker,
@@ -345,6 +429,17 @@ export function createTestConfig(): AuditConfig {
 			...baseConfig.database,
 			url: process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit_test',
 			poolSize: 5,
+		},
+		server: {
+			...baseConfig.server,
+			environment: 'test',
+			auth: {
+				...baseConfig.server.auth,
+				sessionSecret: process.env.BETTER_AUTH_SECRET || generateDefaultSecret(),
+				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://postgres-staging:5432/auth_staging',
+				redisUrl: process.env.BETTER_AUTH_REDIS_URL || 'redis://redis-staging:6379',
+				poolSize: 5,
+			},
 		},
 		worker: {
 			...baseConfig.worker,
@@ -471,6 +566,19 @@ export function createMinimalConfig(
 			ssl: environment === 'production',
 			maxConnectionAttempts: 3,
 		},
+		/**server: {
+			host: 'localhost',
+			port: 3001,
+			environment: 'test',
+			auth: {
+				sessionSecret: process.env.BETTER_AUTH_SECRET || generateDefaultSecret(),
+				sessionMaxAge: 86400000,
+    		trustedOrigins: ['*'],
+    		betterAuthUrl: process.env.BETTER_AUTH_URL || 'XXXXXXXXXXXXXXXXXXXXX',
+				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://localhost:5432/auth',
+				redisUrl: process.env.BETTER_AUTH_REDIS_URL || 'redis://localhost:6379',
+			},
+		},*/
 		worker: {
 			concurrency: 2,
 			queueName: `audit-events-${environment}`,
