@@ -23,3 +23,10 @@ export async function getAuthDb(config: AuditConfig) {
 	}
 	return authInstance.getDbInstance()
 }
+
+export async function getAuthRedis(config: AuditConfig) {
+	if (!authInstance) {
+		authInstance = await initializeAuth(config)
+	}
+	return authInstance.getRedisInstance()
+}

@@ -28,11 +28,11 @@ import {
 	reportTemplates,
 	scheduledReports,
 } from '@repo/audit-db'
+import { createAuthorizationService } from '@repo/auth'
 import { ConsoleLogger } from '@repo/hono-helpers'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
-import { getAuthDb } from '../auth.js'
-import { createAuthorizationService } from '../services/authorization.js'
+import { getAuthDb, getAuthRedis } from '../auth.js'
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { MetricsCollectionService } from '../services/metrics.js'
 
@@ -199,6 +199,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		}
 
 		const authDb = await getAuthDb(config)
+		const authRedis = await getAuthRedis(config)
 		// Get the Drizzle ORM instance
 		const db = {
 			auth: authDb,
@@ -239,7 +240,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 
 		// Initialize authorization service
 		if (!authorizationService) {
-			authorizationService = createAuthorizationService(db.auth)
+			authorizationService = createAuthorizationService(db.auth, authRedis)
 		}
 
 		const monitor = {

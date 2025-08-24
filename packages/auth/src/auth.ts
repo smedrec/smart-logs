@@ -11,6 +11,7 @@ import { getActiveOrganization } from './functions.js'
 import { AuditSDKPlugin } from './plugins/audit.js'
 import { getRedisConnection } from './redis.js'
 
+import type { Redis as RedisInstanceType } from 'ioredis'
 import type { MailerSendOptions } from '@repo/send-mail'
 
 interface EnvConfig {
@@ -26,6 +27,7 @@ interface EnvConfig {
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
 	private db: ReturnType<typeof initDrizzle>['db']
+	private redis: RedisInstanceType
 	/**
 	 * Constructs an Better Auth instance
 	 * @param config The environment config. If not provided, it attempts to use
@@ -40,6 +42,7 @@ class Auth {
 		}*/
 
 		const redis = getRedisConnection(config.server.auth.redisUrl)
+		this.redis = redis
 
 		// Using environment variable AUTH_DB_URL
 		const { db } = initDrizzle(config.server.auth.dbUrl, config.server.auth.poolSize)
@@ -245,6 +248,14 @@ class Auth {
 	 */
 	public getDbInstance(): ReturnType<typeof initDrizzle>['db'] {
 		return this.db
+	}
+
+	/**
+	 * Provides access to the Redis instance for secondary storage operations.
+	 * @returns The Redis instance typed with the RedisInstanceType schema.
+	 */
+	public getRedisInstance(): RedisInstanceType {
+		return this.redis
 	}
 }
 

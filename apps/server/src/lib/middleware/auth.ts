@@ -265,7 +265,7 @@ export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
 	try {
 		// Query the API key from the auth database
 		// Note: This assumes Better Auth's API key plugin stores keys in an 'apiKey' table
-		const apiKeyRecord = await db.auth.query.apiKey.findFirst({
+		const apiKeyRecord = await db.auth.query.apikey.findFirst({
 			where: (apiKeys, { eq, and, gt }) =>
 				and(eq(apiKeys.key, apiKey), gt(apiKeys.expiresAt, new Date())),
 			with: {

@@ -15,7 +15,7 @@ import type {
 	ScheduledReportingService,
 } from '@repo/audit'
 import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
-import type { Session } from '@repo/auth'
+import type { AuthorizationService, Session } from '@repo/auth'
 import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
 //import type { fhir } from '@repo/fhir'
 
@@ -25,7 +25,6 @@ import type { HonoApp, Logger } from '@repo/hono-helpers'
 import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
 import type { Redis } from '@repo/redis-client'
 import type { AlertingService } from '../services/alerting.js'
-import type { AuthorizationService } from '../services/authorization.js'
 import type { StructuredLogger } from '../services/logging.js'
 import type { MetricsCollectionService } from '../services/metrics.js'
 
