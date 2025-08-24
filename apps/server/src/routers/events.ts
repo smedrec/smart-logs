@@ -1,4 +1,13 @@
-import { protectedProcedure, publicProcedure } from '@/lib/trpc'
+import {
+	adminProcedure,
+	auditDeleteProcedure,
+	auditReadProcedure,
+	auditUpdateProcedure,
+	auditVerifyProcedure,
+	auditWriteProcedure,
+	protectedProcedure,
+	publicProcedure,
+} from '@/lib/trpc'
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 
@@ -95,7 +104,7 @@ export const eventsRouter = {
 	 * Requirement 1.1: TRPC endpoints with type safety
 	 * Requirement 1.2: Input validation using Zod schemas
 	 */
-	create: protectedProcedure.input(CreateAuditEventSchema).mutation(async ({ ctx, input }) => {
+	create: auditWriteProcedure.input(CreateAuditEventSchema).mutation(async ({ ctx, input }) => {
 		const { audit, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 
@@ -154,7 +163,7 @@ export const eventsRouter = {
 	 * Create multiple audit events in a single transaction
 	 * Requirement 1.1: TRPC endpoints with type safety
 	 */
-	bulkCreate: protectedProcedure
+	bulkCreate: auditWriteProcedure
 		.input(BulkCreateAuditEventsSchema)
 		.mutation(async ({ ctx, input }) => {
 			const { audit, logger, error } = ctx.services
@@ -237,7 +246,7 @@ export const eventsRouter = {
 	 * Requirement 1.2: Input validation using Zod schemas
 	 * Requirement 1.3: Complete TypeScript type definitions
 	 */
-	query: protectedProcedure.input(QueryAuditEventsSchema).query(async ({ ctx, input }) => {
+	query: auditReadProcedure.input(QueryAuditEventsSchema).query(async ({ ctx, input }) => {
 		const { db, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 
@@ -371,7 +380,7 @@ export const eventsRouter = {
 	 * Get a single audit event by ID
 	 * Requirement 1.3: Complete TypeScript type definitions
 	 */
-	getById: protectedProcedure
+	getById: auditReadProcedure
 		.input(z.object({ id: z.string().min(1, 'Event ID is required') }))
 		.query(async ({ ctx, input }) => {
 			const { db, logger, error } = ctx.services
@@ -443,7 +452,7 @@ export const eventsRouter = {
 	 * Requirement 1.4: Authentication enforcement
 	 * Requirement 1.5: Structured error responses
 	 */
-	verify: protectedProcedure.input(VerifyAuditEventSchema).mutation(async ({ ctx, input }) => {
+	verify: auditVerifyProcedure.input(VerifyAuditEventSchema).mutation(async ({ ctx, input }) => {
 		const { audit, db, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 
@@ -551,7 +560,7 @@ export const eventsRouter = {
 	 * Export audit events with various formats and options
 	 * Requirement 1.2: Input validation using Zod schemas
 	 */
-	export: protectedProcedure.input(ExportAuditEventsSchema).mutation(async ({ ctx, input }) => {
+	export: auditReadProcedure.input(ExportAuditEventsSchema).mutation(async ({ ctx, input }) => {
 		const { compliance, logger, error } = ctx.services
 		const organizationId = ctx.session.session.activeOrganizationId as string
 

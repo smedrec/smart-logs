@@ -30,7 +30,9 @@ export const logSchema = z.discriminatedUnion('type', [
 		})
 	),
 ])
+
 export type LogSchema = z.infer<typeof logSchema>
+
 export class Log<TLog extends LogSchema = LogSchema> {
 	public readonly log: TLog
 

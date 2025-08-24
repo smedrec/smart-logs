@@ -25,6 +25,7 @@ import type { HonoApp, Logger } from '@repo/hono-helpers'
 import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
 import type { Redis } from '@repo/redis-client'
 import type { AlertingService } from '../services/alerting.js'
+import type { AuthorizationService } from '../services/authorization.js'
 import type { StructuredLogger } from '../services/logging.js'
 import type { MetricsCollectionService } from '../services/metrics.js'
 
@@ -46,6 +47,7 @@ export type ServiceContext = {
 	//kms: InfisicalKmsClient
 	redis: Redis
 	health: HealthCheckService
+	authorization: AuthorizationService
 	compliance: {
 		report: ComplianceReportingService
 		export: DataExportService
@@ -72,6 +74,7 @@ export type ServiceContext = {
 /** Variables can be extended */
 export type Variables = SharedHonoVariables & {
 	session: Session | null
+	isApiKeyAuth: boolean
 	services: ServiceContext
 	apiVersion?: {
 		requested: string

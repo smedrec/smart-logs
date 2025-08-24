@@ -12,6 +12,12 @@
  */
 
 import { apiVersion } from '@/lib/middleware/api-version'
+import {
+	requireAuth,
+	requireAuthOrApiKey,
+	requireOrganizationAccess,
+	requireRole,
+} from '@/lib/middleware/auth'
 import { errorHandler, notFoundHandler } from '@/lib/middleware/error-handler'
 import { adaptiveRateLimit, rateLimit } from '@/lib/middleware/rate-limit'
 import { swaggerUI } from '@hono/swagger-ui'
@@ -186,6 +192,9 @@ Pagination information is included in the response:
 			{
 				BearerAuth: [],
 			},
+			{
+				ApiKeyAuth: [],
+			},
 		],
 		tags: [
 			{
@@ -230,6 +239,20 @@ Pagination information is included in the response:
 
 	// Rate limiting middleware
 	app.use('*', adaptiveRateLimit())
+
+	// Authentication middleware for protected routes
+	app.use('/audit/*', requireAuthOrApiKey)
+	app.use('/compliance/*', requireAuthOrApiKey)
+	app.use('/metrics/*', requireAuthOrApiKey)
+	app.use('/observability/*', requireAuthOrApiKey)
+
+	// Organization access control for audit and compliance endpoints
+	app.use('/audit/*', requireOrganizationAccess())
+	app.use('/compliance/*', requireOrganizationAccess())
+
+	// Admin-only access for system metrics and observability
+	app.use('/metrics/system/*', requireRole(['admin']))
+	app.use('/observability/*', requireRole(['admin']))
 
 	// Mount API routes
 	app.route('/audit', createAuditAPI())

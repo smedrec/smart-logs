@@ -110,6 +110,13 @@ async function startServer() {
 
 	// Configure GraphQL endpoint if enabled
 	if (config.server.api.enableGraphql) {
+		// Import authentication middleware
+		const { requireAuthOrApiKey } = await import('./lib/middleware/auth.js')
+
+		// Apply authentication middleware to GraphQL endpoints
+		app.use(`${config.server.api.graphqlPath}/*`, requireAuthOrApiKey)
+		app.use(config.server.api.graphqlPath, requireAuthOrApiKey)
+
 		app.all(`${config.server.api.graphqlPath}/*`, async (c) => {
 			return handleGraphQLRequest(c)
 		})
@@ -217,12 +224,14 @@ async function gracefulShutdown(signal: string) {
 			console.log('✅ Server stopped accepting new connections')
 
 			try {
-				// Close database connections and other resources
+				// TODO: Close database connections and other resources
+				/**
 				const services = await import('./lib/hono/init.js')
 				if (services.cleanup) {
 					await services.cleanup()
 					console.log('✅ Services cleaned up successfully')
 				}
+				*/
 
 				// Clear the shutdown timeout
 				clearTimeout(shutdownTimeout)

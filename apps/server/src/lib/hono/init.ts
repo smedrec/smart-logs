@@ -32,6 +32,7 @@ import { ConsoleLogger } from '@repo/hono-helpers'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { getAuthDb } from '../auth.js'
+import { createAuthorizationService } from '../services/authorization.js'
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { MetricsCollectionService } from '../services/metrics.js'
 
@@ -72,6 +73,9 @@ let dashboard: AuditMonitoringDashboard | undefined = undefined
 // Enhanced monitoring services
 let metricsCollectionService: MetricsCollectionService | undefined = undefined
 let structuredLogger: StructuredLogger | undefined = undefined
+
+// Authorization service
+let authorizationService: ReturnType<typeof createAuthorizationService> | undefined = undefined
 
 // Error handling services
 let errorHandler: ErrorHandler | undefined = undefined
@@ -233,6 +237,11 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			metricsCollectionService = new MetricsCollectionService(connection, logger, monitoringService)
 		}
 
+		// Initialize authorization service
+		if (!authorizationService) {
+			authorizationService = createAuthorizationService(db.auth)
+		}
+
 		const monitor = {
 			alert: databaseAlertHandler,
 			metrics: monitoringService,
@@ -316,6 +325,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			//kms,
 			redis: connection,
 			health: healthCheckService,
+			authorization: authorizationService,
 			compliance,
 			monitor,
 			observability,

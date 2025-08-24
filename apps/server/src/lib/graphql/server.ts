@@ -39,11 +39,16 @@ export const createGraphQLServer = () => {
 				throw new Error('Hono context not available in GraphQL context')
 			}
 
+			const session = honoContext.get('session')
+			const services = honoContext.get('services')
+
 			// Create GraphQL context from Hono context
 			const graphqlContext: GraphQLContext = {
-				services: honoContext.get('services'),
-				session: honoContext.get('session'),
+				services,
+				session,
 				requestId: honoContext.get('requestId'),
+				isAuthenticated: !!session,
+				isApiKeyAuth: honoContext.get('isApiKeyAuth') || false,
 			}
 
 			return graphqlContext
@@ -106,13 +111,17 @@ export const createGraphQLServer = () => {
 				// Connection initialization
 				onConnect: async (ctx) => {
 					// Validate authentication for WebSocket connections
-					const token = ctx.connectionParams?.authorization
+					const token = ctx.connectionParams?.authorization || ctx.connectionParams?.Authorization
+					const apiKey = ctx.connectionParams?.['x-api-key'] || ctx.connectionParams?.['X-API-Key']
 
-					if (!token) {
+					// Try to authenticate with session token or API key
+					if (!token && !apiKey) {
 						throw new Error('Authentication required for subscriptions')
 					}
 
-					// Here you would validate the token and return user context
+					// TODO: Implement proper token/API key validation
+					// This would involve validating the token against Better Auth
+					// and creating a proper session context
 					// For now, we'll return a basic context
 					return {
 						authenticated: true,

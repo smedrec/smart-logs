@@ -34,6 +34,29 @@ export function newApp() {
 		c.set('userAgent', c.req.header('User-Agent'))
 
 		const auth = await getAuthInstance()
+		const apiKey =
+			c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
+
+		// Try API key authentication first
+		if (apiKey) {
+			try {
+				// Validate API key using Better Auth's API key plugin
+				const apiKeySession = await auth.api.validateAPIKey({
+					headers: c.req.raw.headers,
+				})
+
+				if (apiKeySession) {
+					c.set('session', apiKeySession as Session)
+					c.set('isApiKeyAuth', true)
+					return next()
+				}
+			} catch (error) {
+				// API key validation failed, continue with session auth
+				console.warn('API key validation failed:', error)
+			}
+		}
+
+		// Try session authentication
 		const session = await auth.api.getSession({
 			query: {
 				disableCookieCache: true,
@@ -43,17 +66,12 @@ export function newApp() {
 
 		if (!session) {
 			c.set('session', null)
+			c.set('isApiKeyAuth', false)
 			return next()
 		}
 
-		// FIXME - solve this session type structure
-		/**if (c.req.header('x-api-key')) {
-			const organization = await getActiveOrganization(session.session?.userId)
-			session.session.activeOrganizationId = organization?.organizationId
-			session.session.activeOrganizationRole = organization?.role ?? null
-		}*/
-
 		c.set('session', session as Session)
+		c.set('isApiKeyAuth', false)
 
 		return next()
 	})

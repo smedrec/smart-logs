@@ -324,13 +324,15 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 	// Create audit event
 	app.openapi(createAuditEventRoute, async (c) => {
-		const { audit, logger } = c.get('services')
-		const session = c.get('session')
+		const { audit, logger, authorization } = c.get('services')
+		const session = c.get('session')!
 
-		if (!session) {
+		// Check permission to create audit events
+		const hasPermission = await authorization.hasPermission(session, 'audit.events', 'create')
+		if (!hasPermission) {
 			throw new ApiError({
-				code: 'UNAUTHORIZED',
-				message: 'Authentication required',
+				code: 'FORBIDDEN',
+				message: 'Insufficient permissions to create audit events',
 			})
 		}
 
@@ -355,12 +357,20 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				...auditEvent,
 			}
 
-			logger.info(`Created audit event: ${event.id}`)
+			logger.info(`Created audit event: ${event.id}`, {
+				userId: session.session.userId,
+				organizationId: session.session.activeOrganizationId,
+				eventId: event.id,
+			})
 
 			return c.json(event, 201)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error(`Failed to create audit event: ${message}`)
+			logger.error(`Failed to create audit event: ${message}`, {
+				userId: session.session.userId,
+				organizationId: session.session.activeOrganizationId,
+				error: message,
+			})
 
 			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',
@@ -371,13 +381,15 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 	// Query audit events
 	app.openapi(queryAuditEventsRoute, async (c) => {
-		const { db, logger } = c.get('services')
-		const session = c.get('session')
+		const { db, logger, authorization } = c.get('services')
+		const session = c.get('session')!
 
-		if (!session) {
+		// Check permission to read audit events
+		const hasPermission = await authorization.hasPermission(session, 'audit.events', 'read')
+		if (!hasPermission) {
 			throw new ApiError({
-				code: 'UNAUTHORIZED',
-				message: 'Authentication required',
+				code: 'FORBIDDEN',
+				message: 'Insufficient permissions to read audit events',
 			})
 		}
 

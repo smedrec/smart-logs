@@ -16,8 +16,10 @@ import type { ServiceContext } from '../hono/context.js'
 // Base types for GraphQL operations
 export interface GraphQLContext {
 	services: ServiceContext
-	session: Session
+	session: Session | null
 	requestId: string
+	isAuthenticated: boolean
+	isApiKeyAuth: boolean
 }
 
 // Audit Event types - compatible with audit package
