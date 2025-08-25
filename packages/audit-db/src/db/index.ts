@@ -1,11 +1,18 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
-import { DatabaseConfig } from '@repo/audit'
+import {
+	DatabaseConfig,
+	EnhancedClientConfig,
+	MonitoringService,
+	RedisMetricsCollector,
+} from '@repo/audit'
 
+import { EnhancedAuditDatabaseClient } from './enhanced-client.js'
 import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Sql } from 'postgres'
 
 // Helper to try and get env variables from Cloudflare Workers or Node.js process.env
@@ -134,5 +141,56 @@ export class AuditDbWithConfig {
 	 */
 	public async end(): Promise<void> {
 		await this.client.end()
+	}
+}
+
+export class EnhancedAuditDb {
+	private client: EnhancedAuditDatabaseClient
+	private monitor: MonitoringService
+
+	/**
+	 * Constructs an AuditDb instance, establishing a connection to the PostgreSQL database
+	 * and initializing Drizzle ORM.
+	 * @param connection The Redis connection instance.
+	 * @param config The database configuration.
+	 */
+	constructor(connection: RedisInstanceType, config: EnhancedClientConfig) {
+		const metricsCollector = new RedisMetricsCollector(connection)
+		this.monitor = new MonitoringService(undefined, metricsCollector)
+		this.client = new EnhancedAuditDatabaseClient(this.monitor, config)
+	}
+
+	/**
+	 * Provides access to the Drizzle ORM instance for database operations.
+	 * @returns The Drizzle ORM instance typed with the audit log schema.
+	 */
+	public getDrizzleInstance(): PostgresJsDatabase<typeof schema> {
+		return this.client.getDatabase()
+	}
+
+	/**
+	 * Checks the database connection by executing a simple query.
+	 * @returns true or false.
+	 */
+	public async checkAuditDbConnection() {
+		try {
+			const status = await this.client.getHealthStatus()
+			//console.log('🟢 Database connection successful.')
+			return status.overall === 'healthy'
+		} catch (error) {
+			console.error('🔴 Database connection failed:', error)
+			// In a real app, you might want to throw the error or handle it more gracefully
+			// For the worker, if the DB isn't available, it might retry or exit.
+			// process.exit(1); // Consider if failure to connect on startup is fatal
+			return false
+		}
+	}
+
+	/**
+	 * Ends the client connection.
+	 * @returns void.
+	 */
+	public async end(): Promise<void> {
+		await this.client.close()
 	}
 }

@@ -31,6 +31,40 @@ export function createDevelopmentConfig(): AuditConfig {
 			ssl: false,
 			maxConnectionAttempts: 3,
 		},
+		enhancedClient: {
+			connectionPool: {
+				url: process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit_dev',
+				minConnections: 2,
+				maxConnections: 20,
+				idleTimeout: 30000,
+				acquireTimeout: 10000,
+				validateConnections: true,
+				retryAttempts: 3,
+				retryDelay: 1000,
+				ssl: false,
+			},
+			queryCache: {
+				enabled: true,
+				maxSizeMB: 100,
+				defaultTTL: 300, // 5 minutes
+				maxQueries: 1000,
+				keyPrefix: 'audit_cache_dev',
+			},
+			partitioning: {
+				enabled: true,
+				strategy: 'range',
+				interval: 'monthly',
+				retentionDays: 2555, // 7 years
+				autoMaintenance: true,
+				maintenanceInterval: 24 * 60 * 60 * 1000, // Daily
+			},
+			monitoring: {
+				enabled: true,
+				slowQueryThreshold: 1000, // 1 second
+				metricsRetentionDays: 30,
+				autoOptimization: true,
+			},
+		},
 		server: {
 			port: 3000,
 			host: '0.0.0.0',
@@ -221,6 +255,36 @@ export function createStagingConfig(): AuditConfig {
 			ssl: true,
 			poolSize: 15,
 		},
+		enhancedClient: {
+			...baseConfig.enhancedClient,
+			connectionPool: {
+				...baseConfig.enhancedClient.connectionPool,
+				url: process.env.AUDIT_DB_URL || 'postgresql://postgres-staging:5432/audit_staging',
+				minConnections: 5,
+				maxConnections: 30,
+				retryAttempts: 5,
+				retryDelay: 2000,
+				ssl: true,
+			},
+			queryCache: {
+				...baseConfig.enhancedClient.queryCache,
+				maxSizeMB: 150,
+				defaultTTL: 600, // 10 minutes
+				maxQueries: 2000,
+				keyPrefix: 'audit_cache_staging',
+			},
+			partitioning: {
+				...baseConfig.enhancedClient.partitioning,
+				retentionDays: 365, // 1 year
+				maintenanceInterval: 24 * 60 * 60 * 1000, // Daily
+			},
+			monitoring: {
+				...baseConfig.enhancedClient.monitoring,
+				slowQueryThreshold: 2000, // 2 seconds
+				metricsRetentionDays: 60,
+				autoOptimization: true,
+			},
+		},
 		server: {
 			...baseConfig.server,
 			environment: 'staging',
@@ -325,6 +389,36 @@ export function createProductionConfig(): AuditConfig {
 			connectionTimeout: 5000,
 			queryTimeout: 60000,
 			maxConnectionAttempts: 5,
+		},
+		enhancedClient: {
+			...baseConfig.enhancedClient,
+			connectionPool: {
+				...baseConfig.enhancedClient.connectionPool,
+				url: process.env.AUDIT_DB_URL || 'postgresql://postgres-prod:5432/audit_prod',
+				minConnections: 10,
+				maxConnections: 50,
+				retryAttempts: 10,
+				retryDelay: 5000,
+				ssl: true,
+			},
+			queryCache: {
+				...baseConfig.enhancedClient.queryCache,
+				maxSizeMB: 200,
+				defaultTTL: 900, // 15 minutes
+				maxQueries: 3000,
+				keyPrefix: 'audit_cache_prod',
+			},
+			partitioning: {
+				...baseConfig.enhancedClient.partitioning,
+				retentionDays: 365 * 3, // 3 years
+				maintenanceInterval: 7 * 24 * 60 * 60 * 1000, // Weekly
+			},
+			monitoring: {
+				...baseConfig.enhancedClient.monitoring,
+				slowQueryThreshold: 3000, // 3 seconds
+				metricsRetentionDays: 90,
+				autoOptimization: true,
+			},
 		},
 		server: {
 			...baseConfig.server,

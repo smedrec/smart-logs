@@ -793,6 +793,14 @@ export class ConfigurationManager extends EventEmitter {
 		if (sanitized.database?.url) {
 			sanitized.database.url = this.maskSensitiveUrl(sanitized.database.url)
 		}
+		if (sanitized.database?.readReplica?.url) {
+			sanitized.database.readReplica.url = this.maskSensitiveUrl(sanitized.database.readReplica.url)
+		}
+		if (sanitized.enhancedClient?.connectionPool?.url) {
+			sanitized.enhancedClient.connectionPool.url = this.maskSensitiveUrl(
+				sanitized.enhancedClient.connectionPool.url
+			)
+		}
 		if (sanitized.redis?.url) {
 			sanitized.redis.url = this.maskSensitiveUrl(sanitized.redis.url)
 		}

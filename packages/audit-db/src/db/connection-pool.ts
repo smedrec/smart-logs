@@ -10,40 +10,7 @@ import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Sql } from 'postgres'
-
-export interface ConnectionPoolConfig {
-	/** Database connection URL */
-	url: string
-	/** Minimum number of connections in pool */
-	minConnections: number
-	/** Maximum number of connections in pool */
-	maxConnections: number
-	/** Connection idle timeout in milliseconds */
-	idleTimeout: number
-	/** Connection acquisition timeout in milliseconds */
-	acquireTimeout: number
-	/** Connection validation query */
-	validationQuery?: string
-	/** Enable connection validation */
-	validateConnections: boolean
-	/** Connection retry attempts */
-	retryAttempts: number
-	/** Retry delay in milliseconds */
-	retryDelay: number
-}
-
-export interface QueryCacheConfig {
-	/** Enable query result caching */
-	enabled: boolean
-	/** Maximum cache size in MB */
-	maxSizeMB: number
-	/** Default TTL for cached queries in seconds */
-	defaultTTL: number
-	/** Maximum number of cached queries */
-	maxQueries: number
-	/** Cache key prefix */
-	keyPrefix: string
-}
+import type { ConnectionPoolConfig, QueryCacheConfig } from '@repo/audit'
 
 export interface CacheEntry<T = any> {
 	data: T
@@ -98,6 +65,7 @@ export class EnhancedConnectionPool {
 				console.log('PostgreSQL notice:', notice)
 			},
 			debug: process.env.NODE_ENV === 'development',
+			ssl: config.ssl,
 		})
 
 		this.db = drizzle(this.client, { schema })

@@ -1,38 +1,17 @@
+import { DatabaseAlertHandler } from '@repo/audit'
+
 import { EnhancedDatabaseClient } from './connection-pool.js'
 import { DatabasePartitionManager, PartitionMaintenanceScheduler } from './partitioning.js'
 import { DatabasePerformanceMonitor } from './performance-monitoring.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { ConnectionPoolConfig, QueryCacheConfig } from './connection-pool.js'
+import type { Alert, EnhancedClientConfig, MonitoringService } from '@repo/audit'
 import type * as schema from './schema.js'
 
 /**
  * Enhanced database client integrating all performance optimizations
  * Requirements 7.1, 7.2, 7.3, 7.4: Complete database performance optimization integration
  */
-
-export interface EnhancedClientConfig {
-	/** Connection pool configuration */
-	connectionPool: ConnectionPoolConfig
-	/** Query cache configuration */
-	queryCache: QueryCacheConfig
-	/** Partition management configuration */
-	partitioning: {
-		enabled: boolean
-		strategy: 'range' | 'hash' | 'list'
-		interval: 'monthly' | 'quarterly' | 'yearly'
-		retentionDays: number
-		autoMaintenance: boolean
-		maintenanceInterval: number
-	}
-	/** Performance monitoring configuration */
-	monitoring: {
-		enabled: boolean
-		slowQueryThreshold: number
-		metricsRetentionDays: number
-		autoOptimization: boolean
-	}
-}
 
 export interface PerformanceReport {
 	timestamp: Date
@@ -67,11 +46,13 @@ export class EnhancedAuditDatabaseClient {
 	private client: EnhancedDatabaseClient
 	private partitionManager: DatabasePartitionManager
 	private performanceMonitor: DatabasePerformanceMonitor
+	private monitor: MonitoringService
 	private partitionScheduler?: PartitionMaintenanceScheduler
 	private performanceReportInterval?: NodeJS.Timeout
 	private config: EnhancedClientConfig
 
-	constructor(config: EnhancedClientConfig) {
+	constructor(monitor: MonitoringService, config: EnhancedClientConfig) {
+		this.monitor = monitor
 		this.config = config
 
 		// Initialize enhanced database client with connection pooling and caching
@@ -90,6 +71,9 @@ export class EnhancedAuditDatabaseClient {
 	 * Initialize all performance optimization components
 	 */
 	private async initialize(): Promise<void> {
+		const databaseAlertHandler = new DatabaseAlertHandler(this.client.getDatabase())
+		this.monitor.addAlertHandler(databaseAlertHandler)
+
 		try {
 			// Enable performance monitoring
 			if (this.config.monitoring.enabled) {
@@ -206,20 +190,42 @@ export class EnhancedAuditDatabaseClient {
 			const executionTime = Date.now() - startTime
 			const memoryUsed = process.memoryUsage().heapUsed - startMemory
 
-			this.performanceMonitor.recordQueryMetrics({
+			this.monitor.storeQueryMetrics({
 				queryId: `${queryName}_${Date.now()}`,
 				query: queryName,
 				executionTime,
-				planningTime: 0, // Would need to extract from EXPLAIN
+				planningTime: 0, // TODO Would need to extract from EXPLAIN
 				totalTime: executionTime,
 				rowsReturned: Array.isArray(result) ? result.length : 1,
-				bufferHits: 0, // Would need to extract from pg_stat_statements
+				bufferHits: 0, // TODO Would need to extract from pg_stat_statements
 				bufferMisses: 0,
 				timestamp: new Date(),
 			})
 
 			// Log slow queries
 			if (executionTime > this.config.monitoring.slowQueryThreshold) {
+				const alert: Alert = {
+					id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+					severity:
+						executionTime > this.config.monitoring.slowQueryThreshold * 2 ? 'HIGH' : 'MEDIUM',
+					type: 'PERFORMANCE',
+					title: 'Slow Database Query',
+					description: `Slow query detected: ${queryName} took ${executionTime}ms`,
+					timestamp: new Date().toISOString(),
+					source: 'execute-monitored-query',
+					metadata: {
+						query: queryName,
+						executionTime,
+						planningTime: 0, // TODO Would need to extract from EXPLAIN
+						totalTime: executionTime,
+						rowsReturned: Array.isArray(result) ? result.length : 1,
+						bufferHits: 0, // TODO Would need to extract from pg_stat_statements
+						bufferMisses: 0,
+					},
+					acknowledged: false,
+					resolved: false,
+				}
+				this.monitor.sendExternalAlert(alert)
 				console.warn(`Slow query detected: ${queryName} took ${executionTime}ms`)
 			}
 
@@ -501,6 +507,7 @@ export class EnhancedAuditDatabaseClient {
  * Factory function to create enhanced client with default configuration
  */
 export function createEnhancedAuditClient(
+	monitor: MonitoringService,
 	databaseUrl: string,
 	overrides?: Partial<EnhancedClientConfig>
 ): EnhancedAuditDatabaseClient {
@@ -514,6 +521,7 @@ export function createEnhancedAuditClient(
 			validateConnections: true,
 			retryAttempts: 3,
 			retryDelay: 1000,
+			ssl: false,
 		},
 		queryCache: {
 			enabled: true,
@@ -547,5 +555,5 @@ export function createEnhancedAuditClient(
 		monitoring: { ...defaultConfig.monitoring, ...overrides?.monitoring },
 	}
 
-	return new EnhancedAuditDatabaseClient(config)
+	return new EnhancedAuditDatabaseClient(monitor, config)
 }

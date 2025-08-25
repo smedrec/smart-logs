@@ -8,20 +8,6 @@ import { sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type * as schema from './schema.js'
 
-export interface QueryPerformanceMetrics {
-	queryId: string
-	query: string
-	executionTime: number
-	planningTime: number
-	totalTime: number
-	rowsReturned: number
-	bufferHits: number
-	bufferMisses: number
-	timestamp: Date
-	userId?: string
-	organizationId?: string
-}
-
 export interface SlowQueryInfo {
 	query: string
 	avgExecutionTime: number
@@ -69,8 +55,6 @@ export interface TableStats {
  * Database performance monitoring and optimization manager
  */
 export class DatabasePerformanceMonitor {
-	private metricsBuffer: QueryPerformanceMetrics[] = []
-	private readonly bufferSize = 1000
 	private monitoringEnabled = false
 
 	constructor(private db: PostgresJsDatabase<typeof schema>) {}
@@ -80,6 +64,7 @@ export class DatabasePerformanceMonitor {
 	 */
 	async enableMonitoring(): Promise<void> {
 		try {
+			// FIXME: privileges issue
 			// Enable pg_stat_statements extension for query monitoring
 			await this.db.execute(sql`CREATE EXTENSION IF NOT EXISTS pg_stat_statements`)
 
@@ -104,22 +89,7 @@ export class DatabasePerformanceMonitor {
 	 */
 	disableMonitoring(): void {
 		this.monitoringEnabled = false
-		this.metricsBuffer = []
 		console.log('Database performance monitoring disabled')
-	}
-
-	/**
-	 * Record query performance metrics
-	 */
-	recordQueryMetrics(metrics: QueryPerformanceMetrics): void {
-		if (!this.monitoringEnabled) return
-
-		this.metricsBuffer.push(metrics)
-
-		// Keep buffer size manageable
-		if (this.metricsBuffer.length > this.bufferSize) {
-			this.metricsBuffer = this.metricsBuffer.slice(-this.bufferSize)
-		}
 	}
 
 	/**

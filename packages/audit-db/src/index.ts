@@ -11,17 +11,6 @@ export { EnhancedAuditDatabaseClient, createEnhancedAuditClient } from './db/enh
 
 // Performance optimization types
 export type { PartitionConfig, PartitionInfo } from './db/partitioning.js'
-export type {
-	QueryPerformanceMetrics,
-	SlowQueryInfo,
-	IndexUsageStats,
-	TableStats,
-} from './db/performance-monitoring.js'
-export type {
-	ConnectionPoolConfig,
-	QueryCacheConfig,
-	CacheEntry,
-	ConnectionPoolStats,
-	QueryCacheStats,
-} from './db/connection-pool.js'
-export type { EnhancedClientConfig, PerformanceReport } from './db/enhanced-client.js'
+export type { SlowQueryInfo, IndexUsageStats, TableStats } from './db/performance-monitoring.js'
+export type { CacheEntry, ConnectionPoolStats, QueryCacheStats } from './db/connection-pool.js'
+export type { PerformanceReport } from './db/enhanced-client.js'

@@ -29,6 +29,9 @@ export interface AuditConfig {
 	/** Database configuration */
 	database: DatabaseConfig
 
+	/** Enhanced client configuration */
+	enhancedClient: EnhancedClientConfig
+
 	/** Server configuration */
 	server: ServerConfig
 
@@ -104,6 +107,65 @@ export interface DatabaseConfig {
 
 	/** Maximum connection attempts */
 	maxConnectionAttempts: number
+}
+
+export interface EnhancedClientConfig {
+	/** Connection pool configuration */
+	connectionPool: ConnectionPoolConfig
+	/** Query cache configuration */
+	queryCache: QueryCacheConfig
+	/** Partition management configuration */
+	partitioning: {
+		enabled: boolean
+		strategy: 'range' | 'hash' | 'list'
+		interval: 'monthly' | 'quarterly' | 'yearly'
+		retentionDays: number
+		autoMaintenance: boolean
+		maintenanceInterval: number
+	}
+	/** Performance monitoring configuration */
+	monitoring: {
+		enabled: boolean
+		slowQueryThreshold: number
+		metricsRetentionDays: number
+		autoOptimization: boolean
+	}
+}
+
+export interface ConnectionPoolConfig {
+	/** Database connection URL */
+	url: string
+	/** Minimum number of connections in pool */
+	minConnections: number
+	/** Maximum number of connections in pool */
+	maxConnections: number
+	/** Connection idle timeout in milliseconds */
+	idleTimeout: number
+	/** Connection acquisition timeout in milliseconds */
+	acquireTimeout: number
+	/** Connection validation query */
+	validationQuery?: string
+	/** Enable connection validation */
+	validateConnections: boolean
+	/** Connection retry attempts */
+	retryAttempts: number
+	/** Retry delay in milliseconds */
+	retryDelay: number
+	/** Enable SSL */
+	ssl: boolean
+}
+
+export interface QueryCacheConfig {
+	/** Enable query result caching */
+	enabled: boolean
+	/** Maximum cache size in MB */
+	maxSizeMB: number
+	/** Default TTL for cached queries in seconds */
+	defaultTTL: number
+	/** Maximum number of cached queries */
+	maxQueries: number
+	/** Cache key prefix */
+	keyPrefix: string
 }
 
 export interface WorkerConfig {

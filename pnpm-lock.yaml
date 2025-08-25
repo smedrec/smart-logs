@@ -624,12 +624,18 @@ importers:
       '@repo/audit':
         specifier: workspace:*
         version: link:../audit
+      '@repo/redis-client':
+        specifier: workspace:*
+        version: link:../redis-client
       commander:
         specifier: ^12.1.0
         version: 12.1.0
       drizzle-orm:
         specifier: 0.44.2
         version: 0.44.2(@opentelemetry/api@1.9.0)(@prisma/client@5.22.0(prisma@5.22.0))(@types/better-sqlite3@7.6.13)(@types/pg@8.15.4)(better-sqlite3@11.10.0)(kysely@0.28.3)(pg@8.16.3)(postgres@3.4.7)(prisma@5.22.0)
+      ioredis:
+        specifier: 5.6.1
+        version: 5.6.1
       postgres:
         specifier: 3.4.7
         version: 3.4.7
