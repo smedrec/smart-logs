@@ -8,16 +8,16 @@ import { ConfigurationManager } from '@repo/audit'
 import { useConsoleLogger } from '@repo/hono-helpers'
 
 import { getAuthInstance } from './lib/auth.js'
-import { handleGraphQLRequest } from './lib/graphql/index'
-import { newApp } from './lib/hono/'
-import { init } from './lib/hono/init'
-import { nodeEnv } from './lib/hono/node-env'
+import { handleGraphQLRequest } from './lib/graphql/index.js'
+import { newApp } from './lib/hono/index.js'
+import { init } from './lib/hono/init.js'
+import { nodeEnv } from './lib/hono/node-env.js'
 import {
 	errorRateMonitoring,
 	performanceMonitoring,
 	requestMetrics,
 } from './lib/middleware/monitoring.js'
-import { appRouter } from './routers/index'
+import { appRouter } from './routers/index.js'
 
 // Configuration manager
 let configManager: ConfigurationManager | undefined = undefined
@@ -46,7 +46,7 @@ async function startServer() {
 	}
 	const config = configManager.getConfig()
 
-	const app = newApp()
+	const app = newApp(config)
 
 	if (!configManager.isProduction()) {
 		app.use('*', nodeEnv())
@@ -150,6 +150,13 @@ async function startServer() {
 			})
 		})
 	}
+
+	app.get('/session', (c) => {
+		return c.json({
+			isApiKey: c.get('isApiKeyAuth'),
+			session: c.get('session'),
+		})
+	})
 
 	// Start server with Hono's Node.js adapter
 	server = serve(

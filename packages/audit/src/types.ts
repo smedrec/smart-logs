@@ -191,6 +191,18 @@ export type AuthAuditAction =
 	| 'auth.mfa.enabled'
 	| 'auth.mfa.disabled'
 	| 'auth.session.expired'
+	| 'auth.session.revoked'
+	| 'auth.account.banned'
+	| 'auth.account.ban'
+	| 'auth.account.unban'
+	| 'auth.permissions.check'
+	| 'auth.permissions.grant'
+	| 'auth.permissions.revoke'
+	| 'auth.role.change'
+	| 'auth.role.create'
+	| 'auth.role.delete'
+	| 'auth.role.assign'
+	| 'auth.role.unassign'
 
 /**
  * Data access audit events

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
-import { db } from './db/index.js'
+import * as authSchema from './db/schema/index.js'
 import { activeOrganization, member } from './db/schema/index.js'
 
 interface ActiveOrganization {
@@ -9,7 +10,10 @@ interface ActiveOrganization {
 	role: string
 }
 
-async function getActiveOrganization(userId: string): Promise<ActiveOrganization | undefined> {
+async function getActiveOrganization(
+	userId: string,
+	db: PostgresJsDatabase<typeof authSchema>
+): Promise<ActiveOrganization | undefined> {
 	try {
 		const result = await db.query.activeOrganization.findFirst({
 			where: eq(activeOrganization.userId, userId),

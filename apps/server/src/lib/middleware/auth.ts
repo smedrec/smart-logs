@@ -11,7 +11,7 @@ import type { HonoEnv } from '../hono/context.js'
  */
 export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 	const session = c.get('session')
-	const { error, logger } = c.get('services')
+	const { audit, error, logger } = c.get('services')
 	const requestId = c.get('requestId')
 
 	if (!session) {
@@ -65,6 +65,27 @@ export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 	if (session.user.banned) {
 		const err = new HTTPException(403, {
 			message: session.user.banReason || 'Account is banned',
+		})
+
+		await audit.log({
+			principalId: session.user.id,
+			organizationId: session.session.activeOrganizationId,
+			action: `auth.account.banned`,
+			status: 'failure',
+			outcomeDescription: session.user.banReason || 'Account is banned',
+			sessionContext: {
+				sessionId: 'sess-abc123',
+				ipAddress: session.session.ipAddress,
+				userAgent: session.session.userAgent,
+				banReason: session.user.banReason,
+				banExpires: session.user.banExpires,
+			},
+			dataClassification: 'INTERNAL',
+			retntionPolicy: 'auth-logs-1-year',
+			metadata: {
+				path: c.req.path,
+				method: c.req.method,
+			},
 		})
 
 		await error.handleError(

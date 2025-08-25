@@ -71,7 +71,7 @@ class Auth {
 				maxPasswordLength: 128,
 				requireEmailVerification: true,
 				sendResetPassword: async ({ user, url }) => {
-					const org = await getActiveOrganization(user.id)
+					const org = await getActiveOrganization(user.id, db)
 					// TODO - return a error to user
 					if (!org) return
 					const emailDetails: MailerSendOptions = {
@@ -123,7 +123,7 @@ class Auth {
 				session: {
 					create: {
 						before: async (session) => {
-							const activeOrganization = await getActiveOrganization(session.userId)
+							const activeOrganization = await getActiveOrganization(session.userId, db)
 							if (!activeOrganization) {
 								return {
 									data: {
