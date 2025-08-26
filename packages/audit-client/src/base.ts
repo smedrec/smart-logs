@@ -35,7 +35,7 @@ export class BaseResource {
 					method: options.method || 'GET',
 					headers: {
 						...headers,
-						//Authorization: 'apikey ' + this.options.apiKey,
+						'x-api-key': this.options.apiKey,
 						...options.headers,
 					},
 					body:
