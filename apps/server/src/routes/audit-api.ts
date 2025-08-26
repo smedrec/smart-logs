@@ -27,8 +27,7 @@ const AuditEventSchema = z.object({
 	status: z.enum(['attempt', 'success', 'failure']),
 	outcomeDescription: z.string().optional(),
 	dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']),
-	sessionContext: z.record(z.string(), z.any()).optional(),
-	metadata: z.record(z.string(), z.any()).optional(),
+	details: z.record(z.string(), z.any()).optional(),
 	hash: z.string().optional(),
 	correlationId: z.string().optional(),
 })
@@ -43,7 +42,7 @@ const CreateAuditEventSchema = z.object({
 	outcomeDescription: z.string().max(500).optional(),
 	dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']),
 	sessionContext: z.record(z.string(), z.any()).optional(),
-	metadata: z.record(z.string(), z.any()).optional(),
+	details: z.record(z.string(), z.any()).optional(),
 })
 
 const QueryAuditEventsSchema = z.object({
@@ -470,8 +469,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					status: event.status,
 					outcomeDescription: event.outcomeDescription || undefined,
 					dataClassification: event.dataClassification || 'INTERNAL',
-					sessionContext: event.details?.sessionContext || undefined,
-					metadata: event.details || undefined,
+					details: event.details || undefined,
 					hash: event.hash || undefined,
 					correlationId: event.correlationId || undefined,
 				})),
@@ -546,8 +544,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				status: dbEvent.status,
 				outcomeDescription: dbEvent.outcomeDescription || undefined,
 				dataClassification: dbEvent.dataClassification || 'INTERNAL',
-				sessionContext: dbEvent.details?.sessionContext || undefined,
-				metadata: dbEvent.details || undefined,
+				details: dbEvent.details || undefined,
 				hash: dbEvent.hash || undefined,
 				correlationId: dbEvent.correlationId || undefined,
 			}

@@ -31,9 +31,10 @@ export function newApp(config: AuditConfig) {
 			c.req.header('True-Client-IP') ??
 				c.req.header('CF-Connecting-IP') ??
 				//c.req.raw?.cf?.colo ??
-				''
+				'127.0.0.1'
 		)
-		c.set('userAgent', c.req.header('User-Agent'))
+		// FIXME: This is a temporary fix for Hono's bug with IP address parsing
+		c.set('userAgent', c.req.header('User-Agent') ?? 'unknown')
 
 		const auth = await getAuthInstance(config)
 		const apiKey =
@@ -41,6 +42,7 @@ export function newApp(config: AuditConfig) {
 
 		// Try API key authentication first
 		if (apiKey) {
+			c.set('isApiKeyAuth', true)
 			try {
 				// Validate API key using Better Auth's API key plugin
 				let apiKeySession = (await auth.api.getSession({
@@ -56,6 +58,8 @@ export function newApp(config: AuditConfig) {
 						apiKeySession = {
 							session: {
 								...apiKeySession.session,
+								ipAddress: c.get('location'),
+								userAgent: c.get('userAgent'),
 								activeOrganizationId: org.organizationId,
 								activeOrganizationRole: org.role,
 							},
@@ -65,17 +69,18 @@ export function newApp(config: AuditConfig) {
 						}
 					}
 					c.set('session', apiKeySession as Session)
-					c.set('isApiKeyAuth', true)
 					return next()
 				}
 			} catch (error) {
 				// API key validation failed, continue with session auth
 				console.warn('API key validation failed:', error)
-				throw error // Rethro
+				c.set('session', null)
+				return next()
 			}
 		}
 
 		// Try session authentication
+		c.set('isApiKeyAuth', false)
 		const session = await auth.api.getSession({
 			query: {
 				disableCookieCache: true,
@@ -85,13 +90,18 @@ export function newApp(config: AuditConfig) {
 
 		if (!session) {
 			c.set('session', null)
-			c.set('isApiKeyAuth', false)
 			return next()
 		}
 
-		c.set('session', session as Session)
-		c.set('isApiKeyAuth', false)
+		if (!session.session.ipAddress || session.session.ipAddress === '') {
+			session.session.ipAddress = '127.0.0.1'
+		}
 
+		if (!session.session.userAgent || session.session.userAgent === '') {
+			session.session.userAgent = 'unknown'
+		}
+
+		c.set('session', session as Session)
 		return next()
 	})
 

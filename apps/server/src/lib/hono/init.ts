@@ -217,14 +217,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 
 		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
 
-		if (!audit)
-			audit = new Audit(
-				config.reliableProcessor.queueName,
-				{
-					secretKey: config.security.encryptionKey,
-				},
-				connection
-			)
+		if (!audit) audit = new Audit(config, db.audit, connection)
 
 		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db.audit)
 		if (!monitoringService) {

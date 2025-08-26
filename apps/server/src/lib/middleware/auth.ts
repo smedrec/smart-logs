@@ -2,16 +2,19 @@ import { TRPCError } from '@trpc/server'
 import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 
+import { audit } from '../hono/init.js'
+
 import type { Context } from 'hono'
-import type { Session } from '@repo/auth'
+import type { AuthorizationService, Session } from '@repo/auth'
 import type { HonoEnv } from '../hono/context.js'
+import type { Context as TRPCContext } from '../trpc/context.js'
 
 /**
  * Authentication middleware that validates session tokens
  */
 export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 	const session = c.get('session')
-	const { audit, error, logger } = c.get('services')
+	const { audit } = c.get('services')
 	const requestId = c.get('requestId')
 
 	if (!session) {
@@ -19,19 +22,21 @@ export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 			message: 'Authentication required',
 		})
 
-		await error.handleError(
-			err,
-			{
+		audit.logAuth({
+			action: 'session',
+			status: 'failure',
+			sessionContext: {
+				sessionId: 'anonymous',
+				ipAddress: c.get('location'),
+				userAgent: c.get('userAgent'),
 				requestId,
-				metadata: {
-					path: c.req.path,
-					method: c.req.method,
-					userAgent: c.req.header('user-agent'),
-				},
+				path: c.req.path,
+				method: c.req.method,
+				component: 'auth-middleware',
+				operation: 'requireAuth',
 			},
-			'auth-middleware',
-			'requireAuth'
-		)
+			reason: 'Authentication required',
+		})
 
 		throw err
 	}
@@ -42,21 +47,25 @@ export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 			message: 'Session expired',
 		})
 
-		await error.handleError(
-			err,
-			{
-				requestId,
-				userId: session.session.userId,
+		audit.logAuth({
+			principalId: session.user.id,
+			organizationId: session.session.activeOrganizationId || undefined,
+			action: `session`,
+			status: 'failure',
+			sessionContext: {
 				sessionId: session.session.id,
-				metadata: {
-					expiresAt: session.session.expiresAt,
-					path: c.req.path,
-					method: c.req.method,
-				},
+				ipAddress: session.session.ipAddress,
+				userAgent: session.session.userAgent,
+				banReason: session.user.banReason,
+				banExpires: session.user.banExpires,
+				requestId,
+				path: c.req.path,
+				method: c.req.method,
+				component: 'auth-middleware',
+				operation: 'requireAuth',
 			},
-			'auth-middleware',
-			'requireAuth'
-		)
+			reason: 'Session expired',
+		})
 
 		throw err
 	}
@@ -67,43 +76,25 @@ export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 			message: session.user.banReason || 'Account is banned',
 		})
 
-		await audit.log({
+		audit.logAuth({
 			principalId: session.user.id,
-			organizationId: session.session.activeOrganizationId,
-			action: `auth.account.banned`,
+			organizationId: session.session.activeOrganizationId || undefined,
+			action: 'account',
 			status: 'failure',
-			outcomeDescription: session.user.banReason || 'Account is banned',
 			sessionContext: {
-				sessionId: 'sess-abc123',
+				sessionId: session.session.id,
 				ipAddress: session.session.ipAddress,
 				userAgent: session.session.userAgent,
 				banReason: session.user.banReason,
 				banExpires: session.user.banExpires,
-			},
-			dataClassification: 'INTERNAL',
-			retntionPolicy: 'auth-logs-1-year',
-			metadata: {
+				requestId,
 				path: c.req.path,
 				method: c.req.method,
+				component: 'auth-middleware',
+				operation: 'requireAuth',
 			},
+			reason: session.user.banReason || 'Account is banned',
 		})
-
-		await error.handleError(
-			err,
-			{
-				requestId,
-				userId: session.session.userId,
-				sessionId: session.session.id,
-				metadata: {
-					banReason: session.user.banReason,
-					banExpires: session.user.banExpires,
-					path: c.req.path,
-					method: c.req.method,
-				},
-			},
-			'auth-middleware',
-			'requireAuth'
-		)
 
 		throw err
 	}
@@ -117,10 +108,25 @@ export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 export const requireRole = (roles: string[]) =>
 	createMiddleware<HonoEnv>(async (c, next) => {
 		const session = c.get('session')
-		const { error } = c.get('services')
+		const { audit } = c.get('services')
 		const requestId = c.get('requestId')
 
 		if (!session) {
+			audit.logAuth({
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
+					sessionId: 'anonymous',
+					ipAddress: c.get('location'),
+					userAgent: c.get('userAgent'),
+					requestId,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requireAuth',
+				},
+				reason: 'Authentication required',
+			})
 			throw new HTTPException(401, { message: 'Authentication required' })
 		}
 
@@ -130,22 +136,25 @@ export const requireRole = (roles: string[]) =>
 				message: `Access denied. Required roles: ${roles.join(', ')}`,
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId,
-					userId: session.session.userId,
+			audit.logAuth({
+				principalId: session.user.id,
+				organizationId: session.session.activeOrganizationId || undefined,
+				action: `permission`,
+				status: 'failure',
+				sessionContext: {
 					sessionId: session.session.id,
-					metadata: {
-						userRole,
-						requiredRoles: roles,
-						path: c.req.path,
-						method: c.req.method,
-					},
+					ipAddress: session.session.ipAddress,
+					userAgent: session.session.userAgent,
+					userRole,
+					requiredRoles: roles,
+					requestId,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requireRole',
 				},
-				'auth-middleware',
-				'requireRole'
-			)
+				reason: `Access denied. Required roles: ${roles.join(', ')}`,
+			})
 
 			throw err
 		}
@@ -159,10 +168,25 @@ export const requireRole = (roles: string[]) =>
 export const requireOrganizationAccess = (allowSuperAdmin = false) =>
 	createMiddleware<HonoEnv>(async (c, next) => {
 		const session = c.get('session')
-		const { error } = c.get('services')
+		const { audit } = c.get('services')
 		const requestId = c.get('requestId')
 
 		if (!session) {
+			audit.logAuth({
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
+					sessionId: 'anonymous',
+					ipAddress: c.get('location'),
+					userAgent: c.get('userAgent'),
+					requestId,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requireOrganizationAccess',
+				},
+				reason: 'Authentication required',
+			})
 			throw new HTTPException(401, { message: 'Authentication required' })
 		}
 
@@ -178,20 +202,22 @@ export const requireOrganizationAccess = (allowSuperAdmin = false) =>
 				message: 'No active organization. Please select an organization.',
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId,
-					userId: session.session.userId,
+			audit.logAuth({
+				principalId: session.user.id,
+				action: `permission`,
+				status: 'failure',
+				sessionContext: {
 					sessionId: session.session.id,
-					metadata: {
-						path: c.req.path,
-						method: c.req.method,
-					},
+					ipAddress: session.session.ipAddress,
+					userAgent: session.session.userAgent,
+					requestId,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requireOrganizationAccess',
 				},
-				'auth-middleware',
-				'requireOrganizationAccess'
-			)
+				reason: 'No active organization. Please select an organization.',
+			})
 
 			throw err
 		}
@@ -203,22 +229,23 @@ export const requireOrganizationAccess = (allowSuperAdmin = false) =>
 				message: 'Access denied to this organization',
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId,
-					userId: session.session.userId,
+			audit.logAuth({
+				principalId: session.user.id,
+				organizationId: session.session.activeOrganizationId || undefined,
+				action: `permission`,
+				status: 'failure',
+				sessionContext: {
 					sessionId: session.session.id,
-					metadata: {
-						activeOrganizationId,
-						requestedOrganizationId: pathOrgId,
-						path: c.req.path,
-						method: c.req.method,
-					},
+					ipAddress: session.session.ipAddress,
+					userAgent: session.session.userAgent,
+					requestId,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requireOrganizationAccess',
 				},
-				'auth-middleware',
-				'requireOrganizationAccess'
-			)
+				reason: 'Access denied to this organization',
+			})
 
 			throw err
 		}
@@ -232,10 +259,26 @@ export const requireOrganizationAccess = (allowSuperAdmin = false) =>
 export const requireOrganizationRole = (roles: string[]) =>
 	createMiddleware<HonoEnv>(async (c, next) => {
 		const session = c.get('session')
-		const { error } = c.get('services')
+		const { audit } = c.get('services')
 		const requestId = c.get('requestId')
 
 		if (!session) {
+			audit.logAuth({
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
+					sessionId: 'anonymous',
+					ipAddress: c.get('location'),
+					userAgent: c.get('userAgent'),
+					requestId,
+					requiredRoles: roles,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requireOrganizationRole',
+				},
+				reason: 'Authentication required',
+			})
 			throw new HTTPException(401, { message: 'Authentication required' })
 		}
 
@@ -245,23 +288,25 @@ export const requireOrganizationRole = (roles: string[]) =>
 				message: `Access denied. Required organization roles: ${roles.join(', ')}`,
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId,
-					userId: session.session.userId,
+			audit.logAuth({
+				principalId: session.user.id,
+				organizationId: session.session.activeOrganizationId || undefined,
+				action: 'permission',
+				status: 'failure',
+				sessionContext: {
 					sessionId: session.session.id,
-					metadata: {
-						organizationRole,
-						requiredRoles: roles,
-						organizationId: session.session.activeOrganizationId,
-						path: c.req.path,
-						method: c.req.method,
-					},
+					ipAddress: session.session.ipAddress,
+					userAgent: session.session.userAgent,
+					requestId,
+					organizationRole,
+					requiredRoles: roles,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requireOrganizationRole',
 				},
-				'auth-middleware',
-				'requireOrganizationRole'
-			)
+				reason: `Access denied. Required organization roles: ${roles.join(', ')}`,
+			})
 
 			throw err
 		}
@@ -273,100 +318,56 @@ export const requireOrganizationRole = (roles: string[]) =>
  * API key authentication middleware for third-party access
  */
 export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
-	const apiKey = c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
-	const { db, error } = c.get('services')
+	const session = c.get('session')
+	const { audit } = c.get('services')
 	const requestId = c.get('requestId')
 
-	if (!apiKey) {
-		throw new HTTPException(401, {
-			message: 'API key required',
+	if (!session) {
+		audit.logAuth({
+			action: 'session',
+			status: 'failure',
+			sessionContext: {
+				sessionId: 'anonymous',
+				ipAddress: c.get('location'),
+				userAgent: c.get('userAgent'),
+				requestId,
+				path: c.req.path,
+				method: c.req.method,
+				component: 'auth-middleware',
+				operation: 'requireApiKey',
+			},
+			reason: 'Authentication required',
 		})
+		throw new HTTPException(401, { message: 'Authentication required' })
 	}
 
-	try {
-		// Query the API key from the auth database
-		// Note: This assumes Better Auth's API key plugin stores keys in an 'apiKey' table
-		const apiKeyRecord = await db.auth.query.apikey.findFirst({
-			where: (apiKeys, { eq, and, gt }) =>
-				and(eq(apiKeys.key, apiKey), gt(apiKeys.expiresAt, new Date())),
-			with: {
-				user: {
-					with: {
-						organizations: true,
-					},
-				},
-			},
+	// Check if user is banned
+	if (session.user.banned) {
+		const err = new HTTPException(403, {
+			message: session.user.banReason || 'Account is banned',
 		})
 
-		if (!apiKeyRecord) {
-			const err = new HTTPException(401, {
-				message: 'Invalid or expired API key',
-			})
-
-			await error.handleError(
-				err,
-				{
-					requestId,
-					metadata: {
-						apiKeyPrefix: apiKey.substring(0, 8) + '...',
-						path: c.req.path,
-						method: c.req.method,
-					},
-				},
-				'auth-middleware',
-				'requireApiKey'
-			)
-
-			throw err
-		}
-
-		// Create a pseudo-session for API key access
-		const apiSession: Session = {
-			session: {
-				id: `api-${apiKeyRecord.id}`,
-				token: apiKey,
-				userId: apiKeyRecord.userId,
-				expiresAt: apiKeyRecord.expiresAt,
-				createdAt: apiKeyRecord.createdAt,
-				updatedAt: apiKeyRecord.updatedAt,
-				ipAddress: c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for'),
-				userAgent: c.req.header('user-agent'),
-				activeOrganizationId: apiKeyRecord.user.organizations?.[0]?.organizationId || null,
-				activeOrganizationRole: apiKeyRecord.user.organizations?.[0]?.role || null,
-			},
-			user: apiKeyRecord.user,
-		}
-
-		// Set the API session in context
-		c.set('session', apiSession)
-		c.set('isApiKeyAuth', true)
-
-		await next()
-	} catch (err) {
-		// If it's already an HTTPException, re-throw it
-		if (err instanceof HTTPException) {
-			throw err
-		}
-
-		const error_handler = c.get('services').error
-
-		await error_handler.handleError(
-			err as Error,
-			{
+		audit.logAuth({
+			principalId: session.user.id,
+			organizationId: session.session.activeOrganizationId || undefined,
+			action: 'account',
+			status: 'failure',
+			sessionContext: {
+				sessionId: session.session.id,
+				ipAddress: session.session.ipAddress,
+				userAgent: session.session.userAgent,
+				banReason: session.user.banReason,
+				banExpires: session.user.banExpires,
 				requestId,
-				metadata: {
-					apiKeyPrefix: apiKey.substring(0, 8) + '...',
-					path: c.req.path,
-					method: c.req.method,
-				},
+				path: c.req.path,
+				method: c.req.method,
+				component: 'auth-middleware',
+				operation: 'requireApiKey',
 			},
-			'auth-middleware',
-			'requireApiKey'
-		)
-
-		throw new HTTPException(500, {
-			message: 'Internal server error during API key validation',
+			reason: session.user.banReason || 'Account is banned',
 		})
+
+		throw err
 	}
 })
 
@@ -375,21 +376,41 @@ export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
  */
 export const requireAuthOrApiKey = createMiddleware<HonoEnv>(async (c, next) => {
 	const session = c.get('session')
-	const apiKey = c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
+	const { audit } = c.get('services')
+	const isApiKeyAuth = c.get('isApiKeyAuth')
 
 	// If session exists, use session auth
-	if (session) {
+	if (session && !isApiKeyAuth) {
 		return requireAuth(c, next)
 	}
 
 	// If API key provided, use API key auth
-	if (apiKey) {
+	if (session && isApiKeyAuth) {
 		return requireApiKey(c, next)
 	}
 
+	audit.logAuth({
+		action: 'session',
+		status: 'failure',
+		sessionContext: {
+			sessionId: 'anonymous',
+			ipAddress: c.get('location'),
+			userAgent: c.get('userAgent'),
+			requestId: c.get('requestId'),
+			path: c.req.path,
+			method: c.req.method,
+			component: 'auth-middleware',
+			operation: 'requireAuthOrApiKey',
+		},
+		reason: isApiKeyAuth
+			? 'Authentication required. Provide a valid API key.'
+			: 'Authentication required.',
+	})
 	// No authentication provided
 	throw new HTTPException(401, {
-		message: 'Authentication required. Provide either session token or API key.',
+		message: isApiKeyAuth
+			? 'Authentication required. Provide a valid API key.'
+			: 'Authentication required.',
 	})
 })
 
@@ -399,45 +420,57 @@ export const requireAuthOrApiKey = createMiddleware<HonoEnv>(async (c, next) => 
 export const requirePermission = (resource: string, action: string) =>
 	createMiddleware<HonoEnv>(async (c, next) => {
 		const session = c.get('session')
-		const { error } = c.get('services')
+		const { authorization, audit } = c.get('services')
 		const requestId = c.get('requestId')
 
 		if (!session) {
+			audit.logAuth({
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
+					sessionId: 'anonymous',
+					ipAddress: c.get('location'),
+					userAgent: c.get('userAgent'),
+					requestId,
+					resource,
+					action,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requirePermission',
+				},
+				reason: 'Authentication required',
+			})
 			throw new HTTPException(401, { message: 'Authentication required' })
 		}
 
 		// Check if user has permission
-		const hasPermission = await checkUserPermission(
-			session,
-			resource,
-			action,
-			c.get('services').db.auth
-		)
+		const hasPermission = await authorization.hasPermission(session, resource, action)
 
 		if (!hasPermission) {
 			const err = new HTTPException(403, {
 				message: `Access denied. Missing permission: ${action} on ${resource}`,
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId,
-					userId: session.session.userId,
+			audit.logAuth({
+				principalId: session.user.id,
+				organizationId: session.session.activeOrganizationId || undefined,
+				action: `permission`,
+				status: 'failure',
+				sessionContext: {
 					sessionId: session.session.id,
-					metadata: {
-						resource,
-						action,
-						userRole: session.user.role,
-						organizationRole: session.session.activeOrganizationRole,
-						organizationId: session.session.activeOrganizationId,
-						path: c.req.path,
-						method: c.req.method,
-					},
+					ipAddress: session.session.ipAddress,
+					userAgent: session.session.userAgent,
+					requestId,
+					resource,
+					action,
+					path: c.req.path,
+					method: c.req.method,
+					component: 'auth-middleware',
+					operation: 'requirePermission',
 				},
-				'auth-middleware',
-				'requirePermission'
-			)
+				reason: `Access denied. Missing permission: ${action} on ${resource}`,
+			})
 
 			throw err
 		}
@@ -446,161 +479,86 @@ export const requirePermission = (resource: string, action: string) =>
 	})
 
 /**
- * Helper function to check user permissions
- */
-async function checkUserPermission(
-	session: Session,
-	resource: string,
-	action: string,
-	db: any
-): Promise<boolean> {
-	// Super admin has all permissions
-	if (session.user.role === 'admin') {
-		return true
-	}
-
-	// Define permission matrix based on roles and resources
-	const permissions = {
-		user: {
-			'audit.events': ['read', 'create'],
-			'audit.reports': ['read'],
-			'audit.presets': ['read'],
-			'audit.metrics': ['read'],
-		},
-		admin: {
-			'audit.events': ['read', 'create', 'update', 'delete', 'verify'],
-			'audit.reports': ['read', 'create', 'update', 'delete'],
-			'audit.presets': ['read', 'create', 'update', 'delete'],
-			'audit.metrics': ['read'],
-			'audit.alerts': ['read', 'acknowledge', 'resolve'],
-			'system.health': ['read'],
-			'system.metrics': ['read'],
-		},
-	}
-
-	// Organization-level permissions
-	const orgPermissions = {
-		owner: {
-			'audit.events': ['read', 'create', 'update', 'delete', 'verify'],
-			'audit.reports': ['read', 'create', 'update', 'delete'],
-			'audit.presets': ['read', 'create', 'update', 'delete'],
-			'audit.metrics': ['read'],
-			'audit.alerts': ['read', 'acknowledge', 'resolve'],
-			'organization.settings': ['read', 'update'],
-			'organization.members': ['read', 'invite', 'remove'],
-		},
-		admin: {
-			'audit.events': ['read', 'create', 'update', 'delete', 'verify'],
-			'audit.reports': ['read', 'create', 'update', 'delete'],
-			'audit.presets': ['read', 'create', 'update', 'delete'],
-			'audit.metrics': ['read'],
-			'audit.alerts': ['read', 'acknowledge', 'resolve'],
-		},
-		member: {
-			'audit.events': ['read', 'create'],
-			'audit.reports': ['read'],
-			'audit.presets': ['read'],
-			'audit.metrics': ['read'],
-		},
-	}
-
-	// Check system-level permissions
-	const userRole = session.user.role as keyof typeof permissions
-	const userPermissions = permissions[userRole]
-	if (userPermissions?.[resource]?.includes(action)) {
-		return true
-	}
-
-	// Check organization-level permissions
-	const orgRole = session.session.activeOrganizationRole as keyof typeof orgPermissions
-	if (orgRole) {
-		const orgUserPermissions = orgPermissions[orgRole]
-		if (orgUserPermissions?.[resource]?.includes(action)) {
-			return true
-		}
-	}
-
-	return false
-}
-
-/**
  * TRPC-specific authentication middleware
  */
 export const createTRPCAuthMiddleware = () => {
-	return async ({ ctx, next }: { ctx: any; next: any }) => {
+	return async ({ ctx, next }: { ctx: TRPCContext; next: any }) => {
 		if (!ctx.session) {
-			const { error } = ctx.services
+			const { audit } = ctx.services
+			audit.logAuth({
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
+					sessionId: 'anonymous',
+					ipAddress: ctx.location,
+					userAgent: ctx.userAgent,
+					requestId: ctx.requestId,
+					component: 'trpc-auth-middleware',
+					operation: 'requireAuth',
+				},
+				reason: 'Authentication required',
+			})
 			const err = new TRPCError({
 				code: 'UNAUTHORIZED',
 				message: 'Authentication required',
 				cause: 'No session',
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId: ctx.requestId,
-					metadata: {
-						message: err.message,
-						name: err.name,
-						code: err.code,
-						cause: err.cause,
-					},
-				},
-				'trpc-auth-middleware',
-				'requireAuth'
-			)
-
 			throw err
 		}
 
 		// Validate session is not expired
 		if (ctx.session.session.expiresAt < new Date()) {
-			const { error } = ctx.services
+			const { audit } = ctx.services
 			const err = new TRPCError({
 				code: 'UNAUTHORIZED',
 				message: 'Session expired',
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
+			audit.logAuth({
+				principalId: ctx.session.user.id,
+				organizationId: ctx.session.session.activeOrganizationId || undefined,
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
 					sessionId: ctx.session.session.id,
-					metadata: {
-						expiresAt: ctx.session.session.expiresAt,
-					},
+					ipAddress: ctx.session.session.ipAddress,
+					userAgent: ctx.session.session.userAgent,
+					requestId: ctx.requestId,
+					component: 'auth-middleware',
+					operation: 'requireAuth',
 				},
-				'trpc-auth-middleware',
-				'requireAuth'
-			)
+				reason: 'Session expired',
+			})
 
 			throw err
 		}
 
 		// Check if user is banned
 		if (ctx.session.user.banned) {
-			const { error } = ctx.services
+			const { audit } = ctx.services
 			const err = new TRPCError({
 				code: 'FORBIDDEN',
 				message: ctx.session.user.banReason || 'Account is banned',
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
+			audit.logAuth({
+				principalId: ctx.session.user.id,
+				organizationId: ctx.session.session.activeOrganizationId || undefined,
+				action: 'account',
+				status: 'failure',
+				sessionContext: {
 					sessionId: ctx.session.session.id,
-					metadata: {
-						banReason: ctx.session.user.banReason,
-						banExpires: ctx.session.user.banExpires,
-					},
+					ipAddress: ctx.session.session.ipAddress,
+					userAgent: ctx.session.session.userAgent,
+					banReason: ctx.session.user.banReason,
+					banExpires: ctx.session.user.banExpires,
+					requestId: ctx.requestId,
+					component: 'auth-middleware',
+					operation: 'requireAuth',
 				},
-				'trpc-auth-middleware',
-				'requireAuth'
-			)
+				reason: ctx.session.user.banReason || 'Account is banned',
+			})
 
 			throw err
 		}
@@ -618,8 +576,23 @@ export const createTRPCAuthMiddleware = () => {
  * TRPC role-based access control middleware
  */
 export const createTRPCRoleMiddleware = (roles: string[]) => {
-	return async ({ ctx, next }: { ctx: any; next: any }) => {
+	return async ({ ctx, next }: { ctx: TRPCContext; next: any }) => {
+		const { audit } = ctx.services
 		if (!ctx.session) {
+			audit.logAuth({
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
+					sessionId: 'anonymous',
+					ipAddress: ctx.location,
+					userAgent: ctx.userAgent,
+					requestId: ctx.requestId,
+					requiredRoles: roles,
+					component: 'trpc-role-middleware',
+					operation: 'requireRole',
+				},
+				reason: 'Authentication required',
+			})
 			throw new TRPCError({
 				code: 'UNAUTHORIZED',
 				message: 'Authentication required',
@@ -634,20 +607,23 @@ export const createTRPCRoleMiddleware = (roles: string[]) => {
 				message: `Access denied. Required roles: ${roles.join(', ')}`,
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
+			audit.logAuth({
+				principalId: ctx.session.user.id,
+				organizationId: ctx.session.session.activeOrganizationId || undefined,
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
 					sessionId: ctx.session.session.id,
-					metadata: {
-						userRole,
-						requiredRoles: roles,
-					},
+					ipAddress: ctx.session.session.ipAddress,
+					userAgent: ctx.session.session.userAgent,
+					requestId: ctx.requestId,
+					userRole,
+					requiredRoles: roles,
+					component: 'trpc-role-middleware',
+					operation: 'requireRole',
 				},
-				'trpc-role-middleware',
-				'requireRole'
-			)
+				reason: `Access denied. Required roles: ${roles.join(', ')}`,
+			})
 
 			throw err
 		}
@@ -660,20 +636,31 @@ export const createTRPCRoleMiddleware = (roles: string[]) => {
  * TRPC permission-based access control middleware
  */
 export const createTRPCPermissionMiddleware = (resource: string, action: string) => {
-	return async ({ ctx, next }: { ctx: any; next: any }) => {
+	return async ({ ctx, next }: { ctx: TRPCContext; next: any }) => {
+		const { audit, authorization } = ctx.services
 		if (!ctx.session) {
+			audit.logAuth({
+				action: 'session',
+				status: 'failure',
+				sessionContext: {
+					sessionId: 'anonymous',
+					ipAddress: ctx.location,
+					userAgent: ctx.userAgent,
+					requestId: ctx.requestId,
+					resource,
+					action,
+					component: 'trpc-permission-middleware',
+					operation: 'requirePermission',
+				},
+				reason: 'Authentication required',
+			})
 			throw new TRPCError({
 				code: 'UNAUTHORIZED',
 				message: 'Authentication required',
 			})
 		}
 
-		const hasPermission = await checkUserPermission(
-			ctx.session,
-			resource,
-			action,
-			ctx.services.db.auth
-		)
+		const hasPermission = await authorization.hasPermission(ctx.session, resource, action)
 
 		if (!hasPermission) {
 			const { error } = ctx.services
@@ -682,23 +669,23 @@ export const createTRPCPermissionMiddleware = (resource: string, action: string)
 				message: `Access denied. Missing permission: ${action} on ${resource}`,
 			})
 
-			await error.handleError(
-				err,
-				{
-					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
+			audit.logAuth({
+				principalId: ctx.session.user.id,
+				organizationId: ctx.session.session.activeOrganizationId || undefined,
+				action: `permission`,
+				status: 'failure',
+				sessionContext: {
 					sessionId: ctx.session.session.id,
-					metadata: {
-						resource,
-						action,
-						userRole: ctx.session.user.role,
-						organizationRole: ctx.session.session.activeOrganizationRole,
-						organizationId: ctx.session.session.activeOrganizationId,
-					},
+					ipAddress: ctx.session.session.ipAddress,
+					userAgent: ctx.session.session.userAgent,
+					requestId: ctx.requestId,
+					resource,
+					action,
+					component: 'trpc-permission-middleware',
+					operation: 'requirePermission',
 				},
-				'trpc-permission-middleware',
-				'requirePermission'
-			)
+				reason: `Access denied. Missing permission: ${action} on ${resource}`,
+			})
 
 			throw err
 		}

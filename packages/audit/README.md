@@ -9,6 +9,10 @@ A simple audit logging package designed to capture and queue audit events using 
 - **Configurable**: Allows configuration of the BullMQ queue name and Redis connection parameters.
 - **Typed Events**: Uses TypeScript for defined `AuditLogEvent` structures, ensuring consistency.
 - **Environment Variable Support**: Defaults to using a shared Redis connection configured via `REDIS_URL` (from `@repo/redis-client`). Can also use `AUDIT_REDIS_URL` for a dedicated connection if explicitly configured.
+- 🔒 **Security First**: Cryptographic hashing and signatures for tamper detection
+- 🏥 **Healthcare Ready**: FHIR-specific audit events and PHI handling
+- 📋 **Compliance Built-in**: HIPAA and GDPR compliance validation
+- 🚀 **High Performance**: Batching, rate limiting, and guaranteed delivery
 
 ## Installation
 
@@ -50,7 +54,8 @@ const auditServiceShared = new Audit('my-application-audit-queue')
 
 // Advanced Option 1: Provide Redis URL directly for a dedicated connection
 const auditServiceWithUrl = new Audit(
-	'my-application-audit-queue',
+	config,
+	db, // drizzle instance
 	'redis://dedicated-audit-redis:6379'
 )
 
@@ -67,7 +72,8 @@ const auditServiceWithUrl = new Audit(
 
 // Advanced Option 4: Provide additional IORedis connection options for a dedicated connection
 const auditServiceWithCustomOptions = new Audit(
-	'my-application-audit-queue',
+	config, // audit config
+	db, // drizzle instance
 	{ url: 'redis://localhost:6379' }, // Can pass options object
 	{
 		// Example: enable TLS
@@ -132,6 +138,120 @@ export interface AuditLogEvent {
 	outcomeDescription?: string // Detailed outcome
 	[key: string]: any // For additional context-specific data
 }
+```
+
+### Compliance Configuration
+
+```typescript
+const config: AuditConfig = {
+	// ... other config
+	compliance: {
+		hipaa: {
+			enabled: true,
+			requiredFields: ['principalId', 'targetResourceType', 'sessionContext'],
+			retentionYears: 6,
+		},
+		gdpr: {
+			enabled: true,
+			defaultLegalBasis: 'legitimate_interest',
+			retentionDays: 365,
+		},
+	},
+}
+```
+
+## Usage Examples
+
+### Authentication Events
+
+```typescript
+// Successful login
+await auditSDK.logAuth({
+	principalId: 'user-123',
+	action: 'login',
+	status: 'success',
+	sessionContext: {
+		sessionId: 'sess-abc123',
+		ipAddress: '192.168.1.100',
+		userAgent: 'Mozilla/5.0...',
+	},
+})
+
+// Failed login attempt
+await auditSDK.logAuth({
+	principalId: 'user-123',
+	action: 'login',
+	status: 'failure',
+	reason: 'Invalid credentials',
+})
+```
+
+### FHIR Resource Access
+
+```typescript
+// Patient record access
+await auditSDK.logFHIR({
+	principalId: 'practitioner-456',
+	organizationId: 'hospital-1',
+	action: 'read',
+	resourceType: 'Patient',
+	resourceId: 'patient-789',
+	status: 'success',
+	outcomeDescription: 'Accessed patient record for treatment planning',
+	sessionContext: {
+		sessionId: 'sess-def456',
+		ipAddress: '10.0.1.50',
+		userAgent: 'EMR-System/2.1',
+	},
+	fhirContext: {
+		version: 'R4',
+		interaction: 'read',
+		compartment: 'Patient/patient-789',
+	},
+})
+```
+
+### Data Operations
+
+```typescript
+// Data modification
+await auditSDK.logData({
+	principalId: 'user-123',
+	action: 'update',
+	resourceType: 'Patient',
+	resourceId: 'patient-456',
+	status: 'success',
+	dataClassification: 'PHI',
+	changes: {
+		field: 'address',
+		oldValue: '123 Old St',
+		newValue: '456 New Ave',
+	},
+})
+```
+
+### Critical Events with Guaranteed Delivery
+
+```typescript
+// High-priority security event
+await auditSDK.logCritical(
+	{
+		principalId: 'security-system',
+		action: 'security.breach.detected',
+		status: 'failure',
+		outcomeDescription: 'Unauthorized access attempt detected',
+		dataClassification: 'CONFIDENTIAL',
+		securityContext: {
+			threatLevel: 'high',
+			attackVector: 'brute_force',
+			blockedIP: '192.168.1.200',
+		},
+	},
+	{
+		priority: 1,
+		compliance: ['hipaa'],
+	}
+)
 ```
 
 ### Closing the Connection

@@ -191,8 +191,6 @@ Pagination information is included in the response:
 		security: [
 			{
 				BearerAuth: [],
-			},
-			{
 				ApiKeyAuth: [],
 			},
 		],

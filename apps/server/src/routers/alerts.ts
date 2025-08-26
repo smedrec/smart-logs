@@ -8,7 +8,7 @@ import type { AlertQueryFilters } from '@repo/audit'
 const alertsRouter = {
 	active: protectedProcedure.query(async ({ ctx }) => {
 		const { monitor, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 		try {
 			const alerts = await monitor.alert.getActiveAlerts(organizationId)
 			return alerts
@@ -41,7 +41,7 @@ const alertsRouter = {
 	}),
 	resolved: protectedProcedure.query(async ({ ctx }) => {
 		const { monitor, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 		const filter: AlertQueryFilters = {
 			organizationId,
 			resolved: true,

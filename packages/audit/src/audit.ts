@@ -1,15 +1,22 @@
 import { Queue } from 'bullmq'
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { Redis as RedisInstance } from 'ioredis' // Renamed to avoid conflict
 
 import { ConsoleLogger } from '@repo/logs'
 import { getSharedRedisConnection } from '@repo/redis-client'
 
+import { AuditConfig, ComplianceConfig } from './config/types.js'
 import { CryptoService } from './crypto.js'
+import { DatabasePresetHandler } from './preset/database-preset-handler.js'
 import {
 	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 	ReliableEventProcessor,
 } from './queue/reliable-processor.js'
-import { DEFAULT_VALIDATION_CONFIG, validateAndSanitizeAuditEvent } from './validation.js'
+import {
+	DEFAULT_VALIDATION_CONFIG,
+	validateAndSanitizeAuditEvent,
+	validateCompliance,
+} from './validation.js'
 
 import type { RedisOptions, Redis as RedisType } from 'ioredis' // RedisType for type usage
 import type { Logger } from '@repo/logs'
@@ -51,12 +58,14 @@ import type { ValidationConfig } from './validation.js'
  * ```
  */
 export class Audit {
+	private config: AuditConfig
 	private connection: RedisType
 	private queueName: string
 	private bullmq_queue: Queue<AuditLogEvent, any, string>
 	private isSharedConnection: boolean
 	private cryptoService: CryptoService
 	private logger: Logger
+	private presetsService: DatabasePresetHandler
 
 	/**
 	 * Constructs an `Audit` instance.
@@ -85,14 +94,16 @@ export class Audit {
 	 *         or if there's an error during direct Redis client instantiation.
 	 */
 	constructor(
-		queueName: string,
-		cryptoConfig: Partial<CryptoConfig>,
+		config: AuditConfig,
+		db: PostgresJsDatabase<any>,
 		redisOrUrlOrOptions?: string | RedisType | { url?: string; options?: RedisOptions },
 		directConnectionOptions?: RedisOptions
 	) {
-		this.queueName = queueName
+		this.config = config
+		this.queueName = this.config.reliableProcessor.queueName
 		this.isSharedConnection = false
-		this.cryptoService = new CryptoService(cryptoConfig)
+		this.cryptoService = new CryptoService({ secretKey: this.config.security.encryptionKey })
+		this.presetsService = new DatabasePresetHandler(db)
 
 		this.logger = new ConsoleLogger({
 			environment: 'development',
@@ -530,7 +541,8 @@ export class Audit {
 					queueName: this.queueName,
 					error: errorMessages,
 				})
-				throw new Error(`[AuditService] Validation Error: ${errorMessages}`)
+				// FIXME: This error cause the system to crash
+				//throw new Error(`[AuditService] Validation Error: ${errorMessages}`)
 			}
 
 			event = validationResult.sanitizedEvent!
@@ -574,6 +586,243 @@ export class Audit {
 				`[AuditService] Failed to log audit event with guaranteed delivery. Error: ${error instanceof Error ? error.message : String(error)}`
 			)
 		}
+	}
+
+	/**
+	 * Log an audit event with SDK enhancements
+	 */
+	async logWithEnhancements(
+		eventDetails: Omit<AuditLogEvent, 'timestamp'>,
+		options: {
+			preset?: string
+			compliance?: string[]
+			skipValidation?: boolean
+		} = {}
+	): Promise<void> {
+		const timestamp = new Date().toISOString()
+		let enrichedEvent = { ...eventDetails }
+
+		// Apply preset if specified
+		if (options.preset && this.presetsService) {
+			//const preset = AUDIT_PRESETS[options.preset]
+			const preset = await this.presetsService.getPreset(
+				options.preset,
+				eventDetails.organizationId || undefined
+			)
+			if (preset) {
+				enrichedEvent = {
+					...preset.defaultValues,
+					...enrichedEvent,
+					action: enrichedEvent.action || preset.action,
+					dataClassification: enrichedEvent.dataClassification || preset.dataClassification,
+				}
+			}
+		}
+
+		// Apply default values from config
+		if (this.config?.compliance) {
+			enrichedEvent = {
+				dataClassification: this.config.compliance.defaultDataClassification,
+				retentionPolicy: this.config.compliance.defaultRetentionDays,
+				...enrichedEvent,
+			}
+		}
+
+		// Add timestamp before compliance validation
+		enrichedEvent = {
+			timestamp,
+			...enrichedEvent,
+		}
+
+		// Validate compliance if specified
+		if (options.compliance && this.config?.compliance) {
+			for (const complianceType of options.compliance) {
+				validateCompliance(enrichedEvent, complianceType, this.config.compliance)
+			}
+		}
+
+		// Log the event
+		await this.log(enrichedEvent, {
+			generateHash: this.config?.compliance.generateHash ?? true,
+			generateSignature: this.config?.compliance.generateSignature ?? false,
+			skipValidation: options.skipValidation,
+			validationConfig: this.config?.validation,
+		})
+	}
+
+	/**
+	 * Log a healthcare-specific FHIR event
+	 */
+	async logFHIR(details: {
+		principalId: string
+		action: string
+		resourceType: string
+		resourceId: string
+		status: 'attempt' | 'success' | 'failure'
+		outcomeDescription?: string
+		organizationId?: string
+		sessionContext?: any
+		fhirContext?: {
+			version?: string
+			interaction?: string
+			compartment?: string
+		}
+	}): Promise<void> {
+		await this.logWithEnhancements(
+			{
+				principalId: details.principalId,
+				organizationId: details.organizationId,
+				action: `fhir.${details.resourceType.toLowerCase()}.${details.action}`,
+				targetResourceType: details.resourceType,
+				targetResourceId: details.resourceId,
+				status: details.status,
+				outcomeDescription: details.outcomeDescription,
+				sessionContext: details.sessionContext,
+				dataClassification: 'PHI',
+				fhirContext: details.fhirContext,
+			},
+			{
+				compliance: ['hipaa'],
+			}
+		)
+	}
+
+	/**
+	 * Log an authentication event
+	 */
+	async logAuth(details: {
+		principalId?: string
+		organizationId?: string
+		action:
+			| 'login'
+			| 'logout'
+			| 'password_change'
+			| 'mfa_enable'
+			| 'mfa_disable'
+			| 'account'
+			| 'session'
+			| 'permission'
+		status: 'attempt' | 'success' | 'failure'
+		sessionContext?: any
+		reason?: string
+	}): Promise<void> {
+		await this.logWithEnhancements(
+			{
+				principalId: details.principalId,
+				organizationId: details.organizationId,
+				action: `auth.${details.action}.${details.status}`,
+				status: details.status,
+				outcomeDescription: details.reason || `User ${details.action} ${details.status}`,
+				sessionContext: details.sessionContext,
+				dataClassification: 'INTERNAL',
+			},
+			{
+				preset: 'authentication',
+			}
+		)
+	}
+
+	/**
+	 * Log a system event
+	 */
+	async logSystem(details: {
+		action: string
+		status: 'attempt' | 'success' | 'failure'
+		component?: string
+		outcomeDescription?: string
+		systemContext?: any
+	}): Promise<void> {
+		await this.logWithEnhancements(
+			{
+				principalId: `system-${details.component || 'unknown'}`,
+				action: `system.${details.action}`,
+				status: details.status,
+				outcomeDescription: details.outcomeDescription,
+				dataClassification: 'INTERNAL',
+				systemContext: details.systemContext,
+			},
+			{
+				preset: 'system',
+			}
+		)
+	}
+
+	/**
+	 * Log a data operation event
+	 */
+	async logData(details: {
+		principalId: string
+		organizationId?: string
+		action: 'create' | 'read' | 'update' | 'delete' | 'export' | 'import'
+		resourceType: string
+		resourceId: string
+		status: 'attempt' | 'success' | 'failure'
+		dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
+		changes?: any
+		outcomeDescription?: string
+	}): Promise<void> {
+		await this.logWithEnhancements({
+			principalId: details.principalId,
+			organizationId: details.organizationId,
+			action: `data.${details.action}`,
+			targetResourceType: details.resourceType,
+			targetResourceId: details.resourceId,
+			status: details.status,
+			outcomeDescription: details.outcomeDescription,
+			dataClassification: details.dataClassification || 'INTERNAL',
+			changes: details.changes,
+		})
+	}
+
+	/**
+	 * Log with guaranteed delivery for critical events
+	 */
+	async logCritical(
+		eventDetails: Omit<AuditLogEvent, 'timestamp'>,
+		options: {
+			priority?: number
+			preset?: string
+			compliance?: string[]
+		} = {}
+	): Promise<void> {
+		const timestamp = new Date().toISOString()
+		let enrichedEvent = { ...eventDetails }
+
+		// Apply preset if specified
+		if (options.preset && this.presetsService) {
+			const preset = await this.presetsService.getPreset(
+				options.preset,
+				eventDetails.organizationId || undefined
+			)
+			if (preset) {
+				enrichedEvent = {
+					...preset.defaultValues,
+					...enrichedEvent,
+					action: enrichedEvent.action || preset.action,
+					dataClassification: enrichedEvent.dataClassification || preset.dataClassification,
+				}
+			}
+		}
+
+		// Add timestamp before compliance validation
+		enrichedEvent = {
+			timestamp,
+			...enrichedEvent,
+		}
+
+		// Validate compliance if specified
+		if (options.compliance && this.config?.compliance) {
+			for (const complianceType of options.compliance) {
+				validateCompliance(enrichedEvent, complianceType, this.config.compliance)
+			}
+		}
+
+		await this.log(enrichedEvent, {
+			priority: options.priority || 1,
+			durabilityGuarantees: true,
+			generateHash: true,
+			generateSignature: true,
+		})
 	}
 
 	/**

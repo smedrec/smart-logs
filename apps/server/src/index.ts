@@ -84,6 +84,8 @@ async function startServer() {
 					services: c.get('services'),
 					session: c.get('session'),
 					requestId: c.get('requestId'),
+					location: c.get('location'),
+					userAgent: c.get('userAgent'),
 				}),
 			})(c, next)
 		)
