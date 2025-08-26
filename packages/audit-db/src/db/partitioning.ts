@@ -90,6 +90,7 @@ export class DatabasePartitionManager {
 	private async createPartitionIndexes(partitionName: string): Promise<void> {
 		const indexes = [
 			// Primary performance indexes
+			`CREATE INDEX IF NOT EXISTS ${partitionName}_id_idx ON ${partitionName} (id)`,
 			`CREATE INDEX IF NOT EXISTS ${partitionName}_timestamp_idx ON ${partitionName} (timestamp)`,
 			`CREATE INDEX IF NOT EXISTS ${partitionName}_principal_id_idx ON ${partitionName} (principal_id)`,
 			`CREATE INDEX IF NOT EXISTS ${partitionName}_organization_id_idx ON ${partitionName} (organization_id)`,
@@ -288,13 +289,50 @@ export class DatabasePartitionManager {
 	}
 
 	/**
+	 * Initialize partitioned audit_log table
+	 * This should be called once during database setup
+	 */
+	async initializePartitionedTable(): Promise<void> {
+		// First, create the partitioned table if it doesn't exist
+		await this.db.execute(sql`
+			CREATE TABLE IF NOT EXISTS audit_log (
+				id serial,
+				timestamp timestamp with time zone NOT NULL,
+				ttl varchar(255),
+				principal_id varchar(255),
+				organization_id varchar(255),
+				action varchar(255) NOT NULL,
+				target_resource_type varchar(255),
+				target_resource_id varchar(255),
+				status varchar(50) NOT NULL,
+				outcome_description text,
+				hash varchar(64),
+				hash_algorithm varchar(50) DEFAULT 'SHA-256',
+				event_version varchar(20) DEFAULT '1.0',
+				correlation_id varchar(255),
+				data_classification varchar(20) DEFAULT 'INTERNAL',
+				retention_policy varchar(50) DEFAULT 'standard',
+				processing_latency integer,
+				archived_at timestamp with time zone,
+				details jsonb
+			) PARTITION BY RANGE (timestamp);
+		`)
+
+		// Create the partition management functions
+		await this.createPartitionManagementFunctions()
+
+		// Create initial partitions
+		await this.db.execute(sql`SELECT create_audit_log_partitions();`)
+	}
+
+	/**
 	 * Create database functions for partition management
 	 */
 	async createPartitionManagementFunctions(): Promise<void> {
 		// Function to automatically create monthly partitions
 		await this.db.execute(sql`
 			CREATE OR REPLACE FUNCTION create_audit_log_partitions()
-			RETURNS void AS $$
+			RETURNS void AS $$$
 			DECLARE
 				start_date date;
 				end_date date;
@@ -317,7 +355,7 @@ export class DatabasePartitionManager {
 		// Function to drop old partitions
 		await this.db.execute(sql`
 			CREATE OR REPLACE FUNCTION drop_old_audit_partitions(retention_days integer DEFAULT 2555)
-			RETURNS text[] AS $$
+			RETURNS text[] AS $$$
 			DECLARE
 				cutoff_date date;
 				partition_record record;
@@ -358,7 +396,7 @@ export class DatabasePartitionManager {
 				record_count bigint,
 				size_bytes bigint,
 				size_pretty text
-			) AS $$
+			) AS $$$
 			BEGIN
 				RETURN QUERY
 				SELECT 

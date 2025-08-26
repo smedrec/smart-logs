@@ -21,7 +21,7 @@ import {
 	ScheduledReportingService,
 } from '@repo/audit'
 import {
-	AuditDb,
+	EnhancedAuditDb,
 	errorAggregation,
 	errorLog,
 	reportExecutions,
@@ -51,7 +51,7 @@ let isolateCreatedAt: number | undefined = undefined
 
 let connection: Redis | undefined = undefined
 
-let auditDbInstance: AuditDb | undefined = undefined
+let auditDbInstance: EnhancedAuditDb | undefined = undefined
 
 export { auditDbInstance }
 
@@ -188,8 +188,10 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			defaultFields: { environment: config.server.environment },
 		})
 
+		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
+
 		if (!auditDbInstance) {
-			auditDbInstance = new AuditDb(config.database.url)
+			auditDbInstance = new EnhancedAuditDb(connection, config.enhancedClient)
 			// Check the database connection
 			const isConnected = await auditDbInstance.checkAuditDbConnection()
 			if (!isConnected) {
@@ -214,8 +216,6 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			)
 			//healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
 		}
-
-		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
 
 		if (!audit) audit = new Audit(config, db.audit, connection)
 

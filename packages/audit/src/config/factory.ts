@@ -44,13 +44,20 @@ export function createDevelopmentConfig(): AuditConfig {
 				ssl: false,
 			},
 			queryCacheFactory: {
-				type: 'local' as CacheType,
+				type: 'hybrid' as CacheType,
 				queryCache: {
 					enabled: true,
 					maxSizeMB: 50,
 					defaultTTL: 300, // 5 minutes
 					maxQueries: 1000,
 					keyPrefix: 'dev_audit_query',
+				},
+				redis: {
+					redisKeyPrefix: 'audit_cache',
+					enableLocalCache: true,
+					localCacheSizeMB: 100,
+					enableCompression: true,
+					serializationFormat: 'json' as const,
 				},
 			},
 			partitioning: {

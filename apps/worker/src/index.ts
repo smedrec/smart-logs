@@ -1,6 +1,7 @@
 import 'dotenv/config'
 
 import { serve } from '@hono/node-server'
+import { sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { pino } from 'pino'
 
@@ -33,6 +34,7 @@ import {
 import {
 	AuditDbWithConfig,
 	auditLog as auditLogTableSchema,
+	EnhancedAuditDb,
 	errorAggregation,
 	errorLog,
 } from '@repo/audit-db'
@@ -57,7 +59,7 @@ let configManager: ConfigurationManager | undefined = undefined
 let connection: Redis | undefined = undefined
 
 // Using configuration manager
-let auditDbService: AuditDbWithConfig | undefined = undefined
+let auditDbService: EnhancedAuditDb | undefined = undefined
 
 // Reliable event processor instance
 let reliableProcessor: ReliableEventProcessor<AuditLogEvent> | undefined = undefined
@@ -332,7 +334,7 @@ async function main() {
 
 	// 2. Initialize database connection
 	if (!auditDbService) {
-		auditDbService = new AuditDbWithConfig(config.database)
+		auditDbService = new EnhancedAuditDb(connection, config.enhancedClient)
 	}
 
 	// 3. Check database connection

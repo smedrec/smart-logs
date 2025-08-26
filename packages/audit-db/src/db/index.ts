@@ -176,7 +176,7 @@ export class EnhancedAuditDb {
 		try {
 			const status = await this.client.getHealthStatus()
 			//console.log('🟢 Database connection successful.')
-			return status.overall === 'healthy'
+			return status.components.connectionPool.status === 'healthy'
 		} catch (error) {
 			console.error('🔴 Database connection failed:', error)
 			// In a real app, you might want to throw the error or handle it more gracefully

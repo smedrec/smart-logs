@@ -29,6 +29,7 @@
 		"audit-db:rollback": "tsx src/cli.ts rollback",
 		"audit-db:seed-policies": "tsx src/cli.ts seed-policies",
 		"audit-db:seed-presets": "tsx src/cli.ts seed-presets",
+		"audit-db:setup-partitions": "node scripts/setup-partitions.js",
 		"audit-db:stats": "tsx src/archival-cli.ts stats",
 		"audit-db:studio": "drizzle-kit studio --config=drizzle-dev.config.ts",
 		"audit-db:validate": "tsx src/archival-cli.ts validate",

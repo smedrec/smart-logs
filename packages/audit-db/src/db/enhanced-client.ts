@@ -103,15 +103,15 @@ export class EnhancedAuditDatabaseClient {
 	 */
 	private async setupPartitioning(): Promise<void> {
 		// Create partition management functions
-		await this.partitionManager.createPartitionManagementFunctions()
+		//await this.partitionManager.createPartitionManagementFunctions()
 
 		// Create initial partitions
-		await this.partitionManager.createAuditLogPartitions({
+		/*await this.partitionManager.createAuditLogPartitions({
 			strategy: this.config.partitioning.strategy,
 			partitionColumn: 'timestamp',
 			interval: this.config.partitioning.interval,
 			retentionDays: this.config.partitioning.retentionDays,
-		})
+		})*/
 
 		// Setup automatic partition maintenance
 		if (this.config.partitioning.autoMaintenance) {

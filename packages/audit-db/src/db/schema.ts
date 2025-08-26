@@ -73,7 +73,7 @@ export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
 export const auditLog = pgTable(
 	'audit_log',
 	{
-		id: serial('id').primaryKey(),
+		id: serial('id'),
 		// The timestamp from the AuditLogEvent is an ISO string.
 		// Storing it as 'timestamp with time zone' is appropriate.
 		// mode: 'string' ensures Drizzle treats it as a string when reading/writing,
@@ -111,6 +111,7 @@ export const auditLog = pgTable(
 	(table) => {
 		return [
 			// Core audit indexes
+			index('audit_log_id_idx').on(table.id),
 			index('audit_log_timestamp_idx').on(table.timestamp),
 			index('audit_log_principal_id_idx').on(table.principalId),
 			index('audit_log_organization_id_idx').on(table.organizationId),
@@ -188,9 +189,7 @@ export const auditIntegrityLog = pgTable(
 	'audit_integrity_log',
 	{
 		id: serial('id').primaryKey(),
-		auditLogId: integer('audit_log_id')
-			.references(() => auditLog.id)
-			.notNull(),
+		auditLogId: integer('audit_log_id').notNull(),
 		verificationTimestamp: timestamp('verification_timestamp', {
 			withTimezone: true,
 			mode: 'string',

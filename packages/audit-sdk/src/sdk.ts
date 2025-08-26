@@ -100,17 +100,10 @@ export class AuditSDK {
 
 		// Initialize Redis connection
 		const connection = getSharedRedisConnectionWithConfig(config.redis)
+		const auditDb = new AuditDbWithConfig(config.database)
 
 		// Initialize core audit service
-		const audit = new Audit(
-			config.reliableProcessor.queueName,
-			{
-				secretKey: config.security.encryptionKey,
-			},
-			connection
-		)
-
-		const auditDb = new AuditDbWithConfig(config.database)
+		const audit = new Audit(config, auditDb.getDrizzleInstance(), connection)
 
 		const presetsService = createDatabasePresetHandler(auditDb.getDrizzleInstance())
 
