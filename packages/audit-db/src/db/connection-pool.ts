@@ -271,17 +271,17 @@ export class EnhancedDatabaseClient {
 	 */
 	/**invalidateCache(pattern: string): number {
 		let invalidated = 0
-		const entries = this.queryCache.getEntries()
+		const entries = this.queryCache.get()
 
 		for (const { key } of entries) {
 			if (key.includes(pattern)) {
-				this.queryCache.delete(key.replace(`${this.queryCache['config'].keyPrefix}:`, ''))
+				this.queryCache.delete(key.replace(`${this.cacheConfig.queryCache.keyPrefix}:`, ''))
 				invalidated++
 			}
 		}
 
 		return invalidated
-	} */
+	}*/
 
 	/**
 	 * Get performance statistics

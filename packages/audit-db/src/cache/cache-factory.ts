@@ -4,7 +4,7 @@
 import { QueryCache, QueryCacheStats } from './query-cache.js'
 import { RedisQueryCache } from './redis-query-cache.js'
 
-import type { CacheFactoryConfig, CacheType, QueryCacheConfig } from '@repo/audit'
+import type { CacheFactoryConfig, CacheType } from '@repo/audit'
 import type { RedisQueryCacheConfig } from './redis-query-cache.js'
 
 /**
@@ -20,7 +20,7 @@ export interface IQueryCache {
 }
 
 // Re-export types for convenience
-export type { QueryCacheStats, CacheEntry } from '../db/query-cache.js'
+export type { QueryCacheStats, CacheEntry } from './query-cache.js'
 
 /**
  * Factory function to create appropriate cache instance

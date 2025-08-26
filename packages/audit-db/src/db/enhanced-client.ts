@@ -56,7 +56,7 @@ export class EnhancedAuditDatabaseClient {
 		this.config = config
 
 		// Initialize enhanced database client with connection pooling and caching
-		this.client = new EnhancedDatabaseClient(config.connectionPool, config.queryCache)
+		this.client = new EnhancedDatabaseClient(config.connectionPool, config.queryCacheFactory)
 
 		// Initialize partition manager
 		this.partitionManager = new DatabasePartitionManager(this.client.getDatabase())
@@ -239,9 +239,9 @@ export class EnhancedAuditDatabaseClient {
 	/**
 	 * Invalidate cache for specific patterns
 	 */
-	invalidateCache(pattern: string): number {
+	/**invalidateCache(pattern: string): number {
 		return this.client.invalidateCache(pattern)
-	}
+	}*/
 
 	/**
 	 * Generate comprehensive performance report
@@ -523,12 +523,15 @@ export function createEnhancedAuditClient(
 			retryDelay: 1000,
 			ssl: false,
 		},
-		queryCache: {
-			enabled: true,
-			maxSizeMB: 100,
-			defaultTTL: 300, // 5 minutes
-			maxQueries: 1000,
-			keyPrefix: 'audit_cache',
+		queryCacheFactory: {
+			type: 'local',
+			queryCache: {
+				enabled: true,
+				maxSizeMB: 100,
+				defaultTTL: 300, // 5 minutes
+				maxQueries: 1000,
+				keyPrefix: 'audit_cache',
+			},
 		},
 		partitioning: {
 			enabled: true,
@@ -550,7 +553,7 @@ export function createEnhancedAuditClient(
 		...defaultConfig,
 		...overrides,
 		connectionPool: { ...defaultConfig.connectionPool, ...overrides?.connectionPool },
-		queryCache: { ...defaultConfig.queryCache, ...overrides?.queryCache },
+		queryCache: { ...defaultConfig.queryCacheFactory, ...overrides?.queryCacheFactory },
 		partitioning: { ...defaultConfig.partitioning, ...overrides?.partitioning },
 		monitoring: { ...defaultConfig.monitoring, ...overrides?.monitoring },
 	}

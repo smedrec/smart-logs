@@ -3,10 +3,12 @@
  */
 import crypto from 'crypto'
 
+import { CacheFactoryConfig } from '@repo/audit'
+
 import { createQueryCache } from './cache-factory.js'
 
 import type { Pool } from 'pg'
-import type { CacheFactoryConfig, IQueryCache } from './cache-factory.js'
+import type { IQueryCache } from './cache-factory.js'
 
 export interface QueryResult<T = any> {
 	rows: T[]
