@@ -4,7 +4,7 @@
 
 import { generateDefaultSecret } from '../crypto.js'
 
-import type { AuditConfig } from './types.js'
+import type { AuditConfig, CacheType } from './types.js'
 
 /**
  * Create default configuration for development environment
@@ -43,12 +43,15 @@ export function createDevelopmentConfig(): AuditConfig {
 				retryDelay: 1000,
 				ssl: false,
 			},
-			queryCache: {
-				enabled: true,
-				maxSizeMB: 100,
-				defaultTTL: 300, // 5 minutes
-				maxQueries: 1000,
-				keyPrefix: 'audit_cache_dev',
+			queryCacheFactory: {
+				type: 'local' as CacheType,
+				queryCache: {
+					enabled: true,
+					maxSizeMB: 50,
+					defaultTTL: 300, // 5 minutes
+					maxQueries: 1000,
+					keyPrefix: 'dev_audit_query',
+				},
 			},
 			partitioning: {
 				enabled: true,
@@ -266,12 +269,22 @@ export function createStagingConfig(): AuditConfig {
 				retryDelay: 2000,
 				ssl: true,
 			},
-			queryCache: {
-				...baseConfig.enhancedClient.queryCache,
-				maxSizeMB: 150,
-				defaultTTL: 600, // 10 minutes
-				maxQueries: 2000,
-				keyPrefix: 'audit_cache_staging',
+			queryCacheFactory: {
+				type: 'hybrid' as CacheType,
+				queryCache: {
+					enabled: true,
+					maxSizeMB: 500,
+					defaultTTL: 900, // 15 minutes
+					maxQueries: 10000,
+					keyPrefix: 'prod_audit_query',
+				},
+				redis: {
+					redisKeyPrefix: 'audit_cache',
+					enableLocalCache: true,
+					localCacheSizeMB: 100,
+					enableCompression: true,
+					serializationFormat: 'json' as const,
+				},
 			},
 			partitioning: {
 				...baseConfig.enhancedClient.partitioning,
@@ -401,12 +414,22 @@ export function createProductionConfig(): AuditConfig {
 				retryDelay: 5000,
 				ssl: true,
 			},
-			queryCache: {
-				...baseConfig.enhancedClient.queryCache,
-				maxSizeMB: 200,
-				defaultTTL: 900, // 15 minutes
-				maxQueries: 3000,
-				keyPrefix: 'audit_cache_prod',
+			queryCacheFactory: {
+				type: 'hybrid' as CacheType,
+				queryCache: {
+					enabled: true,
+					maxSizeMB: 500,
+					defaultTTL: 900, // 15 minutes
+					maxQueries: 10000,
+					keyPrefix: 'prod_audit_query',
+				},
+				redis: {
+					redisKeyPrefix: 'audit_cache',
+					enableLocalCache: true,
+					localCacheSizeMB: 100,
+					enableCompression: true,
+					serializationFormat: 'json' as const,
+				},
 			},
 			partitioning: {
 				...baseConfig.enhancedClient.partitioning,

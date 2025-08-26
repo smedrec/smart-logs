@@ -1,0 +1,138 @@
+/**
+ * Cache factory for creating appropriate cache instances
+ */
+import { QueryCache, QueryCacheStats } from './query-cache.js'
+import { RedisQueryCache } from './redis-query-cache.js'
+
+import type { CacheFactoryConfig, CacheType, QueryCacheConfig } from '@repo/audit'
+import type { RedisQueryCacheConfig } from './redis-query-cache.js'
+
+/**
+ * Cache interface that both local and Redis caches implement
+ */
+export interface IQueryCache {
+	get<T>(key: string): Promise<T | null> | T | null
+	set<T>(key: string, data: T, ttl?: number): Promise<void> | void
+	delete(key: string): Promise<boolean> | boolean
+	clear(): Promise<void> | void
+	getStats(): QueryCacheStats
+	cleanup(): Promise<number> | number
+}
+
+// Re-export types for convenience
+export type { QueryCacheStats, CacheEntry } from '../db/query-cache.js'
+
+/**
+ * Factory function to create appropriate cache instance
+ */
+export function createQueryCache(config: CacheFactoryConfig): IQueryCache {
+	switch (config.type) {
+		case 'local':
+			return new LocalCacheAdapter(new QueryCache(config.queryCache))
+
+		case 'redis':
+			if (!config.redis) {
+				throw new Error('Redis configuration required for Redis cache type')
+			}
+
+			const redisConfig: RedisQueryCacheConfig = {
+				...config.queryCache,
+				...config.redis,
+				enableLocalCache: false, // Pure Redis mode
+			}
+
+			return new RedisQueryCache(redisConfig)
+
+		case 'hybrid':
+			if (!config.redis) {
+				throw new Error('Redis configuration required for hybrid cache type')
+			}
+
+			const hybridConfig: RedisQueryCacheConfig = {
+				...config.queryCache,
+				...config.redis,
+				enableLocalCache: true, // Enable L1 cache
+			}
+
+			return new RedisQueryCache(hybridConfig)
+
+		default:
+			throw new Error(`Unknown cache type: ${config.type}`)
+	}
+}
+
+/**
+ * Adapter to make local cache async-compatible
+ */
+class LocalCacheAdapter implements IQueryCache {
+	constructor(private cache: QueryCache) {}
+
+	async get<T>(key: string): Promise<T | null> {
+		return this.cache.get<T>(key)
+	}
+
+	async set<T>(key: string, data: T, ttl?: number): Promise<void> {
+		return this.cache.set(key, data, ttl)
+	}
+
+	async delete(key: string): Promise<boolean> {
+		return this.cache.delete(key)
+	}
+
+	async clear(): Promise<void> {
+		return this.cache.clear()
+	}
+
+	getStats() {
+		return this.cache.getStats()
+	}
+
+	async cleanup(): Promise<number> {
+		return this.cache.cleanup()
+	}
+}
+
+/**
+ * Default cache configurations for different environments
+ */
+export const DEFAULT_CACHE_CONFIGS = {
+	development: {
+		type: 'local' as CacheType,
+		queryCache: {
+			enabled: true,
+			maxSizeMB: 50,
+			defaultTTL: 300, // 5 minutes
+			maxQueries: 1000,
+			keyPrefix: 'dev_audit_query',
+		},
+	},
+
+	production: {
+		type: 'hybrid' as CacheType,
+		queryCache: {
+			enabled: true,
+			maxSizeMB: 500,
+			defaultTTL: 900, // 15 minutes
+			maxQueries: 10000,
+			keyPrefix: 'prod_audit_query',
+		},
+		redis: {
+			redisKeyPrefix: 'audit_cache',
+			enableLocalCache: true,
+			localCacheSizeMB: 100,
+			enableCompression: true,
+			serializationFormat: 'json' as const,
+		},
+	},
+
+	test: {
+		type: 'local' as CacheType,
+		queryCache: {
+			enabled: true,
+			maxSizeMB: 10,
+			defaultTTL: 60, // 1 minute
+			maxQueries: 100,
+			keyPrefix: 'test_audit_query',
+		},
+	},
+} as const

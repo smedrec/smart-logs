@@ -113,7 +113,7 @@ export interface EnhancedClientConfig {
 	/** Connection pool configuration */
 	connectionPool: ConnectionPoolConfig
 	/** Query cache configuration */
-	queryCache: QueryCacheConfig
+	queryCacheFactory: CacheFactoryConfig
 	/** Partition management configuration */
 	partitioning: {
 		enabled: boolean
@@ -155,6 +155,8 @@ export interface ConnectionPoolConfig {
 	ssl: boolean
 }
 
+export type CacheType = 'local' | 'redis' | 'hybrid'
+
 export interface QueryCacheConfig {
 	/** Enable query result caching */
 	enabled: boolean
@@ -166,6 +168,24 @@ export interface QueryCacheConfig {
 	maxQueries: number
 	/** Cache key prefix */
 	keyPrefix: string
+}
+
+export interface CacheFactoryConfig {
+	/** Cache type */
+	type: CacheType
+	queryCache: QueryCacheConfig
+	redis?: {
+		/** Redis key prefix for distributed cache */
+		redisKeyPrefix: string
+		/** Enable local cache as L1 cache (Redis as L2) */
+		enableLocalCache: boolean
+		/** Local cache size limit (smaller than main cache) */
+		localCacheSizeMB: number
+		/** Compression for large values */
+		enableCompression: boolean
+		/** Serialization format */
+		serializationFormat: 'json' | 'msgpack'
+	}
 }
 
 export interface WorkerConfig {
