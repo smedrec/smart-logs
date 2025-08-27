@@ -380,7 +380,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 	// Query audit events
 	app.openapi(queryAuditEventsRoute, async (c) => {
-		const { db, logger, authorization } = c.get('services')
+		const { client, db, logger, authorization } = c.get('services')
 		const session = c.get('session')!
 
 		// Check permission to read audit events
@@ -436,8 +436,24 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 			const whereClause = and(...conditions)
 
+			const events = await client.executeOptimizedQuery(
+				(audit) =>
+					audit
+						.select()
+						.from(auditLog)
+						.where(whereClause)
+						.limit(query.limit || 50)
+						.offset(query.offset || 0)
+						.orderBy(
+							query.sortDirection === 'asc'
+								? asc(auditLog[query.sortField || 'timestamp'])
+								: desc(auditLog[query.sortField || 'timestamp'])
+						),
+				{ cacheKey: 'audit_events' }
+			)
+
 			// Execute query with proper error handling
-			const events = await db.audit
+			/**const events = await db.audit
 				.select()
 				.from(auditLog)
 				.where(whereClause)
@@ -447,7 +463,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					query.sortDirection === 'asc'
 						? asc(auditLog[query.sortField || 'timestamp'])
 						: desc(auditLog[query.sortField || 'timestamp'])
-				)
+				) */
 
 			// Get total count for pagination
 			const totalResult = await db.audit
@@ -502,7 +518,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 	// Get audit event by ID
 	app.openapi(getAuditEventRoute, async (c) => {
-		const { db, logger } = c.get('services')
+		const { client, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
@@ -519,11 +535,15 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			const { eq, and } = await import('drizzle-orm')
 			const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
 
-			const events = await db.audit
-				.select()
-				.from(auditLog)
-				.where(and(eq(auditLog.id, parseInt(id)), eq(auditLog.organizationId, organizationId)))
-				.limit(1)
+			const events = await client.executeOptimizedQuery(
+				(audit) =>
+					audit
+						.select()
+						.from(auditLog)
+						.where(and(eq(auditLog.id, parseInt(id)), eq(auditLog.organizationId, organizationId)))
+						.limit(1),
+				{ cacheKey: `audit_event_${id}` }
+			)
 
 			if (!events.length) {
 				throw new ApiError({
@@ -549,11 +569,6 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				correlationId: dbEvent.correlationId || undefined,
 			}
 
-			logger.info(`Retrieved audit event: ${id}`, {
-				organizationId,
-				action: event.action,
-			})
-
 			return c.json(event)
 		} catch (error) {
 			if (error instanceof ApiError) {
@@ -572,7 +587,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 	// Verify audit event integrity
 	app.openapi(verifyAuditEventRoute, async (c) => {
-		const { audit, db, logger } = c.get('services')
+		const { client, audit, db, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
@@ -590,11 +605,15 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			const { auditLog, auditIntegrityLog } = await import('@repo/audit-db/dist/db/schema.js')
 
 			// Get event first to check access
-			const events = await db.audit
-				.select()
-				.from(auditLog)
-				.where(and(eq(auditLog.id, parseInt(id)), eq(auditLog.organizationId, organizationId)))
-				.limit(1)
+			const events = await client.executeOptimizedQuery(
+				(audit) =>
+					audit
+						.select()
+						.from(auditLog)
+						.where(and(eq(auditLog.id, parseInt(id)), eq(auditLog.organizationId, organizationId)))
+						.limit(1),
+				{ cacheKey: `audit_event_${id}` }
+			)
 
 			if (!events.length) {
 				throw new ApiError({
@@ -683,6 +702,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					'application/json': {
 						schema: z.object({
 							principalId: z.string().min(1),
+							resourceType: z.string().min(1),
 							format: z.enum(['json', 'csv', 'xml']).default('json'),
 							dateRange: z
 								.object({
@@ -749,13 +769,21 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 	})
 
 	app.openapi(gdprExportRoute, async (c) => {
-		const { db, logger } = c.get('services')
+		const { db, audit, authorization, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
 			throw new ApiError({
 				code: 'UNAUTHORIZED',
 				message: 'Authentication required',
+			})
+		}
+
+		const hasPermission = await authorization.hasPermission(session, 'audit.events', 'export')
+		if (!hasPermission) {
+			throw new ApiError({
+				code: 'FORBIDDEN',
+				message: 'Insufficient permissions to export audit events',
 			})
 		}
 
@@ -787,11 +815,23 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 			const exportResult = await gdprService.exportUserData(exportRequest)
 
-			logger.info('GDPR data export completed via REST API', {
-				principalId: requestData.principalId,
-				format: requestData.format,
-				recordCount: exportResult.recordCount,
-				requestedBy,
+			audit.logData({
+				principalId: session.session.userId,
+				organizationId: session.session.activeOrganizationId as string,
+				action: 'export',
+				resourceType: requestData.resourceType,
+				resourceId: requestData.principalId,
+				status: 'success',
+				dataClassification: 'PHI',
+				outcomeDescription: 'Exported GDPR data via REST API',
+				exportResult: {
+					requestId: exportResult.requestId,
+					recordCount: exportResult.recordCount,
+					dataSize: exportResult.dataSize,
+					format: exportResult.format,
+					exportTimestamp: exportResult.exportTimestamp,
+					metadata: exportResult.metadata,
+				},
 			})
 
 			return c.json({
@@ -829,6 +869,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					'application/json': {
 						schema: z.object({
 							principalId: z.string().min(1),
+							resourceType: z.string().min(1),
 							strategy: z.enum(['hash', 'token', 'encryption']).default('hash'),
 						}),
 					},
@@ -875,13 +916,21 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 	})
 
 	app.openapi(gdprPseudonymizeRoute, async (c) => {
-		const { db, logger } = c.get('services')
+		const { db, audit, authorization, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
 			throw new ApiError({
 				code: 'UNAUTHORIZED',
 				message: 'Authentication required',
+			})
+		}
+
+		const hasPermission = await authorization.hasPermission(session, 'audit.events', 'pseudonymize')
+		if (!hasPermission) {
+			throw new ApiError({
+				code: 'FORBIDDEN',
+				message: 'Insufficient permissions to pseudonymize audit events',
 			})
 		}
 
@@ -901,11 +950,20 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				requestedBy
 			)
 
-			logger.info('GDPR data pseudonymization completed via REST API', {
-				principalId: requestData.principalId,
-				strategy: requestData.strategy,
-				recordsAffected: result.recordsAffected,
-				requestedBy,
+			audit.logData({
+				principalId: requestedBy,
+				organizationId: session.session.activeOrganizationId as string,
+				action: 'pseudonymize',
+				resourceType: requestData.resourceType,
+				resourceId: requestData.principalId,
+				status: 'success',
+				dataClassification: 'PHI',
+				outcomeDescription: `${requestData.resourceType} data pseudonymized per GDPR right to pseudonymize request completed via REST API`,
+				metadata: {
+					strategy: requestData.strategy,
+					pseudonymId: result.pseudonymId,
+					recordsAffected: result.recordsAffected,
+				},
 			})
 
 			return c.json(result)
@@ -984,13 +1042,21 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 	})
 
 	app.openapi(bulkCreateRoute, async (c) => {
-		const { audit, logger } = c.get('services')
+		const { authorization, audit, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
 			throw new ApiError({
 				code: 'UNAUTHORIZED',
 				message: 'Authentication required',
+			})
+		}
+
+		const hasPermission = await authorization.hasPermission(session, 'audit:events', 'create')
+		if (!hasPermission) {
+			throw new ApiError({
+				code: 'FORBIDDEN',
+				message: 'You do not have permission to create audit events',
 			})
 		}
 

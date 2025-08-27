@@ -14,6 +14,7 @@ import type {
 	RedisEnhancedMetricsCollector,
 	ScheduledReportingService,
 } from '@repo/audit'
+import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import type { AuthorizationService, Session } from '@repo/auth'
 import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
@@ -43,6 +44,7 @@ export type ServiceContext = {
 		auth: PostgresJsDatabase<typeof authSchema>
 		audit: PostgresJsDatabase<typeof auditSchema>
 	}
+	client: EnhancedAuditDatabaseClient
 	//kms: InfisicalKmsClient
 	redis: Redis
 	health: HealthCheckService

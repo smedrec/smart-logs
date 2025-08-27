@@ -753,13 +753,15 @@ export class Audit {
 	async logData(details: {
 		principalId: string
 		organizationId?: string
-		action: 'create' | 'read' | 'update' | 'delete' | 'export' | 'import'
+		action: 'create' | 'read' | 'update' | 'delete' | 'export' | 'import' | 'pseudonymize'
 		resourceType: string
 		resourceId: string
 		status: 'attempt' | 'success' | 'failure'
 		dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
 		changes?: any
 		outcomeDescription?: string
+		exportResult?: any
+		metadata?: any
 	}): Promise<void> {
 		await this.logWithEnhancements({
 			principalId: details.principalId,
@@ -771,6 +773,8 @@ export class Audit {
 			outcomeDescription: details.outcomeDescription,
 			dataClassification: details.dataClassification || 'INTERNAL',
 			changes: details.changes,
+			exportResult: details.exportResult,
+			metadata: details.exportResult,
 		})
 	}
 

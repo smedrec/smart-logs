@@ -207,6 +207,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			auth: authDb,
 			audit: auditDbInstance.getDrizzleInstance(),
 		}
+		const client = auditDbInstance.getEnhancedClientInstance()
 
 		if (!healthCheckService) {
 			healthCheckService = new HealthCheckService()
@@ -316,6 +317,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			//cerbos,
 			//fhir,
 			db,
+			client,
 			//kms,
 			redis: connection,
 			health: healthCheckService,

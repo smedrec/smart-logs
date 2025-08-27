@@ -200,6 +200,19 @@ async function startServer() {
 			if (configManager?.isDevelopment()) {
 				console.log(`⚙️  Configuration: http://${config.server.host}:${config.server.port}/config`)
 			}
+
+			// System startup
+			/**audit.logSystem({
+				action: 'startup',
+				status: 'success',
+				component: 'api-server',
+				outcomeDescription: 'API server started successfully',
+				systemContext: {
+					version: '0.1.0',
+					environment: 'production',
+					nodeVersion: process.version,
+				},
+			}) */
 		}
 	)
 

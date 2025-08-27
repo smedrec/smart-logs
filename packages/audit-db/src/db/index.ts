@@ -169,6 +169,14 @@ export class EnhancedAuditDb {
 	}
 
 	/**
+	 * Provides access to the enhanced client instance for database operations.
+	 * @returns The enhanced client instance.
+	 */
+	public getEnhancedClientInstance(): EnhancedAuditDatabaseClient {
+		return this.client
+	}
+
+	/**
 	 * Checks the database connection by executing a simple query.
 	 * @returns true or false.
 	 */
