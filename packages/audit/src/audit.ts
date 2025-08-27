@@ -80,8 +80,8 @@ export class Audit {
 	 * If no connection details (`redisOrUrl` or `redisConnectionOptions`) are provided,
 	 * it defaults to using the shared Redis connection from `@repo/redis-client`.
 	 *
-	 * @param queueName The name of the BullMQ queue for audit logs.
-	 * @param cryptoConfig Configuration for cryptographic operations.
+	 * @param config The configuration for the audit service.
+	 * @param db The Drizzle database instance.
 	 * @param redisOrUrlOrOptions Optional. Can be:
 	 *                          - A Redis connection URL (string).
 	 *                          - An existing IORedis connection instance.

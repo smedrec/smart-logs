@@ -540,7 +540,9 @@ export const PERMISSIONS = {
 			CREATE: { resource: 'audit.events', action: 'create' },
 			UPDATE: { resource: 'audit.events', action: 'update' },
 			DELETE: { resource: 'audit.events', action: 'delete' },
+			PSEUDONYMIZE: { resource: 'audit.events', action: 'psuedonymize' },
 			VERIFY: { resource: 'audit.events', action: 'verify' },
+			EXPORT: { resource: 'audit.events', action: 'export' },
 		},
 		REPORTS: {
 			READ: { resource: 'audit.reports', action: 'read' },

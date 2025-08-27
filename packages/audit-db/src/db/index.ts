@@ -195,6 +195,14 @@ export class EnhancedAuditDb {
 	}
 
 	/**
+	 *
+	 * @returns The health status of the database connection.
+	 */
+	public async healthStatus() {
+		return await this.client.getHealthStatus()
+	}
+
+	/**
 	 * Ends the client connection.
 	 * @returns void.
 	 */

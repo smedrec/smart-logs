@@ -88,6 +88,29 @@ const ReadinessSchema = z.object({
 	}),
 })
 
+const DatabaseHealthSchema = z.object({
+	overall: z.enum(['healthy', 'warning', 'critical']),
+	components: z.object({
+		connectionPool: z.object({
+			status: z.string(),
+			details: z.any(),
+		}),
+		queryCache: z.object({
+			status: z.string(),
+			details: z.any(),
+		}),
+		partitions: z.object({
+			status: z.string(),
+			details: z.any(),
+		}),
+		performance: z.object({
+			status: z.string(),
+			details: z.any(),
+		}),
+	}),
+	recommendations: z.array(z.string()),
+})
+
 // Route definitions
 const basicHealthRoute = createRoute({
 	method: 'get',
@@ -188,6 +211,32 @@ const livenessRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: BasicHealthSchema,
+				},
+			},
+		},
+	},
+})
+
+const databaseHealthRoute = createRoute({
+	method: 'get',
+	path: '/health/database',
+	tags: ['Health'],
+	summary: 'Database ',
+	description: 'Returns detailed database ',
+	responses: {
+		200: {
+			description: 'Detailed health status retrieved successfully',
+			content: {
+				'application/json': {
+					schema: DatabaseHealthSchema,
+				},
+			},
+		},
+		503: {
+			description: 'One or more services are unhealthy',
+			content: {
+				'application/json': {
+					schema: DatabaseHealthSchema,
 				},
 			},
 		},
@@ -419,6 +468,42 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Liveness check failed', { requestId, error: errorMessage })
+
+			const errorResponse = {
+				status: 'unhealthy' as const,
+				timestamp: new Date().toISOString(),
+				environment: process.env.NODE_ENV || 'unknown',
+				uptime: process.uptime(),
+			}
+
+			return c.json(errorResponse, 503)
+		}
+	})
+
+	app.openapi(databaseHealthRoute, async (c) => {
+		const { client, logger } = c.get('services')
+		const requestId = c.get('requestId')
+
+		try {
+			logger.debug('Database health check started', { requestId })
+
+			if (!healthService) {
+				throw new Error('Health service not initialized')
+			}
+
+			const databaseHealth = await client.getHealthStatus()
+			const statusCode = databaseHealth.overall === 'healthy' ? 200 : 503
+
+			logger.debug('Database health check completed', {
+				requestId,
+				status: databaseHealth.overall,
+				reason: databaseHealth.recommendations.join(', '),
+			})
+
+			return c.json(databaseHealth, statusCode)
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+			logger.error('Database health check failed', { requestId, error: errorMessage })
 
 			const errorResponse = {
 				status: 'unhealthy' as const,
