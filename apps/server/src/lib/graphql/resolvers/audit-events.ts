@@ -3,7 +3,10 @@
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
  */
 
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm'
 import { GraphQLError } from 'graphql'
+
+import { auditLog } from '@repo/audit-db'
 
 import type { AuditEventStatus, DataClassification } from '@repo/audit'
 import type {
@@ -57,9 +60,6 @@ function convertDbEventToGraphQL(dbEvent: any): AuditEvent {
  * Helper function to build database query conditions from GraphQL filter
  */
 async function buildQueryConditions(filter: AuditEventFilter | undefined, organizationId: string) {
-	const { eq, and, gte, lte, inArray, isNotNull } = await import('drizzle-orm')
-	const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
-
 	// Always enforce organization isolation
 	const conditions = [eq(auditLog.organizationId, organizationId)]
 
@@ -142,7 +142,7 @@ export const auditEventResolvers = {
 			context: GraphQLContext
 		) => {
 			const { services } = context
-			const { db, logger, error } = services
+			const { client, logger, error } = services
 
 			// Check authentication
 			if (!context.session) {
@@ -154,9 +154,6 @@ export const auditEventResolvers = {
 			const organizationId = context.session.session.activeOrganizationId as string
 
 			try {
-				const { count, desc, asc } = await import('drizzle-orm')
-				const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
-
 				// Build query conditions
 				const whereClause = await buildQueryConditions(args.filter, organizationId)
 
@@ -167,25 +164,45 @@ export const auditEventResolvers = {
 				// Handle sorting
 				const sortField = args.sort?.field?.toLowerCase() || 'timestamp'
 				const sortDirection = args.sort?.direction || 'DESC'
-				const orderBy =
-					sortDirection === 'ASC'
-						? asc(auditLog[sortField as keyof typeof auditLog])
-						: desc(auditLog[sortField as keyof typeof auditLog])
 
+				// Map sort fields to actual columns
+				const sortColumnMap = {
+					timestamp: auditLog.timestamp,
+					action: auditLog.action,
+					status: auditLog.status,
+					principalid: auditLog.principalId,
+					organizationid: auditLog.organizationId,
+					targetresourcetype: auditLog.targetResourceType,
+					targetresourceid: auditLog.targetResourceId,
+					dataclassification: auditLog.dataClassification,
+					correlationid: auditLog.correlationId,
+				} as const
+
+				const column = sortColumnMap[sortField as keyof typeof sortColumnMap] || auditLog.timestamp
+				const orderBy = sortDirection === 'ASC' ? asc(column) : desc(column)
+
+				const cacheKey = client.generateCacheKey('audit_events', args)
 				// Execute query
-				const events = await db.audit
-					.select()
-					.from(auditLog)
-					.where(whereClause)
-					.limit(limit)
-					.offset(offset)
-					.orderBy(orderBy)
+				const events = await client.executeMonitoredQuery(
+					(audit) =>
+						audit
+							.select()
+							.from(auditLog)
+							.where(whereClause)
+							.limit(limit)
+							.offset(offset)
+							.orderBy(orderBy),
+					'audit_events',
+					{ cacheKey }
+				)
 
-				// Get total count
-				const totalResult = await db.audit
-					.select({ count: count() })
-					.from(auditLog)
-					.where(whereClause)
+				const cacheKeyCount = client.generateCacheKey('audit_events_count', args)
+				// Get total count for pagination
+				const totalResult = await client.executeMonitoredQuery(
+					(audit) => audit.select({ count: count() }).from(auditLog).where(whereClause),
+					'audit_events_count',
+					{ cacheKey: cacheKeyCount }
+				)
 
 				const totalCount = totalResult[0]?.count || 0
 
@@ -251,7 +268,7 @@ export const auditEventResolvers = {
 			context: GraphQLContext
 		): Promise<AuditEvent | null> => {
 			const { services } = context
-			const { db, logger, error } = services
+			const { client, logger, error } = services
 
 			// Check authentication
 			if (!context.session) {
@@ -266,13 +283,17 @@ export const auditEventResolvers = {
 				const { eq, and } = await import('drizzle-orm')
 				const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
 
-				const event = await db.audit
-					.select()
-					.from(auditLog)
-					.where(
-						and(eq(auditLog.id, parseInt(args.id)), eq(auditLog.organizationId, organizationId))
-					)
-					.limit(1)
+				const event = await client.executeOptimizedQuery(
+					(audit) =>
+						audit
+							.select()
+							.from(auditLog)
+							.where(
+								and(eq(auditLog.id, parseInt(args.id)), eq(auditLog.organizationId, organizationId))
+							)
+							.limit(1),
+					{ cacheKey: `audit_event_${args.id}` }
+				)
 
 				if (!event.length) {
 					return null

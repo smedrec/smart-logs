@@ -23,10 +23,10 @@ const alertsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
-						organizationId: ctx.session.session.activeOrganizationId,
+						organizationId: ctx.session?.session.activeOrganizationId,
 						message: err.message,
 						name: err.name,
 						code: err.code,
@@ -60,10 +60,10 @@ const alertsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
-						organizationId: ctx.session.session.activeOrganizationId,
+						organizationId: ctx.session?.session.activeOrganizationId,
 						message: err.message,
 						name: err.name,
 						code: err.code,
@@ -78,7 +78,7 @@ const alertsRouter = {
 	}),
 	statistics: protectedProcedure.query(async ({ ctx }) => {
 		const { monitor, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 		try {
 			const statistics = await monitor.alert.getAlertStatistics(organizationId)
 			return statistics
@@ -93,10 +93,10 @@ const alertsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
-						organizationId: ctx.session.session.activeOrganizationId,
+						organizationId: ctx.session?.session.activeOrganizationId,
 						message: err.message,
 						name: err.name,
 						code: err.code,
@@ -118,7 +118,31 @@ const alertsRouter = {
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { monitor, logger, error } = ctx.services
-			const resolvedBy = ctx.session.session.userId
+			const resolvedBy = ctx.session?.session.userId
+			if (!resolvedBy) {
+				const err = new TRPCError({
+					code: 'UNAUTHORIZED',
+					message: 'User not authenticated',
+				})
+				await error.handleError(
+					err,
+					{
+						requestId: ctx.requestId,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
+						metadata: {
+							organizationId: ctx.session?.session.activeOrganizationId,
+							message: err.message,
+							name: err.name,
+							code: err.code,
+							cause: err.cause,
+						},
+					},
+					'trpc-api',
+					'alerts.resolve'
+				)
+				throw err
+			}
 			const resolutionData = {
 				resolvedBy,
 				resolutionNotes: input.resolutionNotes,
@@ -140,10 +164,10 @@ const alertsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -164,7 +188,7 @@ const alertsRouter = {
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { monitor, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 			try {
 				const result = await monitor.alert.cleanupResolvedAlerts(
 					organizationId,
@@ -185,10 +209,10 @@ const alertsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,

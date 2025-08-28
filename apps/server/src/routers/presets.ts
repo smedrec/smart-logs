@@ -10,7 +10,7 @@ import type { DataClassification } from '@repo/audit'
 const presetsRouter = {
 	all: protectedProcedure.query(async ({ ctx }) => {
 		const { compliance, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 		try {
 			const presets = await compliance.preset.getPresets(organizationId)
 			return presets
@@ -25,10 +25,10 @@ const presetsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
-						organizationId: ctx.session.session.activeOrganizationId,
+						organizationId: ctx.session?.session.activeOrganizationId,
 						message: err.message,
 						name: err.name,
 						code: err.code,
@@ -49,7 +49,7 @@ const presetsRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 			try {
 				const preset = await compliance.preset.getPreset(input.name, organizationId)
 				return preset
@@ -64,10 +64,10 @@ const presetsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -108,8 +108,8 @@ const presetsRouter = {
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
-			const userId = ctx.session.session.userId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
+			const userId = ctx.session?.session.userId as string
 			const record = {
 				name: input.name,
 				description: input.description || undefined,
@@ -140,10 +140,10 @@ const presetsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -164,7 +164,7 @@ const presetsRouter = {
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 			try {
 				const result = await compliance.preset.deletePreset(input.name, organizationId)
 				return {
@@ -182,10 +182,10 @@ const presetsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,

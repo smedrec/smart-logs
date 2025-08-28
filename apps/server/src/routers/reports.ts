@@ -33,7 +33,7 @@ const reportsRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { compliance, db, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 			const criteria: ReportCriteria = {
 				...input.criteria,
 				dateRange: {
@@ -57,10 +57,10 @@ const reportsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -100,7 +100,7 @@ const reportsRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { compliance, db, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 			const criteria: ReportCriteria = {
 				...input.criteria,
 				dateRange: {
@@ -124,10 +124,10 @@ const reportsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -169,7 +169,7 @@ const reportsRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
 				const criteria: ReportCriteria = {
@@ -208,8 +208,8 @@ const reportsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							criteria: input.criteria,
@@ -271,7 +271,7 @@ const reportsRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
 				const criteria: ReportCriteria = {
@@ -299,8 +299,8 @@ const reportsRouter = {
 					)
 				}
 
-				// Process custom fields (placeholder implementation)
-				let customCalculations = null
+				// TODO: Process custom fields (placeholder implementation)
+				/**let customCalculations = null
 				if (input.customFields?.length) {
 					customCalculations = {}
 					for (const field of input.customFields) {
@@ -312,14 +312,14 @@ const reportsRouter = {
 							field: field.field,
 						}
 					}
-				}
+				}*/
 
 				const customReport = {
 					...baseReport,
 					reportName: input.reportName,
 					integrityReport,
-					customCalculations,
-					generatedBy: ctx.session.session.userId,
+					//customCalculations,
+					generatedBy: ctx.session?.session.userId,
 				}
 
 				logger.info('Custom compliance report generated', {
@@ -344,8 +344,8 @@ const reportsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							reportName: input.reportName,
@@ -369,7 +369,7 @@ const reportsRouter = {
 	 */
 	templates: protectedProcedure.query(async ({ ctx }) => {
 		const { compliance, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
 			// Get scheduled reporting service to access templates
@@ -394,8 +394,8 @@ const reportsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
 						organizationId,
 						message: err.message,
@@ -417,7 +417,7 @@ const reportsRouter = {
 	 */
 	scheduled: protectedProcedure.query(async ({ ctx }) => {
 		const { compliance, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
 			const scheduledReports = await compliance.scheduled.getScheduledReports(organizationId)
@@ -441,8 +441,8 @@ const reportsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
 						organizationId,
 						message: err.message,

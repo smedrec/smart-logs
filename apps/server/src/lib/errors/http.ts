@@ -31,6 +31,7 @@ export function errorSchemaFactory(code: z.ZodEnum<any>) {
 			code: code,
 			docs: z.string(),
 			message: z.string(),
+			details: z.record(z.string(), z.any()).optional(),
 			requestId: z.string(),
 		}),
 	})
@@ -41,6 +42,7 @@ export const ErrorSchema = z.object({
 		code: ErrorCode,
 		docs: z.string(),
 		message: z.string(),
+		details: z.record(z.string(), z.any()).optional(),
 		requestId: z.string(),
 	}),
 })
@@ -97,10 +99,20 @@ function statusToCode(status: StatusCode): z.infer<typeof ErrorCode> {
 
 export class ApiError extends HTTPException {
 	public readonly code: z.infer<typeof ErrorCode>
+	public readonly details: Record<string, any> | undefined
 
-	constructor({ code, message }: { code: z.infer<typeof ErrorCode>; message: string }) {
+	constructor({
+		code,
+		message,
+		details,
+	}: {
+		code: z.infer<typeof ErrorCode>
+		message: string
+		details?: Record<string, any>
+	}) {
 		super(codeToStatus(code) as any, { message })
 		this.code = code
+		this.details = details
 	}
 }
 

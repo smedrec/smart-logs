@@ -5,6 +5,7 @@
 
 import { GraphQLError } from 'graphql'
 
+import type { AlertQueryFilters, Alert as MonitorAlert } from '@repo/audit'
 import type { Alert, AlertConnection, AlertFilter, GraphQLContext, PaginationInput } from '../types'
 
 /**
@@ -24,6 +25,25 @@ function cursorToOffset(cursor: string | undefined): number {
  */
 function offsetToCursor(offset: number): string {
 	return Buffer.from(offset.toString()).toString('base64')
+}
+
+/**
+ * Helper function to map monitor alert type to GraphQL alert type
+ */
+function mapAlertType(monitorType: MonitorAlert['type']): Alert['type'] {
+	// Map METRICS to SYSTEM since GraphQL doesn't have METRICS type
+	if (monitorType === 'METRICS') {
+		return 'SYSTEM'
+	}
+	return monitorType as Alert['type']
+}
+
+/**
+ * Helper function to map GraphQL alert type to monitor alert type
+ */
+function mapGraphQLTypeToMonitor(graphqlType: Alert['type']): MonitorAlert['type'] {
+	// Direct mapping since GraphQL types are a subset of monitor types
+	return graphqlType as MonitorAlert['type']
 }
 
 export const alertResolvers = {
@@ -57,27 +77,53 @@ export const alertResolvers = {
 				const limit = args.pagination?.first || 50
 				const offset = args.pagination?.after ? cursorToOffset(args.pagination.after) : 0
 
-				// Get alerts from monitoring service
-				const alertsResult = await monitor.alert.getAlerts({
+				// Convert GraphQL filter to monitor service filter
+				const queryFilters: AlertQueryFilters = {
 					organizationId,
-					filter: args.filter,
 					limit,
 					offset,
-				})
+				}
 
-				// Convert to GraphQL format
-				const alerts: Alert[] = alertsResult.alerts.map((alert: any) => ({
-					id: alert.id.toString(),
-					type: alert.type,
+				// Map GraphQL filter to monitor service filter
+				if (args.filter) {
+					if (args.filter.status === 'ACKNOWLEDGED') {
+						queryFilters.acknowledged = true
+						queryFilters.resolved = false
+					} else if (args.filter.status === 'RESOLVED') {
+						queryFilters.resolved = true
+					} else if (args.filter.status === 'ACTIVE') {
+						queryFilters.acknowledged = false
+						queryFilters.resolved = false
+					}
+
+					if (args.filter.severities?.length === 1) {
+						queryFilters.severity = args.filter.severities[0]
+					}
+
+					if (args.filter.types?.length === 1) {
+						queryFilters.type = mapGraphQLTypeToMonitor(args.filter.types[0])
+					}
+				}
+
+				// Get alerts from monitoring service
+				const monitorAlerts = await monitor.alert.getAlerts(queryFilters)
+
+				// Get total count for pagination
+				const totalCount = monitorAlerts.length // This is a simplified approach
+
+				// Convert monitor alerts to GraphQL format
+				const alerts: Alert[] = monitorAlerts.map((alert: MonitorAlert) => ({
+					id: alert.id,
+					type: mapAlertType(alert.type),
 					severity: alert.severity,
 					title: alert.title,
 					description: alert.description,
-					createdAt: alert.createdAt,
+					createdAt: alert.timestamp,
 					acknowledgedAt: alert.acknowledgedAt,
 					resolvedAt: alert.resolvedAt,
 					acknowledgedBy: alert.acknowledgedBy,
 					resolvedBy: alert.resolvedBy,
-					resolution: alert.resolution,
+					resolution: undefined, // Monitor service doesn't have resolution field
 					metadata: alert.metadata,
 				}))
 
@@ -87,7 +133,7 @@ export const alertResolvers = {
 				}))
 
 				const pageInfo = {
-					hasNextPage: offset + limit < alertsResult.totalCount,
+					hasNextPage: offset + limit < totalCount,
 					hasPreviousPage: offset > 0,
 					startCursor: edges.length > 0 ? edges[0].cursor : undefined,
 					endCursor: edges.length > 0 ? edges[edges.length - 1].cursor : undefined,
@@ -96,14 +142,14 @@ export const alertResolvers = {
 				logger.info('GraphQL alerts retrieved', {
 					organizationId,
 					alertCount: alerts.length,
-					totalCount: alertsResult.totalCount,
+					totalCount,
 					filters: args.filter,
 				})
 
 				return {
 					edges,
 					pageInfo,
-					totalCount: alertsResult.totalCount,
+					totalCount,
 				}
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
@@ -156,26 +202,36 @@ export const alertResolvers = {
 			const userId = context.session.session.userId
 
 			try {
-				const alert = await monitor.alert.acknowledgeAlert(args.id, userId, organizationId)
+				// Acknowledge the alert
+				const result = await monitor.alert.acknowledgeAlert(args.id, userId)
 
-				if (!alert) {
+				if (!result.success) {
 					throw new GraphQLError('Alert not found', {
 						extensions: { code: 'NOT_FOUND' },
 					})
 				}
 
+				// Get the updated alert
+				const alert = await monitor.alert.getAlertById(args.id, organizationId)
+
+				if (!alert) {
+					throw new GraphQLError('Alert not found after acknowledgment', {
+						extensions: { code: 'NOT_FOUND' },
+					})
+				}
+
 				const acknowledgedAlert: Alert = {
-					id: alert.id.toString(),
-					type: alert.type,
+					id: alert.id,
+					type: mapAlertType(alert.type),
 					severity: alert.severity,
 					title: alert.title,
 					description: alert.description,
-					createdAt: alert.createdAt,
+					createdAt: alert.timestamp,
 					acknowledgedAt: alert.acknowledgedAt,
 					resolvedAt: alert.resolvedAt,
 					acknowledgedBy: alert.acknowledgedBy,
 					resolvedBy: alert.resolvedBy,
-					resolution: alert.resolution,
+					resolution: undefined, // Monitor service doesn't have resolution field
 					metadata: alert.metadata,
 				}
 
@@ -238,31 +294,39 @@ export const alertResolvers = {
 			const userId = context.session.session.userId
 
 			try {
-				const alert = await monitor.alert.resolveAlert(
-					args.id,
-					args.resolution,
-					userId,
-					organizationId
-				)
+				// Resolve the alert with resolution notes
+				const result = await monitor.alert.resolveAlert(args.id, userId, {
+					resolvedBy: userId,
+					resolutionNotes: args.resolution,
+				})
 
-				if (!alert) {
+				if (!result.success) {
 					throw new GraphQLError('Alert not found', {
 						extensions: { code: 'NOT_FOUND' },
 					})
 				}
 
+				// Get the updated alert
+				const alert = await monitor.alert.getAlertById(args.id, organizationId)
+
+				if (!alert) {
+					throw new GraphQLError('Alert not found after resolution', {
+						extensions: { code: 'NOT_FOUND' },
+					})
+				}
+
 				const resolvedAlert: Alert = {
-					id: alert.id.toString(),
-					type: alert.type,
+					id: alert.id,
+					type: mapAlertType(alert.type),
 					severity: alert.severity,
 					title: alert.title,
 					description: alert.description,
-					createdAt: alert.createdAt,
+					createdAt: alert.timestamp,
 					acknowledgedAt: alert.acknowledgedAt,
 					resolvedAt: alert.resolvedAt,
 					acknowledgedBy: alert.acknowledgedBy,
 					resolvedBy: alert.resolvedBy,
-					resolution: alert.resolution,
+					resolution: args.resolution, // Use the resolution from args
 					metadata: alert.metadata,
 				}
 

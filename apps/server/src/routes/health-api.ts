@@ -506,10 +506,26 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			logger.error('Database health check failed', { requestId, error: errorMessage })
 
 			const errorResponse = {
-				status: 'unhealthy' as const,
-				timestamp: new Date().toISOString(),
-				environment: process.env.NODE_ENV || 'unknown',
-				uptime: process.uptime(),
+				overall: 'critical' as const,
+				components: {
+					connectionPool: {
+						status: 'unhealthy',
+						details: { error: errorMessage },
+					},
+					queryCache: {
+						status: 'unknown',
+						details: {},
+					},
+					partitions: {
+						status: 'unknown',
+						details: {},
+					},
+					performance: {
+						status: 'unknown',
+						details: {},
+					},
+				},
+				recommendations: ['Check database connectivity', 'Verify database configuration'],
 			}
 
 			return c.json(errorResponse, 503)

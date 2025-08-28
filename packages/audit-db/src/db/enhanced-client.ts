@@ -1,3 +1,5 @@
+import { createHash } from 'crypto'
+
 import { DatabaseAlertHandler } from '@repo/audit'
 
 import { EnhancedDatabaseClient } from './connection-pool.js'
@@ -160,7 +162,11 @@ export class EnhancedAuditDatabaseClient {
 			skipCache?: boolean
 		}
 	): Promise<T> {
-		const { cacheKey, cacheTTL, skipCache = false } = options || {}
+		const {
+			cacheKey,
+			cacheTTL = this.config.queryCacheFactory.queryCache.defaultTTL,
+			skipCache = false,
+		} = options || {}
 
 		if (skipCache || !cacheKey) {
 			return this.client.executeQueryUncached(queryFn)
@@ -234,6 +240,19 @@ export class EnhancedAuditDatabaseClient {
 			console.error(`Query failed: ${queryName}`, error)
 			throw error
 		}
+	}
+
+	generateCacheKey(queryName: string, params: Record<string, any>): string {
+		// Sort keys to ensure deterministic order
+		const sortedKeys = Object.keys(params).sort()
+
+		// Create key-value pairs in sorted order
+		const pairs = sortedKeys.map((key) => `${key}:${JSON.stringify(params[key])}`)
+
+		// Join with separator
+		const dataToHash = `${queryName}_${pairs.join('|')}`
+		// Generate SHA-256 hash
+		return createHash('sha256').update(dataToHash, 'utf8').digest('hex')
 	}
 
 	/**

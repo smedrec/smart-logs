@@ -1,8 +1,12 @@
 import { createHash, randomBytes } from 'crypto'
 import { and, eq, gte, isNotNull, lte, sql } from 'drizzle-orm'
 
+import { auditLog, auditRetentionPolicy } from '@repo/audit-db'
+import * as auditSchema from '@repo/audit-db/dist/db/schema.js'
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { AuditLogEvent } from '../types.js'
+import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
+import type { AuditLogEvent, DataClassification } from '../types.js'
 
 /**
  * GDPR data export format options
@@ -78,7 +82,7 @@ export interface PseudonymizationMapping {
  */
 export interface RetentionPolicy {
 	policyName: string
-	dataClassification: string
+	dataClassification: DataClassification
 	retentionDays: number
 	archiveAfterDays?: number
 	deleteAfterDays?: number
@@ -110,12 +114,11 @@ export interface ArchivalResult {
  */
 export class GDPRComplianceService {
 	private pseudonymMappings = new Map<string, string>()
+	private db: PostgresJsDatabase<typeof auditSchema>
 
-	constructor(
-		private db: PostgresJsDatabase<any>,
-		private auditLogTable: any,
-		private auditRetentionPolicyTable: any
-	) {}
+	constructor(private client: EnhancedAuditDatabaseClient) {
+		this.db = this.client.getDatabase()
+	}
 
 	/**
 	 * Export user audit data in portable format (Requirement 4.1)
@@ -125,21 +128,27 @@ export class GDPRComplianceService {
 		const requestId = this.generateRequestId()
 
 		// Build query conditions
-		const conditions = [eq(this.auditLogTable.principalId, request.principalId)]
+		const conditions = [eq(auditLog.principalId, request.principalId)]
 
 		if (request.dateRange) {
 			conditions.push(
-				gte(this.auditLogTable.timestamp, request.dateRange.start),
-				lte(this.auditLogTable.timestamp, request.dateRange.end)
+				gte(auditLog.timestamp, request.dateRange.start),
+				lte(auditLog.timestamp, request.dateRange.end)
 			)
 		}
 
+		const cacheKey = this.client.generateCacheKey('export_user_data', request)
 		// Query audit logs for the user
-		const auditLogs = await this.db
-			.select()
-			.from(this.auditLogTable)
-			.where(and(...conditions))
-			.orderBy(this.auditLogTable.timestamp)
+		const auditLogs = await this.client.executeMonitoredQuery(
+			(db) =>
+				db
+					.select()
+					.from(auditLog)
+					.where(and(...conditions))
+					.orderBy(auditLog.timestamp),
+			'export_user_data',
+			{ cacheKey }
+		)
 
 		// Collect metadata
 		const categories = new Set<string>()
@@ -217,13 +226,13 @@ export class GDPRComplianceService {
 
 		// Update audit logs with pseudonymized ID
 		const updateResult = await this.db
-			.update(this.auditLogTable)
+			.update(auditLog)
 			.set({
 				principalId: pseudonymId,
 				// Mark as pseudonymized in details
-				details: sql`COALESCE(${this.auditLogTable.details}, '{}') || '{"pseudonymized": true, "pseudonymizedAt": "${new Date().toISOString()}"}'::jsonb`,
+				details: sql`COALESCE(${auditLog.details}, '{}') || '{"pseudonymized": true, "pseudonymizedAt": "${new Date().toISOString()}"}'::jsonb`,
 			})
-			.where(eq(this.auditLogTable.principalId, principalId))
+			.where(eq(auditLog.principalId, principalId))
 
 		// Log the pseudonymization activity
 		await this.logGDPRActivity({
@@ -255,14 +264,24 @@ export class GDPRComplianceService {
 	 */
 	async applyRetentionPolicies(): Promise<ArchivalResult[]> {
 		// Get active retention policies
-		const policies = await this.db
-			.select()
-			.from(this.auditRetentionPolicyTable)
-			.where(eq(this.auditRetentionPolicyTable.isActive, 'true'))
+		const policies = await this.client.executeOptimizedQuery(
+			(db) =>
+				db.select().from(auditRetentionPolicy).where(eq(auditRetentionPolicy.isActive, 'true')),
+			{ cacheKey: 'active_retention_policies', cacheTTL: 3600 }
+		)
 
 		const results: ArchivalResult[] = []
 
-		for (const policy of policies) {
+		const retentionPolicies: RetentionPolicy[] = policies.map((policy) => ({
+			policyName: policy.policyName,
+			dataClassification: policy.dataClassification,
+			retentionDays: policy.retentionDays,
+			archiveAfterDays: policy.archiveAfterDays || undefined,
+			deleteAfterDays: policy.deleteAfterDays || undefined,
+			isActive: policy.isActive === 'true',
+		}))
+
+		for (const policy of retentionPolicies) {
 			const result = await this.applyRetentionPolicy(policy as RetentionPolicy)
 			results.push(result)
 		}
@@ -291,34 +310,42 @@ export class GDPRComplianceService {
 
 		// Archive records that meet archival criteria
 		if (policy.archiveAfterDays) {
-			const recordsToArchive = await this.db
-				.select()
-				.from(this.auditLogTable)
-				.where(
-					and(
-						eq(this.auditLogTable.dataClassification, policy.dataClassification),
-						lte(this.auditLogTable.timestamp, archiveDate.toISOString()),
-						sql`${this.auditLogTable.archivedAt} IS NULL`
-					)
-				)
+			const recordsToArchive = await this.client.executeOptimizedQuery(
+				(db) =>
+					db
+						.select()
+						.from(auditLog)
+						.where(
+							and(
+								eq(auditLog.dataClassification, policy.dataClassification),
+								lte(auditLog.timestamp, archiveDate.toISOString()),
+								sql`${auditLog.archivedAt} IS NULL`
+							)
+						),
+				{ skipCache: true }
+			)
 
 			for (const record of recordsToArchive) {
-				byClassification[record.dataClassification] =
-					(byClassification[record.dataClassification] || 0) + 1
-				byAction[record.action] = (byAction[record.action] || 0) + 1
+				if (record.dataClassification) {
+					byClassification[record.dataClassification] =
+						(byClassification[record.dataClassification] || 0) + 1
+				}
+				if (record.action) {
+					byAction[record.action] = (byAction[record.action] || 0) + 1
+				}
 				if (record.timestamp < earliestDate) earliestDate = record.timestamp
 				if (record.timestamp > latestDate) latestDate = record.timestamp
 			}
 
 			// Mark records as archived
 			const archiveResult = await this.db
-				.update(this.auditLogTable)
+				.update(auditLog)
 				.set({ archivedAt: now.toISOString() })
 				.where(
 					and(
-						eq(this.auditLogTable.dataClassification, policy.dataClassification),
-						lte(this.auditLogTable.timestamp, archiveDate.toISOString()),
-						sql`${this.auditLogTable.archivedAt} IS NULL`
+						eq(auditLog.dataClassification, policy.dataClassification),
+						lte(auditLog.timestamp, archiveDate.toISOString()),
+						sql`${auditLog.archivedAt} IS NULL`
 					)
 				)
 
@@ -328,12 +355,12 @@ export class GDPRComplianceService {
 		// Delete records that meet deletion criteria
 		if (deleteDate) {
 			const deleteResult = await this.db
-				.delete(this.auditLogTable)
+				.delete(auditLog)
 				.where(
 					and(
-						eq(this.auditLogTable.dataClassification, policy.dataClassification),
-						lte(this.auditLogTable.timestamp, deleteDate.toISOString()),
-						isNotNull(this.auditLogTable.archivedAt)
+						eq(auditLog.dataClassification, policy.dataClassification),
+						lte(auditLog.timestamp, deleteDate.toISOString()),
+						isNotNull(auditLog.archivedAt)
 					)
 				)
 
@@ -398,15 +425,20 @@ export class GDPRComplianceService {
 				'gdpr.data.delete',
 			]
 
-			const complianceRecords = await this.db
-				.select()
-				.from(this.auditLogTable)
-				.where(
-					and(
-						eq(this.auditLogTable.principalId, principalId),
-						sql`${this.auditLogTable.action} = ANY(${complianceActions})`
-					)
-				)
+			const complianceRecords = await this.client.executeMonitoredQuery(
+				(db) =>
+					db
+						.select()
+						.from(auditLog)
+						.where(
+							and(
+								eq(auditLog.principalId, principalId),
+								sql`${auditLog.action} = ANY(${complianceActions})`
+							)
+						),
+				'compliance_audit_records',
+				{ cacheKey: `compliance_audit_records_${principalId}` }
+			)
 
 			// Pseudonymize compliance records instead of deleting
 			if (complianceRecords.length > 0) {
@@ -416,11 +448,11 @@ export class GDPRComplianceService {
 
 			// Delete non-compliance records
 			const deleteResult = await this.db
-				.delete(this.auditLogTable)
+				.delete(auditLog)
 				.where(
 					and(
-						eq(this.auditLogTable.principalId, principalId),
-						sql`NOT (${this.auditLogTable.action} = ANY(${complianceActions}))`
+						eq(auditLog.principalId, principalId),
+						sql`NOT (${auditLog.action} = ANY(${complianceActions}))`
 					)
 				)
 
@@ -428,8 +460,8 @@ export class GDPRComplianceService {
 		} else {
 			// Delete all records for the user
 			const deleteResult = await this.db
-				.delete(this.auditLogTable)
-				.where(eq(this.auditLogTable.principalId, principalId))
+				.delete(auditLog)
+				.where(eq(auditLog.principalId, principalId))
 
 			recordsDeleted = (deleteResult as any).rowCount || 0
 		}
@@ -490,6 +522,7 @@ export class GDPRComplianceService {
 	private generatePseudonymId(originalId: string, strategy: PseudonymizationStrategy): string {
 		switch (strategy) {
 			case 'hash':
+				// TODO: add PSEUDONYM_SALT to config
 				return `pseudo-${createHash('sha256')
 					.update(originalId + process.env.PSEUDONYM_SALT || 'default-salt')
 					.digest('hex')
@@ -497,7 +530,7 @@ export class GDPRComplianceService {
 			case 'token':
 				return `pseudo-${randomBytes(16).toString('hex')}`
 			case 'encryption':
-				// For production, implement proper encryption
+				// TODO: For production, implement proper encryption
 				return `pseudo-enc-${Buffer.from(originalId)
 					.toString('base64')
 					.replace(/[^a-zA-Z0-9]/g, '')
@@ -626,7 +659,7 @@ export class GDPRComplianceService {
 	 * Log GDPR compliance activities
 	 */
 	private async logGDPRActivity(event: AuditLogEvent): Promise<void> {
-		await this.db.insert(this.auditLogTable).values({
+		await this.db.insert(auditLog).values({
 			...event,
 			hash: createHash('sha256').update(JSON.stringify(event)).digest('hex'),
 			hashAlgorithm: 'SHA-256',

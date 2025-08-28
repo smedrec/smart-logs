@@ -106,7 +106,7 @@ function handleError(error: unknown, c: Context) {
 			ip: getClientIP(c),
 		})
 
-		return c.json(errorResponse, statusCode)
+		return c.json(errorResponse, statusCode as any)
 	}
 
 	// Handle Hono HTTPException
@@ -156,7 +156,7 @@ function handleError(error: unknown, c: Context) {
 			method,
 		})
 
-		return c.json(errorResponse, 400)
+		return c.json(errorResponse, 400 as any)
 	}
 
 	// Handle database errors
@@ -177,7 +177,7 @@ function handleError(error: unknown, c: Context) {
 			method,
 		})
 
-		return c.json(errorResponse, 503)
+		return c.json(errorResponse, 503 as any)
 	}
 
 	// Handle Redis errors
@@ -198,7 +198,7 @@ function handleError(error: unknown, c: Context) {
 			method,
 		})
 
-		return c.json(errorResponse, 503)
+		return c.json(errorResponse, 503 as any)
 	}
 
 	// Handle generic errors
@@ -223,7 +223,7 @@ function handleError(error: unknown, c: Context) {
 		ip: getClientIP(c),
 	})
 
-	return c.json(errorResponse, 500)
+	return c.json(errorResponse, 500 as any)
 }
 
 /**
@@ -312,7 +312,7 @@ function getClientIP(c: Context): string {
 		return realIP
 	}
 
-	return c.env?.incoming?.socket?.remoteAddress || 'unknown'
+	return c.env?.incoming?.socket?.remoteAddress || '127.0.0.1'
 }
 
 /**
@@ -339,7 +339,7 @@ export function notFoundHandler() {
 			ip: getClientIP(c),
 		})
 
-		return c.json(errorResponse, 404)
+		return c.json(errorResponse, 404 as any)
 	})
 }
 
@@ -372,6 +372,6 @@ export function methodNotAllowedHandler(allowedMethods: string[]) {
 			requestId,
 		})
 
-		return c.json(errorResponse, 405)
+		return c.json(errorResponse, 405 as any)
 	})
 }

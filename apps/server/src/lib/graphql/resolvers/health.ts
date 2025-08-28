@@ -19,16 +19,21 @@ export const healthResolvers = {
 
 			try {
 				// Get health check results
-				const healthResults = await health.checkHealth()
+				const healthResults = await health.checkAllComponents()
 
 				const healthStatus: HealthStatus = {
-					status: healthResults.status as 'healthy' | 'unhealthy' | 'degraded',
+					status:
+						healthResults.status === 'OK'
+							? 'healthy'
+							: healthResults.status === 'CRITICAL'
+								? 'unhealthy'
+								: 'degraded',
 					timestamp: new Date().toISOString(),
-					checks: healthResults.checks.map((check) => ({
-						name: check.name,
-						status: check.status,
-						message: check.message,
-						responseTime: check.responseTime,
+					checks: Object.entries(healthResults.components).map(([name, component]) => ({
+						name,
+						status: component.status === 'OK' ? 'healthy' : 'unhealthy',
+						message: component.message,
+						responseTime: component.responseTime,
 					})),
 				}
 

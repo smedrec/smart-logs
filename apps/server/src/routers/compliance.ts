@@ -9,59 +9,184 @@ import { createTRPCRouter } from '.'
 import type { TRPCRouterRecord } from '@trpc/server'
 import type { ReportCriteria } from '@repo/audit'
 
-/**
- * Helper function to fetch audit events from database based on criteria
- */
-async function fetchAuditEvents(db: any, criteria: ReportCriteria): Promise<any[]> {
-	// This is a simplified implementation
-	// In a real implementation, would use proper database queries with the criteria
-
-	const events = await db
-		.select()
-		.from(auditLog)
-		.where((event: any) => {
-			return (
-				event.timestamp >= criteria.dateRange.startDate &&
-				event.timestamp <= criteria.dateRange.endDate
-			)
-		})
-		.limit(criteria.limit || 1000)
-
-	return events
-}
-
 const complianceReportsRouter = {
 	/**
-	 * Generate general compliance report
+	 * Generate compliance report for HIPAA
 	 */
-	generate: protectedProcedure
+	hipaa: protectedProcedure
 		.input(
 			z.object({
-				reportType: z.string(),
 				criteria: z.object({
-					dateRange: z.object({
-						startDate: z.string(),
-						endDate: z.string(),
-					}),
-					limit: z.number().optional(),
+					startDate: z.string().datetime().optional(),
+					endDate: z.string().datetime().optional(),
+					principalIds: z.array(z.string()).optional(),
+					organizationIds: z.array(z.string()).optional(),
+					actions: z.array(z.string()).optional(),
+					statuses: z.array(z.enum(['attempt', 'success', 'failure'])).optional(),
+					dataClassifications: z
+						.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']))
+						.optional(),
+					resourceTypes: z.array(z.string()).optional(),
 				}),
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { compliance, db, logger, error } = ctx.services
-			const reportType = input.reportType
-			let criteria: ReportCriteria = input.criteria
-			criteria = {
+			const { compliance, logger, error } = ctx.services
+
+			const criteria = input.criteria
+			const criteriaWithOrganizationId = {
 				...criteria,
-				organizationIds: [ctx.session.session.activeOrganizationId as string],
+				dateRange: {
+					startDate:
+						criteria.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+					endDate: criteria.endDate || new Date().toISOString(),
+				},
+				organizationIds: [ctx.session?.session.activeOrganizationId as string],
 			}
+
 			try {
-				const events = await fetchAuditEvents(db.audit, criteria)
-				// Generate report
-				const report = await compliance.report.generateComplianceReport(
-					events,
-					criteria,
-					reportType
+				// Generate HIPAA report
+				const report = await compliance.report.generateHIPAAReport(criteriaWithOrganizationId)
+				return {
+					success: true,
+					report,
+				}
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to generate HIPAA report: ${message}`)
+				const err = new TRPCError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message: `Failed to generate HIPAA report: ${message}`,
+				})
+				await error.handleError(
+					err,
+					{
+						requestId: ctx.requestId,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
+						metadata: {
+							organizationId: ctx.session?.session.activeOrganizationId,
+							message: err.message,
+							name: err.name,
+							code: err.code,
+							cause: err.cause,
+						},
+					},
+					'trpc-api',
+					'processComplianceReportsGenerate'
+				)
+				throw err
+			}
+		}),
+	/**
+	 * Generate compliance report for GDPR
+	 */
+	gdpr: protectedProcedure
+		.input(
+			z.object({
+				criteria: z.object({
+					startDate: z.string().datetime().optional(),
+					endDate: z.string().datetime().optional(),
+					principalIds: z.array(z.string()).optional(),
+					organizationIds: z.array(z.string()).optional(),
+					actions: z.array(z.string()).optional(),
+					statuses: z.array(z.enum(['attempt', 'success', 'failure'])).optional(),
+					dataClassifications: z
+						.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']))
+						.optional(),
+					resourceTypes: z.array(z.string()).optional(),
+				}),
+			})
+		)
+		.mutation(async ({ ctx, input }) => {
+			const { compliance, logger, error } = ctx.services
+
+			const criteria = input.criteria
+			const criteriaWithOrganizationId = {
+				...criteria,
+				dateRange: {
+					startDate:
+						criteria.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+					endDate: criteria.endDate || new Date().toISOString(),
+				},
+				organizationIds: [ctx.session?.session.activeOrganizationId as string],
+			}
+
+			try {
+				// Generate GDPR report
+				const report = await compliance.report.generateGDPRReport(criteriaWithOrganizationId)
+				return {
+					success: true,
+					report,
+				}
+			} catch (e) {
+				const message = e instanceof Error ? e.message : 'Unknown error'
+				logger.error(`Failed to generate GDPR report: ${message}`)
+				const err = new TRPCError({
+					code: 'INTERNAL_SERVER_ERROR',
+					message: `Failed to generate GDPR report: ${message}`,
+				})
+				await error.handleError(
+					err,
+					{
+						requestId: ctx.requestId,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
+						metadata: {
+							organizationId: ctx.session?.session.activeOrganizationId,
+							message: err.message,
+							name: err.name,
+							code: err.code,
+							cause: err.cause,
+						},
+					},
+					'trpc-api',
+					'processComplianceReportsGenerate'
+				)
+				throw err
+			}
+		}),
+	/**
+	 * Generate integrity verification report
+	 */
+	integrity: protectedProcedure
+		.input(
+			z.object({
+				criteria: z.object({
+					startDate: z.string().datetime().optional(),
+					endDate: z.string().datetime().optional(),
+					principalIds: z.array(z.string()).optional(),
+					organizationIds: z.array(z.string()).optional(),
+					actions: z.array(z.string()).optional(),
+					statuses: z.array(z.enum(['attempt', 'success', 'failure'])).optional(),
+					dataClassifications: z
+						.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']))
+						.optional(),
+					resourceTypes: z.array(z.string()).optional(),
+				}),
+				performVerification: z.boolean().optional(),
+			})
+		)
+		.mutation(async ({ ctx, input }) => {
+			const { compliance, logger, error } = ctx.services
+
+			const criteria = input.criteria
+			const performVerification = input.performVerification ?? true
+			const criteriaWithDateRange = {
+				...criteria,
+				dateRange: {
+					startDate:
+						criteria.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+					endDate: criteria.endDate || new Date().toISOString(),
+				},
+				organizationIds: [ctx.session?.session.activeOrganizationId as string],
+			}
+
+			try {
+				// Generate integrity verification report
+				const report = await compliance.report.generateIntegrityVerificationReport(
+					criteriaWithDateRange,
+					performVerification
 				)
 				return {
 					success: true,
@@ -69,19 +194,19 @@ const complianceReportsRouter = {
 				}
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to generate compliance report:: ${message}`)
+				logger.error(`Failed to generate integrity verification report: ${message}`)
 				const err = new TRPCError({
 					code: 'INTERNAL_SERVER_ERROR',
-					message: `Failed to generate compliance report:: ${message}`,
+					message: `Failed to generate integrity verification report: ${message}`,
 				})
 				await error.handleError(
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -120,7 +245,7 @@ const complianceExportRouter = {
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { compliance, db, logger, error } = ctx.services
+			const { compliance, logger, error } = ctx.services
 			const { report, config } = input
 			try {
 				// Generate report
@@ -140,10 +265,10 @@ const complianceExportRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,

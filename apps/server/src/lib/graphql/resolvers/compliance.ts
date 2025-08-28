@@ -56,11 +56,11 @@ export const complianceResolvers = {
 						report = await compliance.report.generateGDPRReport(reportCriteria)
 						break
 					case 'INTEGRITY':
-						report = await compliance.report.generateIntegrityReport(reportCriteria)
+						report = await compliance.report.generateIntegrityVerificationReport(reportCriteria)
 						break
-					case 'CUSTOM':
+					/**case 'CUSTOM':
 						report = await compliance.report.generateCustomReport(reportCriteria)
-						break
+						break*/
 					default:
 						throw new GraphQLError(`Unsupported report type: ${args.type}`, {
 							extensions: { code: 'BAD_REQUEST' },

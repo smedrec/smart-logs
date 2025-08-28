@@ -29,7 +29,7 @@ export const gdprResolvers = {
 			context: GraphQLContext
 		): Promise<GDPRExportResult> => {
 			const { services } = context
-			const { db, logger, error } = services
+			const { compliance, logger, error } = services
 
 			// Check authentication
 			if (!context.session) {
@@ -57,13 +57,7 @@ export const gdprResolvers = {
 					requestTimestamp: new Date().toISOString(),
 				}
 
-				// Use the GDPR compliance service from the audit package
-				const { GDPRComplianceService } = await import('@repo/audit')
-				const { auditLog, auditRetentionPolicy } = await import('@repo/audit-db/dist/db/schema.js')
-
-				const gdprService = new GDPRComplianceService(db.audit, auditLog, auditRetentionPolicy)
-
-				const exportResult = await gdprService.exportUserData(exportRequest)
+				const exportResult = await compliance.gdpr.exportUserData(exportRequest)
 
 				logger.info('GDPR data export completed via GraphQL', {
 					principalId: args.input.principalId,
@@ -118,7 +112,7 @@ export const gdprResolvers = {
 			context: GraphQLContext
 		): Promise<GDPRPseudonymizeResult> => {
 			const { services } = context
-			const { db, logger, error } = services
+			const { compliance, logger, error } = services
 
 			// Check authentication
 			if (!context.session) {
@@ -130,13 +124,7 @@ export const gdprResolvers = {
 			const requestedBy = context.session.session.userId
 
 			try {
-				// Use the GDPR compliance service from the audit package
-				const { GDPRComplianceService } = await import('@repo/audit')
-				const { auditLog, auditRetentionPolicy } = await import('@repo/audit-db/dist/db/schema.js')
-
-				const gdprService = new GDPRComplianceService(db.audit, auditLog, auditRetentionPolicy)
-
-				const result = await gdprService.pseudonymizeUserData(
+				const result = await compliance.gdpr.pseudonymizeUserData(
 					args.input.principalId,
 					args.input.strategy,
 					requestedBy
@@ -198,7 +186,7 @@ export const gdprResolvers = {
 			timestamp: string
 		}> => {
 			const { services } = context
-			const { db, logger, error } = services
+			const { compliance, logger, error } = services
 
 			// Check authentication
 			if (!context.session) {
@@ -210,13 +198,7 @@ export const gdprResolvers = {
 			const requestedBy = context.session.session.userId
 
 			try {
-				// Use the GDPR compliance service from the audit package
-				const { GDPRComplianceService } = await import('@repo/audit')
-				const { auditLog, auditRetentionPolicy } = await import('@repo/audit-db/dist/db/schema.js')
-
-				const gdprService = new GDPRComplianceService(db.audit, auditLog, auditRetentionPolicy)
-
-				const result = await gdprService.deleteUserDataWithAuditTrail(
+				const result = await compliance.gdpr.deleteUserDataWithAuditTrail(
 					args.input.principalId,
 					requestedBy,
 					args.input.preserveComplianceAudits ?? true

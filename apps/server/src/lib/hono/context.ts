@@ -9,6 +9,7 @@ import type {
 	DatabasePresetHandler,
 	DataExportService,
 	ErrorHandler,
+	GDPRComplianceService,
 	HealthCheckService,
 	MonitoringService,
 	RedisEnhancedMetricsCollector,
@@ -18,14 +19,10 @@ import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import type { AuthorizationService, Session } from '@repo/auth'
 import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
-//import type { fhir } from '@repo/fhir'
-
-//import type { InfisicalKmsClient } from '@repo/infisical-kms'
-//import type { cerbos } from '../cerbos/index.js'
 import type { HonoApp, Logger } from '@repo/hono-helpers'
 import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
 import type { Redis } from '@repo/redis-client'
-import type { AlertingService } from '../services/alerting.js'
+import type { HealthStatus } from '../graphql/types.js'
 import type { StructuredLogger } from '../services/logging.js'
 import type { MetricsCollectionService } from '../services/metrics.js'
 
@@ -54,6 +51,7 @@ export type ServiceContext = {
 		export: DataExportService
 		scheduled: ScheduledReportingService
 		preset: DatabasePresetHandler
+		gdpr: GDPRComplianceService
 	}
 	monitor: {
 		alert: DatabaseAlertHandler
@@ -83,6 +81,8 @@ export type Variables = SharedHonoVariables & {
 		isDeprecated: boolean
 		isSupported: boolean
 	}
+	healthStatus: HealthStatus
+	isShuttingDown?: boolean
 }
 
 export interface HonoEnv extends HonoApp {

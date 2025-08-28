@@ -12,6 +12,9 @@
 
 import { ApiError } from '@/lib/errors'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm'
+
+import { auditIntegrityLog, auditLog } from '@repo/audit-db'
 
 import type { HonoEnv } from '@/lib/hono/context'
 
@@ -380,7 +383,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 	// Query audit events
 	app.openapi(queryAuditEventsRoute, async (c) => {
-		const { client, db, logger, authorization } = c.get('services')
+		const { client, logger, authorization } = c.get('services')
 		const session = c.get('session')!
 
 		// Check permission to read audit events
@@ -395,12 +398,6 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const query = c.req.valid('query')
 			const organizationId = session.session.activeOrganizationId as string
-
-			// Import Drizzle operators
-			const { eq, and, gte, lte, inArray, isNotNull, count, desc, asc } = await import(
-				'drizzle-orm'
-			)
-			const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
 
 			// Build query conditions with organization isolation
 			const conditions = [eq(auditLog.organizationId, organizationId)]
@@ -435,8 +432,9 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const whereClause = and(...conditions)
+			const cacheKey = client.generateCacheKey('audit_events', query)
 
-			const events = await client.executeOptimizedQuery(
+			const events = await client.executeMonitoredQuery(
 				(audit) =>
 					audit
 						.select()
@@ -449,27 +447,17 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 								? asc(auditLog[query.sortField || 'timestamp'])
 								: desc(auditLog[query.sortField || 'timestamp'])
 						),
-				{ cacheKey: 'audit_events' }
+				'audit_events',
+				{ cacheKey }
 			)
 
-			// Execute query with proper error handling
-			/**const events = await db.audit
-				.select()
-				.from(auditLog)
-				.where(whereClause)
-				.limit(query.limit || 50)
-				.offset(query.offset || 0)
-				.orderBy(
-					query.sortDirection === 'asc'
-						? asc(auditLog[query.sortField || 'timestamp'])
-						: desc(auditLog[query.sortField || 'timestamp'])
-				) */
-
+			const cacheKeyCount = client.generateCacheKey('audit_events_count', query)
 			// Get total count for pagination
-			const totalResult = await db.audit
-				.select({ count: count() })
-				.from(auditLog)
-				.where(whereClause)
+			const totalResult = await client.executeMonitoredQuery(
+				(audit) => audit.select({ count: count() }).from(auditLog).where(whereClause),
+				'audit_events_count',
+				{ cacheKey: cacheKeyCount }
+			)
 
 			const total = totalResult[0]?.count || 0
 
@@ -518,7 +506,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 	// Get audit event by ID
 	app.openapi(getAuditEventRoute, async (c) => {
-		const { client, logger } = c.get('services')
+		const { authorization, client, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
@@ -528,12 +516,17 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			})
 		}
 
+		const hasPermission = await authorization.hasPermission(session, 'audit.events', 'read')
+		if (!hasPermission) {
+			throw new ApiError({
+				code: 'FORBIDDEN',
+				message: 'Insufficient permissions to read audit events',
+			})
+		}
+
 		try {
 			const { id } = c.req.valid('param')
 			const organizationId = session.session.activeOrganizationId as string
-
-			const { eq, and } = await import('drizzle-orm')
-			const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
 
 			const events = await client.executeOptimizedQuery(
 				(audit) =>
@@ -600,9 +593,6 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const { id } = c.req.valid('param')
 			const organizationId = session.session.activeOrganizationId as string
-
-			const { eq, and } = await import('drizzle-orm')
-			const { auditLog, auditIntegrityLog } = await import('@repo/audit-db/dist/db/schema.js')
 
 			// Get event first to check access
 			const events = await client.executeOptimizedQuery(

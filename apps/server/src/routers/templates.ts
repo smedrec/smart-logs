@@ -15,7 +15,7 @@ const templatesRouter = {
 		.query(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
 			const { limit, offset } = input
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 			try {
 				const templates = await compliance.scheduled.getReportTemplates(
 					organizationId,
@@ -34,10 +34,10 @@ const templatesRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -58,7 +58,7 @@ const templatesRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 			try {
 				const template = await compliance.scheduled.getReportTemplate(input.id, organizationId)
 				return template
@@ -73,10 +73,10 @@ const templatesRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,
@@ -134,8 +134,8 @@ const templatesRouter = {
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
-			const userId = ctx.session.session.userId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
+			const userId = ctx.session?.session.userId as string
 			const record = {
 				name: input.name,
 				description: input.description || undefined,
@@ -168,10 +168,10 @@ const templatesRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
-							organizationId: ctx.session.session.activeOrganizationId,
+							organizationId: ctx.session?.session.activeOrganizationId,
 							message: err.message,
 							name: err.name,
 							code: err.code,

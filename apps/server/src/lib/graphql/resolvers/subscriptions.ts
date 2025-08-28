@@ -127,18 +127,19 @@ export const subscriptionResolvers = {
 			const organizationId = context.session.session.activeOrganizationId as string
 
 			// Create async iterator with filtering
-			const asyncIterator = pubsub.asyncIterator([SUBSCRIPTION_EVENTS.AUDIT_EVENT_CREATED])
+			const asyncIterator = pubsub.asyncIterableIterator([SUBSCRIPTION_EVENTS.AUDIT_EVENT_CREATED])
 
 			// Return filtered iterator
 			return {
-				async next() {
+				async next(): Promise<IteratorResult<any, any>> {
 					const result = await asyncIterator.next()
 
 					if (result.done) {
 						return result
 					}
 
-					const event: AuditEvent = result.value.auditEventCreated
+					const event: AuditEvent = (result.value as { auditEventCreated: AuditEvent })
+						.auditEventCreated
 
 					// Check organization access
 					if (event.organizationId !== organizationId) {
@@ -180,18 +181,18 @@ export const subscriptionResolvers = {
 			const organizationId = context.session.session.activeOrganizationId as string
 
 			// Create async iterator with filtering
-			const asyncIterator = pubsub.asyncIterator([SUBSCRIPTION_EVENTS.ALERT_CREATED])
+			const asyncIterator = pubsub.asyncIterableIterator([SUBSCRIPTION_EVENTS.ALERT_CREATED])
 
 			// Return filtered iterator
 			return {
-				async next() {
+				async next(): Promise<IteratorResult<any, any>> {
 					const result = await asyncIterator.next()
 
 					if (result.done) {
 						return result
 					}
 
-					const alert: Alert = result.value.alertCreated
+					const alert: Alert = (result.value as { alertCreated: Alert }).alertCreated
 
 					// Check organization access (assuming alerts have organization context)
 					// This would need to be implemented based on how alerts are structured
@@ -229,7 +230,7 @@ export const subscriptionResolvers = {
 			}
 
 			// System metrics are global, so no organization filtering needed
-			return pubsub.asyncIterator([SUBSCRIPTION_EVENTS.SYSTEM_METRICS_UPDATED])
+			return pubsub.asyncIterableIterator([SUBSCRIPTION_EVENTS.SYSTEM_METRICS_UPDATED])
 		},
 		resolve: (payload: { systemMetricsUpdated: SystemMetrics }) => {
 			return payload.systemMetricsUpdated
@@ -252,18 +253,22 @@ export const subscriptionResolvers = {
 			const organizationId = context.session.session.activeOrganizationId as string
 
 			// Create async iterator with filtering
-			const asyncIterator = pubsub.asyncIterator([SUBSCRIPTION_EVENTS.REPORT_EXECUTION_UPDATED])
+			const asyncIterator = pubsub.asyncIterableIterator([
+				SUBSCRIPTION_EVENTS.REPORT_EXECUTION_UPDATED,
+			])
 
 			// Return filtered iterator
 			return {
-				async next() {
+				async next(): Promise<IteratorResult<any, any>> {
 					const result = await asyncIterator.next()
 
 					if (result.done) {
 						return result
 					}
 
-					const execution: ReportExecution = result.value.reportExecutionUpdated
+					const execution: ReportExecution = (
+						result.value as { reportExecutionUpdated: ReportExecution }
+					).reportExecutionUpdated
 
 					// Check if this is the report we're interested in
 					if (execution.reportId !== args.reportId) {

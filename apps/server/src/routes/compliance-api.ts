@@ -44,6 +44,43 @@ const ExportConfigSchema = z.object({
 const ScheduledReportConfigSchema = z.object({
 	name: z.string().min(1).max(100),
 	description: z.string().max(500).optional(),
+	reportType: z.enum([
+		'HIPAA_AUDIT_TRAIL',
+		'GDPR_PROCESSING_ACTIVITIES',
+		'GENERAL_COMPLIANCE',
+		'INTEGRITY_VERIFICATION',
+	]),
+	criteria: ReportCriteriaSchema,
+	format: z.enum(['json', 'csv', 'pdf', 'xml']),
+	schedule: z.object({
+		frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly']),
+		dayOfWeek: z.number().min(0).max(6).optional(),
+		dayOfMonth: z.number().min(1).max(31).optional(),
+		time: z.string().regex(/^\d{2}:\d{2}$/),
+		timezone: z.string().optional(),
+	}),
+	delivery: z.object({
+		method: z.enum(['email', 'webhook', 'storage']),
+		recipients: z.array(z.string().email()).optional(),
+		webhookUrl: z.string().url().optional(),
+		storageLocation: z.string().optional(),
+	}),
+	export: ExportConfigSchema,
+	enabled: z.boolean().optional(),
+	createdBy: z.string(),
+	createdAt: z.string(),
+})
+
+const ScheduledReportConfigResponseSchema = ScheduledReportConfigSchema.extend({
+	id: z.string(),
+	templateId: z.string().optional(),
+	lastRun: z.string().optional(),
+	nextRun: z.string().optional(),
+})
+
+const ScheduledReportConfigCreateSchema = z.object({
+	name: z.string().min(1).max(100),
+	description: z.string().max(500).optional(),
 	reportType: z.enum(['hipaa', 'gdpr', 'general', 'integrity']),
 	criteria: ReportCriteriaSchema,
 	schedule: z.object({
@@ -63,6 +100,25 @@ const ScheduledReportConfigSchema = z.object({
 const AuditPresetSchema = z.object({
 	name: z.string().min(1).max(50),
 	description: z.string().max(200).optional(),
+	organizationId: z.string(),
+	action: z.string().min(1).max(100),
+	dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']),
+	requiredFields: z.array(z.string()),
+	defaultValues: z.record(z.string(), z.any()).optional(),
+	validation: z
+		.object({
+			maxStringLength: z.number(),
+			allowedDataClassifications: z.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'])),
+			requiredFields: z.array(z.string()),
+			maxCustomFieldDepth: z.number(),
+			allowedEventVersions: z.array(z.string()),
+		})
+		.optional(),
+})
+
+const AuditPresetCreateSchema = z.object({
+	name: z.string().min(1).max(50),
+	description: z.string().max(200).optional(),
 	action: z.string().min(1).max(100),
 	dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']),
 	requiredFields: z.array(z.string()).optional(),
@@ -78,45 +134,178 @@ const AuditPresetSchema = z.object({
 		.optional(),
 })
 
+const AuditPresetResponseSchema = AuditPresetSchema.extend({
+	id: z.string().optional(),
+	createdBy: z.string(),
+	createdAt: z.string(),
+})
+
 const ComplianceReportSchema = z.object({
 	metadata: z.object({
 		reportId: z.string().uuid(),
 		reportType: z.string(),
-		generatedAt: z.string().datetime(),
+		generatedAt: z.string(),
+		generatedBy: z.string().optional(),
 		criteria: ReportCriteriaSchema,
-		organizationId: z.string(),
+		totalEvents: z.number(),
 	}),
 	summary: z.object({
-		totalEvents: z.number(),
-		complianceScore: z.number(),
-		violations: z.number(),
-		recommendations: z.array(z.string()),
+		eventsByStatus: z.record(z.string(), z.number()),
+		eventsByAction: z.record(z.string(), z.number()),
+		eventsByDataClassification: z.record(z.string(), z.number()),
+		uniquePrincipals: z.number(),
+		uniqueResources: z.number(),
+		integrityViolations: z.number(),
+		timeRange: z.object({
+			earliest: z.string(),
+			latest: z.string(),
+		}),
 	}),
-	sections: z.array(
+	events: z.array(
 		z.object({
-			title: z.string(),
-			content: z.any(),
+			id: z.number().optional(),
+			timestamp: z.string(),
+			principalId: z.string().optional(),
+			organizationId: z.string().optional(),
+			action: z.string(),
+			targetResourceType: z.string().optional(),
+			targetResourceId: z.string().optional(),
+			status: z.string(),
+			outcomeDescription: z.string().optional(),
+			dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']).optional(),
+			sessionContext: z
+				.object({
+					ipAddress: z.string().optional(),
+					userAgent: z.string().optional(),
+					sessionId: z.string().optional(),
+				})
+				.optional(),
+			integrityStatus: z.enum(['verified', 'failed', 'not_checked']).optional(),
+			correlationId: z.string().optional(),
 		})
 	),
+	integrityReport: IntegrityReportSchema.optional(),
+})
+
+const HIPAAComplianceReportSchema = ComplianceReportSchema.extend({
+	reportType: z.literal('HIPAA_AUDIT_TRAIL'),
+	hipaaSpecific: z.object({
+		phiAccessEvents: z.number(),
+		phiModificationEvents: z.number(),
+		unauthorizedAttempts: z.number(),
+		emergencyAccess: z.number(),
+		breakGlassEvents: z.number(),
+		minimumNecessaryViolations: z.number(),
+	}),
+	riskAssessment: z.object({
+		highRiskEvents: z.array(
+			z.object({
+				id: z.number().optional(),
+				timestamp: z.string(),
+				principalId: z.string().optional(),
+				organizationId: z.string().optional(),
+				action: z.string(),
+				targetResourceType: z.string().optional(),
+				targetResourceId: z.string().optional(),
+				status: z.string(),
+				outcomeDescription: z.string().optional(),
+				dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']).optional(),
+				sessionContext: z
+					.object({
+						ipAddress: z.string().optional(),
+						userAgent: z.string().optional(),
+						sessionId: z.string().optional(),
+					})
+					.optional(),
+				integrityStatus: z.enum(['verified', 'failed', 'not_checked']).optional(),
+				correlationId: z.string().optional(),
+			})
+		),
+		suspiciousPatterns: z.array(
+			z.object({
+				patternType: z.string(),
+				description: z.string(),
+				events: z.array(
+					z.object({
+						id: z.number().optional(),
+						timestamp: z.string(),
+						principalId: z.string().optional(),
+						organizationId: z.string().optional(),
+						action: z.string(),
+						targetResourceType: z.string().optional(),
+						targetResourceId: z.string().optional(),
+						status: z.string(),
+						outcomeDescription: z.string().optional(),
+						dataClassification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']).optional(),
+						sessionContext: z
+							.object({
+								ipAddress: z.string().optional(),
+								userAgent: z.string().optional(),
+								sessionId: z.string().optional(),
+							})
+							.optional(),
+						integrityStatus: z.enum(['verified', 'failed', 'not_checked']).optional(),
+						correlationId: z.string().optional(),
+					})
+				),
+				riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+				recommendation: z.string(),
+			})
+		),
+		recommendations: z.array(z.string()),
+	}),
+})
+
+const GDPRComplianceReportSchema = ComplianceReportSchema.extend({
+	reportType: z.literal('GDPR_PROCESSING_ACTIVITIES'),
+	gdprSpecific: z.object({
+		personalDataEvents: z.number(),
+		dataSubjectRights: z.number(),
+		consentEvents: z.number(),
+		dataBreaches: z.number(),
+		crossBorderTransfers: z.number(),
+		retentionViolations: z.number(),
+	}),
+	legalBasisBreakdown: z.record(z.string(), z.number()),
+	dataSubjectRights: z.object({
+		accessRequests: z.number(),
+		rectificationRequests: z.number(),
+		erasureRequests: z.number(),
+		portabilityRequests: z.number(),
+		objectionRequests: z.number(),
+	}),
 })
 
 const IntegrityReportSchema = z.object({
-	verificationId: z.string().uuid(),
-	timestamp: z.string().datetime(),
-	criteria: ReportCriteriaSchema,
+	verificationId: z.string(),
+	verifiedAt: z.string(),
+	verifiedBy: z.string().optional(),
 	results: z.object({
 		totalEvents: z.number(),
 		verifiedEvents: z.number(),
 		failedVerifications: z.number(),
-		integrityScore: z.number(),
+		unverifiedEvents: z.number(),
+		verificationRate: z.number(),
 	}),
-	details: z.array(
+	failures: z.array(
 		z.object({
-			eventId: z.string(),
-			status: z.enum(['verified', 'failed', 'missing']),
-			details: z.string().optional(),
+			eventId: z.number(),
+			timestamp: z.string(),
+			expectedHash: z.string(),
+			actualHash: z.string(),
+			hashAlgorithm: z.string(),
+			failureReason: z.string(),
+			severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
 		})
 	),
+	statistics: z.object({
+		hashAlgorithms: z.record(z.string(), z.number()),
+		verificationLatency: z.object({
+			average: z.number(),
+			median: z.number(),
+			p95: z.number(),
+		}),
+	}),
 })
 
 const ErrorResponseSchema = z.object({
@@ -151,7 +340,7 @@ const generateHIPAAReportRoute = createRoute({
 			description: 'HIPAA report generated successfully',
 			content: {
 				'application/json': {
-					schema: ComplianceReportSchema,
+					schema: HIPAAComplianceReportSchema,
 				},
 			},
 		},
@@ -206,7 +395,7 @@ const generateGDPRReportRoute = createRoute({
 				'application/json': {
 					schema: z.object({
 						success: z.boolean(),
-						report: ComplianceReportSchema,
+						report: GDPRComplianceReportSchema,
 					}),
 				},
 			},
@@ -366,7 +555,7 @@ const createScheduledReportRoute = createRoute({
 		body: {
 			content: {
 				'application/json': {
-					schema: ScheduledReportConfigSchema,
+					schema: ScheduledReportConfigCreateSchema,
 				},
 			},
 		},
@@ -378,11 +567,7 @@ const createScheduledReportRoute = createRoute({
 				'application/json': {
 					schema: z.object({
 						success: z.boolean(),
-						scheduledReport: ScheduledReportConfigSchema.extend({
-							id: z.string(),
-							createdAt: z.string().datetime(),
-							nextRun: z.string().datetime(),
-						}),
+						scheduledReport: ScheduledReportConfigResponseSchema,
 					}),
 				},
 			},
@@ -427,13 +612,7 @@ const getScheduledReportsRoute = createRoute({
 				'application/json': {
 					schema: z.object({
 						success: z.boolean(),
-						scheduledReports: z.array(
-							ScheduledReportConfigSchema.extend({
-								id: z.string(),
-								createdAt: z.string().datetime(),
-								nextRun: z.string().datetime(),
-							})
-						),
+						scheduledReports: z.array(ScheduledReportConfigResponseSchema),
 					}),
 				},
 			},
@@ -465,7 +644,7 @@ const getScheduledReportRoute = createRoute({
 	description: 'Retrieves a specific scheduled report by its ID.',
 	request: {
 		params: z.object({
-			id: z.string().uuid(),
+			id: z.string(),
 		}),
 	},
 	responses: {
@@ -524,13 +703,7 @@ const getAuditPresetsRoute = createRoute({
 				'application/json': {
 					schema: z.object({
 						success: z.boolean(),
-						presets: z.array(
-							AuditPresetSchema.extend({
-								organizationId: z.string(),
-								createdBy: z.string(),
-								createdAt: z.string().datetime(),
-							})
-						),
+						presets: z.array(AuditPresetResponseSchema),
 					}),
 				},
 			},
@@ -565,7 +738,7 @@ const createAuditPresetRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: z.object({
-						preset: AuditPresetSchema,
+						preset: AuditPresetCreateSchema,
 					}),
 				},
 			},
@@ -578,11 +751,7 @@ const createAuditPresetRoute = createRoute({
 				'application/json': {
 					schema: z.object({
 						success: z.boolean(),
-						preset: AuditPresetSchema.extend({
-							organizationId: z.string(),
-							createdBy: z.string(),
-							createdAt: z.string().datetime(),
-						}),
+						preset: AuditPresetResponseSchema,
 					}),
 				},
 			},
@@ -808,8 +977,35 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const config = c.req.valid('json')
 
+			// Map API format to service format
+			const reportTypeMap = {
+				hipaa: 'HIPAA_AUDIT_TRAIL',
+				gdpr: 'GDPR_PROCESSING_ACTIVITIES',
+				general: 'GENERAL_COMPLIANCE',
+				integrity: 'INTEGRITY_VERIFICATION',
+			} as const
+
 			const configWithOrganization = {
 				...config,
+				reportType: reportTypeMap[config.reportType as keyof typeof reportTypeMap],
+				format: 'json' as const,
+				criteria: {
+					...config.criteria,
+					dateRange: {
+						startDate:
+							config.criteria.startDate ||
+							new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+						endDate: config.criteria.endDate || new Date().toISOString(),
+					},
+				},
+				export: {
+					format: 'json' as const,
+					includeMetadata: true,
+					compression: 'none' as const,
+				},
+				createdBy: session.session.userId,
+				createdAt: new Date().toISOString(),
+				enabled: config.enabled ?? true,
 				organizationId: session.session.activeOrganizationId as string,
 			}
 
@@ -926,7 +1122,11 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 
 			return c.json({
 				success: true,
-				presets,
+				presets: presets.map((preset) => ({
+					...preset,
+					createdBy: (preset as any).createdBy || 'system',
+					createdAt: (preset as any).createdAt || new Date().toISOString(),
+				})),
 			})
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
@@ -983,7 +1183,11 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(
 				{
 					success: true,
-					preset: newPreset,
+					preset: {
+						...newPreset,
+						createdBy: userId,
+						createdAt: new Date().toISOString(),
+					},
 				},
 				201
 			)

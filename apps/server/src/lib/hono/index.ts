@@ -25,6 +25,7 @@ export function newApp(config: AuditConfig) {
 	//}));
 
 	app.use('*', async (c, next) => {
+		// FIXME: This is a temporary fix for Hono's bug with IP address parsing
 		// @ts-ignore
 		c.set(
 			'location',
@@ -33,7 +34,6 @@ export function newApp(config: AuditConfig) {
 				//c.req.raw?.cf?.colo ??
 				'127.0.0.1'
 		)
-		// FIXME: This is a temporary fix for Hono's bug with IP address parsing
 		c.set('userAgent', c.req.header('User-Agent') ?? 'unknown')
 
 		const auth = await getAuthInstance(config)
@@ -52,14 +52,19 @@ export function newApp(config: AuditConfig) {
 				})) as Session
 
 				if (apiKeySession) {
+					if (!apiKeySession.session.ipAddress || apiKeySession.session.ipAddress === '') {
+						apiKeySession.session.ipAddress = c.get('location')
+					}
+
+					if (!apiKeySession.session.userAgent || apiKeySession.session.userAgent === '') {
+						apiKeySession.session.userAgent = c.get('userAgent')
+					}
 					const db = await getAuthDb(config)
 					const org = await getActiveOrganization(apiKeySession.session.userId, db)
 					if (org) {
 						apiKeySession = {
 							session: {
 								...apiKeySession.session,
-								ipAddress: c.get('location'),
-								userAgent: c.get('userAgent'),
 								activeOrganizationId: org.organizationId,
 								activeOrganizationRole: org.role,
 							},
@@ -94,11 +99,11 @@ export function newApp(config: AuditConfig) {
 		}
 
 		if (!session.session.ipAddress || session.session.ipAddress === '') {
-			session.session.ipAddress = '127.0.0.1'
+			session.session.ipAddress = c.get('location')
 		}
 
 		if (!session.session.userAgent || session.session.userAgent === '') {
-			session.session.userAgent = 'unknown'
+			session.session.userAgent = c.get('userAgent')
 		}
 
 		c.set('session', session as Session)

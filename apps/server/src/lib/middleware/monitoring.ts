@@ -16,6 +16,7 @@ import { createMiddleware } from 'hono/factory'
 import type { HonoEnv } from '@/lib/hono/context'
 import type { Context } from 'hono'
 import type { Alert, RequestMetrics } from '@repo/audit'
+import type { HealthStatus } from '../graphql/types'
 
 /**
  * Request metrics collection middleware
@@ -193,17 +194,28 @@ export function healthCheckMonitoring() {
 
 		try {
 			// Run health checks
-			const healthStatus = await health.checkHealth()
+			const healthResults = await health.checkAllComponents()
+
+			const healthStatus: HealthStatus = {
+				status:
+					healthResults.status === 'OK'
+						? 'healthy'
+						: healthResults.status === 'CRITICAL'
+							? 'unhealthy'
+							: 'degraded',
+				timestamp: new Date().toISOString(),
+				checks: Object.entries(healthResults.components).map(([name, component]) => ({
+					name,
+					status: component.status === 'OK' ? 'healthy' : 'unhealthy',
+					message: component.message,
+					responseTime: component.responseTime,
+				})),
+			}
 
 			// Log health status
 			logger.info('Health check performed', {
 				requestId,
-				status: healthStatus.status,
-				checks: healthStatus.checks?.map((check) => ({
-					name: check.name,
-					status: check.status,
-					responseTime: check.responseTime,
-				})),
+				healthStatus,
 			})
 
 			// Store health status in context for endpoint handler
@@ -306,7 +318,7 @@ function getClientIP(c: Context): string {
 		return realIP
 	}
 
-	return 'unknown'
+	return '127.0.0.1'
 }
 
 /**

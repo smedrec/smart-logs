@@ -106,7 +106,7 @@ export const eventsRouter = {
 	 */
 	create: auditWriteProcedure.input(CreateAuditEventSchema).mutation(async ({ ctx, input }) => {
 		const { audit, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
 			// Ensure organization isolation
@@ -141,8 +141,8 @@ export const eventsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
 						organizationId,
 						input,
@@ -167,7 +167,7 @@ export const eventsRouter = {
 		.input(BulkCreateAuditEventsSchema)
 		.mutation(async ({ ctx, input }) => {
 			const { audit, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
 				const eventsData = input.events.map((event) => ({
@@ -223,8 +223,8 @@ export const eventsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							eventCount: input.events.length,
@@ -248,7 +248,7 @@ export const eventsRouter = {
 	 */
 	query: auditReadProcedure.input(QueryAuditEventsSchema).query(async ({ ctx, input }) => {
 		const { db, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
 			// Import Drizzle operators
@@ -357,8 +357,8 @@ export const eventsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
 						organizationId,
 						filter: input.filter,
@@ -384,7 +384,7 @@ export const eventsRouter = {
 		.input(z.object({ id: z.string().min(1, 'Event ID is required') }))
 		.query(async ({ ctx, input }) => {
 			const { db, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
 				const { eq, and } = await import('drizzle-orm')
@@ -429,8 +429,8 @@ export const eventsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							eventId: input.id,
@@ -454,7 +454,7 @@ export const eventsRouter = {
 	 */
 	verify: auditVerifyProcedure.input(VerifyAuditEventSchema).mutation(async ({ ctx, input }) => {
 		const { audit, db, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
 			const { eq, and } = await import('drizzle-orm')
@@ -507,7 +507,7 @@ export const eventsRouter = {
 				verificationTimestamp: new Date().toISOString(),
 				verificationStatus: verificationResult.isValid ? 'success' : 'failure',
 				verificationDetails: verificationResult,
-				verifiedBy: ctx.session.session.userId,
+				verifiedBy: ctx.session?.session.userId,
 				hashVerified: event[0].hash,
 				expectedHash: verificationResult.expectedHash,
 			})
@@ -516,7 +516,7 @@ export const eventsRouter = {
 				eventId: input.id,
 				organizationId,
 				isValid: verificationResult.isValid,
-				verifiedBy: ctx.session.session.userId,
+				verifiedBy: ctx.session?.session.userId,
 			})
 
 			return verificationResult
@@ -538,8 +538,8 @@ export const eventsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
 						organizationId,
 						eventId: input.id,
@@ -562,7 +562,7 @@ export const eventsRouter = {
 	 */
 	export: auditReadProcedure.input(ExportAuditEventsSchema).mutation(async ({ ctx, input }) => {
 		const { compliance, logger, error } = ctx.services
-		const organizationId = ctx.session.session.activeOrganizationId as string
+		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
 			const { eq, and, gte, lte, inArray, isNotNull } = await import('drizzle-orm')
@@ -663,8 +663,8 @@ export const eventsRouter = {
 				err,
 				{
 					requestId: ctx.requestId,
-					userId: ctx.session.session.userId,
-					sessionId: ctx.session.session.id,
+					userId: ctx.session?.session.userId,
+					sessionId: ctx.session?.session.id,
 					metadata: {
 						organizationId,
 						filter: input.filter,
@@ -700,7 +700,7 @@ export const eventsRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { db, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
 				const { eq, and, gte, lte, count } = await import('drizzle-orm')
@@ -772,8 +772,8 @@ export const eventsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							dateRange: input.dateRange,
@@ -810,9 +810,9 @@ export const eventsRouter = {
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { compliance, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
-			const requestedBy = ctx.session.session.userId
+			const { logger, error } = ctx.services
+			const organizationId = ctx.session?.session.activeOrganizationId as string
+			const requestedBy = ctx.session?.session.userId
 
 			try {
 				// Create GDPR export request
@@ -875,8 +875,8 @@ export const eventsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							principalId: input.principalId,
@@ -907,8 +907,36 @@ export const eventsRouter = {
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
-			const requestedBy = ctx.session.session.userId
+			const organizationId = ctx.session?.session.activeOrganizationId as string
+			const requestedBy = ctx.session?.session.userId
+
+			if (!requestedBy) {
+				const err = new TRPCError({
+					code: 'UNAUTHORIZED',
+					message: 'User not authenticated',
+				})
+
+				await error.handleError(
+					err,
+					{
+						requestId: ctx.requestId,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
+						metadata: {
+							organizationId,
+							principalId: input.principalId,
+							strategy: input.strategy,
+							message: err.message,
+							name: err.name,
+							code: err.code,
+						},
+					},
+					'trpc-api',
+					'events.gdprPseudonymize'
+				)
+
+				throw err
+			}
 
 			try {
 				// Use the GDPR compliance service from the audit package
@@ -950,8 +978,8 @@ export const eventsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							principalId: input.principalId,
@@ -1042,7 +1070,7 @@ export const eventsRouter = {
 		)
 		.query(async ({ ctx, input }) => {
 			const { db, logger, error } = ctx.services
-			const organizationId = ctx.session.session.activeOrganizationId as string
+			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
 				const { eq, and, or, gte, lte, inArray, isNotNull, isNull, like, count, sql } =
@@ -1212,8 +1240,8 @@ export const eventsRouter = {
 					err,
 					{
 						requestId: ctx.requestId,
-						userId: ctx.session.session.userId,
-						sessionId: ctx.session.session.id,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
 						metadata: {
 							organizationId,
 							query: input.query,

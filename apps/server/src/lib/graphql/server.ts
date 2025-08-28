@@ -109,7 +109,9 @@ export const createGraphQLServer = () => {
 			// WebSocket configuration
 			ws: {
 				// Connection initialization
-				onConnect: async (ctx) => {
+				onConnect: async (ctx: {
+					connectionParams: { [x: string]: any; authorization: any; Authorization: any }
+				}) => {
 					// Validate authentication for WebSocket connections
 					const token = ctx.connectionParams?.authorization || ctx.connectionParams?.Authorization
 					const apiKey = ctx.connectionParams?.['x-api-key'] || ctx.connectionParams?.['X-API-Key']
@@ -130,7 +132,7 @@ export const createGraphQLServer = () => {
 				},
 
 				// Connection cleanup
-				onDisconnect: (ctx) => {
+				onDisconnect: (_ctx: any) => {
 					console.log('GraphQL WebSocket disconnected')
 				},
 			},

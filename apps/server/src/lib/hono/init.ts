@@ -13,6 +13,7 @@ import {
 	DEFAULT_DASHBOARD_CONFIG,
 	DEFAULT_OBSERVABILITY_CONFIG,
 	ErrorHandler,
+	GDPRComplianceService,
 	HealthCheckService,
 	MonitoringService,
 	RedisEnhancedMetricsCollector,
@@ -86,6 +87,7 @@ let reportingService: ComplianceReportingService | undefined = undefined
 let dataExportService: DataExportService | undefined = undefined
 let scheduledReportingService: ScheduledReportingService | undefined = undefined
 let presetDatabaseHandler: DatabasePresetHandler | undefined = undefined
+let gdprComplianceService: GDPRComplianceService | undefined = undefined
 
 /**
  * Create delivery configuration from server config
@@ -295,12 +297,14 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			)
 		}
 		if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(db.audit)
+		if (!gdprComplianceService) gdprComplianceService = new GDPRComplianceService(client)
 
 		const compliance = {
 			report: reportingService,
 			export: dataExportService,
 			scheduled: scheduledReportingService,
 			preset: presetDatabaseHandler,
+			gdpr: gdprComplianceService,
 		}
 
 		/**const kms = new InfisicalKmsClient({

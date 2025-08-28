@@ -23,6 +23,7 @@ export interface LogContext {
 	correlationId?: string
 	traceId?: string
 	spanId?: string
+	service?: string
 }
 
 export interface LogEntry {
