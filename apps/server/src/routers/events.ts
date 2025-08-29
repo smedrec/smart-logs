@@ -1,3 +1,4 @@
+import { join } from 'path'
 import {
 	adminProcedure,
 	auditDeleteProcedure,
@@ -9,9 +10,42 @@ import {
 	publicProcedure,
 } from '@/lib/trpc'
 import { TRPCError } from '@trpc/server'
+import {
+	and,
+	asc,
+	count,
+	desc,
+	eq,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	like,
+	lte,
+	or,
+	sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
 
+import { auditLog } from '@repo/audit-db'
+
 import type { TRPCRouterRecord } from '@trpc/server'
+
+// Helper function to get sort field safely
+function getSortField(auditLog: any, field: string) {
+	switch (field) {
+		case 'timestamp':
+			return auditLog.timestamp
+		case 'status':
+			return auditLog.status
+		case 'action':
+			return auditLog.action
+		case 'principalId':
+			return auditLog.principalId
+		default:
+			return auditLog.timestamp
+	}
+}
 
 // Zod schemas for comprehensive input validation (Requirements 1.2, 1.3)
 const SessionContextSchema = z.object({
@@ -247,7 +281,7 @@ export const eventsRouter = {
 	 * Requirement 1.3: Complete TypeScript type definitions
 	 */
 	query: auditReadProcedure.input(QueryAuditEventsSchema).query(async ({ ctx, input }) => {
-		const { db, logger, error } = ctx.services
+		const { client, logger, error } = ctx.services
 		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
@@ -305,24 +339,32 @@ export const eventsRouter = {
 
 			const whereClause = and(...conditions)
 
+			const cacheKey = client.generateCacheKey('audit_events_query', filter)
 			// Execute query with proper error handling
-			const events = await db.audit
-				.select()
-				.from(auditLog)
-				.where(whereClause)
-				.limit(input.pagination.limit)
-				.offset(input.pagination.offset)
-				.orderBy(
-					input.sort?.direction === 'asc'
-						? asc(auditLog[input.sort.field])
-						: desc(auditLog[input.sort?.field || 'timestamp'])
-				)
+			const events = await client.executeMonitoredQuery(
+				(db) =>
+					db
+						.select()
+						.from(auditLog)
+						.where(whereClause)
+						.limit(input.pagination.limit)
+						.offset(input.pagination.offset)
+						.orderBy(
+							input.sort?.direction === 'asc'
+								? asc(getSortField(auditLog, input.sort.field))
+								: desc(getSortField(auditLog, input.sort?.field || 'timestamp'))
+						),
+				'audit_events_query',
+				{ cacheKey }
+			)
 
+			const cacheKeyCount = client.generateCacheKey('audit_events_query_count', filter)
 			// Get total count for pagination
-			const totalResult = await db.audit
-				.select({ count: count() })
-				.from(auditLog)
-				.where(whereClause)
+			const totalResult = await client.executeMonitoredQuery(
+				(db) => db.select({ count: count() }).from(auditLog).where(whereClause),
+				'audit_events_query_count',
+				{ cacheKey: cacheKeyCount }
+			)
 
 			const total = totalResult[0]?.count || 0
 
@@ -383,20 +425,24 @@ export const eventsRouter = {
 	getById: auditReadProcedure
 		.input(z.object({ id: z.string().min(1, 'Event ID is required') }))
 		.query(async ({ ctx, input }) => {
-			const { db, logger, error } = ctx.services
+			const { client, logger, error } = ctx.services
 			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
-				const { eq, and } = await import('drizzle-orm')
-				const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
-
-				const event = await db.audit
-					.select()
-					.from(auditLog)
-					.where(
-						and(eq(auditLog.id, parseInt(input.id)), eq(auditLog.organizationId, organizationId))
-					)
-					.limit(1)
+				const event = await client.executeOptimizedQuery(
+					(db) =>
+						db
+							.select()
+							.from(auditLog)
+							.where(
+								and(
+									eq(auditLog.id, parseInt(input.id)),
+									eq(auditLog.organizationId, organizationId)
+								)
+							)
+							.limit(1),
+					{ cacheKey: `audit_event_${input.id}` }
+				)
 
 				if (!event.length) {
 					throw new TRPCError({
@@ -453,7 +499,7 @@ export const eventsRouter = {
 	 * Requirement 1.5: Structured error responses
 	 */
 	verify: auditVerifyProcedure.input(VerifyAuditEventSchema).mutation(async ({ ctx, input }) => {
-		const { audit, db, logger, error } = ctx.services
+		const { client, audit, db, logger, error } = ctx.services
 		const organizationId = ctx.session?.session.activeOrganizationId as string
 
 		try {
@@ -461,13 +507,17 @@ export const eventsRouter = {
 			const { auditLog, auditIntegrityLog } = await import('@repo/audit-db/dist/db/schema.js')
 
 			// First, get the event to verify organization access
-			const event = await db.audit
-				.select()
-				.from(auditLog)
-				.where(
-					and(eq(auditLog.id, parseInt(input.id)), eq(auditLog.organizationId, organizationId))
-				)
-				.limit(1)
+			const event = await client.executeOptimizedQuery(
+				(db) =>
+					db
+						.select()
+						.from(auditLog)
+						.where(
+							and(eq(auditLog.id, parseInt(input.id)), eq(auditLog.organizationId, organizationId))
+						)
+						.limit(1),
+				{ cacheKey: `audit_event_${input.id}` }
+			)
 
 			if (!event.length) {
 				throw new TRPCError({
@@ -606,12 +656,16 @@ export const eventsRouter = {
 
 			const whereClause = and(...conditions)
 
+			const cacheKey = ctx.services.client.generateCacheKey('audit_events_export', {
+				organizationId,
+				...input,
+			})
 			// Query events from database
-			const dbEvents = await ctx.services.db.audit
-				.select()
-				.from(auditLog)
-				.where(whereClause)
-				.limit(10000) // Reasonable limit for export
+			const dbEvents = await ctx.services.client.executeMonitoredQuery(
+				(db) => db.select().from(auditLog).where(whereClause).limit(10000), // Reasonable limit for export
+				'audit_events_export',
+				{ cacheKey }
+			)
 
 			// Convert database events to ComplianceReportEvent format
 			const events = dbEvents.map((event) => ({
@@ -703,9 +757,6 @@ export const eventsRouter = {
 			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
-				const { eq, and, gte, lte, count } = await import('drizzle-orm')
-				const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
-
 				// Build base conditions
 				const baseConditions = [eq(auditLog.organizationId, organizationId)]
 
@@ -810,7 +861,7 @@ export const eventsRouter = {
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { logger, error } = ctx.services
+			const { compliance, logger, error } = ctx.services
 			const organizationId = ctx.session?.session.activeOrganizationId as string
 			const requestedBy = ctx.session?.session.userId
 
@@ -831,17 +882,7 @@ export const eventsRouter = {
 					requestTimestamp: new Date().toISOString(),
 				}
 
-				// Use the GDPR compliance service from the audit package
-				const { GDPRComplianceService } = await import('@repo/audit')
-				const { auditLog, auditRetentionPolicy } = await import('@repo/audit-db/dist/db/schema.js')
-
-				const gdprService = new GDPRComplianceService(
-					ctx.services.db.audit,
-					auditLog,
-					auditRetentionPolicy
-				)
-
-				const exportResult = await gdprService.exportUserData(exportRequest)
+				const exportResult = await compliance.gdpr.exportUserData(exportRequest)
 
 				logger.info('GDPR data export completed', {
 					organizationId,
@@ -906,7 +947,7 @@ export const eventsRouter = {
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { logger, error } = ctx.services
+			const { compliance, logger, error } = ctx.services
 			const organizationId = ctx.session?.session.activeOrganizationId as string
 			const requestedBy = ctx.session?.session.userId
 
@@ -939,17 +980,7 @@ export const eventsRouter = {
 			}
 
 			try {
-				// Use the GDPR compliance service from the audit package
-				const { GDPRComplianceService } = await import('@repo/audit')
-				const { auditLog, auditRetentionPolicy } = await import('@repo/audit-db/dist/db/schema.js')
-
-				const gdprService = new GDPRComplianceService(
-					ctx.services.db.audit,
-					auditLog,
-					auditRetentionPolicy
-				)
-
-				const result = await gdprService.pseudonymizeUserData(
+				const result = await compliance.gdpr.pseudonymizeUserData(
 					input.principalId,
 					input.strategy,
 					requestedBy
@@ -1069,14 +1100,10 @@ export const eventsRouter = {
 			})
 		)
 		.query(async ({ ctx, input }) => {
-			const { db, logger, error } = ctx.services
+			const { client, db, logger, error } = ctx.services
 			const organizationId = ctx.session?.session.activeOrganizationId as string
 
 			try {
-				const { eq, and, or, gte, lte, inArray, isNotNull, isNull, like, count, sql } =
-					await import('drizzle-orm')
-				const { auditLog } = await import('@repo/audit-db/dist/db/schema.js')
-
 				// Build base conditions with organization isolation
 				const conditions = [eq(auditLog.organizationId, organizationId)]
 
@@ -1086,9 +1113,9 @@ export const eventsRouter = {
 					conditions.push(
 						or(
 							like(auditLog.action, searchText),
-							like(auditLog.outcomeDescription, searchText),
-							like(auditLog.targetResourceType, searchText),
-							like(auditLog.targetResourceId, searchText)
+							sql`${auditLog.outcomeDescription} IS NOT NULL AND ${auditLog.outcomeDescription} LIKE ${searchText}`,
+							sql`${auditLog.targetResourceType} IS NOT NULL AND ${auditLog.targetResourceType} LIKE ${searchText}`,
+							sql`${auditLog.targetResourceId} IS NOT NULL AND ${auditLog.targetResourceId} LIKE ${searchText}`
 						)
 					)
 				}
@@ -1096,7 +1123,17 @@ export const eventsRouter = {
 				// Date range filters
 				if (input.query.dateRanges) {
 					for (const dateRange of input.query.dateRanges) {
-						const field = auditLog[dateRange.field as keyof typeof auditLog]
+						let field
+						switch (dateRange.field) {
+							case 'timestamp':
+								field = auditLog.timestamp
+								break
+							case 'archivedAt':
+								field = auditLog.archivedAt
+								break
+							default:
+								continue
+						}
 						if (field) {
 							conditions.push(gte(field, dateRange.startDate))
 							conditions.push(lte(field, dateRange.endDate))
@@ -1169,42 +1206,78 @@ export const eventsRouter = {
 				}
 
 				const whereClause = and(...conditions)
-
-				// Execute main query
-				let query = db.audit.select().from(auditLog).where(whereClause)
-
+				let orderBy: any
 				// Apply sorting
 				if (input.sort?.length) {
-					const orderBy = input.sort.map((sort) => {
-						const field = auditLog[sort.field as keyof typeof auditLog]
-						return sort.direction === 'asc' ? field : sql`${field} DESC`
+					orderBy = input.sort.map((sort) => {
+						let field
+						switch (sort.field) {
+							case 'timestamp':
+								field = auditLog.timestamp
+								break
+							case 'status':
+								field = auditLog.status
+								break
+							case 'action':
+								field = auditLog.action
+								break
+							case 'principalId':
+								field = auditLog.principalId
+								break
+							default:
+								field = auditLog.timestamp // fallback
+						}
+						return sort.direction === 'asc' ? asc(field) : desc(field)
 					})
-					query = query.orderBy(...orderBy)
-				} else {
-					query = query.orderBy(sql`${auditLog.timestamp} DESC`)
 				}
 
-				// Apply pagination
-				const events = await query.limit(input.pagination.limit).offset(input.pagination.offset)
+				const cacheKey = client.generateCacheKey('events_advancedSearch', {
+					organizationId,
+					...input,
+				})
+				// Execute main query
+				let events = await client.executeMonitoredQuery(
+					(db) => {
+						let query = db
+							.select()
+							.from(auditLog)
+							.where(whereClause)
+							.limit(input.pagination.limit)
+							.offset(input.pagination.offset)
 
+						if (input.sort?.length && orderBy) {
+							return query.orderBy(...orderBy)
+						} else {
+							return query.orderBy(desc(auditLog.timestamp))
+						}
+					},
+					'events_advancedSearch',
+					{ cacheKey }
+				)
+
+				const cacheKeyCount = client.generateCacheKey('audit_events_advancedSearch_count', {
+					organizationId,
+					...input,
+				})
 				// Get total count
-				const totalResult = await db.audit
-					.select({ count: count() })
-					.from(auditLog)
-					.where(whereClause)
+				const totalResult = await client.executeMonitoredQuery(
+					(db) => db.select({ count: count() }).from(auditLog).where(whereClause),
+					'audit_events_advancedSearch_count',
+					{ cacheKey: cacheKeyCount }
+				)
 
 				const total = totalResult[0]?.count || 0
 
-				// Execute aggregations if requested
+				// TODO: Execute aggregations if requested
 				let aggregationResults = null
-				if (input.query.aggregations?.length) {
+				/**if (input.query.aggregations?.length) {
 					aggregationResults = {}
 					for (const agg of input.query.aggregations) {
 						// This would need proper implementation based on the aggregation type
 						// For now, return placeholder
 						aggregationResults[`${agg.type}_${agg.field}`] = 0
 					}
-				}
+				}*/
 
 				logger.info('Advanced audit search completed', {
 					organizationId,

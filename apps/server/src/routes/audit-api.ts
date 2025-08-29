@@ -351,7 +351,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			// Log the event (this will queue it for processing)
 			await audit.log(auditEvent)
 
-			// For the REST API response, we need to return the event with an ID
+			// TODO: For the REST API response, we need to return the event with an ID
 			// In a real implementation, this would come from the database after processing
 			const event = {
 				id: crypto.randomUUID(),
@@ -432,7 +432,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const whereClause = and(...conditions)
-			const cacheKey = client.generateCacheKey('audit_events', query)
+			const cacheKey = client.generateCacheKey('audit_events_query', query)
 
 			const events = await client.executeMonitoredQuery(
 				(audit) =>
@@ -447,7 +447,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 								? asc(auditLog[query.sortField || 'timestamp'])
 								: desc(auditLog[query.sortField || 'timestamp'])
 						),
-				'audit_events',
+				'audit_events_query',
 				{ cacheKey }
 			)
 
@@ -455,7 +455,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			// Get total count for pagination
 			const totalResult = await client.executeMonitoredQuery(
 				(audit) => audit.select({ count: count() }).from(auditLog).where(whereClause),
-				'audit_events_count',
+				'audit_events_query_count',
 				{ cacheKey: cacheKeyCount }
 			)
 
@@ -759,7 +759,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 	})
 
 	app.openapi(gdprExportRoute, async (c) => {
-		const { db, audit, authorization, logger } = c.get('services')
+		const { compliance, audit, authorization, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
@@ -797,14 +797,9 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				requestTimestamp: new Date().toISOString(),
 			}
 
-			// Use the GDPR compliance service from the audit package
-			const { GDPRComplianceService } = await import('@repo/audit')
-			const { auditLog, auditRetentionPolicy } = await import('@repo/audit-db/dist/db/schema.js')
+			const exportResult = await compliance.gdpr.exportUserData(exportRequest)
 
-			const gdprService = new GDPRComplianceService(db.audit, auditLog, auditRetentionPolicy)
-
-			const exportResult = await gdprService.exportUserData(exportRequest)
-
+			// FIXME: the log data is already done on gdpr service but needs improvements
 			audit.logData({
 				principalId: session.session.userId,
 				organizationId: session.session.activeOrganizationId as string,
@@ -906,7 +901,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 	})
 
 	app.openapi(gdprPseudonymizeRoute, async (c) => {
-		const { db, audit, authorization, logger } = c.get('services')
+		const { compliance, audit, authorization, logger } = c.get('services')
 		const session = c.get('session')
 
 		if (!session) {
@@ -928,18 +923,13 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			const requestData = c.req.valid('json')
 			const requestedBy = session.session.userId
 
-			// Use the GDPR compliance service from the audit package
-			const { GDPRComplianceService } = await import('@repo/audit')
-			const { auditLog, auditRetentionPolicy } = await import('@repo/audit-db/dist/db/schema.js')
-
-			const gdprService = new GDPRComplianceService(db.audit, auditLog, auditRetentionPolicy)
-
-			const result = await gdprService.pseudonymizeUserData(
+			const result = await compliance.gdpr.pseudonymizeUserData(
 				requestData.principalId,
 				requestData.strategy,
 				requestedBy
 			)
 
+			// FIXME: the log data is already done on gdpr service but needs improvements
 			audit.logData({
 				principalId: requestedBy,
 				organizationId: session.session.activeOrganizationId as string,
