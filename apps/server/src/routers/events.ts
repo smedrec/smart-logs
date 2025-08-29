@@ -1112,10 +1112,12 @@ export const eventsRouter = {
 					const searchText = `%${input.query.searchText}%`
 					conditions.push(
 						or(
-							like(auditLog.action, searchText),
-							sql`${auditLog.outcomeDescription} IS NOT NULL AND ${auditLog.outcomeDescription} LIKE ${searchText}`,
-							sql`${auditLog.targetResourceType} IS NOT NULL AND ${auditLog.targetResourceType} LIKE ${searchText}`,
-							sql`${auditLog.targetResourceId} IS NOT NULL AND ${auditLog.targetResourceId} LIKE ${searchText}`
+							...[
+								like(auditLog.action, searchText),
+								sql`${auditLog.outcomeDescription} IS NOT NULL AND ${auditLog.outcomeDescription} LIKE ${searchText}`,
+								sql`${auditLog.targetResourceType} IS NOT NULL AND ${auditLog.targetResourceType} LIKE ${searchText}`,
+								sql`${auditLog.targetResourceId} IS NOT NULL AND ${auditLog.targetResourceId} LIKE ${searchText}`,
+							].filter((expr) => expr !== undefined)
 						)
 					)
 				}

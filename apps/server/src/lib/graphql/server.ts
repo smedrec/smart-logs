@@ -86,9 +86,9 @@ export const createGraphQLServer = () => {
 		maskedErrors:
 			process.env.NODE_ENV === 'production'
 				? {
-						maskError(error, message, isDev) {
+						maskError(error, message, isDev): Error {
 							// In production, mask internal errors but keep GraphQL errors
-							if (error.extensions?.code) {
+							if (error instanceof Error) {
 								return error
 							}
 
@@ -101,59 +101,9 @@ export const createGraphQLServer = () => {
 					}
 				: false,
 
-		// Subscription configuration for real-time features
-		subscriptions: {
-			// Enable subscriptions
-			enabled: true,
-
-			// WebSocket configuration
-			ws: {
-				// Connection initialization
-				onConnect: async (ctx: {
-					connectionParams: { [x: string]: any; authorization: any; Authorization: any }
-				}) => {
-					// Validate authentication for WebSocket connections
-					const token = ctx.connectionParams?.authorization || ctx.connectionParams?.Authorization
-					const apiKey = ctx.connectionParams?.['x-api-key'] || ctx.connectionParams?.['X-API-Key']
-
-					// Try to authenticate with session token or API key
-					if (!token && !apiKey) {
-						throw new Error('Authentication required for subscriptions')
-					}
-
-					// TODO: Implement proper token/API key validation
-					// This would involve validating the token against Better Auth
-					// and creating a proper session context
-					// For now, we'll return a basic context
-					return {
-						authenticated: true,
-						token,
-					}
-				},
-
-				// Connection cleanup
-				onDisconnect: (_ctx: any) => {
-					console.log('GraphQL WebSocket disconnected')
-				},
-			},
-		},
-
 		// Plugin configuration
 		plugins: [
 			// Add custom plugins here if needed
-		],
-
-		// Batch requests configuration
-		batching: {
-			limit: 10, // Maximum number of operations in a batch
-		},
-
-		// Introspection (disable in production for security)
-		introspection: process.env.NODE_ENV !== 'production',
-
-		// Query depth limiting for security
-		validationRules: [
-			// Add custom validation rules here if needed
 		],
 	})
 }
@@ -172,7 +122,7 @@ export const handleGraphQLRequest = async (c: Context) => {
 	;(request as any).context = c
 
 	// Handle the GraphQL request
-	return graphqlServer.handle(request, {
-		context: c,
+	return graphqlServer.handle({
+		request,
 	})
 }

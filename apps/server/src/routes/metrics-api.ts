@@ -11,6 +11,7 @@
  */
 
 import { ApiError } from '@/lib/errors'
+import { openApiErrorResponses } from '@/lib/errors/openapi_responses'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 import type { HonoEnv } from '@/lib/hono/context'
@@ -155,22 +156,7 @@ const getSystemMetricsRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -193,30 +179,7 @@ const getAuditMetricsRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid query parameters',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -273,30 +236,7 @@ const getAlertsRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid query parameters',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -320,30 +260,7 @@ const acknowledgeAlertRoute = createRoute({
 				},
 			},
 		},
-		404: {
-			description: 'Alert not found',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -376,30 +293,7 @@ const resolveAlertRoute = createRoute({
 				},
 			},
 		},
-		404: {
-			description: 'Alert not found',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 

@@ -10,6 +10,7 @@
  */
 
 import { ApiError } from '@/lib/errors'
+import { openApiErrorResponses } from '@/lib/errors/openapi_responses'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 import type { HonoEnv } from '@/lib/hono/context'
@@ -149,15 +150,6 @@ const DashboardDataSchema = z.object({
 	timestamp: z.string(),
 })
 
-const ErrorResponseSchema = z.object({
-	code: z.string(),
-	message: z.string(),
-	details: z.record(z.string(), z.any()).optional(),
-	timestamp: z.string().datetime(),
-	requestId: z.string(),
-	path: z.string().optional(),
-})
-
 // Route definitions
 const getDashboardDataRoute = createRoute({
 	method: 'get',
@@ -175,22 +167,7 @@ const getDashboardDataRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -215,22 +192,7 @@ const getEnhancedMetricsRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -250,22 +212,7 @@ const getBottleneckAnalysisRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -290,22 +237,7 @@ const getTracesRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -325,22 +257,7 @@ const getProfilingRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 

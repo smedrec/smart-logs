@@ -11,6 +11,7 @@
  */
 
 import { ApiError } from '@/lib/errors'
+import { openApiErrorResponses } from '@/lib/errors/openapi_responses'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm'
 
@@ -117,15 +118,6 @@ const IntegrityVerificationSchema = z.object({
 		.optional(),
 })
 
-const ErrorResponseSchema = z.object({
-	code: z.string(),
-	message: z.string(),
-	details: z.record(z.string(), z.any()).optional(),
-	timestamp: z.string().datetime(),
-	requestId: z.string(),
-	path: z.string().optional(),
-})
-
 // Route definitions
 const createAuditEventRoute = createRoute({
 	method: 'post',
@@ -152,30 +144,7 @@ const createAuditEventRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid request data',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -197,30 +166,7 @@ const queryAuditEventsRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid query parameters',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -244,30 +190,7 @@ const getAuditEventRoute = createRoute({
 				},
 			},
 		},
-		404: {
-			description: 'Audit event not found',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -291,30 +214,7 @@ const verifyAuditEventRoute = createRoute({
 				},
 			},
 		},
-		404: {
-			description: 'Audit event not found',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -432,7 +332,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const whereClause = and(...conditions)
-			const cacheKey = client.generateCacheKey('audit_events_query', query)
+			const cacheKey = client.generateCacheKey('audit_events_query', { organizationId, ...query })
 
 			const events = await client.executeMonitoredQuery(
 				(audit) =>
@@ -451,7 +351,10 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				{ cacheKey }
 			)
 
-			const cacheKeyCount = client.generateCacheKey('audit_events_count', query)
+			const cacheKeyCount = client.generateCacheKey('audit_events_count', {
+				organizationId,
+				...query,
+			})
 			// Get total count for pagination
 			const totalResult = await client.executeMonitoredQuery(
 				(audit) => audit.select({ count: count() }).from(auditLog).where(whereClause),
@@ -731,30 +634,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					},
 				},
 			},
-			400: {
-				description: 'Invalid request data',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			401: {
-				description: 'Unauthorized',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			500: {
-				description: 'Internal server error',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
+			...openApiErrorResponses,
 		},
 	})
 
@@ -873,30 +753,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					},
 				},
 			},
-			400: {
-				description: 'Invalid request data',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			401: {
-				description: 'Unauthorized',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			500: {
-				description: 'Internal server error',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
+			...openApiErrorResponses,
 		},
 	})
 
@@ -994,30 +851,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					},
 				},
 			},
-			400: {
-				description: 'Invalid request data',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			401: {
-				description: 'Unauthorized',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			500: {
-				description: 'Internal server error',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
+			...openApiErrorResponses,
 		},
 	})
 
@@ -1060,13 +894,17 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 						return { success: true, eventData }
 					} catch (e) {
 						logger.warn(`Failed to create individual audit event: ${e}`)
-						return { error: e instanceof Error ? e.message : 'Unknown error', eventData }
+						return {
+							success: false,
+							eventData,
+							error: e instanceof Error ? e.message : 'Unknown error',
+						}
 					}
 				})
 			)
 
-			const successful = results.filter((r: any) => !('error' in r))
-			const failed = results.filter((r: any) => 'error' in r)
+			const successful = results.filter((r: any) => r.success)
+			const failed = results.filter((r: any) => !r.success)
 
 			logger.info('Bulk audit events processed via REST API', {
 				organizationId,
@@ -1077,8 +915,8 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 			return c.json(
 				{
-					successful,
-					failed,
+					successful: successful.map(({ success, eventData }) => ({ success, eventData })),
+					failed: failed.map(({ error, eventData }) => ({ error, eventData })),
 					summary: {
 						total: requestData.events.length,
 						successful: successful.length,

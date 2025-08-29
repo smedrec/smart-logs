@@ -11,6 +11,7 @@
  */
 
 import { ApiError } from '@/lib/errors'
+import { openApiErrorResponses } from '@/lib/errors/openapi_responses'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 import { DEFAULT_VALIDATION_CONFIG } from '@repo/audit'
@@ -138,6 +139,38 @@ const AuditPresetResponseSchema = AuditPresetSchema.extend({
 	id: z.string().optional(),
 	createdBy: z.string(),
 	createdAt: z.string(),
+})
+
+const IntegrityReportSchema = z.object({
+	verificationId: z.string(),
+	verifiedAt: z.string(),
+	verifiedBy: z.string().optional(),
+	results: z.object({
+		totalEvents: z.number(),
+		verifiedEvents: z.number(),
+		failedVerifications: z.number(),
+		unverifiedEvents: z.number(),
+		verificationRate: z.number(),
+	}),
+	failures: z.array(
+		z.object({
+			eventId: z.number(),
+			timestamp: z.string(),
+			expectedHash: z.string(),
+			actualHash: z.string(),
+			hashAlgorithm: z.string(),
+			failureReason: z.string(),
+			severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+		})
+	),
+	statistics: z.object({
+		hashAlgorithms: z.record(z.string(), z.number()),
+		verificationLatency: z.object({
+			average: z.number(),
+			median: z.number(),
+			p95: z.number(),
+		}),
+	}),
 })
 
 const ComplianceReportSchema = z.object({
@@ -276,47 +309,6 @@ const GDPRComplianceReportSchema = ComplianceReportSchema.extend({
 	}),
 })
 
-const IntegrityReportSchema = z.object({
-	verificationId: z.string(),
-	verifiedAt: z.string(),
-	verifiedBy: z.string().optional(),
-	results: z.object({
-		totalEvents: z.number(),
-		verifiedEvents: z.number(),
-		failedVerifications: z.number(),
-		unverifiedEvents: z.number(),
-		verificationRate: z.number(),
-	}),
-	failures: z.array(
-		z.object({
-			eventId: z.number(),
-			timestamp: z.string(),
-			expectedHash: z.string(),
-			actualHash: z.string(),
-			hashAlgorithm: z.string(),
-			failureReason: z.string(),
-			severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
-		})
-	),
-	statistics: z.object({
-		hashAlgorithms: z.record(z.string(), z.number()),
-		verificationLatency: z.object({
-			average: z.number(),
-			median: z.number(),
-			p95: z.number(),
-		}),
-	}),
-})
-
-const ErrorResponseSchema = z.object({
-	code: z.string(),
-	message: z.string(),
-	details: z.record(z.string(), z.any()).optional(),
-	timestamp: z.string().datetime(),
-	requestId: z.string(),
-	path: z.string().optional(),
-})
-
 // Route definitions
 const generateHIPAAReportRoute = createRoute({
 	method: 'post',
@@ -344,30 +336,7 @@ const generateHIPAAReportRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid request data',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -400,30 +369,7 @@ const generateGDPRReportRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid request data',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -457,30 +403,7 @@ const generateIntegrityReportRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid request data',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -518,30 +441,7 @@ const exportReportRoute = createRoute({
 				'X-Checksum': z.string(),
 			}),
 		},
-		400: {
-			description: 'Invalid request data',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -572,30 +472,7 @@ const createScheduledReportRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid request data',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -617,22 +494,7 @@ const getScheduledReportsRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -663,30 +525,7 @@ const getScheduledReportRoute = createRoute({
 				},
 			},
 		},
-		404: {
-			description: 'Scheduled report not found',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -708,22 +547,7 @@ const getAuditPresetsRoute = createRoute({
 				},
 			},
 		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
@@ -756,30 +580,7 @@ const createAuditPresetRoute = createRoute({
 				},
 			},
 		},
-		400: {
-			description: 'Invalid request data',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		401: {
-			description: 'Unauthorized',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
-		500: {
-			description: 'Internal server error',
-			content: {
-				'application/json': {
-					schema: ErrorResponseSchema,
-				},
-			},
-		},
+		...openApiErrorResponses,
 	},
 })
 
