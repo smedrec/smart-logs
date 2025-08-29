@@ -5,13 +5,13 @@ import { trpcServer } from '@hono/trpc-server'
 import { cors } from 'hono/cors'
 
 import { ConfigurationManager } from '@repo/audit'
-import { useConsoleLogger } from '@repo/hono-helpers'
 
 import { getAuthInstance } from './lib/auth.js'
 import { handleGraphQLRequest } from './lib/graphql/index.js'
 import { newApp } from './lib/hono/index.js'
 import { init } from './lib/hono/init.js'
 import { nodeEnv } from './lib/hono/node-env.js'
+import { createComprehensiveErrorHandling } from './lib/middleware/error-handling.js'
 import {
 	errorRateMonitoring,
 	performanceMonitoring,
@@ -56,6 +56,14 @@ async function startServer() {
 
 	app.use('*', init(config))
 	//app.use(useConsoleLogger())
+
+	// Add comprehensive error handling middleware
+	const errorHandlingMiddleware = createComprehensiveErrorHandling({
+		enableRecovery: true,
+		enableRateLimit: true,
+		timeoutMs: config.server.timeout || 30000,
+	})
+	errorHandlingMiddleware.forEach((middleware) => app.use('*', middleware))
 
 	// Add monitoring middleware
 	app.use('*', requestMetrics())
@@ -132,11 +140,27 @@ async function startServer() {
 		if (isShuttingDown) {
 			return c.json({ status: 'shutting_down' }, 503)
 		}
+
+		const services = c.get('services')
+		const resilienceHealth = services?.resilience?.getAllServiceHealth() || []
+		const hasUnhealthyServices = resilienceHealth.some((h) => h.status === 'unhealthy')
+
 		return c.json({
-			status: 'healthy',
+			status: hasUnhealthyServices ? 'degraded' : 'healthy',
 			timestamp: new Date().toISOString(),
 			environment: config.server.environment,
 			version: c.get('version'),
+			services: resilienceHealth.reduce(
+				(acc, health) => {
+					acc[health.name] = {
+						status: health.status,
+						circuitBreakerState: health.circuitBreakerState,
+						errorRate: health.errorRate,
+					}
+					return acc
+				},
+				{} as Record<string, any>
+			),
 		})
 	})
 
@@ -159,6 +183,53 @@ async function startServer() {
 			session: c.get('session'),
 		})
 	})
+
+	// Resilience metrics endpoint (development and staging only)
+	if (configManager.isDevelopment() || config.server.environment === 'staging') {
+		app.get('/resilience', (c) => {
+			const services = c.get('services')
+			if (!services?.resilience) {
+				return c.json({ error: 'Resilience service not available' }, 503)
+			}
+
+			return c.json({
+				serviceHealth: services.resilience.getAllServiceHealth(),
+				circuitBreakerMetrics: services.resilience.getCircuitBreakerMetrics(),
+				timestamp: new Date().toISOString(),
+			})
+		})
+
+		app.post('/resilience/reset/:serviceName', (c) => {
+			const serviceName = c.req.param('serviceName')
+			const services = c.get('services')
+
+			if (!services?.resilience) {
+				return c.json({ error: 'Resilience service not available' }, 503)
+			}
+
+			const success = services.resilience.resetCircuitBreaker(serviceName)
+			return c.json({
+				success,
+				message: success
+					? `Circuit breaker reset for ${serviceName}`
+					: `Circuit breaker not found for ${serviceName}`,
+			})
+		})
+
+		app.post('/resilience/reset-all', (c) => {
+			const services = c.get('services')
+
+			if (!services?.resilience) {
+				return c.json({ error: 'Resilience service not available' }, 503)
+			}
+
+			services.resilience.resetAllCircuitBreakers()
+			return c.json({
+				success: true,
+				message: 'All circuit breakers reset',
+			})
+		})
+	}
 
 	// Start server with Hono's Node.js adapter
 	server = serve(

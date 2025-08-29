@@ -8,6 +8,7 @@ import { createYoga } from 'graphql-yoga'
 
 import { logger } from '@repo/hono-helpers/dist/helpers/logger'
 
+import { createGraphQLErrorFormatter } from '../middleware/error-handling'
 import { resolvers } from './resolvers/index'
 import { typeDefs } from './schema'
 
@@ -81,6 +82,9 @@ export const createGraphQLServer = () => {
 				logger.error(...args)
 			},
 		},
+
+		// Error formatting with unified handler
+		formatError: createGraphQLErrorFormatter(),
 
 		// Error masking for production
 		maskedErrors:

@@ -23,6 +23,8 @@ const ErrorCode = z.enum([
 	'METHOD_NOT_ALLOWED',
 	'EXPIRED',
 	'DELETE_PROTECTED',
+	'SERVICE_UNAVAILABLE',
+	'TIMEOUT',
 ])
 
 export function errorSchemaFactory(code: z.ZodEnum<any>) {
@@ -64,6 +66,8 @@ function codeToStatus(code: z.infer<typeof ErrorCode>): StatusCode {
 			return 404
 		case 'METHOD_NOT_ALLOWED':
 			return 405
+		case 'TIMEOUT':
+			return 408
 		case 'NOT_UNIQUE':
 			return 409
 		case 'DELETE_PROTECTED':
@@ -73,6 +77,8 @@ function codeToStatus(code: z.infer<typeof ErrorCode>): StatusCode {
 			return 429
 		case 'INTERNAL_SERVER_ERROR':
 			return 500
+		case 'SERVICE_UNAVAILABLE':
+			return 503
 	}
 }
 
@@ -90,8 +96,14 @@ function statusToCode(status: StatusCode): z.infer<typeof ErrorCode> {
 
 		case 405:
 			return 'METHOD_NOT_ALLOWED'
+		case 408:
+			return 'TIMEOUT'
+		case 409:
+			return 'NOT_UNIQUE'
 		case 500:
 			return 'INTERNAL_SERVER_ERROR'
+		case 503:
+			return 'SERVICE_UNAVAILABLE'
 		default:
 			return 'INTERNAL_SERVER_ERROR'
 	}

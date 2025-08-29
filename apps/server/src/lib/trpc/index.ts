@@ -6,11 +6,39 @@ import {
 	createTRPCPermissionMiddleware,
 	createTRPCRoleMiddleware,
 } from '../middleware/auth.js'
+import { createTRPCErrorHandler } from '../middleware/error-handling.js'
 
 import type { Context } from './context'
 
 export const t = initTRPC.context<Context>().create({
 	transformer: superjson,
+	errorFormatter: ({ error, ctx }) => {
+		const handler = createTRPCErrorHandler()
+		try {
+			handler({ error, ctx })
+		} catch (formattedError: any) {
+			return {
+				message: formattedError.message,
+				code: formattedError.code,
+				data: {
+					code: formattedError.code,
+					httpStatus: formattedError.code === 'INTERNAL_SERVER_ERROR' ? 500 : 400,
+					stack: process.env.NODE_ENV === 'development' ? formattedError.stack : undefined,
+				},
+			}
+		}
+
+		// Fallback formatting
+		return {
+			message: error.message,
+			code: error.code,
+			data: {
+				code: error.code,
+				httpStatus: error.code === 'INTERNAL_SERVER_ERROR' ? 500 : 400,
+				stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+			},
+		}
+	},
 })
 
 export const router = t.router

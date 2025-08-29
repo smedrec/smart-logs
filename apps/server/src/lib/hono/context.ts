@@ -25,6 +25,7 @@ import type { Redis } from '@repo/redis-client'
 import type { HealthStatus } from '../graphql/types.js'
 import type { StructuredLogger } from '../services/logging.js'
 import type { MetricsCollectionService } from '../services/metrics.js'
+import type { ResilienceService } from '../services/resilience.js'
 
 export type Env = SharedHonoEnv & {
 	// add additional Bindings here
@@ -65,8 +66,10 @@ export type ServiceContext = {
 		dashboard: AuditMonitoringDashboard
 	}
 	audit: Audit
-	logger: Logger
+	//logger: Logger
 	//structuredLogger: StructuredLogger
+	logger: StructuredLogger
+	resilience: ResilienceService
 	error: ErrorHandler
 }
 
@@ -83,6 +86,8 @@ export type Variables = SharedHonoVariables & {
 	}
 	healthStatus: HealthStatus
 	isShuttingDown?: boolean
+	requestStartTime: number
+	requestMetadata: any
 }
 
 export interface HonoEnv extends HonoApp {

@@ -215,6 +215,9 @@ export interface ServerConfig {
 	/** Server environment */
 	environment: Environment
 
+	/** Server Timeout */
+	timeout: number
+
 	cors: {
 		origin: string | string[]
 		credentials: boolean

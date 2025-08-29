@@ -79,6 +79,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			port: 3000,
 			host: '0.0.0.0',
 			environment: 'development',
+			timeout: 30000,
 			cors: {
 				origin: '*',
 				credentials: true,

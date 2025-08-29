@@ -75,6 +75,9 @@ let dashboard: AuditMonitoringDashboard | undefined = undefined
 let metricsCollectionService: MetricsCollectionService | undefined = undefined
 let structuredLogger: StructuredLogger | undefined = undefined
 
+// Resilience services
+let resilienceService: import('../services/resilience').ResilienceService | undefined = undefined
+
 // Authorization service
 let authorizationService: ReturnType<typeof createAuthorizationService> | undefined = undefined
 
@@ -164,31 +167,29 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		c.res.headers.set('x-version', version)
 
 		// Initialize enhanced structured logger
-		/**if (!structuredLogger) {
+		if (!structuredLogger) {
 			LoggerFactory.setDefaultConfig({
 				level: config.server.monitoring.logLevel,
 				enablePerformanceLogging: true,
 				enableErrorTracking: true,
 				enableMetrics: config.server.monitoring.enableMetrics,
-				format: config.server.server.environment === 'development' ? 'pretty' : 'json',
+				format: config.server.environment === 'development' ? 'pretty' : 'json',
 				outputs: ['console'],
 			})
 
 			structuredLogger = LoggerFactory.createLogger({
 				requestId,
-				application,
-				environment: config.server.server.environment,
-				version,
+				service: application,
 			})
-		}*/
+		}
 
-		const logger = new ConsoleLogger({
+		/**const logger = new ConsoleLogger({
 			requestId,
 			application,
 			environment: config.server.environment as 'VITEST' | 'development' | 'staging' | 'production',
 			version,
 			defaultFields: { environment: config.server.environment },
-		})
+		})*/
 
 		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
 
@@ -231,7 +232,17 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 
 		// Initialize enhanced monitoring services
 		if (!metricsCollectionService) {
-			metricsCollectionService = new MetricsCollectionService(connection, logger, monitoringService)
+			metricsCollectionService = new MetricsCollectionService(
+				connection,
+				structuredLogger,
+				monitoringService
+			)
+		}
+
+		// Initialize resilience service
+		if (!resilienceService) {
+			const { createResilienceService } = await import('../services/resilience.js')
+			resilienceService = createResilienceService(structuredLogger)
 		}
 
 		// Initialize authorization service
@@ -330,7 +341,8 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			monitor,
 			observability,
 			audit,
-			logger,
+			logger: structuredLogger,
+			resilience: resilienceService,
 			//structuredLogger,
 			error: errorHandler,
 			//cache,
