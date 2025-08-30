@@ -1,14 +1,14 @@
 # @smart-logs/audit-client
 
-A TypeScript client library for interacting with the App API. It provides methods for common API operations.
+A TypeScript client library for interacting with the Server API (apps/server). It provides methods for common API operations.
 
 ## Features
 
 - **Typed API Calls**: Leverages TypeScript for strong typing of requests and responses.
-- **Authentication Ready**: Designed to work with cookie-based authentication (`credentials: 'include'`).
+- **Authentication Ready**: Designed to work with cookie-based authentication (`credentials: 'include'`) and api key.
 - **Retry Mechanism**: Automatically retries failed requests with exponential backoff.
 - **Customizable**: Allows configuration of base URL, retry attempts, backoff timings, and custom headers.
-- **Standard Endpoints**: Includes methods for API health checks (`ok`), version retrieval (`version`), encryption (`encrypt`), and decryption (`decrypt`).
+- **Standard Endpoints**: Includes methods for API health checks (`ok`), version retrieval (`version`), etc.
 - **Modern Build**: Outputs CJS and ESM modules with included type definitions.
 
 ## Installation
@@ -51,7 +51,7 @@ A TypeScript client library for interacting with the App API. It provides method
     To install development dependencies for this specific package (if not handled by a monorepo root install):
     ```bash
     cd packages/audit-client # Or your path to this package
-    npm install
+    pnpm install
     ```
 
 ## Usage
@@ -61,7 +61,7 @@ First, import and instantiate the client:
 ```typescript
 import { AppClient } from '@smart-logs/audit-client'
 
-import type { ClientOptions } from '@repo/audit-client'
+import type { ClientOptions } from '@smart-logs/audit-client'
 
 const options: ClientOptions = {
 	baseUrl: 'https://api.yourapp.com', // Replace with your actual API base URL
@@ -108,7 +108,8 @@ packages/app-client/
 │   ├── client.ts          # Main AuditClient class implementing API methods
 │   ├── client.test.ts     # Unit tests for AppClient
 │   ├── index.ts           # Entry point for the package
-│   └── types.ts           # TypeScript type definitions and interfaces
+│   ├── types.ts           # TypeScript type definitions and interfaces
+│   └── __tests__          # Unit tests for individual methods
 ├── .eslintrc.cjs          # ESLint configuration
 ├── package.json           # NPM package manifest
 ├── README.md              # This file
@@ -119,6 +120,8 @@ packages/app-client/
 ## Dependencies
 
 ### Main Dependencies
+
+- `@repo/audit`: "workspace:\*" (The main package for base types import)
 
 This package currently has no explicit production dependencies listed in its `package.json` (`dependencies: {}`). It relies on the built-in `fetch` API.
 
@@ -152,7 +155,7 @@ Contributions are welcome! Please follow these general guidelines:
 3.  **Pull Requests**:
     - Fork the repository and create a new branch for your feature or bug fix.
     - Ensure your code adheres to the existing coding style and linting rules (`npm run check:lint`).
-    - Write tests for any new functionality or bug fixes (`npm test --prefix packages/app-client` or equivalent for your setup).
+    - Write tests for any new functionality or bug fixes (`pnpm test --prefix packages/app-client` or equivalent for your setup).
     - Ensure all tests pass.
     - Submit a pull request with a clear description of your changes.
 
