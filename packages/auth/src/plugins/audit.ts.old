@@ -1,6 +1,6 @@
 import { createAuthMiddleware } from 'better-auth/plugins'
 
-import AuditSDK from '@repo/audit-sdk'
+import AuditSDK from '@repo/audit'
 
 import type { BetterAuthPlugin } from 'better-auth'
 

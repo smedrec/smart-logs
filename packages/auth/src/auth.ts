@@ -8,33 +8,24 @@ import { SendMail } from '@repo/send-mail'
 import { initDrizzle } from './db/index.js'
 import * as schema from './db/schema/auth.js'
 import { getActiveOrganization } from './functions.js'
-import { AuditSDKPlugin } from './plugins/audit.js'
 import { getRedisConnection } from './redis.js'
 
 import type { Redis as RedisInstanceType } from 'ioredis'
+import type { Audit, AuditConfig } from '@repo/audit'
 import type { MailerSendOptions } from '@repo/send-mail'
-
-interface EnvConfig {
-	sessionSecret: string
-	sessionMaxAge: number
-	trustedOrigins: string[]
-	betterAuthUrl: string
-	redisUrl?: string
-	dbUrl?: string
-	poolSize?: number
-}
 
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
 	private db: ReturnType<typeof initDrizzle>['db']
 	private redis: RedisInstanceType
+	private audit: Audit | undefined = undefined
 	/**
 	 * Constructs an Better Auth instance
 	 * @param config The environment config. If not provided, it attempts to use
 	 *                    the process.env environment variables.
 	 * @throws Error if the config not provided and cannot be found in environment variables.
 	 */
-	constructor(config: any) {
+	constructor(config: AuditConfig, audit?: Audit) {
 		/**const effectiveConfig = config || getEnvConfig()
 
 		if (!effectiveConfig) {
@@ -57,7 +48,9 @@ class Auth {
 
 		const email = new SendMail('mail', config.redis.url)
 
-		//const audit = new Audit('audit', effectiveConfig.AUDIT_REDIS_URL)
+		if (audit) {
+			this.audit = audit
+		}
 
 		this.auth = betterAuth({
 			database: drizzleAdapter(db, {
@@ -128,14 +121,50 @@ class Auth {
 								return {
 									data: {
 										...session,
+										ipAddress:
+											session.ipAddress && session.ipAddress.length > 0
+												? session.ipAddress
+												: '127.0.0.1',
+										userAgent:
+											session.userAgent && session.userAgent.length > 0
+												? session.userAgent
+												: 'unknown',
 										activeOrganizationId: null,
 										activeOrganizationRole: null,
 									},
 								}
 							}
+							if (audit) {
+								const details = {
+									principalId: session.userId,
+									organizationId: activeOrganization.organizationId,
+									action: 'login' as const,
+									status: 'success' as 'success' | 'attempt' | 'failure',
+									sessionContext: {
+										sessionId: session.userId,
+										ipAddress:
+											session.ipAddress && session.ipAddress.length > 0
+												? session.ipAddress
+												: '127.0.0.1',
+										userAgent:
+											session.userAgent && session.userAgent.length > 0
+												? session.userAgent
+												: 'unknown',
+									},
+								}
+								audit.logAuth(details)
+							}
 							return {
 								data: {
 									...session,
+									ipAddress:
+										session.ipAddress && session.ipAddress.length > 0
+											? session.ipAddress
+											: '127.0.0.1',
+									userAgent:
+										session.userAgent && session.userAgent.length > 0
+											? session.userAgent
+											: 'unknown',
 									activeOrganizationId: activeOrganization.organizationId,
 									activeOrganizationRole: activeOrganization.role,
 								},

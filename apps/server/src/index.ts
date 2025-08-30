@@ -6,7 +6,6 @@ import { cors } from 'hono/cors'
 
 import { ConfigurationManager } from '@repo/audit'
 
-import { getAuthInstance } from './lib/auth.js'
 import { handleGraphQLRequest } from './lib/graphql/index.js'
 import { newApp } from './lib/hono/index.js'
 import { init } from './lib/hono/init.js'
@@ -52,8 +51,6 @@ async function startServer() {
 		app.use('*', nodeEnv())
 	}
 
-	const auth = await getAuthInstance(config)
-
 	app.use('*', init(config))
 	//app.use(useConsoleLogger())
 
@@ -81,7 +78,7 @@ async function startServer() {
 		})
 	)
 
-	app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
+	app.on(['POST', 'GET'], '/api/auth/*', (c) => c.get('services').auth.handler(c.req.raw))
 
 	// Configure TRPC with path from configuration
 	if (config.server.api.enableTrpc) {

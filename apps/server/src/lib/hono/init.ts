@@ -29,16 +29,15 @@ import {
 	reportTemplates,
 	scheduledReports,
 } from '@repo/audit-db'
-import { createAuthorizationService } from '@repo/auth'
-import { ConsoleLogger } from '@repo/hono-helpers'
+import { Auth, createAuthorizationService, getActiveOrganization } from '@repo/auth'
 import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
-import { getAuthDb, getAuthRedis } from '../auth.js'
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { MetricsCollectionService } from '../services/metrics.js'
 
 import type { MiddlewareHandler } from 'hono'
 import type { AuditConfig, DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
+import type { Session } from '@repo/auth'
 import type { Redis } from '@repo/redis-client'
 import type { HonoEnv } from '../hono/context.js'
 
@@ -56,8 +55,8 @@ let auditDbInstance: EnhancedAuditDb | undefined = undefined
 
 export { auditDbInstance }
 
+let authInstance: Auth | undefined = undefined
 let audit: Audit | undefined = undefined
-export { audit }
 
 // Alert and health check services
 let metricsCollector: RedisMetricsCollector | undefined = undefined
@@ -203,13 +202,6 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			}
 		}
 
-		const authDb = await getAuthDb(config)
-		const authRedis = await getAuthRedis(config)
-		// Get the Drizzle ORM instance
-		const db = {
-			auth: authDb,
-			audit: auditDbInstance.getDrizzleInstance(),
-		}
 		const client = auditDbInstance.getEnhancedClientInstance()
 
 		if (!healthCheckService) {
@@ -221,7 +213,16 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			//healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
 		}
 
-		if (!audit) audit = new Audit(config, db.audit, connection)
+		if (!audit) audit = new Audit(config, auditDbInstance.getDrizzleInstance(), connection)
+
+		if (!authInstance) authInstance = new Auth(config, audit)
+
+		const auth = authInstance.getAuthInstance()
+		// Get the Drizzle ORM instance
+		const db = {
+			auth: authInstance.getDbInstance(),
+			audit: auditDbInstance.getDrizzleInstance(),
+		}
 
 		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db.audit)
 		if (!monitoringService) {
@@ -247,7 +248,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 
 		// Initialize authorization service
 		if (!authorizationService) {
-			authorizationService = createAuthorizationService(db.auth, authRedis)
+			authorizationService = createAuthorizationService(db.auth, authInstance.getRedisInstance())
 		}
 
 		const monitor = {
@@ -328,7 +329,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		//const cache = null
 
 		c.set('services', {
-			//auth,
+			auth,
 			//cerbos,
 			//fhir,
 			db,
@@ -348,6 +349,77 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			//cache,
 		})
 
-		await next()
+		const apiKey =
+			c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
+
+		// Try API key authentication first
+		if (apiKey) {
+			c.set('isApiKeyAuth', true)
+			try {
+				// Validate API key using Better Auth's API key plugin
+				let apiKeySession = (await auth.api.getSession({
+					headers: new Headers({
+						'x-api-key': apiKey,
+					}),
+				})) as Session
+
+				if (apiKeySession) {
+					if (!apiKeySession.session.ipAddress || apiKeySession.session.ipAddress === '') {
+						apiKeySession.session.ipAddress = c.get('location')
+					}
+
+					if (!apiKeySession.session.userAgent || apiKeySession.session.userAgent === '') {
+						apiKeySession.session.userAgent = c.get('userAgent')
+					}
+
+					const org = await getActiveOrganization(apiKeySession.session.userId, db.auth)
+					if (org) {
+						apiKeySession = {
+							session: {
+								...apiKeySession.session,
+								activeOrganizationId: org.organizationId,
+								activeOrganizationRole: org.role,
+							},
+							user: {
+								...apiKeySession.user,
+							},
+						}
+					}
+					c.set('session', apiKeySession as Session)
+					return next()
+				}
+			} catch (error) {
+				// API key validation failed, continue with session auth
+				console.warn('API key validation failed:', error)
+				c.set('session', null)
+				return next()
+			}
+		}
+
+		// Try session authentication
+		c.set('isApiKeyAuth', false)
+		const session = await auth.api.getSession({
+			query: {
+				disableCookieCache: true,
+			},
+			headers: c.req.raw.headers,
+		})
+
+		if (!session) {
+			c.set('session', null)
+			return next()
+		}
+
+		if (!session.session.ipAddress || session.session.ipAddress.length < 1) {
+			session.session.ipAddress = c.get('location')
+		}
+
+		if (!session.session.userAgent || session.session.userAgent.length < 1) {
+			session.session.userAgent = c.get('userAgent')
+		}
+
+		c.set('session', session as Session)
+
+		return next()
 	}
 }

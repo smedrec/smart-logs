@@ -2,8 +2,6 @@ import { TRPCError } from '@trpc/server'
 import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 
-import { audit } from '../hono/init.js'
-
 import type { Context } from 'hono'
 import type { AuthorizationService, Session } from '@repo/auth'
 import type { HonoEnv } from '../hono/context.js'
