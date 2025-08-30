@@ -30,15 +30,16 @@ export class BaseResource {
 
 		let delay = backoffMs
 
+		let headersToUse = { ...headers, ...options.headers }
+		if (this.options.apiKey !== undefined) {
+			headersToUse['x-api-key'] = this.options.apiKey
+		}
+
 		for (let attempt = 0; attempt <= retries; attempt++) {
 			try {
-				const response = await fetch(`${baseUrl.replace(/\/$/, '')}/${version}${path}`, {
+				const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/${version}${path}`, {
 					method: options.method || 'GET',
-					headers: {
-						...headers,
-						'x-api-key': this.options.apiKey,
-						...options.headers,
-					},
+					headers: headersToUse,
 					body:
 						options.body instanceof FormData
 							? options.body

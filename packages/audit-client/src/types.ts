@@ -2,7 +2,7 @@ export interface ClientOptions {
 	/** Base URL for API requests */
 	baseUrl: string
 	/** API key for authentication */
-	apiKey: string
+	apiKey?: string
 	/** API version to use (default: 'v1') */
 	version?: string
 	/** Number of retry attempts for failed requests */

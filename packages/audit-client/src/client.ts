@@ -31,7 +31,7 @@ export class AuditClient extends BaseResource {
 	 * @returns Promise contains HIPAAComplianceReport
 	 */
 	public async hipaa(criteria: ReportCriteria): Promise<HIPAAComplianceReport> {
-		return await this.request<HIPAAComplianceReport>(`/api/compliance/reports/hipaa`, {
+		return await this.request<HIPAAComplianceReport>(`/compliance/reports/hipaa`, {
 			method: 'POST',
 			body: { criteria: criteria },
 		})

@@ -73,10 +73,11 @@ export class EnhancedAuditDatabaseClient {
 	 * Initialize all performance optimization components
 	 */
 	private async initialize(): Promise<void> {
-		const databaseAlertHandler = new DatabaseAlertHandler(this.client.getDatabase())
-		this.monitor.addAlertHandler(databaseAlertHandler)
-
 		try {
+			//  Setup alerting
+			const databaseAlertHandler = new DatabaseAlertHandler(this.client.getDatabase())
+			this.monitor.addAlertHandler(databaseAlertHandler)
+
 			// Enable performance monitoring
 			if (this.config.monitoring.enabled) {
 				await this.performanceMonitor.enableMonitoring()
