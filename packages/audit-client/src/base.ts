@@ -17,6 +17,7 @@ export class BaseResource {
 		let lastError: Error | null = null
 		const {
 			baseUrl,
+			version = 'v1',
 			retries = 3,
 			backoffMs = 100,
 			maxBackoffMs = 1000,
@@ -31,7 +32,7 @@ export class BaseResource {
 
 		for (let attempt = 0; attempt <= retries; attempt++) {
 			try {
-				const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
+				const response = await fetch(`${baseUrl.replace(/\/$/, '')}/${version}${path}`, {
 					method: options.method || 'GET',
 					headers: {
 						...headers,

@@ -3,6 +3,8 @@ export interface ClientOptions {
 	baseUrl: string
 	/** API key for authentication */
 	apiKey: string
+	/** API version to use (default: 'v1') */
+	version?: string
 	/** Number of retry attempts for failed requests */
 	retries?: number
 	/** Initial backoff time in milliseconds between retries */
@@ -33,7 +35,7 @@ interface Pagination {
 
 export interface PaginationParams {
 	limit?: number
-	page?: number
+	offset?: number
 }
 
 export interface DeleteObjectResponse {
@@ -43,12 +45,4 @@ export interface DeleteObjectResponse {
 
 export interface VersionResponse {
 	version: string
-}
-
-export interface EncryptResponse {
-	ciphertext: string
-}
-
-export interface DecryptResponse {
-	plaintext: string
 }

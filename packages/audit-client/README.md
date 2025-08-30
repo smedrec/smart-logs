@@ -96,37 +96,6 @@ async function getApiVersion() {
 		console.error('Error getting API version:', error)
 	}
 }
-
-async function encryptData(text: string) {
-	try {
-		const response = await client.encrypt(text)
-		console.log('Encrypted Text:', response.ciphertext)
-		return response.ciphertext
-	} catch (error) {
-		console.error('Error encrypting data:', error)
-		return null
-	}
-}
-
-async function decryptData(ciphertext: string) {
-	try {
-		const response = await client.decrypt(ciphertext)
-		console.log('Decrypted Text:', response.plaintext)
-		return response.plaintext
-	} catch (error) {
-		console.error('Error decrypting data:', error)
-		return null
-	}
-}
-
-// Using the functions
-checkApiStatus()
-getApiVersion()
-encryptData('My secret message').then((cipher) => {
-	if (cipher) {
-		decryptData(cipher)
-	}
-})
 ```
 
 ## Project Structure
@@ -203,20 +172,4 @@ client.ok().then(console.log).catch(console.error)
 
 // Get API version
 client.version().then(console.log).catch(console.error)
-
-// Encrypt text
-client
-	.encrypt('sensitive data')
-	.then((response) => {
-		console.log('Ciphertext:', response.ciphertext)
-	})
-	.catch(console.error)
-
-// Decrypt text
-client
-	.decrypt('previously_encrypted_ciphertext')
-	.then((response) => {
-		console.log('Plaintext:', response.plaintext)
-	})
-	.catch(console.error)
 ```
