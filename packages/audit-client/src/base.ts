@@ -1,5 +1,7 @@
 import type { ClientOptions, RequestOptions } from './types.js'
 
+const USER_AGENT = 'audit-client/0.1.0'
+
 export class BaseResource {
 	readonly options: ClientOptions
 
@@ -24,7 +26,7 @@ export class BaseResource {
 			headers = {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',
-				'User-Agent': 'audit-client/0.1.0',
+				'User-Agent': USER_AGENT,
 			},
 		} = this.options
 

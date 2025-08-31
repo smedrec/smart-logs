@@ -70,7 +70,7 @@ CREATE TABLE "audit_log" (
 	"processing_latency" integer,
 	"archived_at" timestamp with time zone,
 	"details" jsonb
-);
+) PARTITION BY RANGE (timestamp);
 --> statement-breakpoint
 CREATE TABLE "audit_preset" (
 	"id" serial PRIMARY KEY NOT NULL,
@@ -149,7 +149,7 @@ CREATE TABLE "error_log" (
 	"troubleshooting" jsonb,
 	"timestamp" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
+) PARTITION BY RANGE (timestamp);
 --> statement-breakpoint
 CREATE TABLE "report_executions" (
 	"id" varchar(255) PRIMARY KEY NOT NULL,

@@ -10,6 +10,7 @@ import { handleGraphQLRequest } from './lib/graphql/index.js'
 import { newApp } from './lib/hono/index.js'
 import { init } from './lib/hono/init.js'
 import { nodeEnv } from './lib/hono/node-env.js'
+import { requireAuthOrApiKey } from './lib/middleware/auth.js'
 import { createComprehensiveErrorHandling } from './lib/middleware/error-handling.js'
 import {
 	errorRateMonitoring,
@@ -17,6 +18,7 @@ import {
 	requestMetrics,
 } from './lib/middleware/monitoring.js'
 import { appRouter } from './routers/index.js'
+import { createRestAPI } from './routes/rest-api.js'
 
 // Configuration manager
 let configManager: ConfigurationManager | undefined = undefined
@@ -98,7 +100,6 @@ async function startServer() {
 
 	// Mount REST API routes if enabled
 	if (config.server.api.enableRest) {
-		const { createRestAPI } = await import('./routes/rest-api.js')
 		const restAPI = createRestAPI()
 		app.route(`${config.server.api.restPath}/v1`, restAPI)
 	}
@@ -117,9 +118,6 @@ async function startServer() {
 
 	// Configure GraphQL endpoint if enabled
 	if (config.server.api.enableGraphql) {
-		// Import authentication middleware
-		const { requireAuthOrApiKey } = await import('./lib/middleware/auth.js')
-
 		// Apply authentication middleware to GraphQL endpoints
 		app.use(`${config.server.api.graphqlPath}/*`, requireAuthOrApiKey)
 		app.use(config.server.api.graphqlPath, requireAuthOrApiKey)

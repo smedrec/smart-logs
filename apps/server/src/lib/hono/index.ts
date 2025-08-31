@@ -32,6 +32,13 @@ export function newApp(config: AuditConfig) {
 				'127.0.0.1'
 		)
 		c.set('userAgent', c.req.header('User-Agent') ?? 'unknown')
+		const apiKey =
+			c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
+		if (apiKey) {
+			c.set('isApiKeyAuth', true)
+		} else {
+			c.set('isApiKeyAuth', false)
+		}
 
 		return next()
 	})

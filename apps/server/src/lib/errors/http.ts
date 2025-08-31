@@ -173,12 +173,13 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 	 * We can handle this very well, as it is something we threw ourselves
 	 */
 	if (err instanceof ApiError) {
-		if (err.status >= 500) {
+		const status = codeToStatus(err.code)
+		if (status >= 500) {
 			logger.error('returning 5XX', {
 				message: err.message,
 				name: err.name,
 				code: err.code,
-				status: err.status,
+				status: status,
 				stack: err.stack,
 			})
 			await error.handleError(
@@ -192,7 +193,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 						message: err.message,
 						name: err.name,
 						code: err.code,
-						status: err.status,
+						status: status,
 						cause: err.cause,
 						stack: err.stack,
 					},
@@ -210,7 +211,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 					requestId: c.get('requestId'),
 				},
 			},
-			{ status: err.status }
+			{ status: status as any }
 		)
 	}
 
@@ -266,7 +267,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 		message: err.message,
 		cause: err.cause,
 		stack: err.stack,
-		requestId: c.get('requestId'),
+		//requestId: requestId,
 	})
 	await error.handleError(
 		err,

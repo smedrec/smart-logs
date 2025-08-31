@@ -134,7 +134,7 @@ class Auth {
 									},
 								}
 							}
-							if (audit) {
+							if (this.audit) {
 								const details = {
 									principalId: session.userId,
 									organizationId: activeOrganization.organizationId,
@@ -152,7 +152,7 @@ class Auth {
 												: 'unknown',
 									},
 								}
-								audit.logAuth(details)
+								this.audit.logAuth(details)
 							}
 							return {
 								data: {
@@ -175,15 +175,15 @@ class Auth {
 			},
 			secondaryStorage: {
 				get: async (key) => {
-					const value = await redis.get(key)
+					const value = await redis.get(`auth:${key}`)
 					return value ? value : null
 				},
 				set: async (key, value, ttl) => {
-					if (ttl) await redis.set(key, value, 'EX', ttl)
-					else await redis.set(key, value)
+					if (ttl) await redis.set(`auth:${key}`, value, 'EX', ttl)
+					else await redis.set(`auth:${key}`, value)
 				},
 				delete: async (key) => {
-					await redis.del(key)
+					await redis.del(`auth:${key}`)
 				},
 			},
 			rateLimit: {

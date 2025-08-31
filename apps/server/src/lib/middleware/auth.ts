@@ -2,6 +2,8 @@ import { TRPCError } from '@trpc/server'
 import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 
+import { getActiveOrganization } from '@repo/auth'
+
 import type { Context } from 'hono'
 import type { AuthorizationService, Session } from '@repo/auth'
 import type { HonoEnv } from '../hono/context.js'
@@ -11,9 +13,32 @@ import type { Context as TRPCContext } from '../trpc/context.js'
  * Authentication middleware that validates session tokens
  */
 export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
-	const session = c.get('session')
-	const { audit } = c.get('services')
+	const { auth, audit } = c.get('services')
 	const requestId = c.get('requestId')
+
+	// Try session authentication
+	const sessionCookie = await auth.api.getSession({
+		query: {
+			disableCookieCache: true,
+		},
+		headers: c.req.raw.headers,
+	})
+
+	if (!sessionCookie) {
+		c.set('session', null)
+	} else {
+		if (!sessionCookie.session.ipAddress || sessionCookie.session.ipAddress.length < 1) {
+			sessionCookie.session.ipAddress = c.get('location')
+		}
+
+		if (!sessionCookie.session.userAgent || sessionCookie.session.userAgent.length < 1) {
+			sessionCookie.session.userAgent = c.get('userAgent')
+		}
+
+		c.set('session', sessionCookie as Session)
+	}
+
+	const session = c.get('session')
 
 	if (!session) {
 		const err = new HTTPException(401, {
@@ -316,9 +341,53 @@ export const requireOrganizationRole = (roles: string[]) =>
  * API key authentication middleware for third-party access
  */
 export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
-	const session = c.get('session')
-	const { audit } = c.get('services')
+	const { db, auth, audit } = c.get('services')
 	const requestId = c.get('requestId')
+
+	const apiKey = c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
+
+	// Try API key authentication first
+	if (apiKey) {
+		try {
+			// Validate API key using Better Auth's API key plugin
+			let apiKeySession = (await auth.api.getSession({
+				headers: new Headers({
+					'x-api-key': apiKey,
+				}),
+			})) as Session
+
+			if (apiKeySession) {
+				if (!apiKeySession.session.ipAddress || apiKeySession.session.ipAddress === '') {
+					apiKeySession.session.ipAddress = c.get('location')
+				}
+
+				if (!apiKeySession.session.userAgent || apiKeySession.session.userAgent === '') {
+					apiKeySession.session.userAgent = c.get('userAgent')
+				}
+
+				const org = await getActiveOrganization(apiKeySession.session.userId, db.auth)
+				if (org) {
+					apiKeySession = {
+						session: {
+							...apiKeySession.session,
+							activeOrganizationId: org.organizationId,
+							activeOrganizationRole: org.role,
+						},
+						user: {
+							...apiKeySession.user,
+						},
+					}
+				}
+				c.set('session', apiKeySession as Session)
+			}
+		} catch (error) {
+			// API key validation failed, continue with session auth
+			console.warn('API key validation failed:', error)
+			c.set('session', null)
+		}
+	}
+
+	const session = c.get('session')
 
 	if (!session) {
 		audit.logAuth({
@@ -367,6 +436,8 @@ export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
 
 		throw err
 	}
+
+	await next()
 })
 
 /**
@@ -377,13 +448,13 @@ export const requireAuthOrApiKey = createMiddleware<HonoEnv>(async (c, next) => 
 	const { audit } = c.get('services')
 	const isApiKeyAuth = c.get('isApiKeyAuth')
 
-	// If session exists, use session auth
-	if (session && !isApiKeyAuth) {
+	// If session not exists, use session auth
+	if (!session && !isApiKeyAuth) {
 		return requireAuth(c, next)
 	}
 
 	// If API key provided, use API key auth
-	if (session && isApiKeyAuth) {
+	if (!session && isApiKeyAuth) {
 		return requireApiKey(c, next)
 	}
 

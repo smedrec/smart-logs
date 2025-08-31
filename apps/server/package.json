@@ -3,6 +3,8 @@
 	"type": "module",
 	"main": "src/index.ts",
 	"scripts": {
+		"benchmark:1": "autocannon -c 100 -d 10 http://localhost:3000/api/auth/ok",
+		"benchmark:2": "autocannon -c 100 -d 10 -H 'x-api-key: test_GHoOmNbAmkoLOqfBxFtLHGXBZkTHbkuSDrjaRCJtxOhBZldxhdCTblBsVEyOcFwN' http://localhost:3000/api/v1/audit/events/22",
 		"build": "tsc --build",
 		"check-types": "tsc --noEmit",
 		"clean": "rm -rf dist node_modules .turbo",
@@ -49,6 +51,7 @@
 		"@types/graphql": "^14.5.0",
 		"@types/node": "^22.13.11",
 		"@types/supertest": "^6.0.2",
+		"autocannon": "^8.0.0",
 		"drizzle-kit": "^0.31.2",
 		"supertest": "^7.0.0",
 		"tsdown": "^0.12.9",
