@@ -224,7 +224,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			audit: auditDbInstance.getDrizzleInstance(),
 		}
 
-		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(client)
+		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(auditDbInstance)
 		if (!monitoringService) {
 			if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
 			monitoringService = new MonitoringService(undefined, metricsCollector)

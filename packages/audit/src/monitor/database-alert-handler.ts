@@ -5,7 +5,11 @@
 
 import { sql } from 'drizzle-orm'
 
-import { EnhancedAuditDatabaseClient } from '@repo/audit-db'
+import {
+	EnhancedAuditDatabaseClient,
+	EnhancedAuditDb,
+	EnhancedDatabaseClient,
+} from '@repo/audit-db'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Alert, AlertSeverity, AlertStatistics, AlertType } from './monitoring-types.js'
@@ -64,8 +68,10 @@ export interface AlertResolution {
  */
 export class DatabaseAlertHandler implements AlertHandler {
 	private readonly name = 'DatabaseAlertHandler'
+	private client: EnhancedAuditDatabaseClient
 	private db: PostgresJsDatabase<any>
-	constructor(private client: EnhancedAuditDatabaseClient) {
+	constructor(auditDbInstance: EnhancedAuditDb) {
+		this.client = auditDbInstance.getEnhancedClientInstance()
 		this.db = this.client.getDatabase()
 	}
 
@@ -439,8 +445,6 @@ export class DatabaseAlertHandler implements AlertHandler {
 /**
  * Factory function to create DatabaseAlertHandler
  */
-export function createDatabaseAlertHandler(
-	client: EnhancedAuditDatabaseClient
-): DatabaseAlertHandler {
-	return new DatabaseAlertHandler(client)
+export function createDatabaseAlertHandler(auditDbInstance: EnhancedAuditDb): DatabaseAlertHandler {
+	return new DatabaseAlertHandler(auditDbInstance)
 }

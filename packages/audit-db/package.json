@@ -44,7 +44,6 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@repo/audit": "workspace:*",
 		"@repo/redis-client": "workspace:*",
 		"commander": "^12.1.0",
 		"drizzle-orm": "0.44.2",

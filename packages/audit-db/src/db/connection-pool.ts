@@ -6,7 +6,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
-import { createQueryCache } from '../cache/cache-factory.js'
+import { CacheFactoryConfig, createQueryCache } from '../cache/cache-factory.js'
 import {
 	IQueryCache,
 	QueryCacheStats,
@@ -17,7 +17,29 @@ import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Sql } from 'postgres'
-import type { CacheFactoryConfig, ConnectionPoolConfig, QueryCacheConfig } from '@repo/audit'
+
+export interface ConnectionPoolConfig {
+	/** Database connection URL */
+	url: string
+	/** Minimum number of connections in pool */
+	minConnections: number
+	/** Maximum number of connections in pool */
+	maxConnections: number
+	/** Connection idle timeout in milliseconds */
+	idleTimeout: number
+	/** Connection acquisition timeout in milliseconds */
+	acquireTimeout: number
+	/** Connection validation query */
+	validationQuery?: string
+	/** Enable connection validation */
+	validateConnections: boolean
+	/** Connection retry attempts */
+	retryAttempts: number
+	/** Retry delay in milliseconds */
+	retryDelay: number
+	/** Enable SSL */
+	ssl: boolean
+}
 
 export interface ConnectionPoolStats {
 	totalConnections: number

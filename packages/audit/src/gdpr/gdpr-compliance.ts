@@ -7,7 +7,7 @@ import * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import { Audit } from '../audit.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
+import type { EnhancedAuditDatabaseClient } from '@repo/audit-db/src/db/enhanced-client.js'
 import type { AuditLogEvent, DataClassification } from '../types.js'
 
 /**

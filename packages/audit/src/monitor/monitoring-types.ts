@@ -114,17 +114,3 @@ export interface PerformanceMetrics {
 	errorRate: number
 	lastUpdated: string
 }
-
-export interface QueryPerformanceMetrics {
-	queryId: string
-	query: string
-	executionTime: number
-	planningTime: number
-	totalTime: number
-	rowsReturned: number
-	bufferHits: number
-	bufferMisses: number
-	timestamp: Date
-	userId?: string
-	organizationId?: string
-}

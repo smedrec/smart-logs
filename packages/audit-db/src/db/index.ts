@@ -1,19 +1,32 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
-import {
-	DatabaseConfig,
-	EnhancedClientConfig,
-	MonitoringService,
-	RedisMetricsCollector,
-} from '@repo/audit'
-
-import { EnhancedAuditDatabaseClient } from './enhanced-client.js'
+import { EnhancedAuditDatabaseClient, EnhancedClientConfig } from './enhanced-client.js'
 import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Sql } from 'postgres'
+
+interface DatabaseConfig {
+	/** Database connection URL */
+	url: string
+
+	/** Connection pool size */
+	poolSize: number
+
+	/** Connection timeout in milliseconds */
+	connectionTimeout: number
+
+	/** Query timeout in milliseconds */
+	queryTimeout: number
+
+	/** Enable SSL */
+	ssl: boolean
+
+	/** Maximum connection attempts */
+	maxConnectionAttempts: number
+}
 
 // Helper to try and get env variables from Cloudflare Workers or Node.js process.env
 function getEnv(variableName: string): string | undefined {
@@ -146,7 +159,6 @@ export class AuditDbWithConfig {
 
 export class EnhancedAuditDb {
 	private client: EnhancedAuditDatabaseClient
-	private monitor: MonitoringService
 
 	/**
 	 * Constructs an AuditDb instance, establishing a connection to the PostgreSQL database
@@ -155,9 +167,7 @@ export class EnhancedAuditDb {
 	 * @param config The database configuration.
 	 */
 	constructor(connection: RedisInstanceType, config: EnhancedClientConfig) {
-		const metricsCollector = new RedisMetricsCollector(connection)
-		this.monitor = new MonitoringService(undefined, metricsCollector)
-		this.client = new EnhancedAuditDatabaseClient(this.monitor, config)
+		this.client = new EnhancedAuditDatabaseClient(connection, config)
 	}
 
 	/**

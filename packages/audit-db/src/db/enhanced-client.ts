@@ -1,19 +1,41 @@
 import { createHash } from 'crypto'
 
-import { DatabaseAlertHandler } from '@repo/audit'
-
-import { EnhancedDatabaseClient } from './connection-pool.js'
+import { CacheFactoryConfig } from '../cache/cache-factory.js'
+import { ConnectionPoolConfig, EnhancedDatabaseClient } from './connection-pool.js'
 import { DatabasePartitionManager, PartitionMaintenanceScheduler } from './partitioning.js'
 import { DatabasePerformanceMonitor } from './performance-monitoring.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { Alert, EnhancedClientConfig, MonitoringService } from '@repo/audit'
+import type { Redis as RedisType } from 'ioredis'
 import type * as schema from './schema.js'
 
 /**
  * Enhanced database client integrating all performance optimizations
  * Requirements 7.1, 7.2, 7.3, 7.4: Complete database performance optimization integration
  */
+
+export interface EnhancedClientConfig {
+	/** Connection pool configuration */
+	connectionPool: ConnectionPoolConfig
+	/** Query cache configuration */
+	queryCacheFactory: CacheFactoryConfig
+	/** Partition management configuration */
+	partitioning: {
+		enabled: boolean
+		strategy: 'range' | 'hash' | 'list'
+		interval: 'monthly' | 'quarterly' | 'yearly'
+		retentionDays: number
+		autoMaintenance: boolean
+		maintenanceInterval: number
+	}
+	/** Performance monitoring configuration */
+	monitoring: {
+		enabled: boolean
+		slowQueryThreshold: number
+		metricsRetentionDays: number
+		autoOptimization: boolean
+	}
+}
 
 export interface PerformanceReport {
 	timestamp: Date
@@ -41,22 +63,36 @@ export interface PerformanceReport {
 	}
 }
 
+interface QueryPerformanceMetrics {
+	queryId: string
+	query: string
+	executionTime: number
+	planningTime: number
+	totalTime: number
+	rowsReturned: number
+	bufferHits: number
+	bufferMisses: number
+	timestamp: Date
+	userId?: string
+	organizationId?: string
+}
+
 /**
  * Enhanced audit database client with comprehensive performance optimizations
  */
 export class EnhancedAuditDatabaseClient {
+	private readonly metricsPrefix = 'metrics:'
+	private readonly retentionPeriod = 86400 // 24 hours in seconds
 	private client: EnhancedDatabaseClient
 	private partitionManager: DatabasePartitionManager
 	private performanceMonitor: DatabasePerformanceMonitor
-	private monitor: MonitoringService
 	private partitionScheduler?: PartitionMaintenanceScheduler
 	private performanceReportInterval?: NodeJS.Timeout
-	private config: EnhancedClientConfig
 
-	constructor(monitor: MonitoringService, config: EnhancedClientConfig) {
-		this.monitor = monitor
-		this.config = config
-
+	constructor(
+		private connection: RedisType,
+		private config: EnhancedClientConfig
+	) {
 		// Initialize enhanced database client with connection pooling and caching
 		this.client = new EnhancedDatabaseClient(config.connectionPool, config.queryCacheFactory)
 
@@ -74,9 +110,9 @@ export class EnhancedAuditDatabaseClient {
 	 */
 	private async initialize(): Promise<void> {
 		try {
-			//  Setup alerting
-			const databaseAlertHandler = new DatabaseAlertHandler(this.client.getDatabase())
-			this.monitor.addAlertHandler(databaseAlertHandler)
+			//  FIXME: Setup alerting
+			//const databaseAlertHandler = new DatabaseAlertHandler(this.client)
+			//this.monitor.addAlertHandler(databaseAlertHandler)
 
 			// Enable performance monitoring
 			if (this.config.monitoring.enabled) {
@@ -197,7 +233,7 @@ export class EnhancedAuditDatabaseClient {
 			const executionTime = Date.now() - startTime
 			const memoryUsed = process.memoryUsage().heapUsed - startMemory
 
-			this.monitor.storeQueryMetrics({
+			this.storeQueryMetrics({
 				queryId: `${queryName}_${Date.now()}`,
 				query: queryName,
 				executionTime,
@@ -211,7 +247,7 @@ export class EnhancedAuditDatabaseClient {
 
 			// Log slow queries
 			if (executionTime > this.config.monitoring.slowQueryThreshold) {
-				const alert: Alert = {
+				/**const alert: Alert = {
 					id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 					severity:
 						executionTime > this.config.monitoring.slowQueryThreshold * 2 ? 'HIGH' : 'MEDIUM',
@@ -231,8 +267,8 @@ export class EnhancedAuditDatabaseClient {
 					},
 					acknowledged: false,
 					resolved: false,
-				}
-				this.monitor.sendExternalAlert(alert)
+				}*/
+				//this.monitor.sendExternalAlert(alert)
 				console.warn(`Slow query detected: ${queryName} took ${executionTime}ms`)
 			}
 
@@ -395,6 +431,40 @@ export class EnhancedAuditDatabaseClient {
 	}
 
 	/**
+	 * Store database query metrics for aggregation
+	 */
+	private async storeQueryMetrics(metrics: QueryPerformanceMetrics): Promise<void> {
+		try {
+			// Store in Redis for real-time metrics using enhanced metrics service
+			const key = `queries:${Date.now()}`
+			await this.storeMetric(key, metrics, 3600) // 1 hour TTL
+		} catch (error) {
+			console.error('Failed to store query metrics:', error)
+		}
+	}
+
+	/**
+	 * Store a metric point
+	 */
+	private async storeMetric(key: string, value: any, ttl?: number): Promise<void> {
+		try {
+			const fullKey = key.startsWith(this.metricsPrefix) ? key : `${this.metricsPrefix}${key}`
+			const serialized = typeof value === 'string' ? value : JSON.stringify(value)
+
+			if (ttl) {
+				await this.connection.setex(fullKey, ttl, serialized)
+			} else {
+				await this.connection.setex(fullKey, this.retentionPeriod, serialized)
+			}
+		} catch (error) {
+			console.error('Failed to store metric', {
+				key,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+		}
+	}
+
+	/**
 	 * Run comprehensive database optimization
 	 */
 	async optimizeDatabase(): Promise<{
@@ -527,7 +597,7 @@ export class EnhancedAuditDatabaseClient {
  * Factory function to create enhanced client with default configuration
  */
 export function createEnhancedAuditClient(
-	monitor: MonitoringService,
+	connection: RedisType,
 	databaseUrl: string,
 	overrides?: Partial<EnhancedClientConfig>
 ): EnhancedAuditDatabaseClient {
@@ -578,5 +648,5 @@ export function createEnhancedAuditClient(
 		monitoring: { ...defaultConfig.monitoring, ...overrides?.monitoring },
 	}
 
-	return new EnhancedAuditDatabaseClient(monitor, config)
+	return new EnhancedAuditDatabaseClient(connection, config)
 }

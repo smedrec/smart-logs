@@ -633,9 +633,6 @@ importers:
 
   packages/audit-db:
     dependencies:
-      '@repo/audit':
-        specifier: workspace:*
-        version: link:../audit
       '@repo/redis-client':
         specifier: workspace:*
         version: link:../redis-client

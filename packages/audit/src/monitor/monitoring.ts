@@ -15,7 +15,6 @@ import type {
 	AuditMetrics,
 	HealthStatus,
 	PerformanceMetrics,
-	QueryPerformanceMetrics,
 	RequestMetrics,
 } from './monitoring-types.js'
 
@@ -724,19 +723,6 @@ export class MonitoringService {
 				},
 			},
 			timestamp: now,
-		}
-	}
-
-	/**
-	 * Store database query metrics for aggregation
-	 */
-	async storeQueryMetrics(metrics: QueryPerformanceMetrics): Promise<void> {
-		try {
-			// Store in Redis for real-time metrics using enhanced metrics service
-			const key = `queries:${Date.now()}`
-			await this.metricsCollector.storeMetric(key, metrics, 3600) // 1 hour TTL
-		} catch (error) {
-			console.error('Failed to store query metrics:', error)
 		}
 	}
 

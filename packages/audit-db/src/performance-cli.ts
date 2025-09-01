@@ -6,7 +6,6 @@
  */
 import { Command } from 'commander'
 
-import { MonitoringService, RedisMetricsCollector } from '@repo/audit'
 import { getSharedRedisConnection } from '@repo/redis-client'
 
 import { createEnhancedAuditClient } from './db/enhanced-client.js'
@@ -339,10 +338,8 @@ clientCmd
 	.description('Check enhanced client health')
 	.action(async () => {
 		const connection = getSharedRedisConnection()
-		const metricsCollector = new RedisMetricsCollector(connection)
-		const monitor = new MonitoringService(undefined, metricsCollector)
 		const client = createEnhancedAuditClient(
-			monitor,
+			connection,
 			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit'
 		)
 
@@ -379,10 +376,8 @@ clientCmd
 	.description('Generate performance report')
 	.action(async () => {
 		const connection = getSharedRedisConnection()
-		const metricsCollector = new RedisMetricsCollector(connection)
-		const monitor = new MonitoringService(undefined, metricsCollector)
 		const client = createEnhancedAuditClient(
-			monitor,
+			connection,
 			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit'
 		)
 
@@ -437,10 +432,8 @@ clientCmd
 	.description('Run comprehensive database optimization')
 	.action(async () => {
 		const connection = getSharedRedisConnection()
-		const metricsCollector = new RedisMetricsCollector(connection)
-		const monitor = new MonitoringService(undefined, metricsCollector)
 		const client = createEnhancedAuditClient(
-			monitor,
+			connection,
 			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit'
 		)
 

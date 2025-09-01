@@ -61,14 +61,20 @@ import {
 	varchar,
 } from 'drizzle-orm/pg-core'
 
-import { DEFAULT_VALIDATION_CONFIG } from '@repo/audit'
-
-import type { AuditEventStatus, ValidationConfig } from '@repo/audit'
-
 /**
  * Data classification levels for audit events
  */
 export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
+
+type AuditEventStatus = 'attempt' | 'success' | 'failure'
+
+const DEFAULT_VALIDATION_CONFIG = {
+	maxStringLength: 10000,
+	allowedDataClassifications: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'],
+	requiredFields: ['timestamp', 'action', 'status'],
+	maxCustomFieldDepth: 3,
+	allowedEventVersions: ['1.0', '1.1', '2.0'],
+}
 
 export const auditLog = pgTable(
 	'audit_log',
@@ -156,7 +162,7 @@ export const auditPreset = pgTable(
 			.notNull(),
 		requiredFields: jsonb('required_fields').$type<string[]>(),
 		defaultValues: jsonb('default_values').$type<Record<string, any>>().notNull(),
-		validation: jsonb('validation').$type<ValidationConfig>().default(DEFAULT_VALIDATION_CONFIG),
+		validation: jsonb('validation').default(DEFAULT_VALIDATION_CONFIG),
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
 			.notNull()
 			.defaultNow(),

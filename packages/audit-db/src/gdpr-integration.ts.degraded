@@ -2,11 +2,12 @@ import { and, eq, gte, lte, sql } from 'drizzle-orm'
 
 import { GDPRComplianceService, GDPRUtils } from '@repo/audit'
 
-import { AuditDb } from './db/index.js'
+import { EnhancedAuditDatabaseClient } from './db/enhanced-client.js'
 import { auditLog, auditRetentionPolicy } from './db/schema.js'
 
 import type {
 	ArchivalResult,
+	Audit,
 	GDPRDataExport,
 	GDPRDataExportRequest,
 	RetentionPolicy,
@@ -19,12 +20,11 @@ import type {
  */
 export class AuditGDPRIntegration {
 	private gdprService: GDPRComplianceService
-	private auditDb: AuditDb
+	private client: EnhancedAuditDatabaseClient
 
-	constructor(auditDb: AuditDb) {
-		this.auditDb = auditDb
-		const db = auditDb.getDrizzleInstance()
-		this.gdprService = new GDPRComplianceService(db, auditLog, auditRetentionPolicy)
+	constructor(client: EnhancedAuditDatabaseClient, audit: Audit) {
+		this.client = client
+		this.gdprService = new GDPRComplianceService(this.client, audit)
 	}
 
 	/**
@@ -128,11 +128,13 @@ export class AuditGDPRIntegration {
 	 */
 	async processDataPortabilityRequest(
 		principalId: string,
+		organizationId: string,
 		requestedBy: string,
 		format: 'json' | 'csv' | 'xml' = 'json'
 	): Promise<GDPRDataExport> {
 		const request: GDPRDataExportRequest = {
 			principalId,
+			organizationId,
 			requestType: 'portability',
 			format,
 			requestedBy,
@@ -204,7 +206,7 @@ export class AuditGDPRIntegration {
 	 * Create a new retention policy
 	 */
 	async createRetentionPolicy(policy: Omit<RetentionPolicy, 'isActive'>): Promise<void> {
-		const db = this.auditDb.getDrizzleInstance()
+		const db = this.client.getDatabase()
 
 		// Validate data classification
 		if (!GDPRUtils.validateDataClassification(policy.dataClassification)) {
@@ -246,7 +248,7 @@ export class AuditGDPRIntegration {
 		newestRecord?: string
 		complianceCriticalRecords: number
 	}> {
-		const db = this.auditDb.getDrizzleInstance()
+		const db = this.client.getDatabase()
 
 		// Get all records for the user
 		const records = await db.select().from(auditLog).where(eq(auditLog.principalId, principalId))
@@ -295,7 +297,7 @@ export class AuditGDPRIntegration {
 	 * Check if user has compliance-critical audit records
 	 */
 	private async hasComplianceCriticalRecords(principalId: string): Promise<boolean> {
-		const db = this.auditDb.getDrizzleInstance()
+		const db = this.client.getDatabase()
 
 		const complianceActions = [
 			'auth.login.success',
@@ -335,7 +337,7 @@ export class AuditGDPRIntegration {
 		}
 		recommendations: string[]
 	}> {
-		const db = this.auditDb.getDrizzleInstance()
+		const db = this.client.getDatabase()
 		const reportId = GDPRUtils.generateTrackingId('compliance-report')
 
 		// Build query conditions
@@ -426,7 +428,9 @@ export class AuditGDPRIntegration {
 }
 
 // Helper function to create AuditGDPRIntegration instance
-export function createAuditGDPRIntegration(postgresUrl?: string): AuditGDPRIntegration {
-	const auditDb = new AuditDb(postgresUrl)
-	return new AuditGDPRIntegration(auditDb)
+export function createAuditGDPRIntegration(
+	client: EnhancedAuditDatabaseClient,
+	audit: Audit
+): AuditGDPRIntegration {
+	return new AuditGDPRIntegration(client, audit)
 }

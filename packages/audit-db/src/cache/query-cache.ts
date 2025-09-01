@@ -1,7 +1,8 @@
 /**
  * Query cache
  */
-import type { QueryCacheConfig } from '@repo/audit'
+
+import { QueryCacheConfig } from './cache-factory.js'
 
 // Re-export distributed cache functionality
 export { RedisQueryCache, type RedisQueryCacheConfig } from './redis-query-cache.js'

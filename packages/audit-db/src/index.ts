@@ -1,7 +1,7 @@
 export * from './db/index.js'
 export * from './db/schema.js'
 export * from './migration-utils.js'
-export * from './gdpr-integration.js'
+//export * from './gdpr-integration.js'
 
 // Performance optimization exports
 export { DatabasePartitionManager, PartitionMaintenanceScheduler } from './db/partitioning.js'
