@@ -11,6 +11,9 @@
  */
 import { sql } from 'drizzle-orm'
 
+import { EnhancedAuditDatabaseClient } from '@repo/audit-db'
+
+import { Audit } from '../audit.js'
 import { CryptoConfig, CryptoService } from '../crypto.js'
 import { ReportTemplate } from './scheduled-reporting.js'
 
@@ -288,12 +291,10 @@ export interface ScheduledReportConfig {
  * Compliance Reporting Service
  */
 export class ComplianceReportingService {
-	private db: PostgresJsDatabase<any>
-	private cryptoService: CryptoService
-	constructor(db: PostgresJsDatabase<any>, cryptoConfig: Partial<CryptoConfig>) {
-		this.db = db
-		this.cryptoService = new CryptoService(cryptoConfig)
-	}
+	constructor(
+		private client: EnhancedAuditDatabaseClient,
+		private audit: Audit
+	) {}
 
 	/**
 	 * Generate a general compliance report
@@ -425,7 +426,7 @@ export class ComplianceReportingService {
 					// Track hash algorithms
 					hashAlgorithms[event.hashAlgorithm] = (hashAlgorithms[event.hashAlgorithm] || 0) + 1
 
-					const computedHash = this.cryptoService.generateHash(event)
+					const computedHash = this.audit.generateEventHash(event)
 
 					if (computedHash === event.hash) {
 						verificationResults.verifiedEvents++
@@ -551,7 +552,13 @@ export class ComplianceReportingService {
 				query += ` OFFSET ${criteria.offset}`
 			}
 
-			const result = await this.db.execute(sql.raw(query))
+			const cacheKey = this.client.generateCacheKey('get_audit_log_events', criteria)
+			const result = await this.client.executeMonitoredQuery(
+				(db) => db.execute(sql.raw(query)),
+				'get_audit_log_events',
+				{ cacheKey }
+			)
+
 			const rows = result || []
 			return rows.map(this.mapDatabaseAuditLogToAuditLog)
 		} catch (error) {
@@ -561,6 +568,7 @@ export class ComplianceReportingService {
 
 	/**
 	 * Filter events based on report criteria
+	 * @deprecated Use getEvents instead
 	 */
 	private filterEvents(events: AuditLogEvent[], criteria: ReportCriteria): AuditLogEvent[] {
 		let filtered = events
@@ -904,7 +912,7 @@ export class ComplianceReportingService {
 	private async verifyEventIntegrity(event: AuditLogEvent): Promise<boolean> {
 		const hash = event.hash
 		if (!hash) return false
-		return this.cryptoService.verifyHash(event, hash)
+		return this.audit.verifyEventHash(event, hash)
 	}
 
 	/**

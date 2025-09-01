@@ -5,6 +5,8 @@
 
 import { sql } from 'drizzle-orm'
 
+import { EnhancedAuditDatabaseClient } from '@repo/audit-db'
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Alert, AlertSeverity, AlertStatistics, AlertType } from './monitoring-types.js'
 import type { AlertHandler } from './monitoring.js'
@@ -62,7 +64,10 @@ export interface AlertResolution {
  */
 export class DatabaseAlertHandler implements AlertHandler {
 	private readonly name = 'DatabaseAlertHandler'
-	constructor(private db: PostgresJsDatabase<any>) {}
+	private db: PostgresJsDatabase<any>
+	constructor(private client: EnhancedAuditDatabaseClient) {
+		this.db = this.client.getDatabase()
+	}
 
 	/**
 	 * Get handler name
@@ -183,12 +188,17 @@ export class DatabaseAlertHandler implements AlertHandler {
 		}
 
 		try {
-			const result = await this.db.execute(sql`
+			const result = await this.client.executeMonitoredQuery(
+				(db) =>
+					db.execute(sql`
 				SELECT * FROM alerts 
 				WHERE organization_id = ${organizationId} 
 				AND resolved = 'false'
 				ORDER BY created_at DESC
-			`)
+			`),
+				'get_active_alerts',
+				{ cacheKey: `get_active_alerts_${organizationId}` }
+			)
 
 			// Handle different database result formats
 			const rows = result || []
@@ -207,7 +217,11 @@ export class DatabaseAlertHandler implements AlertHandler {
 			query += ` AND organization_id = ${organizationId}`
 		}
 		try {
-			const result = await this.db.execute(sql.raw(query))
+			const result = await this.client.executeMonitoredQuery(
+				(db) => db.execute(sql.raw(query)),
+				'get_active_alerts_count',
+				{ cacheKey: `get_active_alerts_count_${organizationId || 'all'}` }
+			)
 			return Number(result[0].count)
 		} catch (error) {
 			throw new Error(`Failed to retrieve number of active alerts: ${error}`)
@@ -274,7 +288,13 @@ export class DatabaseAlertHandler implements AlertHandler {
 				query += ` OFFSET ${filters.offset}`
 			}
 
-			const result = await this.db.execute(sql.raw(query))
+			const cacheKey = this.client.generateCacheKey('get_alerts', filters)
+			const result = await this.client.executeMonitoredQuery(
+				(db) => db.execute(sql.raw(query)),
+				'get_alerts',
+				{ cacheKey }
+			)
+
 			const rows = result || []
 			return rows.map(this.mapDatabaseAlertToAlert)
 		} catch (error) {
@@ -287,12 +307,16 @@ export class DatabaseAlertHandler implements AlertHandler {
 	 */
 	async getAlertById(alertId: string, organizationId: string): Promise<Alert | null> {
 		try {
-			const result = await this.db.execute(sql`
-				SELECT * FROM alerts 
-				WHERE id = ${alertId} 
+			const result = await this.client.executeOptimizedQuery(
+				(db) =>
+					db.execute(sql`
+				SELECT * FROM alerts
+				WHERE id = ${alertId}
 				AND organization_id = ${organizationId}
 				LIMIT 1
-			`)
+			`),
+				{ cacheKey: `get_alert_${alertId.slice(6)}` }
+			)
 
 			const rows = result || []
 			if (rows.length === 0) {
@@ -330,7 +354,11 @@ export class DatabaseAlertHandler implements AlertHandler {
 			query += ` WHERE organization_id = ${organizationId}`
 		}
 		try {
-			const result = await this.db.execute(sql.raw(query))
+			const result = await this.client.executeMonitoredQuery(
+				(db) => db.execute(sql.raw(query)),
+				'get_alert_statistics',
+				{ cacheKey: `get_alert_statistics_${organizationId || 'all'}` }
+			)
 
 			const rows = result || []
 			const row = rows[0]
@@ -411,6 +439,8 @@ export class DatabaseAlertHandler implements AlertHandler {
 /**
  * Factory function to create DatabaseAlertHandler
  */
-export function createDatabaseAlertHandler(db: PostgresJsDatabase<any>): DatabaseAlertHandler {
-	return new DatabaseAlertHandler(db)
+export function createDatabaseAlertHandler(
+	client: EnhancedAuditDatabaseClient
+): DatabaseAlertHandler {
+	return new DatabaseAlertHandler(client)
 }

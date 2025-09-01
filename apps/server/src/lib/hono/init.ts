@@ -224,7 +224,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			audit: auditDbInstance.getDrizzleInstance(),
 		}
 
-		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(db.audit)
+		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(client)
 		if (!monitoringService) {
 			if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
 			monitoringService = new MonitoringService(undefined, metricsCollector)
@@ -291,10 +291,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			databaseErrorLogger = new DatabaseErrorLogger(db.audit, errorLog, errorAggregation)
 		if (!errorHandler) errorHandler = new ErrorHandler(undefined, undefined, databaseErrorLogger)
 
-		if (!reportingService)
-			reportingService = new ComplianceReportingService(db.audit, {
-				secretKey: config.security.encryptionKey,
-			})
+		if (!reportingService) reportingService = new ComplianceReportingService(client, audit)
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService) {
 			const deliveryConfig = createDeliveryConfig(config.server.externalServices)
@@ -309,7 +306,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			)
 		}
 		if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(db.audit)
-		if (!gdprComplianceService) gdprComplianceService = new GDPRComplianceService(client)
+		if (!gdprComplianceService) gdprComplianceService = new GDPRComplianceService(client, audit)
 
 		const compliance = {
 			report: reportingService,

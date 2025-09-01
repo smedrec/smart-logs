@@ -75,11 +75,11 @@ export function requestMetrics() {
 			}
 
 			// Log request completion
-			const logLevel = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info'
+			/**const logLevel = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info'
 			logger[logLevel]('Request completed', {
 				...metrics,
 				duration: responseTime,
-			})
+			})*/
 
 			// Store metrics for aggregation
 			try {

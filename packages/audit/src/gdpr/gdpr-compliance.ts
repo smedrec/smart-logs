@@ -4,6 +4,8 @@ import { and, eq, gte, isNotNull, lte, sql } from 'drizzle-orm'
 import { auditLog, auditRetentionPolicy } from '@repo/audit-db'
 import * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 
+import { Audit } from '../audit.js'
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 import type { AuditLogEvent, DataClassification } from '../types.js'
@@ -33,6 +35,7 @@ export type PseudonymizationStrategy = 'hash' | 'token' | 'encryption'
  */
 export interface GDPRDataExportRequest {
 	principalId: string
+	organizationId: string
 	requestType: DataSubjectRightType
 	format: GDPRExportFormat
 	dateRange?: {
@@ -50,6 +53,7 @@ export interface GDPRDataExportRequest {
 export interface GDPRDataExport {
 	requestId: string
 	principalId: string
+	organizationId: string
 	exportTimestamp: string
 	format: GDPRExportFormat
 	recordCount: number
@@ -116,7 +120,10 @@ export class GDPRComplianceService {
 	private pseudonymMappings = new Map<string, string>()
 	private db: PostgresJsDatabase<typeof auditSchema>
 
-	constructor(private client: EnhancedAuditDatabaseClient) {
+	constructor(
+		private client: EnhancedAuditDatabaseClient,
+		private audit: Audit
+	) {
 		this.db = this.client.getDatabase()
 	}
 
@@ -129,6 +136,8 @@ export class GDPRComplianceService {
 
 		// Build query conditions
 		const conditions = [eq(auditLog.principalId, request.principalId)]
+
+		conditions.push(eq(auditLog.organizationId, request.organizationId))
 
 		if (request.dateRange) {
 			conditions.push(
@@ -174,6 +183,7 @@ export class GDPRComplianceService {
 		await this.logGDPRActivity({
 			timestamp: new Date().toISOString(),
 			principalId: request.requestedBy,
+			organizationId: request.organizationId,
 			action: 'gdpr.data.export',
 			status: 'success',
 			targetResourceType: 'AuditLog',
@@ -192,6 +202,7 @@ export class GDPRComplianceService {
 		return {
 			requestId,
 			principalId: request.principalId,
+			organizationId: request.organizationId,
 			exportTimestamp: new Date().toISOString(),
 			format: request.format,
 			recordCount: auditLogs.length,
@@ -659,11 +670,16 @@ export class GDPRComplianceService {
 	 * Log GDPR compliance activities
 	 */
 	private async logGDPRActivity(event: AuditLogEvent): Promise<void> {
-		await this.db.insert(auditLog).values({
+		await this.audit.log(event, {
+			generateHash: true,
+			generateSignature: true,
+		})
+
+		/**await this.db.insert(auditLog).values({
 			...event,
 			hash: createHash('sha256').update(JSON.stringify(event)).digest('hex'),
 			hashAlgorithm: 'SHA-256',
 			eventVersion: '1.0',
-		})
+		})*/
 	}
 }

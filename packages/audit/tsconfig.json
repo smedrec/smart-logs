@@ -13,5 +13,12 @@
 	//"references": [{ "path": "../audit-db" }],
 	//"include": ["src/**/*", "../audit-db/src/archival-cli.ts"],
 	"include": ["src/**/*"],
-	"exclude": ["node_modules", "dist", "eslint.config.ts", "**/*.test.ts", "**/*.spec.ts"]
+	"exclude": [
+		"node_modules",
+		"dist",
+		"eslint.config.ts",
+		"**/*.test.ts",
+		"**/*.spec.ts",
+		"src/examples/*.ts"
+	]
 }

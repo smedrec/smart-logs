@@ -595,7 +595,6 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 					'application/json': {
 						schema: z.object({
 							principalId: z.string().min(1),
-							resourceType: z.string().min(1),
 							format: z.enum(['json', 'csv', 'xml']).default('json'),
 							dateRange: z
 								.object({
@@ -664,6 +663,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			// Create GDPR export request
 			const exportRequest = {
 				principalId: requestData.principalId,
+				organizationId: session.session.activeOrganizationId as string,
 				requestType: 'access' as const,
 				format: requestData.format,
 				dateRange: requestData.dateRange
@@ -678,26 +678,6 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const exportResult = await compliance.gdpr.exportUserData(exportRequest)
-
-			// FIXME: the log data is already done on gdpr service but needs improvements
-			audit.logData({
-				principalId: session.session.userId,
-				organizationId: session.session.activeOrganizationId as string,
-				action: 'export',
-				resourceType: requestData.resourceType,
-				resourceId: requestData.principalId,
-				status: 'success',
-				dataClassification: 'PHI',
-				outcomeDescription: 'Exported GDPR data via REST API',
-				exportResult: {
-					requestId: exportResult.requestId,
-					recordCount: exportResult.recordCount,
-					dataSize: exportResult.dataSize,
-					format: exportResult.format,
-					exportTimestamp: exportResult.exportTimestamp,
-					metadata: exportResult.metadata,
-				},
-			})
 
 			return c.json({
 				requestId: exportResult.requestId,
