@@ -865,10 +865,39 @@ export const eventsRouter = {
 			const organizationId = ctx.session?.session.activeOrganizationId as string
 			const requestedBy = ctx.session?.session.userId
 
+			if (!requestedBy) {
+				const err = new TRPCError({
+					code: 'UNAUTHORIZED',
+					message: 'User not authenticated',
+				})
+
+				await error.handleError(
+					err,
+					{
+						requestId: ctx.requestId,
+						userId: ctx.session?.session.userId,
+						sessionId: ctx.session?.session.id,
+						metadata: {
+							organizationId,
+							principalId: input.principalId,
+							format: input.format,
+							message: err.message,
+							name: err.name,
+							code: err.code,
+						},
+					},
+					'trpc-api',
+					'events.gdprExport'
+				)
+
+				throw err
+			}
+
 			try {
 				// Create GDPR export request
 				const exportRequest = {
 					principalId: input.principalId,
+					organizationId,
 					requestType: 'access' as const,
 					format: input.format,
 					dateRange: input.dateRange
@@ -1117,7 +1146,7 @@ export const eventsRouter = {
 								sql`${auditLog.outcomeDescription} IS NOT NULL AND ${auditLog.outcomeDescription} LIKE ${searchText}`,
 								sql`${auditLog.targetResourceType} IS NOT NULL AND ${auditLog.targetResourceType} LIKE ${searchText}`,
 								sql`${auditLog.targetResourceId} IS NOT NULL AND ${auditLog.targetResourceId} LIKE ${searchText}`,
-							].filter((expr) => expr !== undefined)
+							].filter((expr): expr is typeof sql => expr !== undefined)
 						)
 					)
 				}

@@ -619,7 +619,7 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 
 			logger.info(`Generated HIPAA report: ${report.metadata.reportId}`)
 
-			return c.json(report)
+			return c.json(report, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to generate HIPAA report: ${message}`)
@@ -661,10 +661,13 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 
 			logger.info(`Generated GDPR report: ${report.metadata.reportId}`)
 
-			return c.json({
-				success: true,
-				report,
-			})
+			return c.json(
+				{
+					success: true,
+					report,
+				},
+				200
+			)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to generate GDPR report: ${message}`)
@@ -709,10 +712,13 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 
 			logger.info(`Generated integrity verification report: ${report.verificationId}`)
 
-			return c.json({
-				success: true,
-				report,
-			})
+			return c.json(
+				{
+					success: true,
+					report,
+				},
+				200
+			)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to generate integrity verification report: ${message}`)
@@ -739,7 +745,6 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const { report, config } = c.req.valid('json')
 
-			// Export the report
 			const exportResult = await compliance.export.exportComplianceReport(report, config)
 
 			logger.info(`Exported report: ${exportResult.exportId}`)
@@ -848,10 +853,13 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 		try {
 			const scheduledReports = await compliance.scheduled.getScheduledReports()
 
-			return c.json({
-				success: true,
-				scheduledReports,
-			})
+			return c.json(
+				{
+					success: true,
+					scheduledReports,
+				},
+				200
+			)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to get scheduled reports: ${message}`)
@@ -886,10 +894,20 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 				})
 			}
 
-			return c.json({
-				success: true,
-				scheduledReport,
-			})
+			// Ensure nextRun and createdAt are always present as strings
+			const safeScheduledReport = {
+				...scheduledReport,
+				nextRun: scheduledReport.nextRun ?? new Date().toISOString(),
+				createdAt: scheduledReport.createdAt ?? new Date().toISOString(),
+			}
+
+			return c.json(
+				{
+					success: true,
+					scheduledReport: safeScheduledReport,
+				},
+				200
+			)
 		} catch (error) {
 			if (error instanceof ApiError) {
 				throw error
@@ -921,14 +939,37 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 			const organizationId = session.session.activeOrganizationId as string
 			const presets = await compliance.preset.getPresets(organizationId)
 
-			return c.json({
-				success: true,
-				presets: presets.map((preset) => ({
-					...preset,
-					createdBy: (preset as any).createdBy || 'system',
-					createdAt: (preset as any).createdAt || new Date().toISOString(),
-				})),
-			})
+			return c.json(
+				{
+					success: true,
+					presets: presets.map((preset) => {
+						const presetValidation = preset.validation ?? DEFAULT_VALIDATION_CONFIG
+						const safeValidation = {
+							maxStringLength:
+								presetValidation.maxStringLength ?? DEFAULT_VALIDATION_CONFIG.maxStringLength,
+							allowedDataClassifications:
+								presetValidation.allowedDataClassifications ??
+								DEFAULT_VALIDATION_CONFIG.allowedDataClassifications,
+							requiredFields: Array.isArray(presetValidation.requiredFields)
+								? presetValidation.requiredFields.map((field) => String(field))
+								: DEFAULT_VALIDATION_CONFIG.requiredFields.map((field) => String(field)),
+							maxCustomFieldDepth:
+								presetValidation.maxCustomFieldDepth ??
+								DEFAULT_VALIDATION_CONFIG.maxCustomFieldDepth,
+							allowedEventVersions:
+								presetValidation.allowedEventVersions ??
+								DEFAULT_VALIDATION_CONFIG.allowedEventVersions,
+						}
+						return {
+							...preset,
+							createdBy: (preset as any).createdBy || 'system',
+							createdAt: (preset as any).createdAt || new Date().toISOString(),
+							validation: safeValidation,
+						}
+					}),
+				},
+				200
+			)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to get all audit presets: ${message}`)
@@ -981,6 +1022,23 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 
 			logger.info(`Created audit preset: ${preset.name}`)
 
+			// Ensure validation matches schema (all required fields present)
+			const presetValidation = newPreset.validation ?? DEFAULT_VALIDATION_CONFIG
+			const safeValidation = {
+				maxStringLength:
+					presetValidation.maxStringLength ?? DEFAULT_VALIDATION_CONFIG.maxStringLength,
+				allowedDataClassifications:
+					presetValidation.allowedDataClassifications ??
+					DEFAULT_VALIDATION_CONFIG.allowedDataClassifications,
+				requiredFields: Array.isArray(presetValidation.requiredFields)
+					? presetValidation.requiredFields.map((field) => String(field))
+					: DEFAULT_VALIDATION_CONFIG.requiredFields.map((field) => String(field)),
+				maxCustomFieldDepth:
+					presetValidation.maxCustomFieldDepth ?? DEFAULT_VALIDATION_CONFIG.maxCustomFieldDepth,
+				allowedEventVersions:
+					presetValidation.allowedEventVersions ?? DEFAULT_VALIDATION_CONFIG.allowedEventVersions,
+			}
+
 			return c.json(
 				{
 					success: true,
@@ -988,6 +1046,7 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 						...newPreset,
 						createdBy: userId,
 						createdAt: new Date().toISOString(),
+						validation: safeValidation,
 					},
 				},
 				201

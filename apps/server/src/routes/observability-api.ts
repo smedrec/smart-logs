@@ -274,7 +274,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 
 		try {
 			const dashboardData: DashboardData = await observability.dashboard.getDashboardData()
-			return c.json(dashboardData)
+			return c.json(dashboardData, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Failed to get dashboard data', message, {
@@ -296,15 +296,15 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 		const requestId = c.get('requestId')
 
 		try {
-			const format = c.req.query('format') || 'json'
+			const format = c.req.valid('query').format || 'json'
 			const metrics = await observability.metrics.exportMetrics(format as 'json' | 'prometheus')
 
 			if (format === 'prometheus') {
-				c.header('Content-Type', 'text/plain')
-				return c.text(metrics)
+				c.header('X-Metrics-Format', 'prometheus')
+				return c.json({ metrics }, 200)
 			}
 
-			return c.json(JSON.parse(metrics))
+			return c.json(JSON.parse(metrics), 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Failed to export enhanced metrics', message, {
@@ -327,7 +327,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 
 		try {
 			const bottlenecks = await observability.dashboard.getBottleneckAnalysis()
-			return c.json(bottlenecks)
+			return c.json(bottlenecks, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Failed to get bottleneck analysis', message, {
@@ -352,11 +352,11 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 			const traceId = c.req.query('traceId')
 			if (traceId) {
 				const spans = observability.tracer.getTraceSpans(traceId)
-				return c.json(spans)
+				return c.json(spans, 200)
 			}
 
 			const activeSpans = observability.tracer.getActiveSpans()
-			return c.json(activeSpans)
+			return c.json(activeSpans, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Failed to get trace data', message, {
@@ -379,7 +379,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 
 		try {
 			const profilingResults = observability.bottleneck.getProfilingResults()
-			return c.json(profilingResults)
+			return c.json(profilingResults, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Failed to get profiling results', message, {

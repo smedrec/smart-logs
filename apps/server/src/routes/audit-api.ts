@@ -395,7 +395,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				filters: query,
 			})
 
-			return c.json(result)
+			return c.json(result, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to query audit events: ${message}`)
@@ -465,7 +465,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				correlationId: dbEvent.correlationId || undefined,
 			}
 
-			return c.json(event)
+			return c.json(event, 200)
 		} catch (error) {
 			if (error instanceof ApiError) {
 				throw error
@@ -535,8 +535,8 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			const isValid = dbEvent.hash ? audit.verifyEventHash(auditEvent, dbEvent.hash) : false
 			const verificationResult = {
 				verified: isValid,
-				originalHash: dbEvent.hash,
-				computedHash: dbEvent.hash ? audit.generateEventHash(auditEvent) : null,
+				originalHash: dbEvent.hash ?? undefined,
+				computedHash: dbEvent.hash ? audit.generateEventHash(auditEvent) : undefined,
 				algorithm: dbEvent.hashAlgorithm || 'SHA-256',
 			}
 
@@ -557,16 +557,19 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				verifiedBy: session.session.userId,
 			})
 
-			return c.json({
-				eventId: id,
-				verified: verificationResult.verified,
-				timestamp: new Date().toISOString(),
-				details: {
-					originalHash: verificationResult.originalHash,
-					computedHash: verificationResult.computedHash,
-					algorithm: verificationResult.algorithm,
+			return c.json(
+				{
+					eventId: id,
+					verified: verificationResult.verified,
+					timestamp: new Date().toISOString(),
+					details: {
+						originalHash: verificationResult.originalHash,
+						computedHash: verificationResult.computedHash,
+						algorithm: verificationResult.algorithm,
+					},
 				},
-			})
+				200
+			)
 		} catch (error) {
 			if (error instanceof ApiError) {
 				throw error
@@ -679,16 +682,19 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 			const exportResult = await compliance.gdpr.exportUserData(exportRequest)
 
-			return c.json({
-				requestId: exportResult.requestId,
-				recordCount: exportResult.recordCount,
-				dataSize: exportResult.dataSize,
-				format: exportResult.format,
-				exportTimestamp: exportResult.exportTimestamp,
-				metadata: exportResult.metadata,
-				// Convert buffer to base64 for JSON transport
-				data: exportResult.data.toString('base64'),
-			})
+			return c.json(
+				{
+					requestId: exportResult.requestId,
+					recordCount: exportResult.recordCount,
+					dataSize: exportResult.dataSize,
+					format: exportResult.format,
+					exportTimestamp: exportResult.exportTimestamp,
+					metadata: exportResult.metadata,
+					// Convert buffer to base64 for JSON transport
+					data: exportResult.data.toString('base64'),
+				},
+				200
+			)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to export GDPR data via REST API: ${message}`)
@@ -783,7 +789,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 				},
 			})
 
-			return c.json(result)
+			return c.json(result, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to pseudonymize GDPR data via REST API: ${message}`)
@@ -896,7 +902,10 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(
 				{
 					successful: successful.map(({ success, eventData }) => ({ success, eventData })),
-					failed: failed.map(({ error, eventData }) => ({ error, eventData })),
+					failed: failed.map(({ error, eventData }) => ({
+						error: error ?? 'Unknown error',
+						eventData,
+					})),
 					summary: {
 						total: requestData.events.length,
 						successful: successful.length,
