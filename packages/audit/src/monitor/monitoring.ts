@@ -13,9 +13,12 @@ import type {
 	AlertStatistics,
 	AlertType,
 	AuditMetrics,
+	EndpointMetrics,
 	HealthStatus,
+	MetricPoint,
 	PerformanceMetrics,
 	RequestMetrics,
+	SystemMetrics,
 } from './monitoring-types.js'
 
 /**
@@ -107,13 +110,16 @@ export class MonitoringService {
 	private config: PatternDetectionConfig
 	private alertHandlers: AlertHandler[] = []
 	private metricsCollector: MetricsCollector
+	private logger: any
 
 	constructor(
 		config: PatternDetectionConfig = DEFAULT_PATTERN_CONFIG,
-		metricsCollector?: MetricsCollector
+		metricsCollector?: MetricsCollector,
+		logger?: any
 	) {
 		this.config = config
 		this.metricsCollector = metricsCollector || new RedisMetricsCollector()
+		this.logger = logger || console
 	}
 
 	/**
@@ -837,6 +843,372 @@ export class MonitoringService {
 		} catch (error) {
 			console.error('Failed to calculate error rate:', error)
 			return 0
+		}
+	}
+
+	/**
+	 * Collect and return current system metrics
+	 */
+	async getSystemMetrics(): Promise<SystemMetrics> {
+		try {
+			const [serverMetrics, databaseMetrics, redisMetrics, apiMetrics] = await Promise.allSettled([
+				this.getServerMetrics(),
+				this.getDatabaseMetrics(),
+				this.getRedisMetrics(),
+				this.getApiMetrics(),
+			])
+
+			return {
+				timestamp: new Date().toISOString(),
+				server:
+					serverMetrics.status === 'fulfilled'
+						? serverMetrics.value
+						: this.getDefaultServerMetrics(),
+				database:
+					databaseMetrics.status === 'fulfilled'
+						? databaseMetrics.value
+						: this.getDefaultDatabaseMetrics(),
+				redis:
+					redisMetrics.status === 'fulfilled' ? redisMetrics.value : this.getDefaultRedisMetrics(),
+				api: apiMetrics.status === 'fulfilled' ? apiMetrics.value : this.getDefaultApiMetrics(),
+			}
+		} catch (error) {
+			this.logger.error('Failed to collect system metrics', {
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+
+			return {
+				timestamp: new Date().toISOString(),
+				server: this.getDefaultServerMetrics(),
+				database: this.getDefaultDatabaseMetrics(),
+				redis: this.getDefaultRedisMetrics(),
+				api: this.getDefaultApiMetrics(),
+			}
+		}
+	}
+
+	/**
+	 * Get endpoint performance metrics
+	 */
+	async getEndpointMetrics(endpoint?: string): Promise<EndpointMetrics[]> {
+		try {
+			const pattern = endpoint ? `endpoints:*:${endpoint}` : `endpoints:*`
+			const metrics: EndpointMetrics[] = await this.metricsCollector.getMetricsByPattern(pattern)
+
+			return metrics.sort(
+				(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+			)
+		} catch (error) {
+			this.logger.error('Failed to get endpoint metrics', {
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+			return []
+		}
+	}
+
+	/**
+	 * Get server metrics
+	 */
+	private async getServerMetrics() {
+		const memoryUsage = process.memoryUsage()
+		const cpuUsage = process.cpuUsage()
+
+		return {
+			uptime: process.uptime(),
+			memoryUsage: {
+				used: memoryUsage.heapUsed,
+				total: memoryUsage.heapTotal,
+				percentage: (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100,
+			},
+			cpuUsage: {
+				percentage: (cpuUsage.user + cpuUsage.system) / 1000000, // Convert to seconds
+				loadAverage: [0, 0, 0], // Not available in Node.js on all platforms
+			},
+		}
+	}
+
+	/**
+	 * Get database metrics
+	 */
+	private async getDatabaseMetrics() {
+		// This would integrate with your database monitoring
+		// For now, return placeholder values
+		return {
+			connectionCount: 10,
+			activeQueries: 2,
+			averageQueryTime: 15,
+		}
+	}
+
+	/**
+	 * Get Redis metrics
+	 */
+	private async getRedisMetrics() {
+		try {
+			const info = await this.metricsCollector.info('memory')
+			const keyCount = await this.metricsCollector.dbsize()
+
+			// Parse memory info
+			const memoryMatch = info.match(/used_memory:(\d+)/)
+			const memoryUsage = memoryMatch ? parseInt(memoryMatch[1], 10) : 0
+
+			return {
+				connectionCount: 1, // This would come from connection pool
+				memoryUsage,
+				keyCount,
+			}
+		} catch (error) {
+			return this.getDefaultRedisMetrics()
+		}
+	}
+
+	/**
+	 * Get API metrics
+	 */
+	private async getApiMetrics() {
+		try {
+			// Calculate metrics from stored request data
+			const now = Date.now()
+			const oneMinuteAgo = now - 60000
+
+			// Get recent request metrics
+			const recentRequests = await this.metricsCollector.getMetricsByPattern(`requests:*`)
+			const recentRequestsInWindow = recentRequests.filter(
+				(req) => new Date(req.timestamp).getTime() > oneMinuteAgo
+			)
+
+			const requestsPerSecond = recentRequestsInWindow.length / 60
+			const averageResponseTime =
+				recentRequestsInWindow.length > 0
+					? recentRequestsInWindow.reduce((sum, req) => sum + req.responseTime, 0) /
+						recentRequestsInWindow.length
+					: 0
+
+			const errorCount = recentRequestsInWindow.filter((req) => req.statusCode >= 400).length
+			const errorRate =
+				recentRequestsInWindow.length > 0 ? errorCount / recentRequestsInWindow.length : 0
+
+			return {
+				requestsPerSecond,
+				averageResponseTime,
+				errorRate,
+			}
+		} catch (error) {
+			return this.getDefaultApiMetrics()
+		}
+	}
+
+	/**
+	 * Get processing metrics
+	 */
+	private async getProcessingMetrics(timeRange?: string) {
+		// This would integrate with audit service metrics
+		return {
+			count: 1000,
+			latency: {
+				average: 25,
+				p95: 50,
+				p99: 100,
+			},
+		}
+	}
+
+	/**
+	 * Get verification metrics
+	 */
+	private async getVerificationMetrics(timeRange?: string) {
+		// This would integrate with audit service metrics
+		return {
+			total: 100,
+			passed: 98,
+			failed: 2,
+		}
+	}
+
+	/**
+	 * Get report metrics
+	 */
+	private async getReportMetrics(timeRange?: string) {
+		// This would integrate with compliance service metrics
+		return {
+			generated: 10,
+			scheduled: 5,
+			failed: 0,
+		}
+	}
+
+	/**
+	 * Build metric key with labels
+	 */
+	private buildMetricKey(type: string, name: string, labels?: Record<string, string>): string {
+		let key = `{type}:${name}`
+
+		if (labels) {
+			const labelString = Object.entries(labels)
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([k, v]) => `${k}=${v}`)
+				.join(',')
+			key += `:${labelString}`
+		}
+
+		return key
+	}
+
+	/**
+	 * Record a counter metric
+	 */
+	async incrementCounter(name: string, labels?: Record<string, string>, value = 1): Promise<void> {
+		try {
+			const key = this.buildMetricKey('counter', name, labels)
+			await this.metricsCollector.incrementCounter(key, value)
+		} catch (error) {
+			this.logger.error('Failed to increment counter', {
+				name,
+				labels,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+		}
+	}
+
+	/**
+	 * Record a gauge metric
+	 */
+	async setGauge(name: string, value: number, labels?: Record<string, string>): Promise<void> {
+		try {
+			const key = this.buildMetricKey('gauge', name, labels)
+			const metric: MetricPoint = {
+				timestamp: Date.now(),
+				value,
+				labels,
+			}
+			await this.metricsCollector.storeMetric(key, metric)
+		} catch (error) {
+			this.logger.error('Failed to set gauge', {
+				name,
+				value,
+				labels,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+		}
+	}
+
+	/**
+	 * Record a histogram metric (for response times, etc.)
+	 */
+	async recordHistogram(
+		name: string,
+		value: number,
+		labels?: Record<string, string>
+	): Promise<void> {
+		try {
+			const key = this.buildMetricKey('histogram', name, labels)
+			const now = Date.now()
+
+			// Store individual measurement
+			const measurementKey = `${key}:${now}`
+			await this.metricsCollector.storeMetric(
+				measurementKey,
+				{ timestamp: now, value, labels },
+				3600
+			) // 1 hour TTL
+
+			// Update aggregated statistics
+			await this.updateHistogramStats(key, value)
+		} catch (error) {
+			this.logger.error('Failed to record histogram', {
+				name,
+				value,
+				labels,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+		}
+	}
+
+	/**
+	 * Update histogram statistics
+	 */
+	private async updateHistogramStats(key: string, value: number): Promise<void> {
+		try {
+			const statsKey = `${key}:stats`
+			const existing = await this.metricsCollector.getMetric(statsKey)
+
+			if (existing) {
+				const updated = {
+					count: existing.count + 1,
+					sum: existing.sum + value,
+					min: Math.min(existing.min, value),
+					max: Math.max(existing.max, value),
+					lastUpdated: Date.now(),
+				}
+				await this.metricsCollector.storeMetric(statsKey, updated)
+			} else {
+				const newStats = {
+					count: 1,
+					sum: value,
+					min: value,
+					max: value,
+					lastUpdated: Date.now(),
+				}
+				await this.metricsCollector.storeMetric(statsKey, newStats)
+			}
+		} catch (error) {
+			this.logger.error('Failed to update histogram stats', {
+				key,
+				value,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+		}
+	}
+
+	/**
+	 * Default server metrics
+	 */
+	private getDefaultServerMetrics() {
+		const memoryUsage = process.memoryUsage()
+		return {
+			uptime: process.uptime(),
+			memoryUsage: {
+				used: memoryUsage.heapUsed,
+				total: memoryUsage.heapTotal,
+				percentage: (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100,
+			},
+			cpuUsage: {
+				percentage: 0,
+				loadAverage: [0, 0, 0],
+			},
+		}
+	}
+
+	/**
+	 * Default database metrics
+	 */
+	private getDefaultDatabaseMetrics() {
+		return {
+			connectionCount: 0,
+			activeQueries: 0,
+			averageQueryTime: 0,
+		}
+	}
+
+	/**
+	 * Default Redis metrics
+	 */
+	private getDefaultRedisMetrics() {
+		return {
+			connectionCount: 0,
+			memoryUsage: 0,
+			keyCount: 0,
+		}
+	}
+
+	/**
+	 * Default API metrics
+	 */
+	private getDefaultApiMetrics() {
+		return {
+			requestsPerSecond: 0,
+			averageResponseTime: 0,
+			errorRate: 0,
 		}
 	}
 }

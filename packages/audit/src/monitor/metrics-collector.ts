@@ -30,9 +30,9 @@ export interface MetricsCollector {
 	storeMetric(key: string, value: any, ttl?: number): Promise<void>
 	getMetric(key: string): Promise<any>
 	getMetricsByPattern(pattern: string): Promise<any[]>
-	incrementCounter(name: string, labels?: Record<string, string>, value?: number): Promise<void>
-	setGauge(name: string, value: number, labels?: Record<string, string>): Promise<void>
-	recordHistogram(name: string, value: number, labels?: Record<string, string>): Promise<void>
+	incrementCounter(key: string, value?: number): Promise<void>
+	info(type?: string): Promise<string>
+	dbsize(): Promise<number>
 }
 
 /**
@@ -142,6 +142,22 @@ export class RedisMetricsCollector implements MetricsCollector {
 			this.connection = getSharedRedisConnection()
 			this.isSharedConnection = true
 		}
+	}
+
+	/**
+	 *
+	 * @returns the info of the redis connection
+	 */
+	async info(type = 'default'): Promise<string> {
+		return await this.connection.info(type)
+	}
+
+	/**
+	 *
+	 * @returns the size of the database
+	 */
+	async dbsize(): Promise<number> {
+		return await this.connection.dbsize()
 	}
 
 	/**
@@ -356,101 +372,12 @@ export class RedisMetricsCollector implements MetricsCollector {
 	/**
 	 * Record a counter metric
 	 */
-	async incrementCounter(name: string, labels?: Record<string, string>, value = 1): Promise<void> {
+	async incrementCounter(key: string, value = 1): Promise<void> {
 		try {
-			const key = this.buildMetricKey('counter', name, labels)
 			await this.connection.incrby(key, value)
 			await this.connection.expire(key, this.retentionPeriod)
 		} catch (error) {
 			console.error('Failed to increment counter', {
-				name,
-				labels,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			})
-		}
-	}
-
-	/**
-	 * Record a gauge metric
-	 */
-	async setGauge(name: string, value: number, labels?: Record<string, string>): Promise<void> {
-		try {
-			const key = this.buildMetricKey('gauge', name, labels)
-			const metric: MetricPoint = {
-				timestamp: Date.now(),
-				value,
-				labels,
-			}
-			await this.storeMetric(key, metric)
-		} catch (error) {
-			console.error('Failed to set gauge', {
-				name,
-				value,
-				labels,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			})
-		}
-	}
-
-	/**
-	 * Record a histogram metric (for response times, etc.)
-	 */
-	async recordHistogram(
-		name: string,
-		value: number,
-		labels?: Record<string, string>
-	): Promise<void> {
-		try {
-			const key = this.buildMetricKey('histogram', name, labels)
-			const now = Date.now()
-
-			// Store individual measurement
-			const measurementKey = `${key}:${now}`
-			await this.storeMetric(measurementKey, { timestamp: now, value, labels }, 3600) // 1 hour TTL
-
-			// Update aggregated statistics
-			await this.updateHistogramStats(key, value)
-		} catch (error) {
-			console.error('Failed to record histogram', {
-				name,
-				value,
-				labels,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			})
-		}
-	}
-
-	/**
-	 * Update histogram statistics
-	 */
-	private async updateHistogramStats(key: string, value: number): Promise<void> {
-		try {
-			const statsKey = `${key}:stats`
-			const existing = await this.getMetric(statsKey)
-
-			if (existing) {
-				const updated = {
-					count: existing.count + 1,
-					sum: existing.sum + value,
-					min: Math.min(existing.min, value),
-					max: Math.max(existing.max, value),
-					lastUpdated: Date.now(),
-				}
-				await this.storeMetric(statsKey, updated)
-			} else {
-				const newStats = {
-					count: 1,
-					sum: value,
-					min: value,
-					max: value,
-					lastUpdated: Date.now(),
-				}
-				await this.storeMetric(statsKey, newStats)
-			}
-		} catch (error) {
-			console.error('Failed to update histogram stats', {
-				key,
-				value,
 				error: error instanceof Error ? error.message : 'Unknown error',
 			})
 		}

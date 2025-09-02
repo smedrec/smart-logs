@@ -23,7 +23,7 @@ export async function getAuthDb(config: AuditConfig, audit?: Audit) {
 	if (!authInstance) {
 		authInstance = await initializeAuth(config, audit)
 	}
-	return authInstance.getDbInstance()
+	return authInstance.getDrizzleInstance()
 }
 
 export async function getAuthRedis(config: AuditConfig, audit?: Audit) {

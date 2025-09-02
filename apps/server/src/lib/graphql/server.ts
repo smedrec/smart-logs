@@ -84,7 +84,7 @@ export const createGraphQLServer = () => {
 		},
 
 		// Error formatting with unified handler
-		formatError: createGraphQLErrorFormatter(),
+		//formatError: createGraphQLErrorFormatter(),
 
 		// Error masking for production
 		maskedErrors:

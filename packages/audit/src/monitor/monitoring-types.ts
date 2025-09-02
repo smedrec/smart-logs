@@ -114,3 +114,51 @@ export interface PerformanceMetrics {
 	errorRate: number
 	lastUpdated: string
 }
+
+export interface SystemMetrics {
+	timestamp: string
+	server: {
+		uptime: number
+		memoryUsage: {
+			used: number
+			total: number
+			percentage: number
+		}
+		cpuUsage: {
+			percentage: number
+			loadAverage: number[]
+		}
+	}
+	database: {
+		connectionCount: number
+		activeQueries: number
+		averageQueryTime: number
+	}
+	redis: {
+		connectionCount: number
+		memoryUsage: number
+		keyCount: number
+	}
+	api: {
+		requestsPerSecond: number
+		averageResponseTime: number
+		errorRate: number
+	}
+}
+
+export interface EndpointMetrics {
+	endpoint: string
+	method: string
+	count: number
+	averageResponseTime: number
+	p95ResponseTime: number
+	p99ResponseTime: number
+	errorRate: number
+	lastUpdated: string
+}
+
+export interface MetricPoint {
+	timestamp: number
+	value: number
+	labels?: Record<string, string>
+}
