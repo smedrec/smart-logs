@@ -228,7 +228,7 @@ export class CircuitBreaker {
 		if (this.state === 'CLOSED' && this.failureCount >= this.config.failureThreshold) {
 			this.state = 'OPEN'
 			this.metrics.circuitBreakerTrips++
-			this.logger?.error('Circuit breaker opened due to failures', {
+			this.logger?.error('Circuit breaker opened due to failures', undefined, {
 				circuitBreaker: this.config.name,
 				state: this.state,
 				failureCount: this.failureCount,
@@ -238,7 +238,7 @@ export class CircuitBreaker {
 			// Any failure in HALF_OPEN state should open the circuit
 			this.state = 'OPEN'
 			this.metrics.circuitBreakerTrips++
-			this.logger?.error('Circuit breaker opened from HALF_OPEN due to failure', {
+			this.logger?.error('Circuit breaker opened from HALF_OPEN due to failure', undefined, {
 				circuitBreaker: this.config.name,
 				state: this.state,
 			})
@@ -296,8 +296,7 @@ export class RetryHandler {
 
 				// Don't retry if we've exceeded max attempts
 				if (attempt > this.config.maxRetries) {
-					this.logger?.error('Max retry attempts exceeded', {
-						error: lastError.message,
+					this.logger?.error('Max retry attempts exceeded', lastError.message, {
 						attempts: attempt,
 						maxRetries: this.config.maxRetries,
 						...context,

@@ -7,8 +7,9 @@ export interface RetryConfig {
 	backoffStrategy: 'exponential' | 'linear' | 'fixed'
 	baseDelay: number
 	maxDelay: number
-	retryableErrors: string[]
+	backoffMultiplier?: number
 	jitter?: boolean
+	retryableErrors: string[]
 }
 
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {

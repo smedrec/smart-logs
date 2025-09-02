@@ -15,11 +15,12 @@ import { GraphQLError } from 'graphql'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 
-import { ApiError, ErrorSchema } from './http'
+import { ApiError, ErrorCode, ErrorSchema } from './http'
 import { CircuitBreakerOpenError, ServiceDegradedError, TimeoutError } from './resilience'
 
 import type { GraphQLFormattedError } from 'graphql'
 import type { Context } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { HonoEnv } from '../hono/context'
 import type { StructuredLogger } from '../services/logging'
 
@@ -691,7 +692,7 @@ export class UnifiedErrorHandler {
 		}
 	}
 
-	private getStatusFromCategory(category: ErrorCategory): number {
+	private getStatusFromCategory(category: ErrorCategory): ContentfulStatusCode {
 		switch (category) {
 			case 'validation':
 				return 400
@@ -715,7 +716,7 @@ export class UnifiedErrorHandler {
 		}
 	}
 
-	private getErrorCodeFromStatus(status: number): string {
+	private getErrorCodeFromStatus(status: number): z.infer<typeof ErrorCode> {
 		switch (status) {
 			case 400:
 				return 'BAD_REQUEST'
@@ -728,7 +729,7 @@ export class UnifiedErrorHandler {
 			case 408:
 				return 'TIMEOUT'
 			case 409:
-				return 'CONFLICT'
+				return 'NOT_UNIQUE'
 			case 429:
 				return 'RATE_LIMITED'
 			case 503:

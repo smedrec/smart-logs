@@ -39,11 +39,13 @@ export const gdprResolvers = {
 			}
 
 			const requestedBy = context.session.session.userId
+			const organizationId = context.session.session.activeOrganizationId as string
 
 			try {
 				// Create GDPR export request
 				const exportRequest = {
 					principalId: args.input.principalId,
+					organizationId,
 					requestType: 'access' as const,
 					format: args.input.format,
 					dateRange: args.input.dateRange

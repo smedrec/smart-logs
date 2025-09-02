@@ -116,10 +116,13 @@ export function rateLimit(config: RateLimitConfig) {
 			}
 
 			// If rate limiting fails, log error but don't block requests
-			logger.error('Rate limiting error, allowing request', {
-				error: error instanceof Error ? error.message : 'Unknown error',
-				key: generateRateLimitKey(c, config.keyGenerator),
-			})
+			logger.error(
+				'Rate limiting error, allowing request',
+				error instanceof Error ? error.message : 'Unknown error',
+				{
+					key: generateRateLimitKey(c, config.keyGenerator),
+				}
+			)
 
 			await next()
 		}

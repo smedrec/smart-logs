@@ -3,10 +3,10 @@
  */
 import { getSharedRedisConnection } from '@repo/redis-client'
 
-import { QueryCacheConfig } from './cache-factory.js'
 import { QueryCache } from './query-cache.js'
 
 import type { Redis } from 'ioredis'
+import type { QueryCacheConfig } from './cache-factory.js'
 import type { CacheEntry, QueryCacheStats } from './query-cache.js'
 
 export interface RedisQueryCacheConfig extends QueryCacheConfig {

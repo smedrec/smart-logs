@@ -8,7 +8,7 @@ import type { StatusCode } from 'hono/utils/http-status'
 import type { ZodError } from 'zod'
 import type { HonoEnv } from '../hono/context.js'
 
-const ErrorCode = z.enum([
+export const ErrorCode = z.enum([
 	'BAD_REQUEST',
 	'FORBIDDEN',
 	'INTERNAL_SERVER_ERROR',
@@ -175,7 +175,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 	if (err instanceof ApiError) {
 		const status = codeToStatus(err.code)
 		if (status >= 500) {
-			logger.error('returning 5XX', {
+			logger.error('returning 5XX', err.message, {
 				message: err.message,
 				name: err.name,
 				code: err.code,
@@ -221,8 +221,7 @@ export async function handleError(err: Error, c: Context<HonoEnv>): Promise<Resp
 	 */
 	if (err instanceof HTTPException) {
 		if (err.status >= 500) {
-			logger.error('HTTPException', {
-				message: err.message,
+			logger.error('HTTPException', err.message, {
 				status: err.status,
 				requestId: c.get('requestId'),
 			})

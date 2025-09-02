@@ -139,6 +139,10 @@ const ErrorResponseSchema = z.object({
 	path: z.string().optional(),
 })
 
+const ResultSchema = z.object({
+	success: z.boolean(),
+})
+
 // Route definitions
 const getSystemMetricsRoute = createRoute({
 	method: 'get',
@@ -256,7 +260,7 @@ const acknowledgeAlertRoute = createRoute({
 			description: 'Alert acknowledged successfully',
 			content: {
 				'application/json': {
-					schema: AlertSchema,
+					schema: ResultSchema,
 				},
 			},
 		},
@@ -272,7 +276,7 @@ const resolveAlertRoute = createRoute({
 	description: 'Resolves an alert with a resolution note.',
 	request: {
 		params: z.object({
-			id: z.string().uuid(),
+			id: z.string(),
 		}),
 		body: {
 			content: {
@@ -289,7 +293,7 @@ const resolveAlertRoute = createRoute({
 			description: 'Alert resolved successfully',
 			content: {
 				'application/json': {
-					schema: AlertSchema,
+					schema: ResultSchema,
 				},
 			},
 		},
@@ -325,7 +329,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(metrics)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get system metrics', {
+			logger.error('Failed to get system metrics', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -366,7 +370,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(metrics)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get audit metrics', {
+			logger.error('Failed to get audit metrics', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -470,7 +474,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(result)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get alerts', {
+			logger.error('Failed to get alerts', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -522,7 +526,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to acknowledge alert', {
+			logger.error('Failed to acknowledge alert', message, {
 				requestId,
 				alertId: c.req.param('id'),
 				error: message,
@@ -556,12 +560,12 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			const { resolution } = c.req.valid('json')
 
 			// Resolve alert
-			const alert = await monitor.alert.resolveAlert(id, userId, {
+			const result = await monitor.alert.resolveAlert(id, userId, {
 				resolvedBy: userId,
 				resolutionNotes: resolution,
 			})
 
-			if (!alert) {
+			if (!result) {
 				throw new ApiError({
 					code: 'NOT_FOUND',
 					message: 'Alert not found',
@@ -575,14 +579,14 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 				userId: session.session.userId,
 			})
 
-			return c.json(alert)
+			return c.json(result)
 		} catch (error) {
 			if (error instanceof ApiError) {
 				throw error
 			}
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to resolve alert', {
+			logger.error('Failed to resolve alert', message, {
 				requestId,
 				alertId: c.req.param('id'),
 				error: message,

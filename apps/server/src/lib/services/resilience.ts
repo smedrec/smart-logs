@@ -28,8 +28,8 @@ import type { StructuredLogger } from './logging'
  * Service configuration for resilience patterns
  */
 export interface ServiceResilienceConfig {
-	circuitBreaker?: Partial<CircuitBreakerConfig>
-	retry?: Partial<RetryConfig>
+	circuitBreaker?: Partial<CircuitBreakerConfig> | false
+	retry?: Partial<RetryConfig> | false
 	timeout?: number
 	enableFallback?: boolean
 }

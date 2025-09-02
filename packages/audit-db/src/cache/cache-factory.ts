@@ -1,10 +1,12 @@
+import { QueryCache } from './query-cache.js'
+import { RedisQueryCache } from './redis-query-cache.js'
+
+import type { QueryCacheStats } from './query-cache.js'
+import type { RedisQueryCacheConfig } from './redis-query-cache.js'
+
 /**
  * Cache factory for creating appropriate cache instances
  */
-import { QueryCache, QueryCacheStats } from './query-cache.js'
-import { RedisQueryCache } from './redis-query-cache.js'
-
-import type { RedisQueryCacheConfig } from './redis-query-cache.js'
 
 type CacheType = 'local' | 'redis' | 'hybrid'
 

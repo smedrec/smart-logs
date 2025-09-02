@@ -6,17 +6,13 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
-import { CacheFactoryConfig, createQueryCache } from '../cache/cache-factory.js'
-import {
-	IQueryCache,
-	QueryCacheStats,
-	RedisQueryCache,
-	RedisQueryCacheConfig,
-} from '../cache/query-cache.js'
+import { createQueryCache } from '../cache/cache-factory.js'
 import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Sql } from 'postgres'
+import type { CacheFactoryConfig } from '../cache/cache-factory.js'
+import type { IQueryCache, QueryCacheStats } from '../cache/query-cache.js'
 
 export interface ConnectionPoolConfig {
 	/** Database connection URL */

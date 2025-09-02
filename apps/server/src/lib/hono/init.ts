@@ -34,6 +34,7 @@ import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { MetricsCollectionService } from '../services/metrics.js'
+import { createResilienceService } from '../services/resilience'
 
 import type { MiddlewareHandler } from 'hono'
 import type { AuditConfig, DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
@@ -242,7 +243,6 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 
 		// Initialize resilience service
 		if (!resilienceService) {
-			const { createResilienceService } = await import('../services/resilience.js')
 			resilienceService = createResilienceService(structuredLogger)
 		}
 

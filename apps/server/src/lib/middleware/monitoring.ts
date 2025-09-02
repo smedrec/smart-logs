@@ -85,10 +85,13 @@ export function requestMetrics() {
 			try {
 				await monitor.metrics.storeRequestMetrics(metrics)
 			} catch (metricsError) {
-				logger.error('Failed to store request metrics', {
-					error: metricsError instanceof Error ? metricsError.message : 'Unknown error',
-					requestId,
-				})
+				logger.error(
+					'Failed to store request metrics',
+					metricsError instanceof Error ? metricsError.message : 'Unknown error',
+					{
+						requestId,
+					}
+				)
 			}
 
 			// Add performance headers
@@ -169,10 +172,13 @@ export function performanceMonitoring(options: { threshold?: number; alertOnSlow
 				}
 				await monitor.metrics.sendExternalAlert(alert)
 			} catch (alertError) {
-				logger.error('Failed to create slow request alert', {
-					error: alertError instanceof Error ? alertError.message : 'Unknown error',
-					requestId,
-				})
+				logger.error(
+					'Failed to create slow request alert',
+					alertError instanceof Error ? alertError.message : 'Unknown error',
+					{
+						requestId,
+					}
+				)
 			}
 		}
 	})
@@ -223,10 +229,13 @@ export function healthCheckMonitoring() {
 
 			await next()
 		} catch (error) {
-			logger.error('Health check failed', {
-				requestId,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			})
+			logger.error(
+				'Health check failed',
+				error instanceof Error ? error.message : 'Unknown error',
+				{
+					requestId,
+				}
+			)
 
 			// Set unhealthy status
 			c.set('healthStatus', {
@@ -293,10 +302,13 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 					await monitor.metrics.sendExternalAlert(alert)
 				}
 			} catch (alertError) {
-				logger.error('Failed to create error rate alert', {
-					error: alertError instanceof Error ? alertError.message : 'Unknown error',
-					requestId,
-				})
+				logger.error(
+					'Failed to create error rate alert',
+					alertError instanceof Error ? alertError.message : 'Unknown error',
+					{
+						requestId,
+					}
+				)
 			}
 
 			throw error

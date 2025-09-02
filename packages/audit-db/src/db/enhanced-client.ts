@@ -1,12 +1,13 @@
 import { createHash } from 'crypto'
 
-import { CacheFactoryConfig } from '../cache/cache-factory.js'
-import { ConnectionPoolConfig, EnhancedDatabaseClient } from './connection-pool.js'
+import { EnhancedDatabaseClient } from './connection-pool.js'
 import { DatabasePartitionManager, PartitionMaintenanceScheduler } from './partitioning.js'
 import { DatabasePerformanceMonitor } from './performance-monitoring.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
+import type { CacheFactoryConfig } from '../cache/cache-factory.js'
+import type { ConnectionPoolConfig } from './connection-pool.js'
 import type * as schema from './schema.js'
 
 /**
