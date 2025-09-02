@@ -2,7 +2,7 @@ import { Redis as RedisInstance } from 'ioredis'
 
 import { getSharedRedisConnection } from '@repo/redis-client'
 
-import { AuditMetrics } from './monitoring-types.js'
+import { AuditMetrics, Metrics } from './monitoring-types.js'
 
 import type { RedisOptions, Redis as RedisType } from 'ioredis'
 
@@ -21,7 +21,7 @@ export interface MetricsCollector {
 	recordError(): Promise<void>
 	recordIntegrityViolation(): Promise<void>
 	recordQueueDepth(depth: number): Promise<void>
-	getMetrics(): Promise<AuditMetrics>
+	getMetrics(): Promise<Metrics>
 	resetMetrics(): Promise<void>
 	recordSuspiciousPattern(suspiciousPatterns: number): Promise<void>
 	recordAlertGenerated(): Promise<void>
@@ -177,8 +177,8 @@ export class RedisMetricsCollector implements MetricsCollector {
 		return key
 	}
 
-	async getMetrics(): Promise<AuditMetrics> {
-		const metrics: AuditMetrics = {
+	async getMetrics(): Promise<Metrics> {
+		const metrics: Metrics = {
 			eventsProcessed: parseInt(
 				(await this.connection.get(`${this.metricsPrefix}eventsProcessed`)) || '0',
 				10
@@ -217,7 +217,7 @@ export class RedisMetricsCollector implements MetricsCollector {
 	async resetMetrics(): Promise<void> {
 		await this.connection.del(`${this.metricsPrefix}`)
 
-		const metrics: AuditMetrics = {
+		const metrics: Metrics = {
 			eventsProcessed: 0,
 			processingLatency: 0,
 			queueDepth: 0,

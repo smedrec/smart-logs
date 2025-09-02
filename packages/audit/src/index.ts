@@ -23,6 +23,8 @@ export type {
 	AlertStatistics,
 	RequestMetrics,
 	PerformanceMetrics,
+	SystemMetrics,
+	AuditMetrics,
 } from './monitor/monitoring-types.js'
 
 // Export database alert handler

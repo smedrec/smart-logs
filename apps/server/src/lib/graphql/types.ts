@@ -339,7 +339,8 @@ export interface TimeRangeInput {
 	endDate: string
 }
 
-export type MetricsGroupBy = 'HOUR' | 'DAY' | 'WEEK' | 'MONTH'
+export type MetricsTimeRange = '1h' | '6h' | '24h' | '7d' | '30d'
+export type MetricsGroupBy = 'hour' | 'day' | 'week' | 'month' | 'year'
 
 // Input types for mutations
 export interface CreateAuditEventInput {

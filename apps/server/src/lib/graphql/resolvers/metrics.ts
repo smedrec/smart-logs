@@ -5,13 +5,8 @@
 
 import { GraphQLError } from 'graphql'
 
-import type {
-	AuditMetrics,
-	GraphQLContext,
-	MetricsGroupBy,
-	SystemMetrics,
-	TimeRangeInput,
-} from '../types'
+import type { AuditMetrics, SystemMetrics } from '@repo/audit'
+import type { GraphQLContext, MetricsGroupBy, MetricsTimeRange, TimeRangeInput } from '../types'
 
 export const metricsResolvers = {
 	Query: {
@@ -37,17 +32,17 @@ export const metricsResolvers = {
 							percentage: (process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100,
 						},
 						cpuUsage: {
-							percentage: metrics.cpu?.usage || 0,
-							loadAverage: metrics.cpu?.loadAverage || [0, 0, 0],
+							percentage: metrics.server.cpuUsage?.percentage || 0,
+							loadAverage: metrics.server.cpuUsage?.loadAverage || [0, 0, 0],
 						},
 					},
 					database: {
-						connectionCount: metrics.database?.connections || 0,
+						connectionCount: metrics.database?.connectionCount || 0,
 						activeQueries: metrics.database?.activeQueries || 0,
 						averageQueryTime: metrics.database?.averageQueryTime || 0,
 					},
 					redis: {
-						connectionCount: metrics.redis?.connections || 0,
+						connectionCount: metrics.redis?.connectionCount || 0,
 						memoryUsage: metrics.redis?.memoryUsage || 0,
 						keyCount: metrics.redis?.keyCount || 0,
 					},
@@ -92,7 +87,8 @@ export const metricsResolvers = {
 		auditMetrics: async (
 			_: any,
 			args: {
-				timeRange: TimeRangeInput
+				metricsTimeRange?: MetricsTimeRange
+				timeRange?: TimeRangeInput
 				groupBy?: MetricsGroupBy
 			},
 			context: GraphQLContext
@@ -112,17 +108,17 @@ export const metricsResolvers = {
 			try {
 				// Get audit metrics from monitoring service
 				const metrics = await monitor.metrics.getAuditMetrics({
-					startDate: args.timeRange.startDate,
-					endDate: args.timeRange.endDate,
-					organizationId,
+					timeRange: args.metricsTimeRange,
+					startTime: args.timeRange?.startDate,
+					endTime: args.timeRange?.endDate,
 					groupBy: args.groupBy,
 				})
 
-				const auditMetrics: AuditMetrics = {
+				/**const auditMetrics: AuditMetrics = {
 					timestamp: new Date().toISOString(),
 					timeRange: {
-						startDate: args.timeRange.startDate,
-						endDate: args.timeRange.endDate,
+						startDate: args.timeRange?.startDate,
+						endDate: args.timeRange?.endDate,
 					},
 					eventsProcessed: metrics.eventsProcessed || 0,
 					processingLatency: {
@@ -154,16 +150,16 @@ export const metricsResolvers = {
 						byType: metrics.errors?.byType || {},
 						errorRate: metrics.errors?.rate || 0,
 					},
-				}
+				} */
 
 				logger.info('GraphQL audit metrics retrieved', {
 					organizationId,
 					timeRange: args.timeRange,
 					groupBy: args.groupBy,
-					eventsProcessed: auditMetrics.eventsProcessed,
+					eventsProcessed: metrics.eventsProcessed,
 				})
 
-				return auditMetrics
+				return metrics
 			} catch (e) {
 				const message = e instanceof Error ? e.message : 'Unknown error'
 				logger.error(`Failed to get audit metrics via GraphQL: ${message}`)

@@ -16,6 +16,8 @@ import type {
 	EndpointMetrics,
 	HealthStatus,
 	MetricPoint,
+	MetricQuery,
+	Metrics,
 	PerformanceMetrics,
 	RequestMetrics,
 	SystemMetrics,
@@ -128,7 +130,6 @@ export class MonitoringService {
 	private initializeMetrics(): AuditMetrics {
 		return {
 			eventsProcessed: 0,
-			processingLatency: 0,
 			queueDepth: 0,
 			errorsGenerated: 0,
 			errorRate: 0,
@@ -136,6 +137,9 @@ export class MonitoringService {
 			timestamp: new Date().toISOString(),
 			alertsGenerated: 0,
 			suspiciousPatterns: 0,
+			processingLatency: { average: 0, p95: 0, p99: 0 },
+			integrityVerifications: { total: 0, passed: 0, failed: 0 },
+			complianceReports: { generated: 0, scheduled: 0, failed: 0 },
 		}
 	}
 
@@ -585,7 +589,7 @@ export class MonitoringService {
 	/**
 	 * Get current metrics
 	 */
-	async getMetrics(): Promise<AuditMetrics> {
+	async getMetrics(): Promise<Metrics> {
 		const metrics = await this.metricsCollector.getMetrics()
 		return metrics
 	}
@@ -883,6 +887,76 @@ export class MonitoringService {
 				database: this.getDefaultDatabaseMetrics(),
 				redis: this.getDefaultRedisMetrics(),
 				api: this.getDefaultApiMetrics(),
+			}
+		}
+	}
+
+	/**
+	 * Get audit-specific metrics
+	 */
+	async getAuditMetrics(query?: MetricQuery): Promise<AuditMetrics> {
+		try {
+			// TODO: review and improve metrics
+			const metrics = await this.getMetrics()
+			const [processingMetrics, verificationMetrics, reportMetrics] = await Promise.allSettled([
+				this.getProcessingMetrics(query?.timeRange),
+				this.getVerificationMetrics(query?.timeRange),
+				this.getReportMetrics(query?.timeRange),
+			])
+
+			return {
+				timestamp: new Date().toISOString(),
+				eventsProcessed: metrics.eventsProcessed,
+				queueDepth: metrics.queueDepth,
+				errorsGenerated: metrics.errorsGenerated,
+				errorRate: metrics.errorRate,
+				integrityViolations: metrics.integrityViolations,
+				alertsGenerated: metrics.alertsGenerated,
+				suspiciousPatterns: metrics.suspiciousPatterns,
+				//eventsProcessed:
+				//	processingMetrics.status === 'fulfilled' ? processingMetrics.value.count : 0,
+				processingLatency:
+					processingMetrics.status === 'fulfilled'
+						? processingMetrics.value.latency
+						: { average: 0, p95: 0, p99: 0 },
+				integrityVerifications:
+					verificationMetrics.status === 'fulfilled'
+						? verificationMetrics.value
+						: { total: 0, passed: 0, failed: 0 },
+				complianceReports:
+					reportMetrics.status === 'fulfilled'
+						? reportMetrics.value
+						: { generated: 0, scheduled: 0, failed: 0 },
+			}
+			/**const metrics = await this.getMetrics()
+			return {
+				timestamp: new Date().toISOString(),
+				eventsProcessed: metrics.eventsProcessed,
+				processingLatency: metrics.processingLatency,
+				queueDepth: metrics.queueDepth,
+				errorsGenerated: metrics.errorsGenerated,
+				errorRate: metrics.errorRate,
+				integrityViolations: metrics.integrityViolations,
+				alertsGenerated: metrics.alertsGenerated,
+				suspiciousPatterns: metrics.suspiciousPatterns,
+			}*/
+		} catch (error) {
+			this.logger.error('Failed to collect audit metrics', {
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+
+			return {
+				timestamp: new Date().toISOString(),
+				eventsProcessed: 0,
+				queueDepth: 0,
+				errorsGenerated: 0,
+				errorRate: 0,
+				integrityViolations: 0,
+				alertsGenerated: 0,
+				suspiciousPatterns: 0,
+				processingLatency: { average: 0, p95: 0, p99: 0 },
+				integrityVerifications: { total: 0, passed: 0, failed: 0 },
+				complianceReports: { generated: 0, scheduled: 0, failed: 0 },
 			}
 		}
 	}

@@ -2,10 +2,7 @@
  * Shared types for monitoring and health check systems
  */
 
-/**
- * Audit metrics interface
- */
-export interface AuditMetrics {
+export interface Metrics {
 	eventsProcessed: number
 	processingLatency: number
 	queueDepth: number
@@ -15,6 +12,35 @@ export interface AuditMetrics {
 	timestamp: string
 	alertsGenerated: number
 	suspiciousPatterns: number
+}
+
+/**
+ * Audit metrics interface
+ */
+export interface AuditMetrics {
+	eventsProcessed: number
+	queueDepth: number
+	errorsGenerated: number
+	errorRate: number
+	integrityViolations: number
+	timestamp: string
+	alertsGenerated: number
+	suspiciousPatterns: number
+	processingLatency: {
+		average: number
+		p95: number
+		p99: number
+	}
+	integrityVerifications: {
+		total: number
+		passed: number
+		failed: number
+	}
+	complianceReports: {
+		generated: number
+		scheduled: number
+		failed: number
+	}
 }
 
 /**
@@ -161,4 +187,11 @@ export interface MetricPoint {
 	timestamp: number
 	value: number
 	labels?: Record<string, string>
+}
+
+export interface MetricQuery {
+	timeRange?: '1h' | '6h' | '24h' | '7d' | '30d'
+	startTime?: string
+	endTime?: string
+	groupBy?: 'hour' | 'day' | 'week' | 'month' | 'year'
 }
