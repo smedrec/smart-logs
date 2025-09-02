@@ -4,7 +4,6 @@ import {
 	AuditMonitoringDashboard,
 	AuditTracer,
 	ComplianceReportingService,
-	ConfigurationManager,
 	createDatabasePresetHandler,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
@@ -30,7 +29,7 @@ import {
 	scheduledReports,
 } from '@repo/audit-db'
 import { Auth, createAuthorizationService, getActiveOrganization } from '@repo/auth'
-import { getSharedRedisConnectionWithConfig } from '@repo/redis-client'
+import { getRedisConnectionStatus, getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { MetricsCollectionService } from '../services/metrics.js'
@@ -38,7 +37,6 @@ import { createResilienceService } from '../services/resilience'
 
 import type { MiddlewareHandler } from 'hono'
 import type { AuditConfig, DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
-import type { Session } from '@repo/auth'
 import type { Redis } from '@repo/redis-client'
 import type { HonoEnv } from '../hono/context.js'
 
@@ -53,8 +51,6 @@ let isolateCreatedAt: number | undefined = undefined
 let connection: Redis | undefined = undefined
 
 let auditDbInstance: EnhancedAuditDb | undefined = undefined
-
-export { auditDbInstance }
 
 let authInstance: Auth | undefined = undefined
 let audit: Audit | undefined = undefined
@@ -183,14 +179,6 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			})
 		}
 
-		/**const logger = new ConsoleLogger({
-			requestId,
-			application,
-			environment: config.server.environment as 'VITEST' | 'development' | 'staging' | 'production',
-			version,
-			defaultFields: { environment: config.server.environment },
-		})*/
-
 		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
 
 		if (!auditDbInstance) {
@@ -211,7 +199,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			healthCheckService.registerHealthCheck(
 				new DatabaseHealthCheck(() => auditDbInstance!.checkAuditDbConnection())
 			)
-			//healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
+			healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
 		}
 
 		if (!audit) audit = new Audit(config, auditDbInstance.getDrizzleInstance(), connection)
@@ -219,9 +207,9 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		if (!authInstance) authInstance = new Auth(config, audit)
 
 		const auth = authInstance.getAuthInstance()
-		// Get the Drizzle ORM instance
+		// Get the Drizzle ORM instances
 		const db = {
-			auth: authInstance.getDbInstance(),
+			auth: authInstance.getDrizzleInstance(),
 			audit: auditDbInstance.getDrizzleInstance(),
 		}
 
