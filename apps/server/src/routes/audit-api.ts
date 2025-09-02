@@ -268,7 +268,7 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(event, 201)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error(`Failed to create audit event: ${message}`, {
+			logger.error(`Failed to create audit event: ${message}`, message, {
 				userId: session.session.userId,
 				organizationId: session.session.activeOrganizationId,
 				error: message,

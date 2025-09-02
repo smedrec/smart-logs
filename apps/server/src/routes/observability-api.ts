@@ -277,7 +277,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(dashboardData)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get dashboard data', {
+			logger.error('Failed to get dashboard data', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -307,7 +307,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(JSON.parse(metrics))
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to export enhanced metrics', {
+			logger.error('Failed to export enhanced metrics', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -330,7 +330,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(bottlenecks)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get bottleneck analysis', {
+			logger.error('Failed to get bottleneck analysis', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -359,7 +359,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(activeSpans)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get trace data', {
+			logger.error('Failed to get trace data', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -382,7 +382,7 @@ export function createObservabilityAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(profilingResults)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get profiling results', {
+			logger.error('Failed to get profiling results', message, {
 				requestId,
 				error: message,
 				userId: session?.session.userId,

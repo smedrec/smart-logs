@@ -47,6 +47,17 @@ export const openApiErrorResponses = {
 			},
 		},
 	},
+	412: {
+		description:
+			'The precondition given in one or more of the request-header fields evaluated to false when it was tested on the server.',
+		content: {
+			'application/json': {
+				schema: errorSchemaFactory(z.enum(['PRECONDITION_FAILED'])).openapi(
+					'ErrPreconditionFailed'
+				),
+			},
+		},
+	},
 	429: {
 		description: `The user has sent too many requests in a given amount of time ("rate limiting")`,
 		content: {
@@ -61,6 +72,17 @@ export const openApiErrorResponses = {
 			'application/json': {
 				schema: errorSchemaFactory(z.enum(['INTERNAL_SERVER_ERROR'])).openapi(
 					'ErrInternalServerError'
+				),
+			},
+		},
+	},
+	503: {
+		description:
+			'The server, while acting as a proxy or gateway, did not receive a timely response from an upstream server it needed to access in order to complete the request.',
+		content: {
+			'application/json': {
+				schema: errorSchemaFactory(z.enum(['SERVICE_UNAVAILABLE'])).openapi(
+					'ErrServiceUnavailable'
 				),
 			},
 		},

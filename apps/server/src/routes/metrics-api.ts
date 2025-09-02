@@ -504,7 +504,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			const { id } = c.req.valid('param')
 
 			// Acknowledge alert using enhanced alerting service
-			const alert = await monitor.alert.acknowledgeAlert(id, session.session.userId)
+			const result = await monitor.alert.acknowledgeAlert(id, session.session.userId)
 
 			if (!alert) {
 				throw new ApiError({
@@ -519,7 +519,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 				userId: session.session.userId,
 			})
 
-			return c.json(alert)
+			return c.json(result)
 		} catch (error) {
 			if (error instanceof ApiError) {
 				throw error
