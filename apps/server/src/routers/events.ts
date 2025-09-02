@@ -1146,7 +1146,7 @@ export const eventsRouter = {
 								sql`${auditLog.outcomeDescription} IS NOT NULL AND ${auditLog.outcomeDescription} LIKE ${searchText}`,
 								sql`${auditLog.targetResourceType} IS NOT NULL AND ${auditLog.targetResourceType} LIKE ${searchText}`,
 								sql`${auditLog.targetResourceId} IS NOT NULL AND ${auditLog.targetResourceId} LIKE ${searchText}`,
-							].filter((expr): expr is typeof sql => expr !== undefined)
+							].filter((expr) => expr !== undefined)
 						)
 					)
 				}

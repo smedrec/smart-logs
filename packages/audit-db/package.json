@@ -15,9 +15,6 @@
 		"dist"
 	],
 	"scripts": {
-		"audit-db:archive": "tsx src/archival-cli.ts archive",
-		"audit-db:cleanup": "tsx src/archival-cli.ts cleanup",
-		"audit-db:delete": "tsx src/archival-cli.ts delete",
 		"audit-db:generate": "drizzle-kit generate --config=drizzle-dev.config.ts",
 		"audit-db:migrate": "drizzle-kit migrate --config=drizzle-dev.config.ts",
 		"audit-db:monitor-summary": "tsx src/performance-cli.ts monitor summary",

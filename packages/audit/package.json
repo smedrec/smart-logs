@@ -10,6 +10,9 @@
 		"dist"
 	],
 	"scripts": {
+		"audit-db:archive": "tsx src/archival/archival-cli.ts archive",
+		"audit-db:cleanup": "tsx src/archival/archival-cli.ts cleanup",
+		"audit-db:delete": "tsx src/archival/archival-cli.ts delete",
 		"build": "tsc --build",
 		"check:lint": "eslint . --ext .ts",
 		"check:types": "tsc --noEmit",

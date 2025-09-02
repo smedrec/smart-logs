@@ -6,10 +6,6 @@ import postgres from 'postgres'
 
 import 'dotenv/config'
 
-import { desc, or } from 'drizzle-orm'
-
-import { DEFAULT_VALIDATION_CONFIG } from '@repo/audit'
-
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 /**
@@ -337,7 +333,7 @@ export class MigrationUtils {
 						${preset.dataClassification},
 						${JSON.stringify(preset.requiredFields)},
 						${JSON.stringify(preset.defaultValues)},
-						${preset.validation ? JSON.stringify(preset.validation) : JSON.stringify(DEFAULT_VALIDATION_CONFIG)},
+						${JSON.stringify(preset.validation)},
 						${preset.created_by}
 					)
 				`

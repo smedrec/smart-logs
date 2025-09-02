@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-import { AuditDb } from './index.js'
 import { Command } from 'commander'
 
-import { PostgresArchivalService } from '@repo/audit'
+import { archiveStorage, AuditDb, auditLog, auditRetentionPolicy } from '@repo/audit-db'
 
-import { archiveStorage, auditLog, auditRetentionPolicy } from './db/schema.js'
+import { PostgresArchivalService } from './postgres-archival-service'
 
 /**
  * CLI tool for audit data archival and cleanup operations
