@@ -7,7 +7,6 @@
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"bin": {
-		"audit-archival": "./dist/archival-cli.js",
 		"audit-db": "./dist/cli.js",
 		"audit-db-performance": "./dist/performance-cli.js"
 	},

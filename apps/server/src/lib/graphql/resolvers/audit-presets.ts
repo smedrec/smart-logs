@@ -9,12 +9,12 @@ import type { AuditPreset, DataClassification, ValidationConfig } from '@repo/au
 import type { GraphQLContext } from '../types'
 
 // Extended AuditPreset interface that includes the database ID
-interface AuditPresetWithId extends AuditPreset {
+export interface AuditPresetWithId extends AuditPreset {
 	id?: string
 }
 
 // GraphQL input types that match the audit package structure
-interface CreateAuditPresetInput {
+export interface CreateAuditPresetInput {
 	name: string
 	description?: string
 	action: string
@@ -24,7 +24,7 @@ interface CreateAuditPresetInput {
 	validation?: Partial<ValidationConfig>
 }
 
-interface UpdateAuditPresetInput {
+export interface UpdateAuditPresetInput {
 	description?: string
 	action?: string
 	dataClassification?: DataClassification

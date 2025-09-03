@@ -1136,8 +1136,8 @@ export const eventsRouter = {
 				// Build base conditions with organization isolation
 				const conditions = [eq(auditLog.organizationId, organizationId)]
 
-				// Text search across multiple fields
-				if (input.query.searchText) {
+				// TODO: Text search across multiple fields (fix Type 'undefined' is not assignable to type 'SQL<unknown>'.ts(2345))
+				/**if (input.query.searchText) {
 					const searchText = `%${input.query.searchText}%`
 					const searchConditions = [
 						like(auditLog.action, searchText),
@@ -1147,7 +1147,7 @@ export const eventsRouter = {
 					]
 					searchConditions.filter((expr) => expr !== undefined)
 					conditions.push(or(...searchConditions))
-				}
+				}*/
 
 				// Date range filters
 				if (input.query.dateRanges) {
