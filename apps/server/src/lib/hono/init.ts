@@ -36,6 +36,7 @@ import { createResilienceService } from '../services/resilience.js'
 
 import type { MiddlewareHandler } from 'hono'
 import type { AuditConfig, DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
+import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 import type { Redis } from '@repo/redis-client'
 import type { HonoEnv } from '../hono/context.js'
 import type { ResilienceService } from '../services/resilience.js'
@@ -190,7 +191,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			}
 		}
 
-		const client = auditDbInstance.getEnhancedClientInstance()
+		const client: EnhancedAuditDatabaseClient = auditDbInstance.getEnhancedClientInstance()
 
 		if (!healthCheckService) {
 			healthCheckService = new HealthCheckService()

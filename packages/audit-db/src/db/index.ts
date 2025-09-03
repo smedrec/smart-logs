@@ -1,12 +1,13 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
-import { EnhancedAuditDatabaseClient, EnhancedClientConfig } from './enhanced-client.js'
+import { EnhancedAuditDatabaseClient } from './enhanced-client.js'
 import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Sql } from 'postgres'
+import type { EnhancedClientConfig } from './enhanced-client.js'
 
 interface DatabaseConfig {
 	/** Database connection URL */
