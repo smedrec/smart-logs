@@ -17,6 +17,16 @@ import {
 	performanceMonitoring,
 	requestMetrics,
 } from './lib/middleware/monitoring.js'
+import {
+	compressionMiddleware,
+	concurrencyLimitMiddleware,
+	memoryMonitoringMiddleware,
+	performanceHeadersMiddleware,
+	performanceMiddleware,
+	requestSizeLimitMiddleware,
+	responseCachingMiddleware,
+	timeoutMiddleware,
+} from './lib/middleware/performance.js'
 import { appRouter } from './routers/index.js'
 import { createRestAPI } from './routes/rest-api.js'
 
@@ -53,7 +63,7 @@ async function startServer() {
 		app.use('*', nodeEnv())
 	}
 
-	app.use('*', init(config))
+	app.use('*', init(configManager))
 	//app.use(useConsoleLogger())
 
 	// Add comprehensive error handling middleware
@@ -64,10 +74,22 @@ async function startServer() {
 	})
 	errorHandlingMiddleware.forEach((middleware) => app.use('*', middleware))
 
+	// Add performance middleware
+	app.use('*', performanceHeadersMiddleware())
+	app.use('*', performanceMiddleware())
+	app.use('*', compressionMiddleware())
+	app.use('*', timeoutMiddleware(config.server.timeout || 30000))
+	app.use('*', memoryMonitoringMiddleware(100)) // 100MB threshold
+	app.use('*', requestSizeLimitMiddleware(10)) // 10MB limit
+	app.use('*', concurrencyLimitMiddleware(200)) // 200 concurrent requests
+
 	// Add monitoring middleware
 	app.use('*', requestMetrics())
 	app.use('*', performanceMonitoring({ threshold: 1000, alertOnSlow: true }))
 	app.use('*', errorRateMonitoring({ windowSize: 300000, threshold: 0.1 }))
+
+	// Add response caching for GET requests
+	app.use('*', responseCachingMiddleware(300)) // 5 minutes cache
 
 	// Configure CORS with settings from configuration
 	app.use(

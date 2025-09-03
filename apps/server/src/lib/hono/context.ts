@@ -6,6 +6,7 @@ import type {
 	AuditMonitoringDashboard,
 	AuditTracer,
 	ComplianceReportingService,
+	ConfigurationManager,
 	DatabaseAlertHandler,
 	DatabasePresetHandler,
 	DataExportService,
@@ -24,6 +25,7 @@ import type { HonoApp, SharedHonoEnv, SharedHonoVariables } from '@repo/hono-hel
 import type { Redis } from '@repo/redis-client'
 import type { HealthStatus } from '../graphql/types.js'
 import type { StructuredLogger } from '../services/logging.js'
+import type { PerformanceService } from '../services/performance.js'
 import type { ResilienceService } from '../services/resilience.js'
 
 export type Env = SharedHonoEnv & {
@@ -32,6 +34,7 @@ export type Env = SharedHonoEnv & {
 }
 
 export type ServiceContext = {
+	config: ConfigurationManager
 	auth: ReturnType<typeof betterAuth>
 	//cerbos: typeof cerbos
 	//fhir: typeof fhir
@@ -67,6 +70,7 @@ export type ServiceContext = {
 	logger: StructuredLogger
 	resilience: ResilienceService
 	error: ErrorHandler
+	performance: PerformanceService
 }
 
 /** Variables can be extended */
@@ -84,6 +88,7 @@ export type Variables = SharedHonoVariables & {
 	isShuttingDown?: boolean
 	requestStartTime: number
 	requestMetadata: any
+	performance: any
 }
 
 export interface HonoEnv extends HonoApp {

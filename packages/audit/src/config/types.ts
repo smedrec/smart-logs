@@ -205,6 +205,40 @@ export interface WorkerConfig {
 	shutdownTimeout: number
 }
 
+export interface PerformanceConfig {
+	/** Response caching configuration */
+	responseCache: {
+		enabled: boolean
+		defaultTTL: number
+		maxSizeMB: number
+		keyPrefix: string
+	}
+	/** Pagination configuration */
+	pagination: {
+		defaultLimit: number
+		maxLimit: number
+		enableCursor: boolean
+	}
+	/** Streaming configuration */
+	streaming: {
+		enabled: boolean
+		chunkSize: number
+		maxConcurrentStreams: number
+	}
+	/** Concurrency configuration */
+	concurrency: {
+		maxConcurrentRequests: number
+		queueTimeout: number
+		enableRequestQueue: boolean
+	}
+	/** Performance monitoring */
+	monitoring: {
+		enableMetrics: boolean
+		slowRequestThreshold: number
+		memoryThreshold: number
+	}
+}
+
 export interface ServerConfig {
 	/** Server port */
 	port: number
@@ -253,13 +287,7 @@ export interface ServerConfig {
 		trustedProxies: string[]
 		maxRequestSize: string
 	}
-	performance: {
-		enableCompression: boolean
-		compressionLevel: number
-		enableCaching: boolean
-		cacheMaxAge: number
-		enableEtag: boolean
-	}
+	performance: PerformanceConfig
 	api: {
 		enableTrpc: boolean
 		enableRest: boolean

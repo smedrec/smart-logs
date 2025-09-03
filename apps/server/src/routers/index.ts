@@ -4,6 +4,7 @@ import { alertsRouter } from './alerts'
 import { eventsRouter } from './events'
 import { healthRouter } from './health'
 import { metricsRouter } from './metrics'
+import { performanceRouter } from './performance'
 import { presetsRouter } from './presets'
 import { reportsRouter } from './reports'
 import { templatesRouter } from './templates'
@@ -18,6 +19,7 @@ export const appRouter = createTRPCRouter({
 	reports: reportsRouter,
 	presets: presetsRouter,
 	events: eventsRouter,
+	performance: performanceRouter,
 })
 
 export type AppRouter = typeof appRouter

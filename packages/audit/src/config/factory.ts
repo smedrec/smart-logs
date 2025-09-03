@@ -116,11 +116,32 @@ export function createDevelopmentConfig(): AuditConfig {
 				enableTracing: false,
 			},
 			performance: {
-				enableCompression: true,
-				compressionLevel: 6,
-				enableCaching: true,
-				cacheMaxAge: 300,
-				enableEtag: true,
+				responseCache: {
+					enabled: true,
+					defaultTTL: 60, // 1 minute for faster development
+					maxSizeMB: 50,
+					keyPrefix: 'dev_api_cache',
+				},
+				pagination: {
+					defaultLimit: 20,
+					maxLimit: 100,
+					enableCursor: true,
+				},
+				streaming: {
+					enabled: true,
+					chunkSize: 500,
+					maxConcurrentStreams: 5,
+				},
+				concurrency: {
+					maxConcurrentRequests: 50,
+					queueTimeout: 15000, // 15 seconds
+					enableRequestQueue: true,
+				},
+				monitoring: {
+					enableMetrics: true,
+					slowRequestThreshold: 500, // 500ms for development
+					memoryThreshold: 70, // 70%
+				},
 			},
 			api: {
 				enableTrpc: true,
@@ -315,6 +336,34 @@ export function createStagingConfig(): AuditConfig {
 				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://postgres-staging:5432/auth_staging',
 				redisUrl: process.env.BETTER_AUTH_REDIS_URL || 'redis://redis-staging:6379',
 			},
+			performance: {
+				responseCache: {
+					enabled: true,
+					defaultTTL: 300, // 5 minutes
+					maxSizeMB: 100,
+					keyPrefix: 'staging_api_cache',
+				},
+				pagination: {
+					defaultLimit: 50,
+					maxLimit: 500,
+					enableCursor: true,
+				},
+				streaming: {
+					enabled: true,
+					chunkSize: 1000,
+					maxConcurrentStreams: 10,
+				},
+				concurrency: {
+					maxConcurrentRequests: 100,
+					queueTimeout: 30000, // 30 seconds
+					enableRequestQueue: true,
+				},
+				monitoring: {
+					enableMetrics: true,
+					slowRequestThreshold: 1000, // 1 second
+					memoryThreshold: 80, // 80%
+				},
+			},
 		},
 		worker: {
 			...baseConfig.worker,
@@ -460,6 +509,34 @@ export function createProductionConfig(): AuditConfig {
 				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://postgres-staging:5432/auth_staging',
 				redisUrl: process.env.BETTER_AUTH_REDIS_URL || 'redis://redis-staging:6379',
 				poolSize: 20,
+			},
+			performance: {
+				responseCache: {
+					enabled: true,
+					defaultTTL: 600, // 10 minutes
+					maxSizeMB: 500,
+					keyPrefix: 'prod_api_cache',
+				},
+				pagination: {
+					defaultLimit: 50,
+					maxLimit: 1000,
+					enableCursor: true,
+				},
+				streaming: {
+					enabled: true,
+					chunkSize: 2000,
+					maxConcurrentStreams: 20,
+				},
+				concurrency: {
+					maxConcurrentRequests: 200,
+					queueTimeout: 60000, // 60 seconds
+					enableRequestQueue: true,
+				},
+				monitoring: {
+					enableMetrics: true,
+					slowRequestThreshold: 2000, // 2 seconds
+					memoryThreshold: 85, // 85%
+				},
 			},
 		},
 		worker: {

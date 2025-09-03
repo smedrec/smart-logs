@@ -32,10 +32,16 @@ import { Auth, createAuthorizationService } from '@repo/auth'
 import { getRedisConnectionStatus, getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
+import { PerformanceService } from '../services/performance.js'
 import { createResilienceService } from '../services/resilience.js'
 
 import type { MiddlewareHandler } from 'hono'
-import type { AuditConfig, DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
+import type {
+	AuditConfig,
+	ConfigurationManager,
+	DatabasePresetHandler,
+	DeliveryConfig,
+} from '@repo/audit'
 import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 import type { Redis } from '@repo/redis-client'
 import type { HonoEnv } from '../hono/context.js'
@@ -73,6 +79,9 @@ let structuredLogger: StructuredLogger | undefined = undefined
 
 // Resilience services
 let resilienceService: ResilienceService | undefined = undefined
+
+// Performance service
+let performanceService: PerformanceService | undefined = undefined
 
 // Authorization service
 let authorizationService: ReturnType<typeof createAuthorizationService> | undefined = undefined
@@ -139,7 +148,7 @@ function createDeliveryConfig(externalServices: any): DeliveryConfig {
  *
  * Call this once before any hono handlers run.
  */
-export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
+export function init(configManager: ConfigurationManager): MiddlewareHandler<HonoEnv> {
 	return async (c, next) => {
 		if (!isolateId) {
 			isolateId = crypto.randomUUID()
@@ -161,6 +170,8 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		c.res.headers.set('x-requestId', requestId)
 		c.res.headers.set('x-application', application)
 		c.res.headers.set('x-version', version)
+
+		const config = configManager.getConfig()
 
 		// Initialize enhanced structured logger
 		if (!structuredLogger) {
@@ -228,6 +239,29 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		// Initialize authorization service
 		if (!authorizationService) {
 			authorizationService = createAuthorizationService(db.auth, authInstance.getRedisInstance())
+		}
+
+		// Initialize performance service
+		if (!performanceService) {
+			const basePerformanceConfig = config.server.performance
+			const performanceConfig = {
+				...basePerformanceConfig,
+				// Override with config values if available
+				responseCache: {
+					...basePerformanceConfig.responseCache,
+					enabled: config.server.monitoring.enableMetrics,
+				},
+				monitoring: {
+					...basePerformanceConfig.monitoring,
+					enableMetrics: config.server.monitoring.enableMetrics,
+				},
+			}
+			performanceService = new PerformanceService(
+				connection,
+				client,
+				structuredLogger,
+				performanceConfig
+			)
 		}
 
 		const monitor = {
@@ -303,6 +337,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		//const cache = null
 
 		c.set('services', {
+			config: configManager,
 			auth,
 			//cerbos,
 			//fhir,
@@ -319,6 +354,7 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			logger: structuredLogger,
 			resilience: resilienceService,
 			error: errorHandler,
+			performance: performanceService,
 			//cache,
 		})
 

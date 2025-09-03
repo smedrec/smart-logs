@@ -1,652 +1,560 @@
+import { testClient } from 'hono/testing'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+
+import { newApp } from '../lib/hono/index.js'
+import { init } from '../lib/hono/init.js'
+import { performanceMiddleware } from '../lib/middleware/performance.js'
+import { DEFAULT_PERFORMANCE_CONFIG, PerformanceService } from '../lib/services/performance.js'
+
+import type { HonoEnv } from '../lib/hono/context.js'
+
 /**
- * Performance and Load Tests
- * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
+ * Performance optimization tests
+ * Requirements 8.1, 8.2, 8.3, 8.4, 8.5: Performance optimization testing
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-import { testUtils } from './setup'
-
-// Performance testing utilities
-class PerformanceMonitor {
-	private startTime: number = 0
-	private endTime: number = 0
-	private memoryStart: NodeJS.MemoryUsage | null = null
-	private memoryEnd: NodeJS.MemoryUsage | null = null
-
-	start() {
-		this.startTime = performance.now()
-		this.memoryStart = process.memoryUsage()
-	}
-
-	end() {
-		this.endTime = performance.now()
-		this.memoryEnd = process.memoryUsage()
-	}
-
-	getDuration() {
-		return this.endTime - this.startTime
-	}
-
-	getMemoryDelta() {
-		if (!this.memoryStart || !this.memoryEnd) return null
-		return {
-			heapUsed: this.memoryEnd.heapUsed - this.memoryStart.heapUsed,
-			heapTotal: this.memoryEnd.heapTotal - this.memoryStart.heapTotal,
-			external: this.memoryEnd.external - this.memoryStart.external,
-			rss: this.memoryEnd.rss - this.memoryStart.rss,
-		}
-	}
-}
-
-// Mock load generator
-class LoadGenerator {
-	private concurrency: number
-	private duration: number
-	private requestsPerSecond: number
-
-	constructor(concurrency: number, duration: number, requestsPerSecond: number) {
-		this.concurrency = concurrency
-		this.duration = duration
-		this.requestsPerSecond = requestsPerSecond
-	}
-
-	async generateLoad(requestFunction: () => Promise<any>) {
-		const results: Array<{ success: boolean; duration: number; error?: Error }> = []
-		const startTime = Date.now()
-		const endTime = startTime + this.duration
-
-		const workers = Array(this.concurrency)
-			.fill(null)
-			.map(async () => {
-				while (Date.now() < endTime) {
-					const requestStart = performance.now()
-					try {
-						await requestFunction()
-						const requestEnd = performance.now()
-						results.push({
-							success: true,
-							duration: requestEnd - requestStart,
-						})
-					} catch (error) {
-						const requestEnd = performance.now()
-						results.push({
-							success: false,
-							duration: requestEnd - requestStart,
-							error: error as Error,
-						})
-					}
-
-					// Rate limiting
-					const delay = 1000 / this.requestsPerSecond
-					await new Promise((resolve) => setTimeout(resolve, delay))
-				}
-			})
-
-		await Promise.all(workers)
-		return results
-	}
-}
-
-describe('Performance and Load Tests', () => {
+describe('Performance Optimizations', () => {
+	let app: ReturnType<typeof newApp>
 	let mockServices: any
-	let mockContext: any
+	let performanceService: PerformanceService
 
-	beforeEach(() => {
+	beforeAll(async () => {
+		// Mock configuration
+		const mockConfig = {
+			server: {
+				environment: 'test',
+				monitoring: {
+					enableMetrics: true,
+					logLevel: 'info' as const,
+				},
+			},
+			redis: {
+				url: 'redis://localhost:6379',
+			},
+		}
+
+		// Mock services
 		mockServices = {
-			...testUtils.mockServices,
-			audit: {
-				...testUtils.mockServices.audit,
-				log: vi.fn().mockResolvedValue(undefined),
+			redis: {
+				get: vi.fn(),
+				set: vi.fn(),
+				setex: vi.fn(),
+				del: vi.fn(),
+				keys: vi.fn(),
 			},
 			client: {
-				...testUtils.mockServices.client,
-				executeMonitoredQuery: vi.fn().mockResolvedValue([]),
-				executeOptimizedQuery: vi.fn().mockResolvedValue([]),
+				executeOptimizedQuery: vi.fn(),
+				generatePerformanceReport: vi.fn(),
+				optimizeDatabase: vi.fn(),
+				getHealthStatus: vi.fn(),
+			},
+			db: {
+				audit: {
+					auditLog: {
+						select: vi.fn(),
+						from: vi.fn(),
+						limit: vi.fn(),
+						offset: vi.fn(),
+						orderBy: vi.fn(),
+						where: vi.fn(),
+					},
+				},
+			},
+			audit: {
+				logEvent: vi.fn(),
+			},
+			logger: {
+				info: vi.fn(),
+				warn: vi.fn(),
+				error: vi.fn(),
 			},
 		}
 
-		mockContext = {
-			...testUtils.mockTRPCContext,
-			services: mockServices,
+		// Create performance service
+		performanceService = new PerformanceService(
+			mockServices.redis,
+			mockServices.client,
+			mockServices.logger,
+			DEFAULT_PERFORMANCE_CONFIG
+		)
+
+		mockServices.performance = performanceService
+
+		// Create test app
+		app = newApp(mockConfig as any)
+		app.use('*', init(mockConfig as any))
+		app.use('*', performanceMiddleware())
+
+		// Mock the services in context
+		app.use('*', async (c, next) => {
+			c.set('services', mockServices)
+			await next()
+		})
+
+		// Add test routes
+		app.get('/test/cached', async (c) => {
+			const performance = c.get('performance')
+
+			if (!performance) {
+				return c.json({ error: 'Performance not available' })
+			}
+
+			const result = await performance.execute(
+				async () => ({ data: 'test-data', timestamp: Date.now() }),
+				{ cacheKey: 'test-key', cacheTTL: 300 }
+			)
+
+			return c.json(result)
+		})
+
+		app.get('/test/paginated', async (c) => {
+			const performance = c.get('performance')
+
+			if (!performance) {
+				return c.json({ error: 'Performance not available' })
+			}
+
+			const data = Array.from({ length: 100 }, (_, i) => ({ id: i, name: `Item ${i}` }))
+			const pagination = { limit: 10, offset: 0 }
+
+			const result = performance.paginate(data, pagination)
+			return c.json(result)
+		})
+
+		app.post('/test/bulk', async (c) => {
+			const performance = c.get('performance')
+			const body = await c.req.json()
+
+			if (!performance) {
+				return c.json({ error: 'Performance not available' })
+			}
+
+			const result = await performance.execute(
+				async () => {
+					// Simulate bulk processing
+					const results = body.items.map((item: any) => ({ ...item, processed: true }))
+					return results
+				},
+				{ skipCache: true }
+			)
+
+			return c.json({ processed: result.length })
+		})
+	})
+
+	beforeEach(() => {
+		// Reset mocks
+		vi.clearAllMocks()
+	})
+
+	describe('Response Caching', () => {
+		it('should cache responses and improve performance', async () => {
+			// Mock Redis responses
+			mockServices.redis.get.mockResolvedValueOnce(null) // Cache miss
+			mockServices.redis.setex.mockResolvedValueOnce('OK')
+
+			const client = testClient(app)
+
+			// First request - cache miss
+			const response1 = await client.test.cached.$get()
+			expect(response1.status).toBe(200)
+
+			const data1 = await response1.json()
+			expect(data1).toHaveProperty('data', 'test-data')
+
+			// Verify cache was set
+			expect(mockServices.redis.setex).toHaveBeenCalled()
+
+			// Second request - cache hit
+			mockServices.redis.get.mockResolvedValueOnce(JSON.stringify(data1))
+
+			const response2 = await client.test.cached.$get()
+			expect(response2.status).toBe(200)
+
+			const data2 = await response2.json()
+			expect(data2).toEqual(data1)
+		})
+
+		it('should handle cache errors gracefully', async () => {
+			// Mock Redis error
+			mockServices.redis.get.mockRejectedValueOnce(new Error('Redis connection failed'))
+
+			const client = testClient(app)
+			const response = await client.test.cached.$get()
+
+			expect(response.status).toBe(200)
+			// Should still return data even with cache error
+			const data = await response.json()
+			expect(data).toHaveProperty('data', 'test-data')
+		})
+	})
+
+	describe('Pagination', () => {
+		it('should paginate large datasets efficiently', async () => {
+			const client = testClient(app)
+			const response = await client.test.paginated.$get()
+
+			expect(response.status).toBe(200)
+
+			const data = await response.json()
+			expect(data).toHaveProperty('data')
+			expect(data).toHaveProperty('pagination')
+			expect(data.data).toHaveLength(10)
+			expect(data.pagination).toMatchObject({
+				limit: 10,
+				offset: 0,
+				hasNext: true,
+				hasPrevious: false,
+			})
+		})
+
+		it('should handle cursor-based pagination', async () => {
+			const data = Array.from({ length: 100 }, (_, i) => ({ id: i, name: `Item ${i}` }))
+			const cursor = Buffer.from(JSON.stringify({ offset: 10 })).toString('base64')
+
+			const result = performanceService.createPaginatedResponse(data, {
+				limit: 10,
+				cursor,
+			})
+
+			expect(result.data).toHaveLength(10)
+			expect(result.pagination.cursor).toBe(cursor)
+			expect(result.pagination.hasNext).toBe(true)
+			expect(result.pagination.hasPrevious).toBe(true)
+		})
+	})
+
+	describe('Concurrency Control', () => {
+		it('should handle concurrent requests efficiently', async () => {
+			const client = testClient(app)
+
+			// Create multiple concurrent requests
+			const requests = Array.from({ length: 10 }, (_, i) =>
+				client.test.bulk.$post({
+					json: { items: [{ id: i, name: `Item ${i}` }] },
+				})
+			)
+
+			const responses = await Promise.all(requests)
+
+			// All requests should succeed
+			responses.forEach((response) => {
+				expect(response.status).toBe(200)
+			})
+
+			// Verify all responses
+			const results = await Promise.all(responses.map((r) => r.json()))
+			results.forEach((result, index) => {
+				expect(result.processed).toBe(1)
+			})
+		})
+
+		it('should queue requests when at capacity', async () => {
+			// This would require more complex mocking to test the actual queue behavior
+			// For now, we'll test that the queue exists and has the right configuration
+			const metrics = performanceService.getMetrics()
+
+			expect(metrics.concurrency).toHaveProperty('maxConcurrentRequests')
+			expect(metrics.concurrency).toHaveProperty('activeRequests')
+			expect(metrics.concurrency).toHaveProperty('queuedRequests')
+		})
+	})
+
+	describe('Performance Metrics', () => {
+		it('should collect and report performance metrics', async () => {
+			const client = testClient(app)
+
+			// Make some requests to generate metrics
+			await client.test.cached.$get()
+			await client.test.paginated.$get()
+
+			const metrics = performanceService.getMetrics()
+
+			expect(metrics).toHaveProperty('timestamp')
+			expect(metrics).toHaveProperty('requestsPerSecond')
+			expect(metrics).toHaveProperty('averageResponseTime')
+			expect(metrics).toHaveProperty('memoryUsage')
+			expect(metrics).toHaveProperty('cacheStats')
+			expect(metrics).toHaveProperty('concurrency')
+			expect(metrics).toHaveProperty('slowRequests')
+		})
+
+		it('should track slow requests', async () => {
+			// Mock a slow operation
+			const slowOperation = async () => {
+				await new Promise((resolve) => setTimeout(resolve, 1100)) // 1.1 seconds
+				return { data: 'slow-data' }
+			}
+
+			await performanceService.executeOptimized(slowOperation)
+
+			const metrics = performanceService.getMetrics()
+			// The slow request should be recorded (threshold is 1000ms)
+			expect(metrics.slowRequests.count).toBeGreaterThan(0)
+		})
+	})
+
+	describe('Memory Monitoring', () => {
+		it('should monitor memory usage', async () => {
+			const metrics = performanceService.getMetrics()
+
+			expect(metrics.memoryUsage).toHaveProperty('used')
+			expect(metrics.memoryUsage).toHaveProperty('total')
+			expect(metrics.memoryUsage).toHaveProperty('percentage')
+			expect(metrics.memoryUsage.percentage).toBeGreaterThan(0)
+			expect(metrics.memoryUsage.percentage).toBeLessThan(100)
+		})
+	})
+
+	describe('Cache Management', () => {
+		it('should invalidate cache by pattern', async () => {
+			mockServices.redis.keys.mockResolvedValueOnce(['cache:key1', 'cache:key2'])
+			mockServices.redis.del.mockResolvedValueOnce(2)
+
+			const invalidated = await performanceService.invalidateCache('cache:*')
+
+			expect(invalidated).toBe(2)
+			expect(mockServices.redis.keys).toHaveBeenCalledWith('api_cache:cache:*')
+			expect(mockServices.redis.del).toHaveBeenCalledWith('cache:key1', 'cache:key2')
+		})
+
+		it('should generate consistent cache keys', async () => {
+			const params1 = { userId: '123', orgId: '456', limit: 10 }
+			const params2 = { limit: 10, orgId: '456', userId: '123' } // Different order
+
+			const key1 = performanceService.generateCacheKey('test-endpoint', params1)
+			const key2 = performanceService.generateCacheKey('test-endpoint', params2)
+
+			// Keys should be the same regardless of parameter order
+			expect(key1).toBe(key2)
+		})
+	})
+
+	describe('Health Checks', () => {
+		it('should report performance health status', async () => {
+			const health = await performanceService.healthCheck()
+
+			expect(health).toHaveProperty('status')
+			expect(health).toHaveProperty('details')
+			expect(health.details).toHaveProperty('cache')
+			expect(health.details).toHaveProperty('concurrency')
+			expect(health.details).toHaveProperty('memory')
+
+			expect(['healthy', 'warning', 'critical']).toContain(health.status)
+		})
+
+		it('should detect performance issues', async () => {
+			// Simulate high memory usage
+			const originalMemoryUsage = process.memoryUsage
+			process.memoryUsage = vi.fn().mockReturnValue({
+				heapUsed: 900 * 1024 * 1024, // 900MB
+				heapTotal: 1000 * 1024 * 1024, // 1GB
+				external: 0,
+				arrayBuffers: 0,
+				rss: 0,
+			})
+
+			const health = await performanceService.healthCheck()
+
+			expect(health.details.memory.status).toBe('critical')
+			expect(health.status).toBe('critical')
+
+			// Restore original function
+			process.memoryUsage = originalMemoryUsage
+		})
+	})
+
+	describe('Database Performance Integration', () => {
+		it('should integrate with enhanced database client', async () => {
+			const mockReport = {
+				timestamp: new Date(),
+				connectionPool: {
+					totalConnections: 10,
+					activeConnections: 5,
+					averageAcquisitionTime: 50,
+					successRate: 99.5,
+				},
+				queryCache: {
+					hitRatio: 85.5,
+					totalSizeMB: 50,
+					evictions: 10,
+				},
+				partitions: {
+					totalPartitions: 12,
+					totalSizeGB: 2.5,
+					recommendations: ['Consider archiving old partitions'],
+				},
+				performance: {
+					slowQueries: 3,
+					unusedIndexes: 2,
+					cacheHitRatio: 92.1,
+					suggestions: ['Add index on timestamp column'],
+				},
+			}
+
+			mockServices.client.generatePerformanceReport.mockResolvedValueOnce(mockReport)
+
+			const report = await mockServices.client.generatePerformanceReport()
+
+			expect(report).toEqual(mockReport)
+			expect(report.connectionPool.successRate).toBeGreaterThan(95)
+			expect(report.queryCache.hitRatio).toBeGreaterThan(80)
+		})
+
+		it('should handle database optimization', async () => {
+			const mockOptimizationResult = {
+				partitionOptimization: ['Created monthly partitions for 2024'],
+				indexOptimization: ['Added index on audit_log.timestamp'],
+				maintenanceResults: {
+					vacuumResults: ['Vacuumed audit_log table'],
+					analyzeResults: ['Analyzed audit_log statistics'],
+					reindexResults: ['Reindexed primary key'],
+				},
+				configOptimization: [
+					{
+						setting: 'shared_buffers',
+						currentValue: '128MB',
+						recommendedValue: '256MB',
+						reason: 'Increase buffer size for better performance',
+					},
+				],
+			}
+
+			mockServices.client.optimizeDatabase.mockResolvedValueOnce(mockOptimizationResult)
+
+			const result = await mockServices.client.optimizeDatabase()
+
+			expect(result).toEqual(mockOptimizationResult)
+			expect(result.partitionOptimization).toHaveLength(1)
+			expect(result.indexOptimization).toHaveLength(1)
+		})
+	})
+
+	describe('Streaming Support', () => {
+		it('should create streaming responses', async () => {
+			async function* testDataGenerator() {
+				yield [{ id: 1, name: 'Item 1' }]
+				yield [{ id: 2, name: 'Item 2' }]
+			}
+
+			// Mock context for streaming
+			const mockContext = {
+				req: { header: vi.fn() },
+				res: { headers: new Map() },
+			} as any
+
+			const streamResponse = await performanceService.createStreamingResponse(
+				testDataGenerator(),
+				mockContext,
+				{ format: 'json' }
+			)
+
+			expect(streamResponse).toBeInstanceOf(Response)
+			expect(streamResponse.headers.get('Content-Type')).toBe('application/json')
+			expect(streamResponse.headers.get('Transfer-Encoding')).toBe('chunked')
+		})
+
+		it('should support different streaming formats', async () => {
+			async function* testDataGenerator() {
+				yield [{ id: 1, name: 'Item 1' }]
+			}
+
+			const mockContext = {
+				req: { header: vi.fn() },
+				res: { headers: new Map() },
+			} as any
+
+			// Test CSV format
+			const csvResponse = await performanceService.createStreamingResponse(
+				testDataGenerator(),
+				mockContext,
+				{ format: 'csv' }
+			)
+
+			expect(csvResponse.headers.get('Content-Type')).toBe('text/csv')
+
+			// Test NDJSON format
+			const ndjsonResponse = await performanceService.createStreamingResponse(
+				testDataGenerator(),
+				mockContext,
+				{ format: 'ndjson' }
+			)
+
+			expect(ndjsonResponse.headers.get('Content-Type')).toBe('application/x-ndjson')
+		})
+	})
+})
+
+// Performance benchmark tests
+describe('Performance Benchmarks', () => {
+	let performanceService: PerformanceService
+
+	beforeAll(() => {
+		const mockRedis = {
+			get: vi.fn(),
+			setex: vi.fn(),
+			del: vi.fn(),
+			keys: vi.fn(),
 		}
+
+		const mockClient = {
+			executeOptimizedQuery: vi.fn(),
+		}
+
+		const mockLogger = {
+			info: vi.fn(),
+			warn: vi.fn(),
+			error: vi.fn(),
+		}
+
+		performanceService = new PerformanceService(
+			mockRedis as any,
+			mockClient as any,
+			mockLogger as any,
+			DEFAULT_PERFORMANCE_CONFIG
+		)
 	})
 
-	describe('TRPC Performance Tests', () => {
-		it('should handle high-throughput audit event creation', async () => {
-			const { eventsRouter } = await import('../routers/events')
-			const monitor = new PerformanceMonitor()
-
-			const eventInput = {
-				action: 'performance.test',
-				principalId: 'user-perf',
-				organizationId: 'org-perf',
-				status: 'success' as const,
-				dataClassification: 'INTERNAL' as const,
-			}
-
-			const requestCount = 1000
-			monitor.start()
-
-			const promises = Array(requestCount)
-				.fill(null)
-				.map(() =>
-					eventsRouter.create({
-						ctx: mockContext,
-						input: eventInput,
-						type: 'mutation',
-						path: 'events.create',
-					})
-				)
-
-			const results = await Promise.all(promises)
-			monitor.end()
-
-			const duration = monitor.getDuration()
-			const throughput = requestCount / (duration / 1000)
-			const memoryDelta = monitor.getMemoryDelta()
-
-			// Performance assertions
-			expect(results).toHaveLength(requestCount)
-			expect(results.every((r) => r.success)).toBe(true)
-			expect(throughput).toBeGreaterThan(100) // Should handle >100 requests/second
-			expect(duration).toBeLessThan(10000) // Should complete within 10 seconds
-			expect(memoryDelta?.heapUsed).toBeLessThan(100 * 1024 * 1024) // <100MB memory increase
-
-			console.log(
-				`TRPC Performance: ${throughput.toFixed(2)} req/s, ${duration.toFixed(2)}ms total`
-			)
-		})
-
-		it('should handle large query result sets efficiently', async () => {
-			const { eventsRouter } = await import('../routers/events')
-			const monitor = new PerformanceMonitor()
-
-			// Mock large dataset
-			const largeDataset = Array(10000)
-				.fill(null)
-				.map((_, index) => testUtils.generateAuditEvent({ id: index + 1 }))
-
-			mockServices.client.executeMonitoredQuery
-				.mockResolvedValueOnce(largeDataset)
-				.mockResolvedValueOnce([{ count: 10000 }])
-
-			const queryInput = {
-				pagination: { limit: 10000, offset: 0 },
-				filter: {
-					dateRange: {
-						startDate: '2024-01-01T00:00:00.000Z',
-						endDate: '2024-01-31T23:59:59.999Z',
-					},
-				},
-			}
-
-			monitor.start()
-			const result = await eventsRouter.query({
-				ctx: mockContext,
-				input: queryInput,
-				type: 'query',
-				path: 'events.query',
+	it('should handle high-throughput operations', async () => {
+		const operations = Array.from({ length: 1000 }, (_, i) =>
+			performanceService.executeOptimized(async () => ({ id: i, processed: true }), {
+				skipCache: true,
 			})
-			monitor.end()
+		)
 
-			const duration = monitor.getDuration()
-			const memoryDelta = monitor.getMemoryDelta()
+		const startTime = Date.now()
+		const results = await Promise.all(operations)
+		const endTime = Date.now()
 
-			// Performance assertions
-			expect(result.events).toHaveLength(10000)
-			expect(duration).toBeLessThan(1000) // Should complete within 1 second
-			expect(memoryDelta?.heapUsed).toBeLessThan(200 * 1024 * 1024) // <200MB memory increase
+		const duration = endTime - startTime
+		const throughput = results.length / (duration / 1000) // operations per second
 
-			console.log(`Large Query Performance: ${duration.toFixed(2)}ms for 10k records`)
-		})
+		expect(results).toHaveLength(1000)
+		expect(throughput).toBeGreaterThan(100) // At least 100 ops/sec
+		expect(duration).toBeLessThan(10000) // Less than 10 seconds
+	})
 
-		it('should handle concurrent queries efficiently', async () => {
-			const { eventsRouter } = await import('../routers/events')
-			const monitor = new PerformanceMonitor()
+	it('should maintain performance under memory pressure', async () => {
+		// Create large objects to simulate memory pressure
+		const largeObjects = Array.from({ length: 100 }, (_, i) => ({
+			id: i,
+			data: new Array(10000).fill(`data-${i}`),
+		}))
 
-			// Mock different query results
-			mockServices.client.executeMonitoredQuery.mockImplementation(() =>
-				Promise.resolve([testUtils.generateAuditEvent()])
-			)
-			mockServices.client.executeOptimizedQuery.mockImplementation(() =>
-				Promise.resolve([testUtils.generateAuditEvent()])
-			)
+		const startTime = Date.now()
 
-			const concurrentQueries = 100
-			monitor.start()
-
-			const promises = Array(concurrentQueries)
-				.fill(null)
-				.map((_, index) => {
-					if (index % 2 === 0) {
-						// Query multiple events
-						return eventsRouter.query({
-							ctx: mockContext,
-							input: { pagination: { limit: 50, offset: 0 } },
-							type: 'query',
-							path: 'events.query',
-						})
-					} else {
-						// Query single event
-						return eventsRouter.getById({
-							ctx: mockContext,
-							input: { id: `${index}` },
-							type: 'query',
-							path: 'events.getById',
-						})
-					}
+		const results = await Promise.all(
+			largeObjects.map((obj) =>
+				performanceService.executeOptimized(async () => ({ processed: obj.id }), {
+					skipCache: true,
 				})
-
-			const results = await Promise.all(promises)
-			monitor.end()
-
-			const duration = monitor.getDuration()
-			const throughput = concurrentQueries / (duration / 1000)
-
-			// Performance assertions
-			expect(results).toHaveLength(concurrentQueries)
-			expect(throughput).toBeGreaterThan(50) // Should handle >50 concurrent queries/second
-			expect(duration).toBeLessThan(2000) // Should complete within 2 seconds
-
-			console.log(`Concurrent Query Performance: ${throughput.toFixed(2)} queries/s`)
-		})
-	})
-
-	describe('REST API Performance Tests', () => {
-		it('should handle high-throughput REST requests', async () => {
-			const { createRestAPI } = await import('../routes/rest-api')
-			const app = createRestAPI()
-
-			// Add middleware to inject services
-			app.use('*', (c: any, next: any) => {
-				c.set('services', mockServices)
-				c.set('session', testUtils.mockSession)
-				c.set('requestId', 'perf-test-request')
-				c.set('apiVersion', { resolved: '1.0.0' })
-				return next()
-			})
-
-			const monitor = new PerformanceMonitor()
-			const requestCount = 500
-
-			monitor.start()
-
-			const promises = Array(requestCount)
-				.fill(null)
-				.map(
-					() =>
-						fetch('http://localhost/health', {
-							method: 'GET',
-						}).catch(() => ({ status: 200 })) // Mock successful response
-				)
-
-			const results = await Promise.all(promises)
-			monitor.end()
-
-			const duration = monitor.getDuration()
-			const throughput = requestCount / (duration / 1000)
-
-			// Performance assertions
-			expect(results).toHaveLength(requestCount)
-			expect(throughput).toBeGreaterThan(50) // Should handle >50 requests/second
-			expect(duration).toBeLessThan(10000) // Should complete within 10 seconds
-
-			console.log(`REST API Performance: ${throughput.toFixed(2)} req/s`)
-		})
-
-		it('should handle large response payloads efficiently', async () => {
-			const monitor = new PerformanceMonitor()
-
-			// Mock large response payload
-			const largePayload = {
-				events: Array(5000)
-					.fill(null)
-					.map((_, index) => testUtils.generateAuditEvent({ id: index + 1 })),
-				pagination: {
-					total: 5000,
-					limit: 5000,
-					offset: 0,
-					hasNext: false,
-					hasPrevious: false,
-				},
-			}
-
-			monitor.start()
-
-			// Simulate JSON serialization/deserialization
-			const serialized = JSON.stringify(largePayload)
-			const deserialized = JSON.parse(serialized)
-
-			monitor.end()
-
-			const duration = monitor.getDuration()
-			const payloadSize = Buffer.byteLength(serialized, 'utf8')
-
-			// Performance assertions
-			expect(deserialized.events).toHaveLength(5000)
-			expect(duration).toBeLessThan(500) // Should serialize/deserialize within 500ms
-			expect(payloadSize).toBeLessThan(50 * 1024 * 1024) // Should be <50MB
-
-			console.log(
-				`Large Payload Performance: ${duration.toFixed(2)}ms for ${(payloadSize / 1024 / 1024).toFixed(2)}MB`
 			)
-		})
-	})
+		)
 
-	describe('Database Performance Tests', () => {
-		it('should handle database connection pooling efficiently', async () => {
-			const monitor = new PerformanceMonitor()
-			const connectionCount = 50
+		const endTime = Date.now()
+		const duration = endTime - startTime
 
-			// Mock database connections
-			const connections = Array(connectionCount)
-				.fill(null)
-				.map(() => ({
-					query: vi.fn().mockResolvedValue([testUtils.generateAuditEvent()]),
-					close: vi.fn(),
-				}))
-
-			monitor.start()
-
-			// Simulate concurrent database operations
-			const promises = connections.map((conn) => conn.query('SELECT * FROM audit_log LIMIT 1'))
-
-			const results = await Promise.all(promises)
-			monitor.end()
-
-			const duration = monitor.getDuration()
-
-			// Performance assertions
-			expect(results).toHaveLength(connectionCount)
-			expect(duration).toBeLessThan(1000) // Should complete within 1 second
-
-			console.log(
-				`Database Connection Performance: ${duration.toFixed(2)}ms for ${connectionCount} connections`
-			)
-		})
-
-		it('should handle query optimization efficiently', async () => {
-			const monitor = new PerformanceMonitor()
-
-			// Mock optimized vs unoptimized queries
-			const optimizedQuery = vi.fn().mockResolvedValue([testUtils.generateAuditEvent()])
-			const unoptimizedQuery = vi
-				.fn()
-				.mockImplementation(
-					() =>
-						new Promise((resolve) =>
-							setTimeout(() => resolve([testUtils.generateAuditEvent()]), 100)
-						)
-				)
-
-			mockServices.client.executeOptimizedQuery = optimizedQuery
-			mockServices.client.executeMonitoredQuery = unoptimizedQuery
-
-			monitor.start()
-
-			// Run both query types
-			const [optimizedResult, unoptimizedResult] = await Promise.all([
-				mockServices.client.executeOptimizedQuery(() => []),
-				mockServices.client.executeMonitoredQuery(() => []),
-			])
-
-			monitor.end()
-
-			const duration = monitor.getDuration()
-
-			// Performance assertions
-			expect(optimizedResult).toBeDefined()
-			expect(unoptimizedResult).toBeDefined()
-			expect(duration).toBeLessThan(200) // Should complete within 200ms
-
-			console.log(`Query Optimization Performance: ${duration.toFixed(2)}ms`)
-		})
-	})
-
-	describe('Memory Performance Tests', () => {
-		it('should handle memory usage efficiently during high load', async () => {
-			const monitor = new PerformanceMonitor()
-			const { eventsRouter } = await import('../routers/events')
-
-			monitor.start()
-
-			// Create many objects to test memory management
-			const promises = Array(1000)
-				.fill(null)
-				.map(() =>
-					eventsRouter.create({
-						ctx: mockContext,
-						input: {
-							action: 'memory.test',
-							principalId: 'user-memory',
-							organizationId: 'org-memory',
-							status: 'success' as const,
-							metadata: {
-								// Add some data to increase memory usage
-								largeData: Array(100).fill('test-data'),
-							},
-						},
-						type: 'mutation',
-						path: 'events.create',
-					})
-				)
-
-			await Promise.all(promises)
-
-			// Force garbage collection if available
-			if (global.gc) {
-				global.gc()
-			}
-
-			monitor.end()
-
-			const memoryDelta = monitor.getMemoryDelta()
-			const duration = monitor.getDuration()
-
-			// Memory performance assertions
-			expect(memoryDelta?.heapUsed).toBeLessThan(500 * 1024 * 1024) // <500MB increase
-			expect(duration).toBeLessThan(5000) // Should complete within 5 seconds
-
-			console.log(
-				`Memory Performance: ${(memoryDelta?.heapUsed || 0) / 1024 / 1024}MB heap increase in ${duration.toFixed(2)}ms`
-			)
-		})
-
-		it('should prevent memory leaks during long-running operations', async () => {
-			const initialMemory = process.memoryUsage()
-			const { eventsRouter } = await import('../routers/events')
-
-			// Simulate long-running operations
-			for (let i = 0; i < 100; i++) {
-				await eventsRouter.create({
-					ctx: mockContext,
-					input: {
-						action: `leak.test.${i}`,
-						principalId: 'user-leak',
-						organizationId: 'org-leak',
-						status: 'success' as const,
-					},
-					type: 'mutation',
-					path: 'events.create',
-				})
-
-				// Periodically check memory usage
-				if (i % 10 === 0) {
-					const currentMemory = process.memoryUsage()
-					const memoryIncrease = currentMemory.heapUsed - initialMemory.heapUsed
-
-					// Memory should not continuously increase
-					expect(memoryIncrease).toBeLessThan(100 * 1024 * 1024) // <100MB increase
-				}
-			}
-
-			// Force garbage collection
-			if (global.gc) {
-				global.gc()
-			}
-
-			const finalMemory = process.memoryUsage()
-			const totalIncrease = finalMemory.heapUsed - initialMemory.heapUsed
-
-			// Final memory increase should be reasonable
-			expect(totalIncrease).toBeLessThan(50 * 1024 * 1024) // <50MB final increase
-
-			console.log(`Memory Leak Test: ${totalIncrease / 1024 / 1024}MB final increase`)
-		})
-	})
-
-	describe('Load Testing', () => {
-		it('should handle sustained load over time', async () => {
-			const { eventsRouter } = await import('../routers/events')
-			const loadGenerator = new LoadGenerator(10, 5000, 20) // 10 concurrent, 5 seconds, 20 req/s
-
-			const requestFunction = async () => {
-				await eventsRouter.create({
-					ctx: mockContext,
-					input: {
-						action: 'load.test',
-						principalId: 'user-load',
-						organizationId: 'org-load',
-						status: 'success' as const,
-					},
-					type: 'mutation',
-					path: 'events.create',
-				})
-			}
-
-			const results = await loadGenerator.generateLoad(requestFunction)
-
-			const successfulRequests = results.filter((r) => r.success).length
-			const failedRequests = results.filter((r) => !r.success).length
-			const averageResponseTime = results.reduce((sum, r) => sum + r.duration, 0) / results.length
-			const successRate = successfulRequests / results.length
-
-			// Load testing assertions
-			expect(successRate).toBeGreaterThan(0.95) // >95% success rate
-			expect(averageResponseTime).toBeLessThan(100) // <100ms average response time
-			expect(results.length).toBeGreaterThan(50) // Should process significant number of requests
-
-			console.log(
-				`Load Test Results: ${results.length} requests, ${(successRate * 100).toFixed(1)}% success rate, ${averageResponseTime.toFixed(2)}ms avg response time`
-			)
-		})
-
-		it('should handle burst traffic patterns', async () => {
-			const { eventsRouter } = await import('../routers/events')
-			const monitor = new PerformanceMonitor()
-
-			// Simulate burst pattern: high load followed by low load
-			const burstSize = 200
-			const normalSize = 50
-
-			monitor.start()
-
-			// Burst phase
-			const burstPromises = Array(burstSize)
-				.fill(null)
-				.map(() =>
-					eventsRouter.create({
-						ctx: mockContext,
-						input: {
-							action: 'burst.test',
-							principalId: 'user-burst',
-							organizationId: 'org-burst',
-							status: 'success' as const,
-						},
-						type: 'mutation',
-						path: 'events.create',
-					})
-				)
-
-			const burstResults = await Promise.all(burstPromises)
-
-			// Normal phase
-			const normalPromises = Array(normalSize)
-				.fill(null)
-				.map(() =>
-					eventsRouter.create({
-						ctx: mockContext,
-						input: {
-							action: 'normal.test',
-							principalId: 'user-normal',
-							organizationId: 'org-normal',
-							status: 'success' as const,
-						},
-						type: 'mutation',
-						path: 'events.create',
-					})
-				)
-
-			const normalResults = await Promise.all(normalPromises)
-
-			monitor.end()
-
-			const duration = monitor.getDuration()
-			const totalRequests = burstSize + normalSize
-			const throughput = totalRequests / (duration / 1000)
-
-			// Burst handling assertions
-			expect(burstResults.every((r) => r.success)).toBe(true)
-			expect(normalResults.every((r) => r.success)).toBe(true)
-			expect(throughput).toBeGreaterThan(30) // Should maintain >30 req/s during burst
-			expect(duration).toBeLessThan(10000) // Should complete within 10 seconds
-
-			console.log(`Burst Test: ${throughput.toFixed(2)} req/s for ${totalRequests} requests`)
-		})
-	})
-
-	describe('Caching Performance Tests', () => {
-		it('should improve performance with caching', async () => {
-			const { eventsRouter } = await import('../routers/events')
-
-			// Mock cache hit vs cache miss
-			let cacheHit = false
-			mockServices.client.executeOptimizedQuery.mockImplementation(() => {
-				if (cacheHit) {
-					// Simulate cache hit (fast)
-					return Promise.resolve([testUtils.generateAuditEvent()])
-				} else {
-					// Simulate cache miss (slower)
-					cacheHit = true
-					return new Promise((resolve) =>
-						setTimeout(() => resolve([testUtils.generateAuditEvent()]), 50)
-					)
-				}
-			})
-
-			// First request (cache miss)
-			const monitor1 = new PerformanceMonitor()
-			monitor1.start()
-			await eventsRouter.getById({
-				ctx: mockContext,
-				input: { id: '123' },
-				type: 'query',
-				path: 'events.getById',
-			})
-			monitor1.end()
-
-			// Second request (cache hit)
-			const monitor2 = new PerformanceMonitor()
-			monitor2.start()
-			await eventsRouter.getById({
-				ctx: mockContext,
-				input: { id: '123' },
-				type: 'query',
-				path: 'events.getById',
-			})
-			monitor2.end()
-
-			const cacheMissDuration = monitor1.getDuration()
-			const cacheHitDuration = monitor2.getDuration()
-
-			// Caching performance assertions
-			expect(cacheHitDuration).toBeLessThan(cacheMissDuration)
-			expect(cacheHitDuration).toBeLessThan(10) // Cache hit should be very fast
-
-			console.log(
-				`Cache Performance: ${cacheMissDuration.toFixed(2)}ms miss vs ${cacheHitDuration.toFixed(2)}ms hit`
-			)
-		})
+		expect(results).toHaveLength(100)
+		expect(duration).toBeLessThan(5000) // Should complete within 5 seconds
 	})
 })

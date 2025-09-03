@@ -27,6 +27,7 @@ import { createAuditAPI } from './audit-api'
 import { createComplianceAPI } from './compliance-api'
 import { createMetricsAPI } from './metrics-api'
 import { createObservabilityAPI } from './observability-api'
+import { createPerformanceAPI } from './performance-api'
 
 import type { HonoEnv } from '@/lib/hono/context'
 
@@ -251,12 +252,14 @@ Pagination information is included in the response:
 	// Admin-only access for system metrics and observability
 	app.use('/metrics/system/*', requireRole(['admin']))
 	app.use('/observability/*', requireRole(['admin']))
+	app.use('/performance/*', requireRole(['admin']))
 
 	// Mount API routes
 	app.route('/audit', createAuditAPI())
 	app.route('/compliance', createComplianceAPI())
 	app.route('/metrics', createMetricsAPI())
 	app.route('/observability', createObservabilityAPI())
+	app.route('/performance', createPerformanceAPI())
 
 	// Swagger UI
 	app.get(
