@@ -1,6 +1,5 @@
 import { defineWorkspace } from 'vitest/config'
-
-import { glob } from '@repo/workspace-dependencies/zx'
+import { glob } from 'zx'
 
 const projects = await glob([
 	// All vitest projects

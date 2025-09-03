@@ -1,43 +1,44 @@
 {
-  "name": "smart-logs",
-  "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "scripts": {
-    "dev": "turbo dev",
-    "build": "tsc --build --verbose",
-    "check:lint": "turbo check-lint",
-    "check-types": "turbo check-types",
-    "clean": "turbo clean",
-    "dev:native": "turbo -F native dev",
-    "dev:web": "turbo -F web dev",
-    "dev:server": "turbo -F server dev",
-    "dev:worker": "turbo -F worker dev",
-    "db:push": "turbo -F server db:push",
-    "db:studio": "turbo -F server db:studio",
-    "db:generate": "turbo -F server db:generate",
-    "db:migrate": "turbo -F server db:migrate",
-    "db:start": "turbo -F server db:start",
-    "db:watch": "turbo -F server db:watch",
-    "db:stop": "turbo -F server db:stop",
-    "db:down": "turbo -F server db:down",
-    "test": "turbo test",
+	"name": "smart-logs",
+	"private": true,
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"scripts": {
+		"build": "tsc --build --verbose",
+		"check-types": "turbo check-types",
+		"check:lint": "turbo check-lint",
+		"clean": "turbo clean",
+		"db:down": "turbo -F server db:down",
+		"db:generate": "turbo -F server db:generate",
+		"db:migrate": "turbo -F server db:migrate",
+		"db:push": "turbo -F server db:push",
+		"db:start": "turbo -F server db:start",
+		"db:stop": "turbo -F server db:stop",
+		"db:studio": "turbo -F server db:studio",
+		"db:watch": "turbo -F server db:watch",
+		"dev": "turbo dev",
+		"dev:native": "turbo -F native dev",
+		"dev:server": "turbo -F server dev",
+		"dev:web": "turbo -F web dev",
+		"dev:worker": "turbo -F worker dev",
+		"test": "turbo test",
 		"test:ci": "turbo test:ci",
 		"test:watch": "turbo test:watch"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "turbo": "^2.5.4",
-    "@ianvs/prettier-plugin-sort-imports": "4.5.1",
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@ianvs/prettier-plugin-sort-imports": "4.5.1",
 		"@repo/eslint-config": "workspace:*",
-    "@repo/typescript-config": "workspace:*",
-    "npm-run-all2": "8.0.4",
+		"@repo/typescript-config": "workspace:*",
+		"npm-run-all2": "8.0.4",
 		"prettier": "3.6.2",
 		"prettier-plugin-packagejson": "2.5.18",
-    "typescript": "5.8.2",
-		"vitest": "3.2.4"
-  },
-  "packageManager": "pnpm@10.12.4+sha512.5ea8b0deed94ed68691c9bad4c955492705c5eeb8a87ef86bc62c74a26b037b08ff9570f108b2e4dbd1dd1a9186fea925e527f141c648e85af45631074680184"
+		"turbo": "^2.5.6",
+		"typescript": "5.8.2",
+		"vitest": "3.2.4",
+		"zx": "8.8.1"
+	},
+	"packageManager": "pnpm@10.15.1+sha512.34e538c329b5553014ca8e8f4535997f96180a1d0f614339357449935350d924e22f8614682191264ec33d1462ac21561aff97f6bb18065351c162c7e8f6de67"
 }

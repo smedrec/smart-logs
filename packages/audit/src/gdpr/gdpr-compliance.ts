@@ -7,7 +7,7 @@ import * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import { Audit } from '../audit.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { EnhancedAuditDatabaseClient } from '@repo/audit-db/src/db/enhanced-client.js'
+import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 import type { AuditLogEvent, DataClassification } from '../types.js'
 
 /**
@@ -118,14 +118,13 @@ export interface ArchivalResult {
  */
 export class GDPRComplianceService {
 	private pseudonymMappings = new Map<string, string>()
-	private client: EnhancedAuditDatabaseClient
 	private db: PostgresJsDatabase<typeof auditSchema>
-	private audit: Audit
 
-	constructor(client: EnhancedAuditDatabaseClient, audit: Audit) {
-		this.client = client
+	constructor(
+		private client: EnhancedAuditDatabaseClient,
+		private audit: Audit
+	) {
 		this.db = this.client.getDatabase()
-		this.audit = audit
 	}
 
 	/**
