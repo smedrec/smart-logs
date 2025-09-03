@@ -50,7 +50,7 @@ const SystemMetricsSchema = z.object({
 
 const AuditMetricsSchema = z.object({
 	eventsProcessed: z.number(),
-	processingLatency: z.number(),
+	//processingLatency: z.number(),
 	queueDepth: z.number(),
 	errorsGenerated: z.number(),
 	errorRate: z.number(),
@@ -58,7 +58,6 @@ const AuditMetricsSchema = z.object({
 	timestamp: z.string().datetime(),
 	alertsGenerated: z.number(),
 	suspiciousPatterns: z.number(),
-	/*
 	processingLatency: z.object({
 		average: z.number(),
 		p95: z.number(),
@@ -74,7 +73,6 @@ const AuditMetricsSchema = z.object({
 		scheduled: z.number(),
 		failed: z.number(),
 	}),
-	*/
 })
 
 const HealthStatusSchema = z.object({
@@ -322,7 +320,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 
 		try {
 			// Get comprehensive system metrics
-			const metrics = await monitor.metricsCollection.getSystemMetrics()
+			const metrics = await monitor.metrics.getSystemMetrics()
 
 			logger.info('Retrieved system metrics', { requestId, userId: session.session.userId })
 
@@ -359,7 +357,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			const query = c.req.valid('query')
 
 			// Get audit-specific metrics
-			const metrics = await monitor.metricsCollection.getAuditMetrics()
+			const metrics = await monitor.metrics.getAuditMetrics()
 
 			logger.info('Retrieved audit metrics', {
 				requestId,

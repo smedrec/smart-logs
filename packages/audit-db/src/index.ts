@@ -1,6 +1,6 @@
-export * from './db/index.js'
+export { AuditDb, AuditDbWithConfig, EnhancedAuditDb } from './db/index.js'
 export * from './db/schema.js'
-export * from './migration-utils.js'
+export { MigrationUtils, runMigrationCommand } from './migration-utils.js'
 //export * from './gdpr-integration.js'
 
 // Performance optimization exports

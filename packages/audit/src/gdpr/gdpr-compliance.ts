@@ -118,13 +118,14 @@ export interface ArchivalResult {
  */
 export class GDPRComplianceService {
 	private pseudonymMappings = new Map<string, string>()
+	private client: EnhancedAuditDatabaseClient
 	private db: PostgresJsDatabase<typeof auditSchema>
+	private audit: Audit
 
-	constructor(
-		private client: EnhancedAuditDatabaseClient,
-		private audit: Audit
-	) {
+	constructor(client: EnhancedAuditDatabaseClient, audit: Audit) {
+		this.client = client
 		this.db = this.client.getDatabase()
+		this.audit = audit
 	}
 
 	/**

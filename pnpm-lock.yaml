@@ -571,6 +571,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 3.859.0
         version: 3.859.0
+      '@repo/audit-db':
+        specifier: workspace:*
+        version: link:../audit-db
       '@repo/logs':
         specifier: workspace:*
         version: link:../logs

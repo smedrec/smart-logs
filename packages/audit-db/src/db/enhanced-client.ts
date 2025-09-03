@@ -82,8 +82,8 @@ interface QueryPerformanceMetrics {
  * Enhanced audit database client with comprehensive performance optimizations
  */
 export class EnhancedAuditDatabaseClient {
-	private readonly metricsPrefix = 'metrics:'
-	private readonly retentionPeriod = 86400 // 24 hours in seconds
+	private readonly metricsPrefix: string = 'metrics:'
+	private readonly retentionPeriod: number = 86400 // 24 hours in seconds
 	private client: EnhancedDatabaseClient
 	private partitionManager: DatabasePartitionManager
 	private performanceMonitor: DatabasePerformanceMonitor
@@ -248,6 +248,7 @@ export class EnhancedAuditDatabaseClient {
 
 			// Log slow queries
 			if (executionTime > this.config.monitoring.slowQueryThreshold) {
+				// TODO generate alert to slow queries
 				/**const alert: Alert = {
 					id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 					severity:

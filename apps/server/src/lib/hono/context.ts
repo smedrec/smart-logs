@@ -20,12 +20,11 @@ import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import type { AuthorizationService, Session } from '@repo/auth'
 import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
-import type { HonoApp, Logger } from '@repo/hono-helpers'
+import type { HonoApp } from '@repo/hono-helpers'
 import type { SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers/src/types.js'
 import type { Redis } from '@repo/redis-client'
 import type { HealthStatus } from '../graphql/types.js'
 import type { StructuredLogger } from '../services/logging.js'
-import type { MetricsCollectionService } from '../services/metrics.js'
 import type { ResilienceService } from '../services/resilience.js'
 
 export type Env = SharedHonoEnv & {
@@ -58,7 +57,6 @@ export type ServiceContext = {
 	monitor: {
 		alert: DatabaseAlertHandler
 		metrics: MonitoringService
-		metricsCollection: MetricsCollectionService
 	}
 	observability: {
 		tracer: AuditTracer
@@ -67,8 +65,6 @@ export type ServiceContext = {
 		dashboard: AuditMonitoringDashboard
 	}
 	audit: Audit
-	//logger: Logger
-	//structuredLogger: StructuredLogger
 	logger: StructuredLogger
 	resilience: ResilienceService
 	error: ErrorHandler

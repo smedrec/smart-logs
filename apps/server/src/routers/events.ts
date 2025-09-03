@@ -1139,35 +1139,30 @@ export const eventsRouter = {
 				// Text search across multiple fields
 				if (input.query.searchText) {
 					const searchText = `%${input.query.searchText}%`
-					conditions.push(
-						or(
-							...[
-								like(auditLog.action, searchText),
-								sql`${auditLog.outcomeDescription} IS NOT NULL AND ${auditLog.outcomeDescription} LIKE ${searchText}`,
-								sql`${auditLog.targetResourceType} IS NOT NULL AND ${auditLog.targetResourceType} LIKE ${searchText}`,
-								sql`${auditLog.targetResourceId} IS NOT NULL AND ${auditLog.targetResourceId} LIKE ${searchText}`,
-							].filter((expr) => expr !== undefined)
-						)
-					)
+					const searchConditions = [
+						like(auditLog.action, searchText),
+						sql`${auditLog.outcomeDescription} IS NOT NULL AND ${auditLog.outcomeDescription} LIKE ${searchText}`,
+						sql`${auditLog.targetResourceType} IS NOT NULL AND ${auditLog.targetResourceType} LIKE ${searchText}`,
+						sql`${auditLog.targetResourceId} IS NOT NULL AND ${auditLog.targetResourceId} LIKE ${searchText}`,
+					]
+					searchConditions.filter((expr) => expr !== undefined)
+					conditions.push(or(...searchConditions))
 				}
 
 				// Date range filters
 				if (input.query.dateRanges) {
 					for (const dateRange of input.query.dateRanges) {
-						let field
 						switch (dateRange.field) {
 							case 'timestamp':
-								field = auditLog.timestamp
+								conditions.push(gte(auditLog.timestamp, dateRange.startDate))
+								conditions.push(lte(auditLog.timestamp, dateRange.endDate))
 								break
 							case 'archivedAt':
-								field = auditLog.archivedAt
+								if (auditLog.archivedAt) {
+									conditions.push(gte(auditLog.archivedAt, dateRange.startDate))
+									conditions.push(lte(auditLog.archivedAt, dateRange.endDate))
+								}
 								break
-							default:
-								continue
-						}
-						if (field) {
-							conditions.push(gte(field, dateRange.startDate))
-							conditions.push(lte(field, dateRange.endDate))
 						}
 					}
 				}

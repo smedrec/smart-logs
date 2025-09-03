@@ -418,7 +418,7 @@ const exportReportRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: z.object({
-						report: ComplianceReportSchema,
+						report: z.any(), // Use z.any() to avoid union type issues
 						config: ExportConfigSchema,
 					}),
 				},

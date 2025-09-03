@@ -28,17 +28,17 @@ import {
 	reportTemplates,
 	scheduledReports,
 } from '@repo/audit-db'
-import { Auth, createAuthorizationService, getActiveOrganization } from '@repo/auth'
+import { Auth, createAuthorizationService } from '@repo/auth'
 import { getRedisConnectionStatus, getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
-import { MetricsCollectionService } from '../services/metrics.js'
-import { createResilienceService } from '../services/resilience'
+import { createResilienceService } from '../services/resilience.js'
 
 import type { MiddlewareHandler } from 'hono'
 import type { AuditConfig, DatabasePresetHandler, DeliveryConfig } from '@repo/audit'
 import type { Redis } from '@repo/redis-client'
 import type { HonoEnv } from '../hono/context.js'
+import type { ResilienceService } from '../services/resilience.js'
 
 /**
  * These maps persist between worker executions and are used for caching
@@ -67,12 +67,11 @@ let enhancedMetricsCollector: RedisEnhancedMetricsCollector | undefined = undefi
 let bottleneckAnalyzer: AuditBottleneckAnalyzer | undefined = undefined
 let dashboard: AuditMonitoringDashboard | undefined = undefined
 
-// Enhanced monitoring services
-let metricsCollectionService: MetricsCollectionService | undefined = undefined
+// Enhanced logger service
 let structuredLogger: StructuredLogger | undefined = undefined
 
 // Resilience services
-let resilienceService: import('../services/resilience').ResilienceService | undefined = undefined
+let resilienceService: ResilienceService | undefined = undefined
 
 // Authorization service
 let authorizationService: ReturnType<typeof createAuthorizationService> | undefined = undefined
@@ -220,15 +219,6 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 
-		// Initialize enhanced monitoring services
-		if (!metricsCollectionService) {
-			metricsCollectionService = new MetricsCollectionService(
-				connection,
-				structuredLogger,
-				monitoringService
-			)
-		}
-
 		// Initialize resilience service
 		if (!resilienceService) {
 			resilienceService = createResilienceService(structuredLogger)
@@ -242,8 +232,6 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 		const monitor = {
 			alert: databaseAlertHandler,
 			metrics: monitoringService,
-			// Enhanced monitoring services
-			metricsCollection: metricsCollectionService,
 		}
 
 		if (!tracer) {
@@ -329,7 +317,6 @@ export function init(config: AuditConfig): MiddlewareHandler<HonoEnv> {
 			audit,
 			logger: structuredLogger,
 			resilience: resilienceService,
-			//structuredLogger,
 			error: errorHandler,
 			//cache,
 		})
