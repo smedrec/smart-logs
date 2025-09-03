@@ -1,5 +1,5 @@
 import { testClient } from 'hono/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { newApp } from '../lib/hono/index.js'
 import { init } from '../lib/hono/init.js'

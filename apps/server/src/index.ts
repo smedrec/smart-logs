@@ -42,7 +42,7 @@ async function startServer() {
 	// Initialize configuration
 	if (!configManager) {
 		console.info('🔗 Initializing configuration manager...')
-		configManager = new ConfigurationManager('default/audit-development.json', 's3')
+		configManager = new ConfigurationManager(process.env.CONFIG_PATH!, 's3')
 		try {
 			await configManager.initialize()
 		} catch (error) {
@@ -64,7 +64,6 @@ async function startServer() {
 	}
 
 	app.use('*', init(configManager))
-	//app.use(useConsoleLogger())
 
 	// Add comprehensive error handling middleware
 	const errorHandlingMiddleware = createComprehensiveErrorHandling({
