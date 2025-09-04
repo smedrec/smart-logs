@@ -65,6 +65,9 @@ export type {
 	ConfigValidationResult,
 } from './core/config'
 
+// Re-export cache-related types for convenience
+export type { CacheStorage, CacheStats } from './infrastructure/cache'
+
 export interface AuditEvent {
 	id: string
 	timestamp: string
