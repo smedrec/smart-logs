@@ -1,0 +1,35 @@
+# Database Services for SMEDREC Audit Server
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+  selector:
+    app.kubernetes.io/name: postgres
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+  selector:
+    app.kubernetes.io/name: redis

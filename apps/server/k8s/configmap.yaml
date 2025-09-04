@@ -8,10 +8,226 @@ metadata:
     app.kubernetes.io/name: audit-server
     app.kubernetes.io/component: config
 data:
+  # Application Configuration
   NODE_ENV: 'production'
   PORT: '3000'
   HOST: '0.0.0.0'
   LOG_LEVEL: 'info'
-  CORS_ORIGIN: 'https://app.smedrec.com,https://admin.smedrec.com'
-  # Database and Redis URLs should be provided via secrets
-  # These are non-sensitive configuration values
+
+  # Feature Flags
+  ENABLE_METRICS: 'true'
+  ENABLE_GRAPHQL: 'true'
+  ENABLE_TRPC: 'true'
+  ENABLE_REST_API: 'true'
+
+  # API Configuration
+  CORS_ORIGINS: 'https://app.smedrec.com,https://admin.smedrec.com,https://mobile.smedrec.com'
+  API_RATE_LIMIT_WINDOW: '900000'
+  API_RATE_LIMIT_MAX: '100'
+
+  # Database Configuration
+  DATABASE_POOL_SIZE: '20'
+  DATABASE_CONNECTION_TIMEOUT: '30000'
+  DATABASE_IDLE_TIMEOUT: '600000'
+
+  # Redis Configuration
+  REDIS_MAX_RETRIES: '3'
+  REDIS_RETRY_DELAY: '100'
+  REDIS_MAX_MEMORY: '512mb'
+
+  # Authentication Configuration
+  SESSION_MAX_AGE: '86400'
+  BETTER_AUTH_URL: 'https://api.smedrec.com'
+
+  # Storage Configuration
+  S3_REGION: 'us-east-1'
+  S3_BUCKET: 'smedrec-audit-storage'
+  S3_BACKUP_BUCKET: 'smedrec-audit-backups'
+
+  # Monitoring Configuration
+  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://jaeger:14268/api/traces'
+  GRAFANA_URL: 'https://monitoring.smedrec.com'
+  LOGS_URL: 'https://logs.smedrec.com'
+
+  # Backup Configuration
+  BACKUP_SCHEDULE: '0 2 * * *'
+  BACKUP_RETENTION_DAYS: '30'
+
+  # Alert Configuration
+  SMTP_HOST: 'smtp.gmail.com'
+  SMTP_PORT: '587'
+  ALERT_FROM_EMAIL: 'alerts@smedrec.com'
+  CRITICAL_ALERT_EMAIL: 'critical@smedrec.com'
+  WARNING_ALERT_EMAIL: 'warnings@smedrec.com'
+  DBA_EMAIL: 'dba@smedrec.com'
+  DEV_TEAM_EMAIL: 'dev-team@smedrec.com'
+
+  # Health Check Configuration
+  HEALTH_CHECK_URL: 'https://api.smedrec.com/health'
+  READINESS_CHECK_URL: 'https://api.smedrec.com/ready'
+
+---
+# PostgreSQL Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+data:
+  postgresql.conf: |
+    # PostgreSQL Production Configuration
+
+    # Connection Settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+
+    # Memory Settings
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    maintenance_work_mem = 64MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 4MB
+    min_wal_size = 1GB
+    max_wal_size = 4GB
+
+    # Logging Settings
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_rotation_age = 1d
+    log_rotation_size = 100MB
+    log_statement = 'all'
+    log_duration = on
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+
+    # Performance Settings
+    checkpoint_segments = 32
+    checkpoint_completion_target = 0.9
+    wal_level = replica
+    max_wal_senders = 3
+    wal_keep_segments = 8
+
+    # Security Settings
+    ssl = on
+    ssl_cert_file = 'server.crt'
+    ssl_key_file = 'server.key'
+
+---
+# Redis Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+data:
+  redis.conf: |
+    # Redis Production Configuration
+
+    # Network
+    bind 0.0.0.0
+    port 6379
+    protected-mode yes
+
+    # General
+    daemonize no
+    supervised no
+    pidfile /var/run/redis_6379.pid
+    loglevel notice
+    logfile ""
+    databases 16
+
+    # Security
+    requirepass ${REDIS_PASSWORD}
+
+    # Memory Management
+    maxmemory 512mb
+    maxmemory-policy allkeys-lru
+
+    # Persistence
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+
+    # Append Only File
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    aof-load-truncated yes
+
+    # Slow Log
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
+
+    # Client Output Buffer Limits
+    client-output-buffer-limit normal 0 0 0
+    client-output-buffer-limit replica 256mb 64mb 60
+    client-output-buffer-limit pubsub 32mb 8mb 60
+
+    # TCP Settings
+    tcp-keepalive 300
+    tcp-backlog 511
+    timeout 0
+
+---
+# PostgreSQL Init Scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: smedrec-audit
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+data:
+  01-init-audit-db.sql: |
+    -- Initialize SMEDREC Audit Database
+
+    -- Create extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+
+    -- Create audit schema
+    CREATE SCHEMA IF NOT EXISTS audit;
+
+    -- Set default privileges
+    ALTER DEFAULT PRIVILEGES IN SCHEMA audit GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO audit_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA audit GRANT USAGE, SELECT ON SEQUENCES TO audit_user;
+
+    -- Create performance monitoring views
+    CREATE OR REPLACE VIEW audit.performance_stats AS
+    SELECT 
+        schemaname,
+        tablename,
+        attname,
+        n_distinct,
+        correlation
+    FROM pg_stats 
+    WHERE schemaname = 'audit';
+
+    -- Create backup user (read-only)
+    CREATE USER backup_user WITH PASSWORD 'backup_password';
+    GRANT CONNECT ON DATABASE audit_db TO backup_user;
+    GRANT USAGE ON SCHEMA audit TO backup_user;
+    GRANT SELECT ON ALL TABLES IN SCHEMA audit TO backup_user;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA audit GRANT SELECT ON TABLES TO backup_user;

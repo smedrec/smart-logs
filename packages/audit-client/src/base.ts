@@ -39,15 +39,17 @@ export class BaseResource {
 
 		for (let attempt = 0; attempt <= retries; attempt++) {
 			try {
+				const body: BodyInit | null =
+					options.body instanceof FormData
+						? options.body
+						: options.body
+							? JSON.stringify(options.body)
+							: null
+
 				const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/${version}${path}`, {
 					method: options.method || 'GET',
 					headers: headersToUse,
-					body:
-						options.body instanceof FormData
-							? options.body
-							: options.body
-								? JSON.stringify(options.body)
-								: undefined,
+					body,
 					credentials: 'include',
 				})
 

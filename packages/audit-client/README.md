@@ -1,178 +1,193 @@
 # @smart-logs/audit-client
 
-A TypeScript client library for interacting with the Server API (apps/server). It provides methods for common API operations.
+Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features including retry mechanisms, caching, authentication, and type safety.
 
 ## Features
 
-- **Typed API Calls**: Leverages TypeScript for strong typing of requests and responses.
-- **Authentication Ready**: Designed to work with cookie-based authentication (`credentials: 'include'`) and api key.
-- **Retry Mechanism**: Automatically retries failed requests with exponential backoff.
-- **Customizable**: Allows configuration of base URL, retry attempts, backoff timings, and custom headers.
-- **Standard Endpoints**: Includes methods for API health checks (`ok`), version retrieval (`version`), etc.
-- **Modern Build**: Outputs CJS and ESM modules with included type definitions.
+- 🔒 **Type Safety**: Full TypeScript support with strict type checking
+- 🔄 **Retry Logic**: Exponential backoff with configurable retry policies
+- 💾 **Intelligent Caching**: Multiple storage backends with TTL management
+- 🔐 **Authentication**: Support for API keys, session tokens, and custom auth
+- 📊 **Request Batching**: Automatic request batching and deduplication
+- 🚨 **Error Handling**: Comprehensive error management with correlation IDs
+- 📈 **Performance**: Request compression, streaming, and performance monitoring
+- 🔍 **Observability**: Structured logging and request/response inspection
 
 ## Installation
 
-### Prerequisites
+```bash
+pnpm add @smart-logs/audit-client
+```
 
-- Node.js (LTS version recommended)
-- npm, yarn, or pnpm (depending on your project/monorepo setup)
-
-### Setup
-
-1.  **Add the package to your project**:
-    If this package is published to a registry:
-
-    ```bash
-    npm install @smart-logs/audit-client
-    # or
-    yarn add @smart-logs/audit-client
-    # or
-    pnpm add @smart-logs/audit-client
-    ```
-
-    If you are using it as part of a monorepo with workspace support (as suggested by `workspace:*` dependencies):
-
-    ```bash
-    # Ensure it's listed as a dependency in your consuming package's package.json
-    # "dependencies": {
-    #   "@smart-logs/audit-client": "workspace:*"
-    # }
-    # Then run install from the monorepo root
-    npm install
-    # or
-    yarn install
-    # or
-    pnpm install
-    ```
-
-2.  **Development Dependencies (for contributing or running tests locally for this package)**:
-    The package uses `vitest` for testing and `tsup` for building. These are listed in `devDependencies`.
-    To install development dependencies for this specific package (if not handled by a monorepo root install):
-    ```bash
-    cd packages/audit-client # Or your path to this package
-    pnpm install
-    ```
-
-## Usage
-
-First, import and instantiate the client:
+## Quick Start
 
 ```typescript
-import { AppClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smart-logs/audit-client'
 
-import type { ClientOptions } from '@smart-logs/audit-client'
-
-const options: ClientOptions = {
-	baseUrl: 'https://api.yourapp.com', // Replace with your actual API base URL
-	apiKey: 'your-api-key',
-	// Optional custom headers
-	headers: {
-		'X-Custom-App-Header': 'my-app-value',
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'apiKey',
+		apiKey: 'your-api-key',
 	},
-	// Optional retry configuration
-	retries: 3, // Default is 3
-	backoffMs: 200, // Default is 100ms
-	maxBackoffMs: 2000, // Default is 1000ms
-}
+})
 
-const client = new AuditClient(options)
-
-// Example API calls
-async function checkApiStatus() {
-	try {
-		const response = await client.ok()
-		console.log('API Status:', response) // { ok: true }
-	} catch (error) {
-		console.error('Error checking API status:', error)
-	}
-}
-
-async function getApiVersion() {
-	try {
-		const response = await client.version()
-		console.log('API Version:', response.version)
-	} catch (error) {
-		console.error('Error getting API version:', error)
-	}
-}
+// Create an audit event
+const event = await client.events.create({
+	action: 'user.login',
+	principalId: 'user-123',
+	organizationId: 'org-456',
+	status: 'success',
+})
 ```
+
+## Architecture
+
+The library is built with a modular architecture:
+
+- **Core Layer**: Main client, configuration, and base resource classes
+- **Service Layer**: Domain-specific services (events, compliance, metrics, etc.)
+- **Infrastructure Layer**: Cross-cutting concerns (auth, caching, retry, etc.)
+- **Utils Layer**: Utility functions, validators, and transformers
 
 ## Project Structure
 
 ```
-packages/app-client/
-├── dist/                  # Compiled output (JavaScript and type definitions)
-├── src/                   # TypeScript source files
-│   ├── base.ts            # Base class with common request logic (retries, backoff)
-│   ├── client.ts          # Main AuditClient class implementing API methods
-│   ├── client.test.ts     # Unit tests for AppClient
-│   ├── index.ts           # Entry point for the package
-│   ├── types.ts           # TypeScript type definitions and interfaces
-│   └── __tests__          # Unit tests for individual methods
-├── .eslintrc.cjs          # ESLint configuration
-├── package.json           # NPM package manifest
-├── README.md              # This file
-├── tsconfig.json          # TypeScript compiler configuration
-└── vitest.config.ts       # Vitest test runner configuration
+packages/audit-client/
+├── dist/                     # Compiled output (CJS/ESM + type definitions)
+├── src/                      # TypeScript source files
+│   ├── core/                 # Core layer (client, config, base resource)
+│   ├── services/             # Service layer (events, compliance, etc.)
+│   ├── infrastructure/       # Infrastructure layer (auth, cache, retry, etc.)
+│   ├── utils/                # Utility functions and helpers
+│   ├── types.ts              # Main type definitions
+│   └── index.ts              # Main entry point
+├── examples/                 # Usage examples
+├── docs/                     # Documentation
+├── package.json              # Package configuration with dual exports
+├── tsconfig.json             # TypeScript configuration with strict settings
+├── tsup.config.ts            # Build configuration for CJS/ESM output
+└── README.md                 # This file
 ```
 
-## Dependencies
+## Configuration
 
-### Main Dependencies
+The client supports comprehensive configuration options:
 
-- `@repo/audit`: "workspace:\*" (The main package for base types import)
+```typescript
+import { AuditClient } from '@smart-logs/audit-client'
 
-This package currently has no explicit production dependencies listed in its `package.json` (`dependencies: {}`). It relies on the built-in `fetch` API.
+import type { AuditClientConfig } from '@smart-logs/audit-client'
 
-### Development Dependencies
+const config: AuditClientConfig = {
+	baseUrl: 'https://api.smartlogs.com',
 
-The following are key development dependencies:
+	// Authentication
+	authentication: {
+		type: 'apiKey',
+		apiKey: 'your-api-key',
+		autoRefresh: true,
+	},
 
-- `@repo/eslint-config`: "workspace:\*" (Shared ESLint configuration)
-- `@repo/typescript-config`: "workspace:\*" (Shared TypeScript configuration)
-- `tsup`: "8.5.0" (For bundling TypeScript into CJS/ESM)
-- `typescript`: "5.8.3"
-- `vitest`: "3.2.4" (Test runner)
+	// Retry configuration
+	retry: {
+		enabled: true,
+		maxAttempts: 3,
+		initialDelayMs: 100,
+		maxDelayMs: 5000,
+		backoffMultiplier: 2,
+	},
 
-_(Version numbers are as of the time of this writing and may change. Refer to `package.json` for the most up-to-date list.)_
+	// Caching
+	cache: {
+		enabled: true,
+		defaultTtlMs: 300000, // 5 minutes
+		storage: 'memory',
+	},
 
-## Security Considerations
+	// Logging
+	logging: {
+		enabled: true,
+		level: 'info',
+		maskSensitiveData: true,
+	},
+}
 
-- **Cookie-Based Authentication**: This client is configured to send credentials (like cookies) with requests by using `credentials: 'include'` in its `fetch` calls. The security of this mechanism heavily relies on the server-side implementation:
-  - **HttpOnly Cookies**: Server should set cookies with the `HttpOnly` flag to prevent access from client-side JavaScript, mitigating XSS risks.
-  - **Secure Cookies**: Cookies should be set with the `Secure` flag to ensure they are only sent over HTTPS.
-  - **CORS Policy**: The server must have a correctly configured Cross-Origin Resource Sharing (CORS) policy that allows credentials from the client's origin.
-- **Base URL Configuration**: The `baseUrl` for the API is configurable. Ensure that this URL is trusted and correctly set. If the `baseUrl` can be manipulated by user input, sanitize it thoroughly to prevent requests from being redirected to malicious servers.
-- **Sensitive Data**: When using `encrypt` and `decrypt` methods, be mindful of how and where plaintext and ciphertext are handled and stored in your application.
+const client = new AuditClient(config)
+```
 
-## How to Contribute
+## Services
 
-Contributions are welcome! Please follow these general guidelines:
+The client provides several specialized services:
 
-1.  **Bug Reports**: If you find a bug, please open an issue on the project's issue tracker. Include a clear description, steps to reproduce, and expected behavior.
-2.  **Feature Requests**: Open an issue to discuss new features or improvements.
-3.  **Pull Requests**:
-    - Fork the repository and create a new branch for your feature or bug fix.
-    - Ensure your code adheres to the existing coding style and linting rules (`npm run check:lint`).
-    - Write tests for any new functionality or bug fixes (`pnpm test --prefix packages/app-client` or equivalent for your setup).
-    - Ensure all tests pass.
-    - Submit a pull request with a clear description of your changes.
+### Events Service
+
+```typescript
+// Create audit events
+await client.events.create(eventData)
+await client.events.bulkCreate([event1, event2])
+
+// Query events
+const events = await client.events.query({
+	filter: { dateRange: { startDate: '2024-01-01', endDate: '2024-01-31' } },
+})
+
+// Verify event integrity
+const verification = await client.events.verify(eventId)
+```
+
+### Compliance Service
+
+```typescript
+// Generate compliance reports
+const hipaaReport = await client.compliance.generateHipaaReport(criteria)
+const gdprReport = await client.compliance.generateGdprReport(criteria)
+
+// GDPR data export
+const exportResult = await client.compliance.exportGdprData(params)
+```
+
+### Metrics Service
+
+```typescript
+// Get system metrics
+const systemMetrics = await client.metrics.getSystemMetrics()
+const auditMetrics = await client.metrics.getAuditMetrics(params)
+
+// Manage alerts
+const alerts = await client.metrics.getAlerts()
+await client.metrics.acknowledgeAlert(alertId)
+```
+
+## Development
+
+### Building
+
+```bash
+pnpm build          # Build for production
+pnpm build:watch    # Build in watch mode
+pnpm dev           # Development mode with watch
+```
+
+### Testing
+
+```bash
+pnpm test              # Run tests
+pnpm test:watch        # Run tests in watch mode
+pnpm test:coverage     # Run tests with coverage
+```
+
+### Type Checking
+
+```bash
+pnpm check:types    # Type check
+pnpm check:lint     # Lint check
+```
+
+## Documentation
+
+See the [docs](./docs) directory for comprehensive documentation and examples.
 
 ## License
 
-This project is licensed under the **MIT License**. See the `LICENSE` file in the root of the repository for more details.
-
-## Examples
-
-See the [Usage](#usage) section for detailed examples of how to instantiate the client and call its methods. Here's a quick recap of method calls:
-
-```typescript
-// Assuming 'client' is an instance of AuditClient
-
-// Check API health
-client.ok().then(console.log).catch(console.error)
-
-// Get API version
-client.version().then(console.log).catch(console.error)
-```
+MIT License - see LICENSE file for details.

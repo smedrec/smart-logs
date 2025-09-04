@@ -1,0 +1,216 @@
+# Prometheus alerting rules for SMEDREC Audit Server
+groups:
+  - name: audit-server.rules
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{job="audit-server",status=~"5.."}[5m]) /
+            rate(http_requests_total{job="audit-server"}[5m])
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: audit-server
+        annotations:
+          summary: 'High error rate detected'
+          description: 'Error rate is {{ $value | humanizePercentage }} for the last 5 minutes'
+
+      # High response time
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket{job="audit-server"}[5m])
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-server
+        annotations:
+          summary: 'High response time detected'
+          description: '95th percentile response time is {{ $value }}s'
+
+      # Service down
+      - alert: ServiceDown
+        expr: up{job="audit-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: audit-server
+        annotations:
+          summary: 'Audit server is down'
+          description: 'Audit server has been down for more than 1 minute'
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            process_resident_memory_bytes{job="audit-server"} /
+            container_spec_memory_limit_bytes{name=~".*audit-server.*"}
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-server
+        annotations:
+          summary: 'High memory usage'
+          description: 'Memory usage is {{ $value | humanizePercentage }}'
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_seconds_total{job="audit-server"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-server
+        annotations:
+          summary: 'High CPU usage'
+          description: 'CPU usage is {{ $value | humanizePercentage }}'
+
+      # Database connection issues
+      - alert: DatabaseConnectionIssues
+        expr: |
+          increase(database_connection_errors_total{job="audit-server"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: audit-server
+        annotations:
+          summary: 'Database connection issues'
+          description: '{{ $value }} database connection errors in the last 5 minutes'
+
+      # Redis connection issues
+      - alert: RedisConnectionIssues
+        expr: |
+          increase(redis_connection_errors_total{job="audit-server"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: audit-server
+        annotations:
+          summary: 'Redis connection issues'
+          description: '{{ $value }} Redis connection errors in the last 5 minutes'
+
+      # Audit event processing lag
+      - alert: AuditEventProcessingLag
+        expr: |
+          audit_event_processing_lag_seconds{job="audit-server"} > 300
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-server
+        annotations:
+          summary: 'Audit event processing lag'
+          description: 'Audit events are lagging by {{ $value }}s'
+
+      # Failed audit events
+      - alert: FailedAuditEvents
+        expr: |
+          increase(audit_events_failed_total{job="audit-server"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: audit-server
+        annotations:
+          summary: 'High number of failed audit events'
+          description: '{{ $value }} audit events failed in the last 5 minutes'
+
+  - name: database.rules
+    interval: 30s
+    rules:
+      # Database down
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: 'PostgreSQL database is down'
+          description: 'PostgreSQL database has been down for more than 1 minute'
+
+      # High database connections
+      - alert: HighDatabaseConnections
+        expr: |
+          (
+            pg_stat_database_numbackends{job="postgres"} /
+            pg_settings_max_connections{job="postgres"}
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: 'High database connection usage'
+          description: 'Database connection usage is {{ $value | humanizePercentage }}'
+
+      # Long running queries
+      - alert: LongRunningQueries
+        expr: |
+          pg_stat_activity_max_tx_duration{job="postgres"} > 300
+        for: 2m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: 'Long running database queries'
+          description: 'Longest running query is {{ $value }}s'
+
+      # Database disk usage
+      - alert: HighDatabaseDiskUsage
+        expr: |
+          (
+            pg_database_size_bytes{job="postgres"} /
+            node_filesystem_size_bytes{mountpoint="/var/lib/postgresql/data"}
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: 'High database disk usage'
+          description: 'Database disk usage is {{ $value | humanizePercentage }}'
+
+  - name: redis.rules
+    interval: 30s
+    rules:
+      # Redis down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: 'Redis is down'
+          description: 'Redis has been down for more than 1 minute'
+
+      # High Redis memory usage
+      - alert: HighRedisMemoryUsage
+        expr: |
+          (
+            redis_memory_used_bytes{job="redis"} /
+            redis_memory_max_bytes{job="redis"}
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: 'High Redis memory usage'
+          description: 'Redis memory usage is {{ $value | humanizePercentage }}'
+
+      # Redis connection issues
+      - alert: RedisConnectionIssues
+        expr: |
+          increase(redis_rejected_connections_total{job="redis"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: 'Redis connection issues'
+          description: '{{ $value }} Redis connections rejected in the last 5 minutes'

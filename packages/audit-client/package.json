@@ -2,39 +2,109 @@
 	"name": "@smart-logs/audit-client",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Client for Smart Logs Audit API",
+	"description": "Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features including retry mechanisms, caching, authentication, and type safety",
+	"keywords": [
+		"audit",
+		"logging",
+		"compliance",
+		"typescript",
+		"sdk",
+		"client",
+		"hipaa",
+		"gdpr"
+	],
 	"homepage": "https://github.com/smart-logs/smartlogs",
 	"bugs": {
-		"url": "https://github.com/smart-logs/smartlogs"
+		"url": "https://github.com/smart-logs/smartlogs/issues"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/smart-logs/smartlogs"
+		"url": "https://github.com/smart-logs/smartlogs",
+		"directory": "packages/audit-client"
 	},
 	"license": "MIT",
 	"author": "José Cordeiro <joseantcordeiro@gmail.com>",
 	"sideEffects": false,
 	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./services": {
+			"types": "./dist/services/index.d.ts",
+			"import": "./dist/services/index.mjs",
+			"require": "./dist/services/index.js"
+		},
+		"./infrastructure": {
+			"types": "./dist/infrastructure/index.d.ts",
+			"import": "./dist/infrastructure/index.mjs",
+			"require": "./dist/infrastructure/index.js"
+		},
+		"./core": {
+			"types": "./dist/core/index.d.ts",
+			"import": "./dist/core/index.mjs",
+			"require": "./dist/core/index.js"
+		},
+		"./utils": {
+			"types": "./dist/utils/index.d.ts",
+			"import": "./dist/utils/index.mjs",
+			"require": "./dist/utils/index.js"
+		},
+		"./types": {
+			"types": "./dist/types.d.ts",
+			"import": "./dist/types.mjs",
+			"require": "./dist/types.js"
+		},
+		"./package.json": "./package.json"
+	},
 	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
 	"files": [
-		"dist"
+		"dist",
+		"README.md",
+		"CHANGELOG.md"
 	],
 	"scripts": {
-		"build": "tsup src/index.ts --format cjs,esm --dts",
+		"build": "tsup",
+		"build:watch": "tsup --watch",
 		"check:lint": "run-eslint",
 		"check:types": "run-tsc",
 		"clean": "rm -rf dist node_modules .turbo",
-		"test": "vitest run"
+		"dev": "tsup --watch",
+		"prepublishOnly": "pnpm run build",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@repo/audit": "workspace:*"
+		"@repo/audit": "workspace:*",
+		"zod": "^3.22.4"
 	},
 	"devDependencies": {
 		"@repo/eslint-config": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
+		"@types/node": "^20.11.0",
+		"@vitest/coverage-v8": "^3.2.4",
 		"tsup": "8.5.0",
 		"typescript": "5.8.2",
 		"vitest": "3.2.4"
+	},
+	"peerDependencies": {
+		"typescript": ">=4.9.0"
+	},
+	"peerDependenciesMeta": {
+		"typescript": {
+			"optional": true
+		}
+	},
+	"engines": {
+		"node": ">=18.0.0"
+	},
+	"publishConfig": {
+		"access": "public"
 	}
 }

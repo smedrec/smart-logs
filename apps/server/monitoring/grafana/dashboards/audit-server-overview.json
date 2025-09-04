@@ -1,0 +1,133 @@
+{
+	"dashboard": {
+		"id": null,
+		"title": "SMEDREC Audit Server Overview",
+		"tags": ["audit", "smedrec", "production"],
+		"style": "dark",
+		"timezone": "browser",
+		"panels": [
+			{
+				"id": 1,
+				"title": "System Overview",
+				"type": "stat",
+				"targets": [
+					{
+						"expr": "up{job=\"audit-server\"}",
+						"legendFormat": "Service Status"
+					}
+				],
+				"fieldConfig": {
+					"defaults": {
+						"color": {
+							"mode": "thresholds"
+						},
+						"thresholds": {
+							"steps": [
+								{ "color": "red", "value": 0 },
+								{ "color": "green", "value": 1 }
+							]
+						}
+					}
+				},
+				"gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 }
+			},
+			{
+				"id": 2,
+				"title": "Request Rate",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "rate(http_requests_total{job=\"audit-server\"}[5m])",
+						"legendFormat": "{{method}} {{status}}"
+					}
+				],
+				"gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 }
+			},
+			{
+				"id": 3,
+				"title": "Response Time",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"audit-server\"}[5m]))",
+						"legendFormat": "95th percentile"
+					},
+					{
+						"expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"audit-server\"}[5m]))",
+						"legendFormat": "50th percentile"
+					}
+				],
+				"gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+			},
+			{
+				"id": 4,
+				"title": "Error Rate",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "rate(http_requests_total{job=\"audit-server\",status=~\"5..\"}[5m]) / rate(http_requests_total{job=\"audit-server\"}[5m])",
+						"legendFormat": "Error Rate"
+					}
+				],
+				"gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+			},
+			{
+				"id": 5,
+				"title": "Memory Usage",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "process_resident_memory_bytes{job=\"audit-server\"}",
+						"legendFormat": "Memory Usage"
+					}
+				],
+				"gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+			},
+			{
+				"id": 6,
+				"title": "CPU Usage",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "rate(process_cpu_seconds_total{job=\"audit-server\"}[5m])",
+						"legendFormat": "CPU Usage"
+					}
+				],
+				"gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+			},
+			{
+				"id": 7,
+				"title": "Database Connections",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "database_connections_active{job=\"audit-server\"}",
+						"legendFormat": "Active Connections"
+					},
+					{
+						"expr": "database_connections_idle{job=\"audit-server\"}",
+						"legendFormat": "Idle Connections"
+					}
+				],
+				"gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
+			},
+			{
+				"id": 8,
+				"title": "Audit Events Processed",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "rate(audit_events_processed_total{job=\"audit-server\"}[5m])",
+						"legendFormat": "Events/sec"
+					}
+				],
+				"gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
+			}
+		],
+		"time": {
+			"from": "now-1h",
+			"to": "now"
+		},
+		"refresh": "30s"
+	}
+}

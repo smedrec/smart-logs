@@ -1,3 +1,4 @@
+// Legacy types (will be enhanced in later tasks)
 export interface ClientOptions {
 	/** Base URL for API requests */
 	baseUrl: string
@@ -45,4 +46,42 @@ export interface DeleteObjectResponse {
 
 export interface VersionResponse {
 	version: string
+}
+
+// Enhanced types - Configuration types are now implemented in core/config.ts
+// Re-export the main configuration types for convenience
+export type {
+	AuditClientConfig,
+	PartialAuditClientConfig,
+	AuthenticationConfig,
+	RetryConfig,
+	CacheConfig,
+	BatchingConfig,
+	PerformanceConfig,
+	LoggingConfig,
+	ErrorHandlingConfig,
+	InterceptorConfig,
+	EnvironmentConfig,
+	ConfigValidationResult,
+} from './core/config'
+
+export interface AuditEvent {
+	id: string
+	timestamp: string
+	action: string
+	// More fields will be added in task 17
+}
+
+export interface CreateAuditEventInput {
+	action: string
+	// More fields will be added in task 17
+}
+
+export interface QueryAuditEventsParams {
+	// Query parameters will be added in task 17
+}
+
+export interface PaginatedAuditEvents {
+	events: AuditEvent[]
+	// Pagination info will be added in task 17
 }
