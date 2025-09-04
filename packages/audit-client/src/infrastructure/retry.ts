@@ -53,8 +53,8 @@ export interface CircuitBreakerStats {
 	failureCount: number
 	successCount: number
 	totalRequests: number
-	lastFailureTime?: number
-	nextRetryTime?: number
+	lastFailureTime?: number | undefined
+	nextRetryTime?: number | undefined
 }
 
 /**
@@ -103,8 +103,12 @@ export class HttpError extends Error {
 		this.name = 'HttpError'
 		this.status = status
 		this.statusText = statusText
-		this.body = body
-		this.requestId = requestId
+		if (body !== undefined) {
+			this.body = body
+		}
+		if (requestId !== undefined) {
+			this.requestId = requestId
+		}
 	}
 }
 
@@ -144,7 +148,7 @@ export class RetryManager {
 			this.checkCircuitBreaker(circuitBreakerKey)
 		}
 
-		let lastError: Error
+		let lastError: Error | undefined
 		let attempt = 0
 
 		for (attempt = 1; attempt <= this.config.maxAttempts; attempt++) {
@@ -166,7 +170,7 @@ export class RetryManager {
 				}
 
 				// Check if we should retry
-				if (attempt === this.config.maxAttempts || !this.shouldRetry(error)) {
+				if (attempt === this.config.maxAttempts || !this.shouldRetry(error as Error)) {
 					break
 				}
 
@@ -179,7 +183,7 @@ export class RetryManager {
 		// All retries exhausted
 		throw new RetryExhaustedError(
 			`Request failed after ${attempt} attempts`,
-			lastError,
+			lastError || new Error('Unknown error occurred'),
 			{ ...context, attempt, totalAttempts: this.config.maxAttempts, startTime },
 			attempt
 		)
@@ -198,8 +202,13 @@ export class RetryManager {
 
 		const promises = operations.map(async (operation, index) => {
 			const startTime = Date.now()
+			const context = contexts[index]
+			if (!context) {
+				throw new Error(`Missing context for operation at index ${index}`)
+			}
+
 			try {
-				const data = await this.execute(operation, contexts[index])
+				const data = await this.execute(operation, context)
 				return {
 					success: true,
 					data,
