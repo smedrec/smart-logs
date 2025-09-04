@@ -71,8 +71,8 @@
 	"scripts": {
 		"build": "tsup",
 		"build:watch": "tsup --watch",
+		"check-types": "tsc --noEmit",
 		"check:lint": "run-eslint",
-		"check:types": "run-tsc",
 		"clean": "rm -rf dist node_modules .turbo",
 		"dev": "tsup --watch",
 		"prepublishOnly": "pnpm run build",

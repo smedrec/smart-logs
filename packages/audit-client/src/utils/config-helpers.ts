@@ -277,7 +277,7 @@ export class ConfigPresets {
 			errorHandling: {
 				throwOnError: true,
 				includeStackTrace: true,
-				errorTransformation: false,
+				transformErrors: false,
 			},
 			retry: {
 				enabled: false, // Disable retry for debugging

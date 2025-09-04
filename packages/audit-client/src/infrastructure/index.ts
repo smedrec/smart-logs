@@ -5,5 +5,24 @@ export * from './auth'
 export * from './cache'
 export * from './retry'
 export * from './batch'
-export * from './error'
 export * from './logger'
+
+// Export error module with explicit re-exports to avoid naming conflicts
+export {
+	AuditClientError,
+	HttpError,
+	NetworkError,
+	TimeoutError,
+	ValidationError,
+	AuthenticationError as ErrorAuthenticationError, // Rename to avoid conflict with auth module
+	ConfigurationError,
+	RetryExhaustedError,
+	CacheError,
+	BatchError,
+	GenericError,
+	ErrorHandler,
+	AuthTokenRefreshStrategy,
+	CacheInvalidationStrategy,
+} from './error'
+
+export type { ErrorContext, ErrorRecoveryStrategy, Logger } from './error'

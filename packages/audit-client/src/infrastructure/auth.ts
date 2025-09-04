@@ -406,11 +406,11 @@ export class AuthManager {
 		let expiredTokens = 0
 		const now = Date.now()
 
-		for (const entry of this.tokenCache.values()) {
+		Array.from(this.tokenCache.values()).forEach((entry) => {
 			if (now >= entry.expiresAt) {
 				expiredTokens++
 			}
-		}
+		})
 
 		return {
 			totalTokens: this.tokenCache.size,
@@ -426,12 +426,12 @@ export class AuthManager {
 		const now = Date.now()
 		let cleanedCount = 0
 
-		for (const [key, entry] of this.tokenCache.entries()) {
+		Array.from(this.tokenCache.entries()).forEach(([key, entry]) => {
 			if (now >= entry.expiresAt) {
 				this.tokenCache.delete(key)
 				cleanedCount++
 			}
-		}
+		})
 
 		return cleanedCount
 	}
