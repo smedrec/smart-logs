@@ -57,7 +57,7 @@ export class AuditClient {
 	private errorCount: number = 0
 
 	// Infrastructure components
-	private logger: Logger
+	private logger: Logger | undefined
 	private authManager!: AuthManager
 	private cacheManager!: CacheManager
 	private retryManager!: RetryManager
@@ -101,7 +101,7 @@ export class AuditClient {
 			// Mark as ready
 			this.state = 'ready'
 
-			this.logger.info('AuditClient initialized successfully', {
+			this.getLogger().info('AuditClient initialized successfully', {
 				baseUrl: this.config.baseUrl,
 				environment: this.config.environment,
 				features: this.getEnabledFeatures(),
@@ -109,8 +109,10 @@ export class AuditClient {
 		} catch (error) {
 			this.state = 'error'
 			// Initialize logger first if it failed during initialization
-			const logger = this.logger || new DefaultLogger()
-			logger.error('Failed to initialize AuditClient', { error })
+			if (!this.logger) {
+				this.logger = new DefaultLogger()
+			}
+			this.getLogger().error('Failed to initialize AuditClient', { error })
 			throw error
 		}
 	}
@@ -141,10 +143,10 @@ export class AuditClient {
 		this.errorHandler = new ErrorHandler(
 			this.config.logging,
 			this.config.errorHandling,
-			this.logger
+			this.getLogger()
 		)
 
-		this.logger.debug('Infrastructure components initialized', {
+		this.getLogger().debug('Infrastructure components initialized', {
 			auth: this.config.authentication.type,
 			cache: this.config.cache.enabled,
 			retry: this.config.retry.enabled,
@@ -157,14 +159,15 @@ export class AuditClient {
 	 */
 	private initializeServices(): void {
 		// All services share the same configuration and logger
-		this._events = new EventsService(this.config, this.logger)
-		this._compliance = new ComplianceService(this.config, this.logger)
-		this._scheduledReports = new ScheduledReportsService(this.config, this.logger)
-		this._presets = new PresetsService(this.config, this.logger)
-		this._metrics = new MetricsService(this.config, this.logger)
-		this._health = new HealthService(this.config, this.logger)
+		const logger = this.getLogger()
+		this._events = new EventsService(this.config, logger)
+		this._compliance = new ComplianceService(this.config, logger)
+		this._scheduledReports = new ScheduledReportsService(this.config, logger)
+		this._presets = new PresetsService(this.config, logger)
+		this._metrics = new MetricsService(this.config, logger)
+		this._health = new HealthService(this.config, logger)
 
-		this.logger.debug('Services initialized', {
+		this.getLogger().debug('Services initialized', {
 			services: ['events', 'compliance', 'scheduledReports', 'presets', 'metrics', 'health'],
 		})
 	}
@@ -270,6 +273,16 @@ export class AuditClient {
 	}
 
 	/**
+	 * Get logger instance, ensuring it's always available
+	 */
+	private getLogger(): Logger {
+		if (!this.logger) {
+			this.logger = new DefaultLogger()
+		}
+		return this.logger
+	}
+
+	/**
 	 * Validate that the client is in a usable state
 	 */
 	private validateClientState(): void {
@@ -316,12 +329,12 @@ export class AuditClient {
 			this._metrics.updateConfig(this.config)
 			this._health.updateConfig(this.config)
 
-			this.logger.info('Configuration updated successfully', {
+			this.getLogger().info('Configuration updated successfully', {
 				updatedFields: Object.keys(updates),
 			})
 		} catch (error) {
 			this.errorCount++
-			this.logger.error('Failed to update configuration', { error })
+			this.getLogger().error('Failed to update configuration', { error })
 			throw error
 		}
 	}
@@ -349,10 +362,10 @@ export class AuditClient {
 				this._health.updateConfig(this.config)
 			}
 
-			this.logger.info('Environment configuration loaded', { environment })
+			this.getLogger().info('Environment configuration loaded', { environment })
 		} catch (error) {
 			this.errorCount++
-			this.logger.error('Failed to load environment configuration', { error, environment })
+			this.getLogger().error('Failed to load environment configuration', { error, environment })
 			throw error
 		}
 	}
@@ -371,7 +384,7 @@ export class AuditClient {
 		this._metrics.addRequestInterceptor(interceptor)
 		this._health.addRequestInterceptor(interceptor)
 
-		this.logger.debug('Request interceptor added to all services')
+		this.getLogger().debug('Request interceptor added to all services')
 	}
 
 	/**
@@ -387,7 +400,7 @@ export class AuditClient {
 		this._metrics.addResponseInterceptor(interceptor)
 		this._health.addResponseInterceptor(interceptor)
 
-		this.logger.debug('Response interceptor added to all services')
+		this.getLogger().debug('Response interceptor added to all services')
 	}
 
 	/**
@@ -403,7 +416,7 @@ export class AuditClient {
 		this._metrics.clearInterceptors()
 		this._health.clearInterceptors()
 
-		this.logger.debug('All interceptors cleared from all services')
+		this.getLogger().debug('All interceptors cleared from all services')
 	}
 
 	// Statistics and monitoring methods
@@ -547,7 +560,7 @@ export class AuditClient {
 			}
 		} catch (error) {
 			this.errorCount++
-			this.logger.error('Health check failed', { error })
+			this.getLogger().error('Health check failed', { error })
 			throw error
 		}
 	}
@@ -560,7 +573,7 @@ export class AuditClient {
 			return
 		}
 
-		this.logger.info('Destroying AuditClient instance')
+		this.getLogger().info('Destroying AuditClient instance')
 
 		try {
 			// Remove process event listeners
@@ -577,7 +590,7 @@ export class AuditClient {
 					try {
 						await task()
 					} catch (error) {
-						this.logger.warn('Cleanup task failed', { error })
+						this.getLogger().warn('Cleanup task failed', { error })
 					}
 				})
 			)
@@ -586,13 +599,13 @@ export class AuditClient {
 			this.destroyed = true
 			this.state = 'destroyed'
 
-			this.logger.info('AuditClient destroyed successfully', {
+			this.getLogger().info('AuditClient destroyed successfully', {
 				uptime: Date.now() - this.startTime,
 				totalRequests: this.requestCount,
 				totalErrors: this.errorCount,
 			})
 		} catch (error) {
-			this.logger.error('Error during client destruction', { error })
+			this.getLogger().error('Error during client destruction', { error })
 			throw error
 		}
 	}
