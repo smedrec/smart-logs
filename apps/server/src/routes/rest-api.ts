@@ -244,6 +244,7 @@ Pagination information is included in the response:
 	app.use('/compliance/*', requireAuthOrApiKey)
 	app.use('/metrics/*', requireAuthOrApiKey)
 	app.use('/observability/*', requireAuthOrApiKey)
+	app.use('/performance/*', requireAuthOrApiKey)
 
 	// Organization access control for audit and compliance endpoints
 	app.use('/audit/*', requireOrganizationAccess())

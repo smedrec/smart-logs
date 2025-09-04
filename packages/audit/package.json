@@ -42,8 +42,8 @@
 		"@repo/redis-client": "workspace:*",
 		"bullmq": "5.56.4",
 		"dotenv": "17.2.0",
-		"drizzle-orm": "0.44.2",
-		"ioredis": "5.6.1",
+		"drizzle-orm": "0.44.5",
+		"ioredis": "5.7.0",
 		"postgres": "3.4.7"
 	},
 	"devDependencies": {
