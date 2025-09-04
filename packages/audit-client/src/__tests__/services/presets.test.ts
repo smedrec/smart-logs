@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { PresetsService } from '../presets'
+import { PresetsService } from '../../services/presets'
 
 import type { MockedFunction } from 'vitest'
 import type { AuditClientConfig } from '../../core/config'
@@ -15,7 +15,7 @@ import type {
 	PresetVersionHistory,
 	UpdateAuditPresetInput,
 	ValidationResult,
-} from '../presets'
+} from '../../services/presets'
 
 // Mock the BaseResource
 vi.mock('../../core/base-resource', () => ({

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { EventsService } from '../events'
+import { EventsService } from '../../services/events'
 
 import type { AuditClientConfig } from '../../core/config'
 import type {
@@ -14,7 +14,7 @@ import type {
 	QueryAuditEventsParams,
 	StreamEventsParams,
 	SubscriptionParams,
-} from '../events'
+} from '../../services/events'
 
 // Mock fetch globally
 const mockFetch = vi.fn()

@@ -76,6 +76,46 @@ export {
 	type PresetUsageStats,
 } from './presets'
 
-// Other services (placeholders for future implementation)
-export * from './metrics'
-export * from './health'
+// Metrics Service - Comprehensive system monitoring and metrics
+export {
+	MetricsService,
+	type MemoryUsage,
+	type CpuUsage,
+	type DatabaseMetrics,
+	type CacheMetrics,
+	type ApiMetrics,
+	type EndpointStats,
+	type SystemMetrics,
+	type AuditMetrics,
+	type PerformanceMetrics,
+	type UsageMetricsParams,
+	type UsageMetrics,
+	type AlertSeverity,
+	type AlertStatus,
+	type Alert,
+	type AlertsParams,
+	type PaginatedAlerts,
+	type AuditMetricsParams,
+	type MetricsSubscriptionParams,
+	type RealTimeMetricsData,
+	type MetricsSubscription,
+	type AcknowledgeAlertRequest,
+	type ResolveAlertRequest,
+} from './metrics'
+
+// Health Service - Comprehensive system health monitoring
+export {
+	HealthService,
+	type HealthStatus,
+	type DetailedHealthStatus,
+	type ComponentHealth,
+	type ServiceDependency,
+	type ReadinessStatus,
+	type LivenessStatus,
+	type VersionInfo,
+	type ApiStatus,
+	type HealthCheckConfig,
+	type HealthSubscriptionParams,
+	type RealTimeHealthData,
+	type HealthSubscription,
+} from './health'

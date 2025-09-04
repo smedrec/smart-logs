@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { EventsService } from '../events'
+import { EventsService } from '../../services/events'
 
 import type { AuditClientConfig } from '../../core/config'
 

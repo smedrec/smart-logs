@@ -134,6 +134,50 @@ export {
 	type PresetUsageStats,
 } from './services'
 
+// Metrics Service exports
+export {
+	MetricsService,
+	type MemoryUsage,
+	type CpuUsage,
+	type DatabaseMetrics,
+	type CacheMetrics,
+	type ApiMetrics,
+	type EndpointStats,
+	type SystemMetrics,
+	type AuditMetrics,
+	type PerformanceMetrics,
+	type UsageMetricsParams,
+	type UsageMetrics,
+	type AlertSeverity,
+	type AlertStatus,
+	type Alert,
+	type AlertsParams,
+	type PaginatedAlerts,
+	type AuditMetricsParams,
+	type MetricsSubscriptionParams,
+	type RealTimeMetricsData,
+	type MetricsSubscription,
+	type AcknowledgeAlertRequest,
+	type ResolveAlertRequest,
+} from './services'
+
+// Health Service exports
+export {
+	HealthService,
+	type HealthStatus,
+	type DetailedHealthStatus,
+	type ComponentHealth,
+	type ServiceDependency,
+	type ReadinessStatus,
+	type LivenessStatus,
+	type VersionInfo,
+	type ApiStatus,
+	type HealthCheckConfig,
+	type HealthSubscriptionParams,
+	type RealTimeHealthData,
+	type HealthSubscription,
+} from './services'
+
 // Export all other services
 export * from './services'
 

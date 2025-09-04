@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BaseResource } from '../../core/base-resource'
-import { ScheduledReportsService } from '../scheduled-reports'
+import { ScheduledReportsService } from '../../services/scheduled-reports'
 
 import type { MockedFunction } from 'vitest'
 import type { AuditClientConfig } from '../../core/config'
@@ -14,7 +14,7 @@ import type {
 	ReportExecution,
 	ScheduledReport,
 	UpdateScheduledReportInput,
-} from '../scheduled-reports'
+} from '../../services/scheduled-reports'
 
 // Mock BaseResource
 vi.mock('../../core/base-resource')

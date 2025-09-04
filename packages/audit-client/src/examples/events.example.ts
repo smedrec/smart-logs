@@ -5,10 +5,10 @@
  * including creating events, querying, verifying, exporting, streaming, and subscriptions.
  */
 
-import { EventsService } from '../events'
+import { EventsService } from '../services/events'
 
-import type { AuditClientConfig } from '../../types'
-import type { CreateAuditEventInput } from '../events'
+import type { CreateAuditEventInput } from '../services/events'
+import type { AuditClientConfig } from '../types'
 
 // Example configuration
 const config: AuditClientConfig = {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ComplianceService } from '../compliance'
+import { ComplianceService } from '../../services/compliance'
 
 import type { AuditClientConfig } from '../../core/config'
 import type {
@@ -8,7 +8,7 @@ import type {
 	GdprExportParams,
 	PseudonymizationParams,
 	ReportCriteria,
-} from '../compliance'
+} from '../../services/compliance'
 
 // Mock the BaseResource
 vi.mock('../../core/base-resource', () => ({
