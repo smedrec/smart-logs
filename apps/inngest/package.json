@@ -19,7 +19,7 @@
 		"@repo/hono-helpers": "workspace:*",
 		"@repo/send-mail": "workspace:*",
 		"drizzle-orm": "^0.44.2",
-		"hono": "^4.8.2",
+		"hono": "^4.9.6",
 		"inngest": "^3.40.1",
 		"zod": "^4.0.2"
 	},

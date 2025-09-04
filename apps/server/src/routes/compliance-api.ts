@@ -756,7 +756,11 @@ export function createComplianceAPI(): OpenAPIHono<HonoEnv> {
 			c.header('X-Export-ID', exportResult.exportId)
 			c.header('X-Checksum', exportResult.checksum)
 
-			return c.body(exportResult.data)
+			if (typeof exportResult.data === 'string') {
+				return c.text(exportResult.data)
+			} else {
+				return c.json(exportResult.data)
+			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to export report: ${message}`)
