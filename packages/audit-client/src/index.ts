@@ -59,7 +59,82 @@ export {
 } from './infrastructure/error'
 export type { ErrorContext, ErrorRecoveryStrategy, Logger } from './infrastructure/error'
 
-// Services exports (will be implemented in later tasks)
+// Services exports
+export {
+	EventsService,
+	type AuditEvent,
+	type CreateAuditEventInput,
+	type BulkCreateAuditEventsInput,
+	type BulkCreateResult,
+	type QueryAuditEventsParams,
+	type PaginatedAuditEvents,
+	type IntegrityVerificationResult,
+	type ExportEventsParams,
+	type ExportResult,
+	type StreamEventsParams,
+	type SubscriptionParams,
+	type EventSubscription,
+	type SessionContext,
+	type DataClassification,
+	type AuditEventStatus,
+} from './services'
+
+// Compliance Service exports
+export {
+	ComplianceService,
+	type ReportCriteria,
+	type ReportMetadata,
+	type HIPAASection,
+	type HIPAAReport,
+	type GDPRSection,
+	type GDPRReport,
+	type CustomReportParams,
+	type CustomReport,
+	type GdprExportParams,
+	type GdprExportResult,
+	type PseudonymizationParams,
+	type PseudonymizationResult,
+	type ReportTemplate,
+	type ReportDownloadOptions,
+} from './services'
+
+// Scheduled Reports Service exports
+export {
+	ScheduledReportsService,
+	type ScheduleConfig,
+	type DeliveryConfig,
+	type ScheduledReportCriteria,
+	type ScheduledReport,
+	type CreateScheduledReportInput,
+	type UpdateScheduledReportInput,
+	type ListScheduledReportsParams,
+	type PaginatedScheduledReports,
+	type ReportExecution,
+	type ExecutionHistoryParams,
+	type PaginatedExecutions,
+} from './services'
+
+// Audit Presets Service exports
+export {
+	PresetsService,
+	type ValidationRule,
+	type AuditPresetTemplate,
+	type AuditPresetValidation,
+	type AuditPresetMetadata,
+	type AuditPreset,
+	type CreateAuditPresetInput,
+	type UpdateAuditPresetInput,
+	type PresetContext,
+	type ValidationResult,
+	type PresetApplicationResult,
+	type ListAuditPresetsParams,
+	type PaginatedAuditPresets,
+	type PresetVersion,
+	type PresetVersionHistory,
+	type PresetUsageStats,
+} from './services'
+
+// Export all other services
 export * from './services'
 
 // Utils exports (will be implemented in later tasks)
@@ -71,8 +146,8 @@ export type {
 	PaginationParams,
 	DeleteObjectResponse,
 	VersionResponse,
-	AuditEvent,
-	CreateAuditEventInput,
-	QueryAuditEventsParams,
-	PaginatedAuditEvents,
+	LegacyAuditEvent,
+	LegacyCreateAuditEventInput,
+	LegacyQueryAuditEventsParams,
+	LegacyPaginatedAuditEvents,
 } from './types'

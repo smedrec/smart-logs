@@ -87,23 +87,22 @@ export {
 	CacheInvalidationStrategy,
 } from './infrastructure/error'
 
-export interface AuditEvent {
+// Legacy audit event types - now implemented in services/events.ts
+// These are kept for backward compatibility but will be deprecated
+export interface LegacyAuditEvent {
 	id: string
 	timestamp: string
 	action: string
-	// More fields will be added in task 17
 }
 
-export interface CreateAuditEventInput {
+export interface LegacyCreateAuditEventInput {
 	action: string
-	// More fields will be added in task 17
 }
 
-export interface QueryAuditEventsParams {
-	// Query parameters will be added in task 17
+export interface LegacyQueryAuditEventsParams {
+	// Legacy query parameters
 }
 
-export interface PaginatedAuditEvents {
-	events: AuditEvent[]
-	// Pagination info will be added in task 17
+export interface LegacyPaginatedAuditEvents {
+	events: LegacyAuditEvent[]
 }
