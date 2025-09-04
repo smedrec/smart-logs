@@ -68,6 +68,25 @@ export type {
 // Re-export cache-related types for convenience
 export type { CacheStorage, CacheStats } from './infrastructure/cache'
 
+// Re-export error-related types for convenience
+export type { ErrorContext, ErrorRecoveryStrategy, Logger } from './infrastructure/error'
+
+export {
+	AuditClientError,
+	HttpError,
+	NetworkError,
+	TimeoutError,
+	ValidationError,
+	AuthenticationError,
+	ConfigurationError,
+	RetryExhaustedError,
+	CacheError,
+	BatchError,
+	ErrorHandler,
+	AuthTokenRefreshStrategy,
+	CacheInvalidationStrategy,
+} from './infrastructure/error'
+
 export interface AuditEvent {
 	id: string
 	timestamp: string

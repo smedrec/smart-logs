@@ -58,7 +58,9 @@ const LoggingConfigSchema = z.object({
 const ErrorHandlingConfigSchema = z.object({
 	throwOnError: z.boolean().default(true),
 	includeStackTrace: z.boolean().default(false),
-	errorTransformation: z.boolean().default(true),
+	transformErrors: z.boolean().default(true),
+	sanitizeErrors: z.boolean().default(true),
+	enableRecovery: z.boolean().default(true),
 	customErrorHandler: z.any().optional(),
 })
 
