@@ -1,4 +1,11 @@
-// Legacy types (will be enhanced in later tasks)
+// ============================================================================
+// Comprehensive TypeScript Type Definitions and Validation
+// ============================================================================
+
+// Export all comprehensive types from the types directory
+export * from './types'
+
+// Legacy types (kept for backward compatibility)
 export interface ClientOptions {
 	/** Base URL for API requests */
 	baseUrl: string
@@ -48,64 +55,7 @@ export interface VersionResponse {
 	version: string
 }
 
-// Enhanced types - Configuration types are now implemented in core/config.ts
-// Re-export the main configuration types for convenience
-export type {
-	AuditClientConfig,
-	PartialAuditClientConfig,
-	AuthenticationConfig,
-	RetryConfig,
-	CacheConfig,
-	BatchingConfig,
-	PerformanceConfig,
-	LoggingConfig,
-	ErrorHandlingConfig,
-	InterceptorConfig,
-	EnvironmentConfig,
-	ConfigValidationResult,
-} from './core/config'
-
-// Re-export cache-related types for convenience
-export type { CacheStorage, CacheStats } from './infrastructure/cache'
-
-// Re-export error-related types for convenience
-export type { ErrorContext, ErrorRecoveryStrategy } from './infrastructure/error'
-
-// Re-export logger-related types for convenience
-export type {
-	Logger,
-	LogLevel,
-	LogFormat,
-	LogEntry,
-	LoggerConfig,
-	CustomLogger,
-} from './infrastructure/logger'
-
-export {
-	AuditLogger,
-	DefaultLogger,
-	LoggerFactory,
-	DataMasker,
-	LogFormatter,
-} from './infrastructure/logger'
-
-export {
-	AuditClientError,
-	HttpError,
-	NetworkError,
-	TimeoutError,
-	ValidationError,
-	AuthenticationError,
-	ConfigurationError,
-	RetryExhaustedError,
-	CacheError,
-	BatchError,
-	ErrorHandler,
-	AuthTokenRefreshStrategy,
-	CacheInvalidationStrategy,
-} from './infrastructure/error'
-
-// Legacy audit event types - now implemented in services/events.ts
+// Legacy audit event types - now implemented in types/api.ts
 // These are kept for backward compatibility but will be deprecated
 export interface LegacyAuditEvent {
 	id: string

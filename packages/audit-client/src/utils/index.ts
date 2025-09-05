@@ -1,7 +1,12 @@
-// Utility functions and helpers
-// This file will export utility functions, validators, and transformers
+// ============================================================================
+// Utilities Index - Export All Utility Functions and Types
+// ============================================================================
 
-export * from './config-helpers'
-export * from './validators'
-export * from './transformers'
+// Export validation utilities
+export * from './validation'
+
+// Export type guards
+export * from './type-guards'
+
+// Export additional utility functions
 export * from './helpers'
