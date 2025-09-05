@@ -63,6 +63,9 @@ export * from './presets'
 // Re-export all metrics types
 export * from './metrics'
 
+// Re-export all health types
+export * from './health'
+
 // Re-export utility types
 export * from './utils'
 
@@ -327,10 +330,10 @@ export interface IMetricsService extends BaseService {
  * Health service interface
  */
 export interface IHealthService extends BaseService {
-	check(): Promise<import('./api').HealthStatus>
-	detailed(): Promise<import('./api').DetailedHealthStatus>
-	ready(): Promise<import('./api').ReadinessStatus>
-	getVersion(): Promise<import('./api').VersionInfo>
+	check(): Promise<import('./health').HealthStatus>
+	detailed(): Promise<import('./health').DetailedHealthStatus>
+	ready(): Promise<import('./health').ReadinessStatus>
+	getVersion(): Promise<import('./health').VersionInfo>
 }
 
 // ============================================================================
