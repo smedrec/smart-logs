@@ -22,6 +22,12 @@ import {
 	ReportTemplateSchema,
 } from '../types/compliance'
 import {
+	DetailedHealthStatusSchema,
+	HealthStatusSchema,
+	ReadinessStatusSchema,
+	VersionInfoSchema,
+} from '../types/health'
+import {
 	AlertSchema,
 	AlertsParamsSchema,
 	AuditMetricsParamsSchema,
@@ -372,6 +378,30 @@ export const validateAlertsParams = createValidator(AlertsParamsSchema)
 export const validateAlert = createValidator(AlertSchema)
 
 // ============================================================================
+// Health Validation Functions
+// ============================================================================
+
+/**
+ * Validates health status
+ */
+export const validateHealthStatus = createValidator(HealthStatusSchema)
+
+/**
+ * Validates detailed health status
+ */
+export const validateDetailedHealthStatus = createValidator(DetailedHealthStatusSchema)
+
+/**
+ * Validates readiness status
+ */
+export const validateReadinessStatus = createValidator(ReadinessStatusSchema)
+
+/**
+ * Validates version information
+ */
+export const validateVersionInfo = createValidator(VersionInfoSchema)
+
+// ============================================================================
 // Composite Validation Functions
 // ============================================================================
 
@@ -642,4 +672,7 @@ defaultSchemaRegistry.register('UsageMetricsParams', UsageMetricsParamsSchema)
 defaultSchemaRegistry.register('AlertsParams', AlertsParamsSchema)
 defaultSchemaRegistry.register('Alert', AlertSchema)
 
-// All functions are already exported above with their declarations
+defaultSchemaRegistry.register('HealthStatus', HealthStatusSchema)
+defaultSchemaRegistry.register('DetailedHealthStatus', DetailedHealthStatusSchema)
+defaultSchemaRegistry.register('ReadinessStatus', ReadinessStatusSchema)
+defaultSchemaRegistry.register('VersionInfo', VersionInfoSchema)

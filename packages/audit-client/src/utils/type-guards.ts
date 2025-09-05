@@ -23,6 +23,12 @@ import type {
 	ReportType,
 } from '../types/compliance'
 import type {
+	DetailedHealthStatus,
+	HealthStatus,
+	ReadinessStatus,
+	VersionInfo,
+} from '../types/health'
+import type {
 	Alert,
 	AlertCategory,
 	AlertSeverity,
@@ -171,6 +177,13 @@ export function isDate(value: unknown): value is Date {
  */
 export function isDateString(value: unknown): value is string {
 	return isString(value) && !isNaN(Date.parse(value))
+}
+
+/**
+ * Type guard that checks if a string starts with a given prefix
+ */
+export function startsWith(value: unknown, prefix: string): value is string {
+	return isString(value) && value.length >= prefix.length && value.startsWith(prefix)
 }
 
 // ============================================================================
@@ -444,6 +457,7 @@ export function isAuditEvent(value: unknown): value is AuditEvent {
 
 	const event = value as any
 	return (
+		// FIXME: the id is serial
 		isUUID(event.id) &&
 		isISODateTime(event.timestamp) &&
 		isNonEmptyString(event.action) &&
@@ -516,7 +530,7 @@ export function isExportResult(value: unknown): value is ExportResult {
 
 	const result = value as any
 	return (
-		isUUID(result.exportId) &&
+		startsWith(result.exportId, 'export-') &&
 		isNonNegativeNumber(result.recordCount) &&
 		isNonNegativeNumber(result.dataSize) &&
 		isNonEmptyString(result.format) &&
@@ -534,6 +548,7 @@ export function isIntegrityVerificationResult(
 
 	const result = value as any
 	return (
+		// FIXME: ebent ID is serial
 		isUUID(result.eventId) &&
 		isBoolean(result.isValid) &&
 		isISODateTime(result.verificationTimestamp) &&
@@ -580,7 +595,7 @@ export function isScheduledReport(value: unknown): value is ScheduledReport {
 
 	const report = value as any
 	return (
-		isUUID(report.id) &&
+		startsWith(report.id, 'report-') &&
 		isNonEmptyString(report.name) &&
 		isReportType(report.reportType) &&
 		isObject(report.criteria) &&
@@ -602,8 +617,8 @@ export function isReportExecution(value: unknown): value is ReportExecution {
 
 	const execution = value as any
 	return (
-		isUUID(execution.id) &&
-		isUUID(execution.scheduledReportId) &&
+		startsWith(execution.id, 'execution-') &&
+		startsWith(execution.scheduledReportId, 'report-') &&
 		isExecutionStatus(execution.status) &&
 		isExecutionTrigger(execution.trigger) &&
 		isISODateTime(execution.scheduledAt)
@@ -654,6 +669,37 @@ export function isSystemMetrics(value: unknown): value is SystemMetrics {
 }
 
 /**
+ * Type guard for health status
+ */
+export function isHealthStatus(value: unknown): value is HealthStatus {
+	if (!isObject(value)) return false
+
+	const status = value as any
+	return (
+		isString(status.status) &&
+		isISODateTime(status.timestamp) &&
+		isNonNegativeNumber(status.uptime) &&
+		isString(status.version)
+	)
+}
+
+/**
+ * Type guard for detailed health status
+ */
+export function isDetailedHealthStatus(value: unknown): value is DetailedHealthStatus {
+	if (!isObject(value)) return false
+
+	const status = value as any
+	return (
+		isString(status.status) &&
+		isISODateTime(status.timestamp) &&
+		isNonNegativeNumber(status.uptime) &&
+		isString(status.version) &&
+		isObject(status.details)
+	)
+}
+
+/**
  * Type guard for alert
  */
 export function isAlert(value: unknown): value is Alert {
@@ -661,7 +707,7 @@ export function isAlert(value: unknown): value is Alert {
 
 	const alert = value as any
 	return (
-		isUUID(alert.id) &&
+		startsWith(alert.id, 'alert-') &&
 		isNonEmptyString(alert.title) &&
 		isAlertSeverity(alert.severity) &&
 		isAlertStatus(alert.status) &&
@@ -822,5 +868,3 @@ export function everyByType<T>(
 ): array is T[] {
 	return array.every(predicate)
 }
-
-// All functions are already exported above with their declarations

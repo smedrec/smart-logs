@@ -872,5 +872,3 @@ export function memoize<T extends (...args: any[]) => any>(
 		return result
 	}) as T
 }
-
-// All functions are already exported above with their declarations
