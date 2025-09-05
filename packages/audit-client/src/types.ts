@@ -69,7 +69,25 @@ export type {
 export type { CacheStorage, CacheStats } from './infrastructure/cache'
 
 // Re-export error-related types for convenience
-export type { ErrorContext, ErrorRecoveryStrategy, Logger } from './infrastructure/error'
+export type { ErrorContext, ErrorRecoveryStrategy } from './infrastructure/error'
+
+// Re-export logger-related types for convenience
+export type {
+	Logger,
+	LogLevel,
+	LogFormat,
+	LogEntry,
+	LoggerConfig,
+	CustomLogger,
+} from './infrastructure/logger'
+
+export {
+	AuditLogger,
+	DefaultLogger,
+	LoggerFactory,
+	DataMasker,
+	LogFormatter,
+} from './infrastructure/logger'
 
 export {
 	AuditClientError,

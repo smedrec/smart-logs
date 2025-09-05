@@ -57,7 +57,24 @@ export {
 	AuthTokenRefreshStrategy,
 	CacheInvalidationStrategy,
 } from './infrastructure/error'
-export type { ErrorContext, ErrorRecoveryStrategy, Logger } from './infrastructure/error'
+export type { ErrorContext, ErrorRecoveryStrategy } from './infrastructure/error'
+
+// Logging exports
+export {
+	AuditLogger,
+	DefaultLogger,
+	LoggerFactory,
+	DataMasker,
+	LogFormatter,
+} from './infrastructure/logger'
+export type {
+	Logger,
+	LogLevel,
+	LogFormat,
+	LogEntry,
+	LoggerConfig,
+	CustomLogger,
+} from './infrastructure/logger'
 
 // Services exports
 export {

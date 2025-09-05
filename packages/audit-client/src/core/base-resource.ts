@@ -2,6 +2,7 @@ import { AuthManager } from '../infrastructure/auth'
 import { BatchManager } from '../infrastructure/batch'
 import { CacheManager } from '../infrastructure/cache'
 import { ErrorHandler } from '../infrastructure/error'
+import { AuditLogger, LoggerFactory } from '../infrastructure/logger'
 import { RetryManager } from '../infrastructure/retry'
 
 import type { Logger } from '../infrastructure/logger'
@@ -56,13 +57,13 @@ export abstract class BaseResource {
 	protected retryManager!: RetryManager
 	protected batchManager!: BatchManager
 	protected errorHandler!: ErrorHandler
-	protected logger: Logger | undefined
+	protected logger: Logger
 	protected requestInterceptors: RequestInterceptor[] = []
 	protected responseInterceptors: ResponseInterceptor[] = []
 
 	constructor(config: AuditClientConfig, logger?: Logger) {
 		this.config = config
-		this.logger = logger
+		this.logger = logger || LoggerFactory.create(config.logging)
 		this.initializeManagers()
 	}
 
@@ -188,6 +189,7 @@ export abstract class BaseResource {
 		options: RequestOptions,
 		requestId: string
 	): Promise<T> {
+		const startTime = Date.now()
 		const url = this.buildUrl(endpoint, options.query)
 		const headers = await this.buildHeaders(options.headers, requestId)
 		const body = this.buildBody(options.body)
@@ -205,13 +207,39 @@ export abstract class BaseResource {
 			headers.set('Accept-Encoding', 'gzip, deflate, br')
 		}
 
+		// Log the outgoing request
+		const headersObj: Record<string, string> = {}
+		headers.forEach((value, key) => {
+			headersObj[key] = value
+		})
+		this.logHttpRequest(options.method || 'GET', url, headersObj, options.body, requestId)
+
 		const response = await fetch(url, fetchOptions)
+		const duration = Date.now() - startTime
+
+		// Log the response
+		const responseHeadersObj: Record<string, string> = {}
+		response.headers.forEach((value, key) => {
+			responseHeadersObj[key] = value
+		})
 
 		if (!response.ok) {
-			const headersObj: Record<string, string> = {}
-			headers.forEach((value, key) => {
-				headersObj[key] = value
-			})
+			// Log error response
+			let errorBody: any
+			try {
+				errorBody = await response.clone().json()
+			} catch {
+				errorBody = await response.clone().text()
+			}
+
+			this.logHttpResponse(
+				response.status,
+				response.statusText,
+				responseHeadersObj,
+				errorBody,
+				duration,
+				requestId
+			)
 
 			const httpError = await ErrorHandler.createHttpError(response, requestId, {
 				url,
@@ -221,7 +249,19 @@ export abstract class BaseResource {
 			throw httpError
 		}
 
-		return this.parseResponse<T>(response, options.responseType)
+		// Parse response and log success
+		const parsedResponse = await this.parseResponse<T>(response, options.responseType)
+
+		this.logHttpResponse(
+			response.status,
+			response.statusText,
+			responseHeadersObj,
+			this.config.logging.includeResponseBody ? parsedResponse : undefined,
+			duration,
+			requestId
+		)
+
+		return parsedResponse
 	}
 
 	/**
@@ -549,31 +589,119 @@ export abstract class BaseResource {
 	}
 
 	/**
-	 * Log request information
+	 * Log request information using enhanced logging system
 	 */
 	private logRequest(message: string, meta: Record<string, any>): void {
-		if (!this.config.logging.enabled || !this.logger) {
+		if (!this.config.logging.enabled) {
 			return
 		}
 
-		switch (this.config.logging.level) {
-			case 'debug':
-				this.logger.debug(message, meta)
-				break
-			case 'info':
-				this.logger.info(message, meta)
-				break
-			case 'warn':
-				if (meta.error) {
-					this.logger.warn(message, meta)
-				}
-				break
-			case 'error':
-				if (meta.error) {
-					this.logger.error(message, meta)
-				}
-				break
+		// Set request correlation if available
+		if (meta.requestId && this.logger.setRequestId) {
+			this.logger.setRequestId(meta.requestId)
 		}
+
+		if (meta.correlationId && this.logger.setCorrelationId) {
+			this.logger.setCorrelationId(meta.correlationId)
+		}
+
+		// Determine log level based on context
+		if (meta.error) {
+			this.logger.error(message, meta)
+		} else if (meta.warning || meta.status >= 400) {
+			this.logger.warn(message, meta)
+		} else {
+			this.logger.info(message, meta)
+		}
+	}
+
+	/**
+	 * Log HTTP request details
+	 */
+	private logHttpRequest(
+		method: string,
+		url: string,
+		headers?: Record<string, string>,
+		body?: any,
+		requestId?: string
+	): void {
+		if (!this.config.logging.enabled) {
+			return
+		}
+
+		if (this.logger instanceof AuditLogger) {
+			this.logger.logRequest(method, url, headers, body)
+		} else {
+			this.logger.info(`HTTP ${method} ${url}`, {
+				type: 'request',
+				method,
+				url,
+				headers: this.config.logging.maskSensitiveData ? this.maskSensitiveData(headers) : headers,
+				body:
+					this.config.logging.includeRequestBody && this.config.logging.maskSensitiveData
+						? this.maskSensitiveData(body)
+						: this.config.logging.includeRequestBody
+							? body
+							: undefined,
+				requestId,
+			})
+		}
+	}
+
+	/**
+	 * Log HTTP response details
+	 */
+	private logHttpResponse(
+		status: number,
+		statusText: string,
+		headers?: Record<string, string>,
+		body?: any,
+		duration?: number,
+		requestId?: string
+	): void {
+		if (!this.config.logging.enabled) {
+			return
+		}
+
+		if (this.logger instanceof AuditLogger) {
+			this.logger.logResponse(status, statusText, headers, body, duration)
+		} else {
+			const level = status >= 400 ? 'error' : status >= 300 ? 'warn' : 'info'
+			this.logger[level](`HTTP ${status} ${statusText}`, {
+				type: 'response',
+				status,
+				statusText,
+				duration,
+				headers: this.config.logging.maskSensitiveData ? this.maskSensitiveData(headers) : headers,
+				body:
+					this.config.logging.includeResponseBody && this.config.logging.maskSensitiveData
+						? this.maskSensitiveData(body)
+						: this.config.logging.includeResponseBody
+							? body
+							: undefined,
+				requestId,
+			})
+		}
+	}
+
+	/**
+	 * Basic sensitive data masking for non-AuditLogger instances
+	 */
+	private maskSensitiveData(data: any): any {
+		if (!data || typeof data !== 'object') {
+			return data
+		}
+
+		const sensitiveFields = ['password', 'token', 'apiKey', 'authorization', 'cookie', 'session']
+		const masked = { ...data }
+
+		for (const field of sensitiveFields) {
+			if (field in masked) {
+				masked[field] = '***'
+			}
+		}
+
+		return masked
 	}
 
 	/**

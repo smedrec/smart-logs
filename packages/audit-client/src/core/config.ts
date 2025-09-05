@@ -49,9 +49,16 @@ const PerformanceConfigSchema = z.object({
 const LoggingConfigSchema = z.object({
 	enabled: z.boolean().default(true),
 	level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+	format: z.enum(['json', 'text', 'structured']).default('text'),
 	includeRequestBody: z.boolean().default(false),
 	includeResponseBody: z.boolean().default(false),
 	maskSensitiveData: z.boolean().default(true),
+	sensitiveFields: z.array(z.string()).default([]),
+	maxLogSize: z.number().min(1000).max(100000).default(10000),
+	enableConsole: z.boolean().default(true),
+	enableBuffer: z.boolean().default(false),
+	bufferSize: z.number().min(10).max(10000).default(1000),
+	component: z.string().optional(),
 	customLogger: z.any().optional(),
 })
 
@@ -342,9 +349,16 @@ export class ConfigManager {
 			config.logging = {
 				enabled: loggingEnabled,
 				level: getEnvVar('LOGGING_LEVEL') as 'debug' | 'info' | 'warn' | 'error',
+				format: getEnvVar('LOGGING_FORMAT') as 'json' | 'text' | 'structured',
 				includeRequestBody: parseBoolean(getEnvVar('LOGGING_INCLUDE_REQUEST_BODY')),
 				includeResponseBody: parseBoolean(getEnvVar('LOGGING_INCLUDE_RESPONSE_BODY')),
 				maskSensitiveData: parseBoolean(getEnvVar('LOGGING_MASK_SENSITIVE_DATA')),
+				sensitiveFields: parseJSON(getEnvVar('LOGGING_SENSITIVE_FIELDS')),
+				maxLogSize: parseNumber(getEnvVar('LOGGING_MAX_LOG_SIZE')),
+				enableConsole: parseBoolean(getEnvVar('LOGGING_ENABLE_CONSOLE')),
+				enableBuffer: parseBoolean(getEnvVar('LOGGING_ENABLE_BUFFER')),
+				bufferSize: parseNumber(getEnvVar('LOGGING_BUFFER_SIZE')),
+				component: getEnvVar('LOGGING_COMPONENT'),
 			}
 		}
 

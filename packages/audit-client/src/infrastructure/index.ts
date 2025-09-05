@@ -25,4 +25,4 @@ export {
 	CacheInvalidationStrategy,
 } from './error'
 
-export type { ErrorContext, ErrorRecoveryStrategy, Logger } from './error'
+export type { ErrorContext, ErrorRecoveryStrategy } from './error'
