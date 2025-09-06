@@ -76,7 +76,8 @@ async function startServer() {
 	// Add performance middleware
 	app.use('*', performanceHeadersMiddleware())
 	app.use('*', performanceMiddleware())
-	app.use('*', compressionMiddleware())
+	// FIXME: generate a error when the request is text/html
+	//app.use('*', compressionMiddleware())
 	app.use('*', timeoutMiddleware(config.server.timeout || 30000))
 	app.use('*', memoryMonitoringMiddleware(100)) // 100MB threshold
 	app.use('*', requestSizeLimitMiddleware(10)) // 10MB limit
@@ -287,19 +288,6 @@ async function startServer() {
 			if (configManager?.isDevelopment()) {
 				console.log(`⚙️  Configuration: http://${config.server.host}:${config.server.port}/config`)
 			}
-
-			// System startup
-			/**audit.logSystem({
-				action: 'startup',
-				status: 'success',
-				component: 'api-server',
-				outcomeDescription: 'API server started successfully',
-				systemContext: {
-					version: '0.1.0',
-					environment: 'production',
-					nodeVersion: process.version,
-				},
-			}) */
 		}
 	)
 

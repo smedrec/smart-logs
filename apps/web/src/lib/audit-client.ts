@@ -1,9 +1,16 @@
-import { AuditClient } from '@repo/audit-client'
+import { AuditClient } from '@smart-logs/audit-client'
 
-import type { ClientOptions } from '@repo/audit-client'
+import type { PartialAuditClientConfig } from '@smart-logs/audit-client'
 
-const options: ClientOptions = {
+const options: PartialAuditClientConfig = {
 	baseUrl: 'http://localhost:3000',
+	apiVersion: 'v1',
+	timeout: 60000,
+	environment: 'development',
+	authentication: {
+		type: 'session',
+		autoRefresh: true,
+	},
 }
 
 export const auditClient = new AuditClient(options)

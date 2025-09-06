@@ -89,7 +89,7 @@ describe('Audit Worker Monitoring Integration', () => {
 
 		app.get('/alerts', async (c) => {
 			try {
-				const activeAlerts = monitoringService.getActiveAlerts()
+				const activeAlerts = await monitoringService.getActiveAlerts()
 				return c.json({
 					alerts: activeAlerts,
 					count: activeAlerts.length,
@@ -260,7 +260,7 @@ describe('Audit Worker Monitoring Integration', () => {
 			}
 
 			// Get the alert ID
-			const activeAlerts = monitoringService.getActiveAlerts()
+			const activeAlerts = await monitoringService.getActiveAlerts()
 			expect(activeAlerts.length).toBeGreaterThan(0)
 
 			const alertId = activeAlerts[0].id
@@ -280,7 +280,7 @@ describe('Audit Worker Monitoring Integration', () => {
 			expect(data.message).toContain('resolved by test-admin')
 
 			// Verify alert is resolved
-			const remainingAlerts = monitoringService.getActiveAlerts()
+			const remainingAlerts = await monitoringService.getActiveAlerts()
 			expect(remainingAlerts.length).toBe(0)
 		})
 	})
@@ -315,7 +315,7 @@ describe('Audit Worker Monitoring Integration', () => {
 			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('FAILED_AUTH'))
 
 			// Verify alert is active
-			const activeAlerts = monitoringService.getActiveAlerts()
+			const activeAlerts = await monitoringService.getActiveAlerts()
 			expect(activeAlerts.length).toBeGreaterThan(0)
 			expect(activeAlerts[0].severity).toBe('HIGH')
 			expect(activeAlerts[0].type).toBe('SECURITY')
@@ -349,7 +349,7 @@ describe('Audit Worker Monitoring Integration', () => {
 			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('🚨 ALERT [CRITICAL]'))
 			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('UNAUTHORIZED_ACCESS'))
 
-			const activeAlerts = monitoringService.getActiveAlerts()
+			const activeAlerts = await monitoringService.getActiveAlerts()
 			expect(activeAlerts.length).toBeGreaterThan(0)
 			expect(activeAlerts[0].severity).toBe('CRITICAL')
 
@@ -381,7 +381,7 @@ describe('Audit Worker Monitoring Integration', () => {
 			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('🚨 ALERT [MEDIUM]'))
 			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('DATA_VELOCITY'))
 
-			const activeAlerts = monitoringService.getActiveAlerts()
+			const activeAlerts = await monitoringService.getActiveAlerts()
 			expect(activeAlerts.length).toBeGreaterThan(0)
 			expect(activeAlerts[0].severity).toBe('MEDIUM')
 

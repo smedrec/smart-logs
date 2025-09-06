@@ -1,4 +1,4 @@
-import { AuthCard } from '@daveyplate/better-auth-ui'
+import { AuthView } from '@daveyplate/better-auth-ui'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/auth/$pathname')({
@@ -11,7 +11,7 @@ function RouteComponent() {
 	return (
 		<div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
 			<div className="w-full max-w-sm">
-				<AuthCard pathname={pathname} redirectTo="/dashboard" />
+				<AuthView pathname={pathname} redirectTo="/dashboard" />
 				<p className="text-center text-muted-foreground text-xs p-6">
 					By signing in, you agree to our{' '}
 					<Link className="text-warning underline" to="/tos" target="_blank" rel="noreferrer">

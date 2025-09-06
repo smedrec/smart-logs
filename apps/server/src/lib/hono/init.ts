@@ -336,6 +336,19 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		//const cache = initCache(c);
 		//const cache = null
 
+		// System startup
+		audit.logSystem({
+			action: 'startup',
+			status: 'success',
+			component: 'api-server',
+			outcomeDescription: 'API server started successfully',
+			systemContext: {
+				version: '0.1.0',
+				environment: configManager.getEnvironment(),
+				nodeVersion: process.version,
+			},
+		})
+
 		c.set('services', {
 			config: configManager,
 			auth,
