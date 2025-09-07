@@ -175,6 +175,11 @@ Pagination information is included in the response:
 		],
 		components: {
 			securitySchemes: {
+				cookieAuth: {
+					type: 'apiKey',
+					in: 'cookie',
+					name: 'better-auth.session_token',
+				},
 				BearerAuth: {
 					type: 'http',
 					scheme: 'bearer',
@@ -191,6 +196,7 @@ Pagination information is included in the response:
 		},
 		security: [
 			{
+				cookieAuth: [],
 				BearerAuth: [],
 				ApiKeyAuth: [],
 			},
