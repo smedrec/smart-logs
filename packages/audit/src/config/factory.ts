@@ -211,6 +211,26 @@ export function createDevelopmentConfig(): AuditConfig {
 				memoryUsage: 0.8,
 			},
 			healthCheckInterval: 30000,
+			patternDetection: {
+				failedAuthThreshold: 5,
+				failedAuthTimeWindow: 5 * 60 * 1000, // 5 minutes
+				unauthorizedAccessThreshold: 3,
+				unauthorizedAccessTimeWindow: 10 * 60 * 1000, // 10 minutes
+				dataAccessVelocityThreshold: 50,
+				dataAccessTimeWindow: 60 * 1000, // 1 minute
+				bulkOperationThreshold: 100,
+				bulkOperationTimeWindow: 5 * 60 * 1000, // 5 minutes
+				offHoursStart: 22, // 10 PM
+				offHoursEnd: 6, // 6 AM
+			},
+			notification: {
+				enabled: true,
+				provider: 'push',
+				url: process.env.NOTIFICATION_URL || 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+				credentials: {
+					secret: process.env.NOTIFICATION_SECRET || 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+				},
+			},
 		},
 		security: {
 			enableIntegrityVerification: true,

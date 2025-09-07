@@ -3,6 +3,7 @@
  * Implements suspicious pattern detection, alert generation, and metrics collection
  */
 
+import { MonitoringConfig, PatternDetectionConfig } from '../config/types.js'
 import { AlertResolution } from './database-alert-handler.js'
 import { MetricsCollector, RedisMetricsCollector } from './metrics-collector.js'
 
@@ -22,47 +23,6 @@ import type {
 	RequestMetrics,
 	SystemMetrics,
 } from './monitoring-types.js'
-
-/**
- * Pattern detection configuration
- */
-export interface PatternDetectionConfig {
-	// Failed authentication thresholds
-	failedAuthThreshold: number
-	failedAuthTimeWindow: number // in milliseconds
-
-	// Unauthorized access detection
-	unauthorizedAccessThreshold: number
-	unauthorizedAccessTimeWindow: number
-
-	// Suspicious data access patterns
-	dataAccessVelocityThreshold: number
-	dataAccessTimeWindow: number
-
-	// Bulk operations detection
-	bulkOperationThreshold: number
-	bulkOperationTimeWindow: number
-
-	// Off-hours access detection
-	offHoursStart: number // hour (0-23)
-	offHoursEnd: number // hour (0-23)
-}
-
-/**
- * Default pattern detection configuration
- */
-export const DEFAULT_PATTERN_CONFIG: PatternDetectionConfig = {
-	failedAuthThreshold: 5,
-	failedAuthTimeWindow: 5 * 60 * 1000, // 5 minutes
-	unauthorizedAccessThreshold: 3,
-	unauthorizedAccessTimeWindow: 10 * 60 * 1000, // 10 minutes
-	dataAccessVelocityThreshold: 50,
-	dataAccessTimeWindow: 60 * 1000, // 1 minute
-	bulkOperationThreshold: 100,
-	bulkOperationTimeWindow: 5 * 60 * 1000, // 5 minutes
-	offHoursStart: 22, // 10 PM
-	offHoursEnd: 6, // 6 AM
-}
 
 /**
  * Suspicious pattern detection results
@@ -109,16 +69,12 @@ export class MonitoringService {
 	private readonly cooldownPrefix = 'alert_cooldown:'
 	private events: AuditLogEvent[] = []
 	private alerts: Alert[] = []
-	private config: PatternDetectionConfig
+	private config: MonitoringConfig
 	private alertHandlers: AlertHandler[] = []
 	private metricsCollector: MetricsCollector
 	private logger: any
 
-	constructor(
-		config: PatternDetectionConfig = DEFAULT_PATTERN_CONFIG,
-		metricsCollector?: MetricsCollector,
-		logger?: any
-	) {
+	constructor(config: MonitoringConfig, metricsCollector?: MetricsCollector, logger?: any) {
 		this.config = config
 		this.metricsCollector = metricsCollector || new RedisMetricsCollector()
 		this.logger = logger || console
@@ -168,10 +124,10 @@ export class MonitoringService {
 		const cutoffTime =
 			Date.now() -
 			Math.max(
-				this.config.failedAuthTimeWindow,
-				this.config.unauthorizedAccessTimeWindow,
-				this.config.dataAccessTimeWindow,
-				this.config.bulkOperationTimeWindow
+				this.config.patternDetection.failedAuthTimeWindow,
+				this.config.patternDetection.unauthorizedAccessTimeWindow,
+				this.config.patternDetection.dataAccessTimeWindow,
+				this.config.patternDetection.bulkOperationTimeWindow
 			)
 
 		this.events = this.events.filter((e) => new Date(e.timestamp).getTime() > cutoffTime)
@@ -245,7 +201,7 @@ export class MonitoringService {
 	 */
 	private detectFailedAuthPattern(events: AuditLogEvent[]): SuspiciousPattern | null {
 		const now = Date.now()
-		const cutoffTime = now - this.config.failedAuthTimeWindow
+		const cutoffTime = now - this.config.patternDetection.failedAuthTimeWindow
 
 		const failedAuthEvents = events.filter(
 			(event) =>
@@ -267,16 +223,16 @@ export class MonitoringService {
 
 		// Check if any group exceeds threshold
 		for (const [key, groupEvents] of groupedEvents) {
-			if (groupEvents.length >= this.config.failedAuthThreshold) {
+			if (groupEvents.length >= this.config.patternDetection.failedAuthThreshold) {
 				return {
 					type: 'FAILED_AUTH',
 					severity: 'HIGH',
-					description: `${groupEvents.length} failed authentication attempts detected from ${key} within ${this.config.failedAuthTimeWindow / 1000} seconds`,
+					description: `${groupEvents.length} failed authentication attempts detected from ${key} within ${this.config.patternDetection.failedAuthTimeWindow / 1000} seconds`,
 					events: groupEvents,
 					metadata: {
 						source: key,
 						attemptCount: groupEvents.length,
-						timeWindow: this.config.failedAuthTimeWindow,
+						timeWindow: this.config.patternDetection.failedAuthTimeWindow,
 					},
 					timestamp: new Date().toISOString(),
 				}
@@ -291,7 +247,7 @@ export class MonitoringService {
 	 */
 	private detectUnauthorizedAccessPattern(events: AuditLogEvent[]): SuspiciousPattern | null {
 		const now = Date.now()
-		const cutoffTime = now - this.config.unauthorizedAccessTimeWindow
+		const cutoffTime = now - this.config.patternDetection.unauthorizedAccessTimeWindow
 
 		const unauthorizedEvents = events.filter(
 			(event) =>
@@ -315,16 +271,16 @@ export class MonitoringService {
 
 		// Check if any group exceeds threshold
 		for (const [key, groupEvents] of groupedEvents) {
-			if (groupEvents.length >= this.config.unauthorizedAccessThreshold) {
+			if (groupEvents.length >= this.config.patternDetection.unauthorizedAccessThreshold) {
 				return {
 					type: 'UNAUTHORIZED_ACCESS',
 					severity: 'CRITICAL',
-					description: `${groupEvents.length} unauthorized access attempts detected from principal ${key} within ${this.config.unauthorizedAccessTimeWindow / 1000} seconds`,
+					description: `${groupEvents.length} unauthorized access attempts detected from principal ${key} within ${this.config.patternDetection.unauthorizedAccessTimeWindow / 1000} seconds`,
 					events: groupEvents,
 					metadata: {
 						principalId: key,
 						attemptCount: groupEvents.length,
-						timeWindow: this.config.unauthorizedAccessTimeWindow,
+						timeWindow: this.config.patternDetection.unauthorizedAccessTimeWindow,
 					},
 					timestamp: new Date().toISOString(),
 				}
@@ -339,7 +295,7 @@ export class MonitoringService {
 	 */
 	private detectDataVelocityPattern(events: AuditLogEvent[]): SuspiciousPattern | null {
 		const now = Date.now()
-		const cutoffTime = now - this.config.dataAccessTimeWindow
+		const cutoffTime = now - this.config.patternDetection.dataAccessTimeWindow
 
 		const dataAccessEvents = events.filter(
 			(event) =>
@@ -363,16 +319,16 @@ export class MonitoringService {
 
 		// Check if any group exceeds threshold
 		for (const [key, groupEvents] of groupedEvents) {
-			if (groupEvents.length >= this.config.dataAccessVelocityThreshold) {
+			if (groupEvents.length >= this.config.patternDetection.dataAccessVelocityThreshold) {
 				return {
 					type: 'DATA_VELOCITY',
 					severity: 'MEDIUM',
-					description: `${groupEvents.length} data access operations detected from principal ${key} within ${this.config.dataAccessTimeWindow / 1000} seconds`,
+					description: `${groupEvents.length} data access operations detected from principal ${key} within ${this.config.patternDetection.dataAccessTimeWindow / 1000} seconds`,
 					events: groupEvents,
 					metadata: {
 						principalId: key,
 						accessCount: groupEvents.length,
-						timeWindow: this.config.dataAccessTimeWindow,
+						timeWindow: this.config.patternDetection.dataAccessTimeWindow,
 						resourceTypes: [
 							...new Set(groupEvents.map((e) => e.targetResourceType).filter(Boolean)),
 						],
@@ -390,7 +346,7 @@ export class MonitoringService {
 	 */
 	private detectBulkOperationPattern(events: AuditLogEvent[]): SuspiciousPattern | null {
 		const now = Date.now()
-		const cutoffTime = now - this.config.bulkOperationTimeWindow
+		const cutoffTime = now - this.config.patternDetection.bulkOperationTimeWindow
 
 		const bulkEvents = events.filter(
 			(event) =>
@@ -401,15 +357,15 @@ export class MonitoringService {
 				new Date(event.timestamp).getTime() > cutoffTime
 		)
 
-		if (bulkEvents.length >= this.config.bulkOperationThreshold) {
+		if (bulkEvents.length >= this.config.patternDetection.bulkOperationThreshold) {
 			return {
 				type: 'BULK_OPERATION',
 				severity: 'MEDIUM',
-				description: `${bulkEvents.length} bulk operations detected within ${this.config.bulkOperationTimeWindow / 1000} seconds`,
+				description: `${bulkEvents.length} bulk operations detected within ${this.config.patternDetection.bulkOperationTimeWindow / 1000} seconds`,
 				events: bulkEvents,
 				metadata: {
 					operationCount: bulkEvents.length,
-					timeWindow: this.config.bulkOperationTimeWindow,
+					timeWindow: this.config.patternDetection.bulkOperationTimeWindow,
 					totalRecords: bulkEvents.reduce((sum, e) => sum + ((e as any).recordCount || 1), 0),
 				},
 				timestamp: new Date().toISOString(),
@@ -429,9 +385,11 @@ export class MonitoringService {
 
 			// Check if event occurred during off-hours
 			const isOffHours =
-				this.config.offHoursStart > this.config.offHoursEnd
-					? hour >= this.config.offHoursStart || hour < this.config.offHoursEnd
-					: hour >= this.config.offHoursStart && hour < this.config.offHoursEnd
+				this.config.patternDetection.offHoursStart > this.config.patternDetection.offHoursEnd
+					? hour >= this.config.patternDetection.offHoursStart ||
+						hour < this.config.patternDetection.offHoursEnd
+					: hour >= this.config.patternDetection.offHoursStart &&
+						hour < this.config.patternDetection.offHoursEnd
 
 			return (
 				isOffHours &&
@@ -444,12 +402,12 @@ export class MonitoringService {
 			return {
 				type: 'OFF_HOURS',
 				severity: 'LOW',
-				description: `${offHoursEvents.length} data access operations detected during off-hours (${this.config.offHoursStart}:00 - ${this.config.offHoursEnd}:00)`,
+				description: `${offHoursEvents.length} data access operations detected during off-hours (${this.config.patternDetection.offHoursStart}:00 - ${this.config.patternDetection.offHoursEnd}:00)`,
 				events: offHoursEvents,
 				metadata: {
 					accessCount: offHoursEvents.length,
-					offHoursStart: this.config.offHoursStart,
-					offHoursEnd: this.config.offHoursEnd,
+					offHoursStart: this.config.patternDetection.offHoursStart,
+					offHoursEnd: this.config.patternDetection.offHoursEnd,
 					principals: [...new Set(offHoursEvents.map((e) => e.principalId).filter(Boolean))],
 				},
 				timestamp: new Date().toISOString(),
@@ -549,6 +507,10 @@ export class MonitoringService {
 	 * Send notifications based on alert severity
 	 */
 	private async sendNotifications(alert: Alert): Promise<void> {
+		if (!this.config.notification.enabled) {
+			return
+		}
+
 		try {
 			// Log notification (in a real implementation, this would integrate with external systems)
 			console.info('Alert notification', {
@@ -562,6 +524,16 @@ export class MonitoringService {
 			// For critical alerts, you might want to send immediate notifications
 			if (alert.severity === 'CRITICAL') {
 				await this.sendCriticalAlertNotification(alert)
+			} else {
+				fetch(`${this.config.notification.url}/${alert.metadata.organizationId}`, {
+					method: 'POST', // PUT works too
+					body: alert.description,
+					headers: {
+						Authorization: `Bearer ${this.config.notification.credentials.secret}`,
+						Title: alert.title,
+						Tags: `warning,${alert.type},${alert.severity},${alert.source}`,
+					},
+				})
 			}
 		} catch (error) {
 			console.error('Failed to send alert notifications', {
@@ -583,6 +555,16 @@ export class MonitoringService {
 			description: alert.description,
 			source: alert.source,
 			metadata: alert.metadata,
+		})
+		fetch(`${this.config.notification.url}/${alert.metadata.organizationId}`, {
+			method: 'POST', // PUT works too
+			body: alert.description,
+			headers: {
+				Authorization: `Bearer ${this.config.notification.credentials.secret}`,
+				Title: alert.title,
+				Priority: '5',
+				Tags: `warning,${alert.type},${alert.severity},${alert.source}`,
+			},
 		})
 	}
 

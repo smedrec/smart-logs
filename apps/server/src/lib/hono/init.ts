@@ -227,7 +227,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(auditDbInstance)
 		if (!monitoringService) {
 			if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
-			monitoringService = new MonitoringService(undefined, metricsCollector)
+			monitoringService = new MonitoringService(config.monitoring, metricsCollector)
 			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 

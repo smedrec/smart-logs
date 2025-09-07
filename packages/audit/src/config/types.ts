@@ -330,6 +330,31 @@ export interface ServerConfig {
 	}
 }
 
+/**
+ * Pattern detection configuration
+ */
+export interface PatternDetectionConfig {
+	// Failed authentication thresholds
+	failedAuthThreshold: number
+	failedAuthTimeWindow: number // in milliseconds
+
+	// Unauthorized access detection
+	unauthorizedAccessThreshold: number
+	unauthorizedAccessTimeWindow: number
+
+	// Suspicious data access patterns
+	dataAccessVelocityThreshold: number
+	dataAccessTimeWindow: number
+
+	// Bulk operations detection
+	bulkOperationThreshold: number
+	bulkOperationTimeWindow: number
+
+	// Off-hours access detection
+	offHoursStart: number // hour (0-23)
+	offHoursEnd: number // hour (0-23)
+}
+
 export interface MonitoringConfig {
 	/** Enable real-time monitoring */
 	enabled: boolean
@@ -347,6 +372,52 @@ export interface MonitoringConfig {
 
 	/** Health check interval in milliseconds */
 	healthCheckInterval: number
+
+	patternDetection: PatternDetectionConfig
+
+	notification: {
+		/** Notification enabled status */
+		enabled: boolean
+
+		/** Notification service configuration
+		/** Notification service provider */
+		provider: 'push' | 'email' | 'slack' | 'telegram' | 'webhook'
+
+		/** Notification service url */
+		url: string
+
+		// Notification service credentials
+		credentials: {
+			// Notification secret
+			secret?: string
+
+			/** Notification service username */
+			username?: string
+
+			/** Notification service password */
+			password?: string
+		}
+
+		/** Notification channels */
+		channels?: {
+			email: string[]
+			slack: string[]
+			telegram: string[]
+			webhook: string[]
+		}
+
+		/** Notification templates */
+		templates?: {
+			/** Error notification template */
+			error: string
+
+			/** Alert notification template */
+			alert: string
+
+			/** Pattern detection notification template */
+			patternDetection: string
+		}
+	}
 }
 
 export interface SecurityConfig {

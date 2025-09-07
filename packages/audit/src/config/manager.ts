@@ -810,6 +810,9 @@ export class ConfigurationManager extends EventEmitter {
 		if (sanitized.server.externalServices?.webhook?.headers?.Authorization) {
 			sanitized.server.externalServices.webhook.headers.Authorization = '***MASKED***'
 		}
+		if (sanitized.monitoring.notification.credentials.secret) {
+			sanitized.monitoring.notification.credentials.secret = '***MASKED***'
+		}
 
 		return sanitized
 	}
