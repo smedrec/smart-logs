@@ -545,19 +545,40 @@ export class Audit {
 				//throw new Error(`[AuditService] Validation Error: ${errorMessages}`)
 			}
 
-			event = validationResult.sanitizedEvent!
+			// FIXME: event = validationResult.sanitizedEvent! cause system to crash because timestamp is null
+			event = validationResult.sanitizedEvent || event
 		}
 
 		// Generate hash by default (can be disabled by setting generateHash: false)
 		if (options.generateHash !== false) {
-			const hash = this.generateEventHash(event)
-			event = { ...event, hash }
+			try {
+				const hash = this.generateEventHash(event)
+				event = { ...event, hash }
+			} catch (error) {
+				this.logger.error(
+					`[AuditService] Failed to generate hash for event: ${error instanceof Error ? error.message : String(error)}`,
+					{
+						queueName: this.queueName,
+						error: error instanceof Error ? error.message : String(error),
+					}
+				)
+			}
 		}
 
 		// Generate signature if requested
 		if (options.generateSignature) {
-			const signature = this.generateEventSignature(event)
-			event = { ...event, signature }
+			try {
+				const signature = this.generateEventSignature(event)
+				event = { ...event, signature }
+			} catch (error) {
+				this.logger.error(
+					`[AuditService] Failed to generate signature for event: ${error instanceof Error ? error.message : String(error)}`,
+					{
+						queueName: this.queueName,
+						error: error instanceof Error ? error.message : String(error),
+					}
+				)
+			}
 		}
 
 		try {
@@ -589,7 +610,7 @@ export class Audit {
 	}
 
 	/**
-	 * Log an audit event with SDK enhancements
+	 * Log an audit event with enhancements
 	 */
 	async logWithEnhancements(
 		eventDetails: Omit<AuditLogEvent, 'timestamp'>,

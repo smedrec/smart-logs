@@ -7,7 +7,7 @@ import { SendMail } from '@repo/send-mail'
 
 import { initDrizzle } from './db/index.js'
 import * as schema from './db/schema/auth.js'
-import { getActiveOrganization } from './functions.js'
+import { generateSessionId, getActiveOrganization } from './functions.js'
 import { getRedisConnection } from './redis.js'
 
 import type { Redis as RedisInstanceType } from 'ioredis'
@@ -116,11 +116,13 @@ class Auth {
 				session: {
 					create: {
 						before: async (session) => {
+							const sessionId = generateSessionId()
 							const activeOrganization = await getActiveOrganization(session.userId, db)
 							if (!activeOrganization) {
 								return {
 									data: {
 										...session,
+										id: sessionId,
 										ipAddress:
 											session.ipAddress && session.ipAddress.length > 0
 												? session.ipAddress
@@ -141,7 +143,7 @@ class Auth {
 									action: 'login' as const,
 									status: 'success' as 'success' | 'attempt' | 'failure',
 									sessionContext: {
-										sessionId: session.userId,
+										sessionId: session.id,
 										ipAddress:
 											session.ipAddress && session.ipAddress.length > 0
 												? session.ipAddress
@@ -157,6 +159,7 @@ class Auth {
 							return {
 								data: {
 									...session,
+									id: sessionId,
 									ipAddress:
 										session.ipAddress && session.ipAddress.length > 0
 											? session.ipAddress

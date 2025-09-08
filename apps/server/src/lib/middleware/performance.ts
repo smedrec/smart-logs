@@ -257,9 +257,10 @@ export function responseCachingMiddleware(
 ): MiddlewareHandler<HonoEnv> {
 	return async (c, next) => {
 		const method = c.req.method
+		const path = c.req.path
 
 		// Only cache GET requests
-		if (method !== 'GET') {
+		if (method !== 'GET' || path.includes('/auth/')) {
 			await next()
 			return
 		}
