@@ -82,6 +82,7 @@ export function createValidator<T>(schema: z.ZodSchema<T>): Validator<T> {
 				...(firstError?.path && { path: firstError.path as (string | number)[] }),
 				...(firstError?.code && { code: firstError.code }),
 			},
+			zodError: result.error, // Preserve the original ZodError
 		}
 	}
 }

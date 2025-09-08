@@ -419,6 +419,7 @@ export interface ValidationResult<T = unknown> {
 		path?: (string | number)[]
 		code?: string
 	}
+	zodError?: import('zod').ZodError
 }
 
 /**

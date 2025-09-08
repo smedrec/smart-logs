@@ -1,4 +1,24 @@
 import { BaseResource } from '../core/base-resource'
+import {
+	assertDefined,
+	assertType,
+	isAuditEvent,
+	isBulkCreateResult,
+	isCreateAuditEventInput,
+	isExportResult,
+	isIntegrityVerificationResult,
+	isPaginatedAuditEvents,
+} from '../utils/type-guards'
+import {
+	validateBulkCreateAuditEventsInput,
+	validateCreateAuditEventInput,
+	validateExportEventsParams,
+	validateQueryAuditEventsParams,
+	validateStatisticsParams,
+	validateStreamEventsParams,
+	validateSubscriptionParams,
+	ValidationError,
+} from '../utils/validation'
 
 import type { RequestOptions } from '../core/base-resource'
 
@@ -197,8 +217,10 @@ export interface SubscriptionParams {
 		principalIds?: string[]
 		organizationIds?: string[]
 		resourceTypes?: string[]
+		dataClassifications?: DataClassification[]
+		statuses?: AuditEventStatus[]
 	}
-	transport?: 'websocket' | 'sse'
+	transport?: 'websocket' | 'sse' | 'polling'
 	reconnect?: boolean
 	maxReconnectAttempts?: number
 	heartbeatInterval?: number
@@ -460,10 +482,22 @@ export class EventsService extends BaseResource {
 	 * Requirements: 4.1 - WHEN creating audit events THEN the client SHALL validate event data and submit to the server API
 	 */
 	async create(event: CreateAuditEventInput): Promise<AuditEvent> {
-		return this.request<AuditEvent>('/audit/events', {
+		// Validate input data
+		const validationResult = validateCreateAuditEventInput(event)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid audit event data', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const response = await this.request<AuditEvent>('/audit/events', {
 			method: 'POST',
-			body: event,
+			body: validationResult.data,
 		})
+
+		// Validate response
+		assertType(response, isAuditEvent, 'Invalid audit event response from server')
+		return response
 	}
 
 	/**
@@ -475,10 +509,23 @@ export class EventsService extends BaseResource {
 	 * Requirements: 4.1 - WHEN creating audit events THEN the client SHALL validate event data and submit to the server API
 	 */
 	async bulkCreate(events: CreateAuditEventInput[]): Promise<BulkCreateResult> {
-		return this.request<BulkCreateResult>('/audit/events/bulk', {
+		// Validate input data
+		const bulkInput = { events }
+		const validationResult = validateBulkCreateAuditEventsInput(bulkInput)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid bulk create input', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const response = await this.request<BulkCreateResult>('/audit/events/bulk', {
 			method: 'POST',
-			body: { events },
+			body: validationResult.data,
 		})
+
+		// Validate response
+		assertType(response, isBulkCreateResult, 'Invalid bulk create result from server')
+		return response
 	}
 
 	/**
@@ -491,64 +538,81 @@ export class EventsService extends BaseResource {
 	 * Requirements: 4.5 - WHEN handling large result sets THEN the client SHALL support pagination and streaming responses
 	 */
 	async query(params: QueryAuditEventsParams = {}): Promise<PaginatedAuditEvents> {
+		// Validate input parameters
+		const validationResult = validateQueryAuditEventsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid query parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const validatedParams = validationResult.data!
 		const queryParams: Record<string, any> = {}
 
 		// Handle date range filter
-		if (params.filter?.dateRange) {
-			queryParams.startDate = params.filter.dateRange.startDate
-			queryParams.endDate = params.filter.dateRange.endDate
+		if (validatedParams.filter?.dateRange) {
+			queryParams.startDate = validatedParams.filter.dateRange.startDate
+			queryParams.endDate = validatedParams.filter.dateRange.endDate
 		}
 
 		// Handle array filters
-		if (params.filter?.principalIds?.length) {
-			queryParams.principalIds = params.filter.principalIds.join(',')
+		if (validatedParams.filter?.principalIds?.length) {
+			queryParams.principalIds = validatedParams.filter.principalIds.join(',')
 		}
-		if (params.filter?.organizationIds?.length) {
-			queryParams.organizationIds = params.filter.organizationIds.join(',')
+		if (validatedParams.filter?.organizationIds?.length) {
+			queryParams.organizationIds = validatedParams.filter.organizationIds.join(',')
 		}
-		if (params.filter?.actions?.length) {
-			queryParams.actions = params.filter.actions.join(',')
+		if (validatedParams.filter?.actions?.length) {
+			queryParams.actions = validatedParams.filter.actions.join(',')
 		}
-		if (params.filter?.statuses?.length) {
-			queryParams.statuses = params.filter.statuses.join(',')
+		if (validatedParams.filter?.statuses?.length) {
+			queryParams.statuses = validatedParams.filter.statuses.join(',')
 		}
-		if (params.filter?.dataClassifications?.length) {
-			queryParams.dataClassifications = params.filter.dataClassifications.join(',')
+		if (validatedParams.filter?.dataClassifications?.length) {
+			queryParams.dataClassifications = validatedParams.filter.dataClassifications.join(',')
 		}
-		if (params.filter?.resourceTypes?.length) {
-			queryParams.resourceTypes = params.filter.resourceTypes.join(',')
+		if (validatedParams.filter?.resourceTypes?.length) {
+			queryParams.resourceTypes = validatedParams.filter.resourceTypes.join(',')
 		}
 
 		// Handle boolean filters
-		if (params.filter?.verifiedOnly !== undefined) {
-			queryParams.verifiedOnly = params.filter.verifiedOnly.toString()
+		if (validatedParams.filter?.verifiedOnly !== undefined) {
+			queryParams.verifiedOnly = validatedParams.filter.verifiedOnly.toString()
 		}
 
 		// Handle correlation ID filter
-		if (params.filter?.correlationId) {
-			queryParams.correlationId = params.filter.correlationId
+		if (validatedParams.filter?.correlationId) {
+			queryParams.correlationId = validatedParams.filter.correlationId
 		}
 
 		// Handle pagination
-		if (params.pagination?.limit !== undefined) {
-			queryParams.limit = params.pagination.limit.toString()
+		if (validatedParams.pagination?.limit !== undefined) {
+			queryParams.limit = validatedParams.pagination.limit.toString()
 		}
-		if (params.pagination?.offset !== undefined) {
-			queryParams.offset = params.pagination.offset.toString()
+		if (validatedParams.pagination?.offset !== undefined) {
+			queryParams.offset = validatedParams.pagination.offset.toString()
 		}
 
 		// Handle sorting
-		if (params.sort?.field) {
-			queryParams.sortField = params.sort.field
+		if (validatedParams.sort?.field) {
+			queryParams.sortField = validatedParams.sort.field
 		}
-		if (params.sort?.direction) {
-			queryParams.sortDirection = params.sort.direction
+		if (validatedParams.sort?.direction) {
+			queryParams.sortDirection = validatedParams.sort.direction
 		}
 
-		return this.request<PaginatedAuditEvents>('/audit/events', {
+		const response = await this.request<PaginatedAuditEvents>('/audit/events', {
 			method: 'GET',
 			query: queryParams,
 		})
+
+		// Validate response
+		assertType(
+			response,
+			isPaginatedAuditEvents,
+			'Invalid paginated audit events response from server'
+		)
+		return response
 	}
 
 	/**
@@ -580,9 +644,23 @@ export class EventsService extends BaseResource {
 	 * Requirements: 4.4 - WHEN verifying event integrity THEN the client SHALL provide cryptographic verification methods
 	 */
 	async verify(id: string): Promise<IntegrityVerificationResult> {
-		return this.request<IntegrityVerificationResult>(`/audit/events/${id}/verify`, {
+		// Validate input
+		assertDefined(id, 'Event ID is required for verification')
+		if (typeof id !== 'string' || id.trim().length === 0) {
+			throw new ValidationError('Event ID must be a non-empty string')
+		}
+
+		const response = await this.request<IntegrityVerificationResult>(`/audit/events/${id}/verify`, {
 			method: 'POST',
 		})
+
+		// Validate response
+		assertType(
+			response,
+			isIntegrityVerificationResult,
+			'Invalid integrity verification result from server'
+		)
+		return response
 	}
 
 	/**
@@ -594,10 +672,22 @@ export class EventsService extends BaseResource {
 	 * Requirements: 4.5 - WHEN handling large result sets THEN the client SHALL support pagination and streaming responses
 	 */
 	async export(params: ExportEventsParams): Promise<ExportResult> {
-		return this.request<ExportResult>('/audit/events/export', {
+		// Validate input parameters
+		const validationResult = validateExportEventsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid export parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const response = await this.request<ExportResult>('/audit/events/export', {
 			method: 'POST',
-			body: params,
+			body: validationResult.data,
 		})
+
+		// Validate response
+		assertType(response, isExportResult, 'Invalid export result from server')
+		return response
 	}
 
 	/**
@@ -609,46 +699,55 @@ export class EventsService extends BaseResource {
 	 * Requirements: 4.5 - WHEN handling large result sets THEN the client SHALL support pagination and streaming responses
 	 */
 	async stream(params: StreamEventsParams): Promise<ReadableStream<AuditEvent>> {
+		// Validate input parameters
+		const validationResult = validateStreamEventsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid stream parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const validatedParams = validationResult.data!
 		const queryParams: Record<string, any> = {}
 
 		// Handle filters similar to query method
-		if (params.filter?.dateRange) {
-			queryParams.startDate = params.filter.dateRange.startDate
-			queryParams.endDate = params.filter.dateRange.endDate
+		if (validatedParams.filter?.dateRange) {
+			queryParams.startDate = validatedParams.filter.dateRange.startDate
+			queryParams.endDate = validatedParams.filter.dateRange.endDate
 		}
 
-		if (params.filter?.principalIds?.length) {
-			queryParams.principalIds = params.filter.principalIds.join(',')
+		if (validatedParams.filter?.principalIds?.length) {
+			queryParams.principalIds = validatedParams.filter.principalIds.join(',')
 		}
-		if (params.filter?.organizationIds?.length) {
-			queryParams.organizationIds = params.filter.organizationIds.join(',')
+		if (validatedParams.filter?.organizationIds?.length) {
+			queryParams.organizationIds = validatedParams.filter.organizationIds.join(',')
 		}
-		if (params.filter?.actions?.length) {
-			queryParams.actions = params.filter.actions.join(',')
+		if (validatedParams.filter?.actions?.length) {
+			queryParams.actions = validatedParams.filter.actions.join(',')
 		}
-		if (params.filter?.statuses?.length) {
-			queryParams.statuses = params.filter.statuses.join(',')
+		if (validatedParams.filter?.statuses?.length) {
+			queryParams.statuses = validatedParams.filter.statuses.join(',')
 		}
-		if (params.filter?.dataClassifications?.length) {
-			queryParams.dataClassifications = params.filter.dataClassifications.join(',')
+		if (validatedParams.filter?.dataClassifications?.length) {
+			queryParams.dataClassifications = validatedParams.filter.dataClassifications.join(',')
 		}
-		if (params.filter?.resourceTypes?.length) {
-			queryParams.resourceTypes = params.filter.resourceTypes.join(',')
+		if (validatedParams.filter?.resourceTypes?.length) {
+			queryParams.resourceTypes = validatedParams.filter.resourceTypes.join(',')
 		}
 
-		if (params.filter?.verifiedOnly !== undefined) {
-			queryParams.verifiedOnly = params.filter.verifiedOnly.toString()
+		if (validatedParams.filter?.verifiedOnly !== undefined) {
+			queryParams.verifiedOnly = validatedParams.filter.verifiedOnly.toString()
 		}
-		if (params.filter?.correlationId) {
-			queryParams.correlationId = params.filter.correlationId
+		if (validatedParams.filter?.correlationId) {
+			queryParams.correlationId = validatedParams.filter.correlationId
 		}
 
 		// Handle stream-specific parameters
-		if (params.batchSize) {
-			queryParams.batchSize = params.batchSize.toString()
+		if (validatedParams.batchSize) {
+			queryParams.batchSize = validatedParams.batchSize.toString()
 		}
-		if (params.format) {
-			queryParams.format = params.format
+		if (validatedParams.format) {
+			queryParams.format = validatedParams.format
 		}
 
 		return this.request<ReadableStream<AuditEvent>>('/audit/events/stream', {
@@ -667,7 +766,45 @@ export class EventsService extends BaseResource {
 	 * Requirements: 4.5 - Real-time event subscription capabilities
 	 */
 	subscribe(params: SubscriptionParams): EventSubscription {
-		return new EventSubscriptionImpl(this.config.baseUrl, params, this.authManager)
+		// Validate input parameters
+		const validationResult = validateSubscriptionParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid subscription parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const validatedData = validationResult.data!
+
+		// Create clean params object that only includes defined properties
+		const cleanParams: SubscriptionParams = {}
+
+		if (validatedData.filter) {
+			const filter: SubscriptionParams['filter'] = {}
+			if (validatedData.filter.actions) filter.actions = validatedData.filter.actions
+			if (validatedData.filter.principalIds) filter.principalIds = validatedData.filter.principalIds
+			if (validatedData.filter.organizationIds)
+				filter.organizationIds = validatedData.filter.organizationIds
+			if (validatedData.filter.resourceTypes)
+				filter.resourceTypes = validatedData.filter.resourceTypes
+			if (validatedData.filter.dataClassifications)
+				filter.dataClassifications = validatedData.filter.dataClassifications
+			if (validatedData.filter.statuses) filter.statuses = validatedData.filter.statuses
+
+			// Only add filter if it has properties
+			if (Object.keys(filter).length > 0) {
+				cleanParams.filter = filter
+			}
+		}
+
+		if (validatedData.transport) cleanParams.transport = validatedData.transport
+		if (validatedData.reconnect !== undefined) cleanParams.reconnect = validatedData.reconnect
+		if (validatedData.maxReconnectAttempts !== undefined)
+			cleanParams.maxReconnectAttempts = validatedData.maxReconnectAttempts
+		if (validatedData.heartbeatInterval !== undefined)
+			cleanParams.heartbeatInterval = validatedData.heartbeatInterval
+
+		return new EventSubscriptionImpl(this.config.baseUrl, cleanParams, this.authManager)
 	}
 
 	/**
@@ -735,28 +872,37 @@ export class EventsService extends BaseResource {
 			count: number
 		}>
 	}> {
-		const queryParams: Record<string, any> = {
-			startDate: params.dateRange.startDate,
-			endDate: params.dateRange.endDate,
+		// Validate input parameters
+		const validationResult = validateStatisticsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid statistics parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
 		}
 
-		if (params.groupBy) {
-			queryParams.groupBy = params.groupBy
+		const validatedParams = validationResult.data!
+		const queryParams: Record<string, any> = {
+			startDate: validatedParams.dateRange.startDate,
+			endDate: validatedParams.dateRange.endDate,
+		}
+
+		if (validatedParams.groupBy) {
+			queryParams.groupBy = validatedParams.groupBy
 		}
 
 		// Add filters if provided
-		if (params.filters) {
-			if (params.filters.principalIds?.length) {
-				queryParams.principalIds = params.filters.principalIds.join(',')
+		if (validatedParams.filters) {
+			if (validatedParams.filters.principalIds?.length) {
+				queryParams.principalIds = validatedParams.filters.principalIds.join(',')
 			}
-			if (params.filters.organizationIds?.length) {
-				queryParams.organizationIds = params.filters.organizationIds.join(',')
+			if (validatedParams.filters.organizationIds?.length) {
+				queryParams.organizationIds = validatedParams.filters.organizationIds.join(',')
 			}
-			if (params.filters.actions?.length) {
-				queryParams.actions = params.filters.actions.join(',')
+			if (validatedParams.filters.actions?.length) {
+				queryParams.actions = validatedParams.filters.actions.join(',')
 			}
-			if (params.filters.resourceTypes?.length) {
-				queryParams.resourceTypes = params.filters.resourceTypes.join(',')
+			if (validatedParams.filters.resourceTypes?.length) {
+				queryParams.resourceTypes = validatedParams.filters.resourceTypes.join(',')
 			}
 		}
 

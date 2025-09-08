@@ -1,4 +1,12 @@
 import { BaseResource } from '../core/base-resource'
+import { assertDefined, assertType, isNonEmptyString, isObject } from '../utils/type-guards'
+import {
+	validateCreateScheduledReportInput,
+	validateExecutionHistoryParams,
+	validateListScheduledReportsParams,
+	validateUpdateScheduledReportInput,
+	ValidationError,
+} from '../utils/validation'
 
 import type { AuditClientConfig } from '../core/config'
 import type { Logger } from '../infrastructure/logger'
@@ -183,12 +191,27 @@ export class ScheduledReportsService extends BaseResource {
 	 * Requirement 6.3: WHEN listing scheduled reports THEN the client SHALL provide filtering and pagination options
 	 */
 	async list(params: ListScheduledReportsParams = {}): Promise<PaginatedScheduledReports> {
-		this.validateListParams(params)
+		// Validate input using centralized validation
+		const validationResult = validateListScheduledReportsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid list scheduled reports parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 
-		return this.request<PaginatedScheduledReports>('/scheduled-reports', {
+		const validatedQuery = validationResult.data!
+
+		const response = await this.request<PaginatedScheduledReports>('/scheduled-reports', {
 			method: 'GET',
-			query: params,
+			query: validatedQuery,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid paginated scheduled reports response from server')
+		assertDefined(response.reports, 'Paginated scheduled reports response missing reports array')
+		assertDefined(response.pagination, 'Paginated scheduled reports response missing pagination')
+
+		return response
 	}
 
 	/**
@@ -212,12 +235,25 @@ export class ScheduledReportsService extends BaseResource {
 	 * Requirement 6.1: WHEN creating scheduled reports THEN the client SHALL validate schedule configuration and report parameters
 	 */
 	async create(report: CreateScheduledReportInput): Promise<ScheduledReport> {
-		this.validateCreateInput(report)
+		// Validate input using centralized validation
+		const validationResult = validateCreateScheduledReportInput(report)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid create scheduled report input', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 
-		return this.request<ScheduledReport>('/scheduled-reports', {
+		const response = await this.request<ScheduledReport>('/scheduled-reports', {
 			method: 'POST',
-			body: report,
+			body: validationResult.data,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid scheduled report response from server')
+		assertDefined(response.id, 'Scheduled report response missing ID')
+		assertDefined(response.name, 'Scheduled report response missing name')
+
+		return response
 	}
 
 	/**
@@ -225,13 +261,30 @@ export class ScheduledReportsService extends BaseResource {
 	 * Requirement 6.2: WHEN updating scheduled reports THEN the client SHALL support partial updates and validation
 	 */
 	async update(id: string, updates: UpdateScheduledReportInput): Promise<ScheduledReport> {
-		this.validateId(id)
-		this.validateUpdateInput(updates)
+		// Validate input
+		assertDefined(id, 'Scheduled report ID is required')
+		if (!isNonEmptyString(id)) {
+			throw new ValidationError('Scheduled report ID must be a non-empty string')
+		}
 
-		return this.request<ScheduledReport>(`/scheduled-reports/${id}`, {
+		const validationResult = validateUpdateScheduledReportInput(updates)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid update scheduled report input', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const response = await this.request<ScheduledReport>(`/scheduled-reports/${id}`, {
 			method: 'PUT',
-			body: updates,
+			body: validationResult.data,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid scheduled report response from server')
+		assertDefined(response.id, 'Scheduled report response missing ID')
+		assertDefined(response.name, 'Scheduled report response missing name')
+
+		return response
 	}
 
 	/**
@@ -266,13 +319,35 @@ export class ScheduledReportsService extends BaseResource {
 		id: string,
 		params: ExecutionHistoryParams = {}
 	): Promise<PaginatedExecutions> {
-		this.validateId(id)
-		this.validateExecutionHistoryParams(params)
+		// Validate input
+		assertDefined(id, 'Scheduled report ID is required')
+		if (!isNonEmptyString(id)) {
+			throw new ValidationError('Scheduled report ID must be a non-empty string')
+		}
 
-		return this.request<PaginatedExecutions>(`/scheduled-reports/${id}/executions`, {
-			method: 'GET',
-			query: params,
-		})
+		const validationResult = validateExecutionHistoryParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid execution history parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const validatedQuery = validationResult.data!
+
+		const response = await this.request<PaginatedExecutions>(
+			`/scheduled-reports/${id}/executions`,
+			{
+				method: 'GET',
+				query: validatedQuery,
+			}
+		)
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid paginated executions response from server')
+		assertDefined(response.executions, 'Paginated executions response missing executions array')
+		assertDefined(response.pagination, 'Paginated executions response missing pagination')
+
+		return response
 	}
 
 	/**

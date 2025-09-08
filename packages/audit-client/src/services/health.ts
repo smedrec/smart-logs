@@ -1,4 +1,19 @@
 import { BaseResource } from '../core/base-resource'
+import {
+	assertDefined,
+	assertType,
+	isDetailedHealthStatus,
+	isHealthStatus,
+	isNonEmptyString,
+	isObject,
+} from '../utils/type-guards'
+import {
+	validateDetailedHealthStatus,
+	validateHealthStatus,
+	validateReadinessStatus,
+	validateVersionInfo,
+	ValidationError,
+} from '../utils/validation'
 
 import type { RequestOptions } from '../core/base-resource'
 
@@ -216,7 +231,11 @@ export class HealthService extends BaseResource {
 			}
 		}
 
-		return this.request<HealthStatus>('/health', options)
+		const response = await this.request<HealthStatus>('/health', options)
+
+		// Validate response using type guards
+		assertType(response, isHealthStatus, 'Invalid health status response from server')
+		return response
 	}
 
 	/**
@@ -236,7 +255,15 @@ export class HealthService extends BaseResource {
 			},
 		}
 
-		return this.request<DetailedHealthStatus>('/health/detailed', options)
+		const response = await this.request<DetailedHealthStatus>('/health/detailed', options)
+
+		// Validate response using type guards
+		assertType(
+			response,
+			isDetailedHealthStatus,
+			'Invalid detailed health status response from server'
+		)
+		return response
 	}
 
 	/**

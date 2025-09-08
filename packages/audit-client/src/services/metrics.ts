@@ -1,4 +1,20 @@
 import { BaseResource } from '../core/base-resource'
+import {
+	assertDefined,
+	assertType,
+	isAlert,
+	isNonEmptyString,
+	isObject,
+	isSystemMetrics,
+} from '../utils/type-guards'
+import {
+	validateAlert,
+	validateAlertsParams,
+	validateAuditMetricsParams,
+	validateSystemMetrics,
+	validateUsageMetricsParams,
+	ValidationError,
+} from '../utils/validation'
 
 import type { RequestOptions } from '../core/base-resource'
 
@@ -387,9 +403,13 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<SystemMetrics> Current system performance metrics
 	 */
 	async getSystemMetrics(): Promise<SystemMetrics> {
-		return this.request<SystemMetrics>('/metrics/system', {
+		const response = await this.request<SystemMetrics>('/metrics/system', {
 			method: 'GET',
 		})
+
+		// Validate response using type guards
+		assertType(response, isSystemMetrics, 'Invalid system metrics response from server')
+		return response
 	}
 
 	/**
@@ -399,10 +419,26 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<AuditMetrics> Audit system metrics
 	 */
 	async getAuditMetrics(params: AuditMetricsParams = {}): Promise<AuditMetrics> {
-		return this.request<AuditMetrics>('/metrics/audit', {
+		// Validate input parameters
+		const validationResult = validateAuditMetricsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid audit metrics parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const validatedQuery = validationResult.data!
+
+		const response = await this.request<AuditMetrics>('/metrics/audit', {
 			method: 'GET',
-			query: params,
+			query: validatedQuery,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid audit metrics response from server')
+		assertDefined(response.timestamp, 'Audit metrics response missing timestamp')
+
+		return response
 	}
 
 	/**
@@ -423,10 +459,26 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<UsageMetrics> API usage statistics
 	 */
 	async getUsageMetrics(params: UsageMetricsParams = {}): Promise<UsageMetrics> {
-		return this.request<UsageMetrics>('/metrics/usage', {
+		// Validate input parameters
+		const validationResult = validateUsageMetricsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid usage metrics parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const validatedQuery = validationResult.data!
+
+		const response = await this.request<UsageMetrics>('/metrics/usage', {
 			method: 'GET',
-			query: params,
+			query: validatedQuery,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid usage metrics response from server')
+		assertDefined(response.timestamp, 'Usage metrics response missing timestamp')
+
+		return response
 	}
 
 	/**
@@ -436,10 +488,27 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<PaginatedAlerts> List of system alerts
 	 */
 	async getAlerts(params: AlertsParams = {}): Promise<PaginatedAlerts> {
-		return this.request<PaginatedAlerts>('/alerts', {
+		// Validate input parameters
+		const validationResult = validateAlertsParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid alerts parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const validatedQuery = validationResult.data!
+
+		const response = await this.request<PaginatedAlerts>('/alerts', {
 			method: 'GET',
-			query: params,
+			query: validatedQuery,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid paginated alerts response from server')
+		assertDefined(response.alerts, 'Paginated alerts response missing alerts array')
+		assertDefined(response.pagination, 'Paginated alerts response missing pagination')
+
+		return response
 	}
 
 	/**
@@ -449,10 +518,20 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<Alert | null> Alert details or null if not found
 	 */
 	async getAlert(id: string): Promise<Alert | null> {
+		// Validate input
+		assertDefined(id, 'Alert ID is required')
+		if (!isNonEmptyString(id)) {
+			throw new ValidationError('Alert ID must be a non-empty string')
+		}
+
 		try {
-			return await this.request<Alert>(`/alerts/${id}`, {
+			const response = await this.request<Alert>(`/alerts/${id}`, {
 				method: 'GET',
 			})
+
+			// Validate response
+			assertType(response, isAlert, 'Invalid alert response from server')
+			return response
 		} catch (error: any) {
 			if (error.status === 404) {
 				return null

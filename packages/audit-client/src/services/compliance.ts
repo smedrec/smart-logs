@@ -1,4 +1,12 @@
 import { BaseResource } from '../core/base-resource'
+import { assertDefined, assertType, isNonEmptyString, isObject } from '../utils/type-guards'
+import {
+	validateCustomReportParams,
+	validateGdprExportParams,
+	validatePseudonymizationParams,
+	validateReportCriteria,
+	ValidationError,
+} from '../utils/validation'
 
 import type { RequestOptions } from '../core/base-resource'
 import type { AuditClientConfig } from '../core/config'
@@ -294,12 +302,25 @@ export class ComplianceService extends BaseResource {
 	 * Requirement 5.1: WHEN generating HIPAA reports THEN the client SHALL provide methods with proper criteria validation
 	 */
 	async generateHipaaReport(criteria: ReportCriteria): Promise<HIPAAReport> {
-		this.validateReportCriteria(criteria)
+		// Validate input using centralized validation
+		const validationResult = validateReportCriteria(criteria)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid report criteria for HIPAA report', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 
-		return this.request<HIPAAReport>('/compliance/reports/hipaa', {
+		const response = await this.request<HIPAAReport>('/compliance/reports/hipaa', {
 			method: 'POST',
-			body: { criteria },
+			body: { criteria: validationResult.data },
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid HIPAA report response from server')
+		assertDefined(response.id, 'HIPAA report response missing ID')
+		assertDefined(response.summary, 'HIPAA report response missing summary')
+
+		return response
 	}
 
 	/**
@@ -307,12 +328,25 @@ export class ComplianceService extends BaseResource {
 	 * Requirement 5.2: WHEN generating GDPR reports THEN the client SHALL support data export and pseudonymization requests
 	 */
 	async generateGdprReport(criteria: ReportCriteria): Promise<GDPRReport> {
-		this.validateReportCriteria(criteria)
+		// Validate input using centralized validation
+		const validationResult = validateReportCriteria(criteria)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid report criteria for GDPR report', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 
-		return this.request<GDPRReport>('/compliance/reports/gdpr', {
+		const response = await this.request<GDPRReport>('/compliance/reports/gdpr', {
 			method: 'POST',
-			body: { criteria },
+			body: { criteria: validationResult.data },
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid GDPR report response from server')
+		assertDefined(response.id, 'GDPR report response missing ID')
+		assertDefined(response.summary, 'GDPR report response missing summary')
+
+		return response
 	}
 
 	/**
@@ -320,12 +354,25 @@ export class ComplianceService extends BaseResource {
 	 * Requirement 5.3: WHEN creating custom reports THEN the client SHALL allow flexible report criteria and formatting
 	 */
 	async generateCustomReport(params: CustomReportParams): Promise<CustomReport> {
-		this.validateCustomReportParams(params)
+		// Validate input using centralized validation
+		const validationResult = validateCustomReportParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid custom report parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 
-		return this.request<CustomReport>('/compliance/reports/custom', {
+		const response = await this.request<CustomReport>('/compliance/reports/custom', {
 			method: 'POST',
-			body: params,
+			body: validationResult.data,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid custom report response from server')
+		assertDefined(response.id, 'Custom report response missing ID')
+		assertDefined(response.name, 'Custom report response missing name')
+
+		return response
 	}
 
 	/**
@@ -333,12 +380,25 @@ export class ComplianceService extends BaseResource {
 	 * Requirement 5.2: WHEN generating GDPR reports THEN the client SHALL support data export and pseudonymization requests
 	 */
 	async exportGdprData(params: GdprExportParams): Promise<GdprExportResult> {
-		this.validateGdprExportParams(params)
+		// Validate input using centralized validation
+		const validationResult = validateGdprExportParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid GDPR export parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 
-		return this.request<GdprExportResult>('/compliance/gdpr/export', {
+		const response = await this.request<GdprExportResult>('/compliance/gdpr/export', {
 			method: 'POST',
-			body: params,
+			body: validationResult.data,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid GDPR export result from server')
+		assertDefined(response.exportId, 'GDPR export result missing export ID')
+		assertDefined(response.dataSubjectId, 'GDPR export result missing data subject ID')
+
+		return response
 	}
 
 	/**
@@ -346,12 +406,25 @@ export class ComplianceService extends BaseResource {
 	 * Requirement 5.2: WHEN generating GDPR reports THEN the client SHALL support data export and pseudonymization requests
 	 */
 	async pseudonymizeData(params: PseudonymizationParams): Promise<PseudonymizationResult> {
-		this.validatePseudonymizationParams(params)
+		// Validate input using centralized validation
+		const validationResult = validatePseudonymizationParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid pseudonymization parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 
-		return this.request<PseudonymizationResult>('/compliance/gdpr/pseudonymize', {
+		const response = await this.request<PseudonymizationResult>('/compliance/gdpr/pseudonymize', {
 			method: 'POST',
-			body: params,
+			body: validationResult.data,
 		})
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid pseudonymization result from server')
+		assertDefined(response.operationId, 'Pseudonymization result missing operation ID')
+		assertDefined(response.summary, 'Pseudonymization result missing summary')
+
+		return response
 	}
 
 	/**

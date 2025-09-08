@@ -1,4 +1,19 @@
 import { BaseResource } from '../core/base-resource'
+import {
+	assertDefined,
+	assertType,
+	isAuditPreset,
+	isNonEmptyString,
+	isObject,
+	isPresetContext,
+} from '../utils/type-guards'
+import {
+	validateAuditPreset,
+	validateCreateAuditPresetInput,
+	validatePresetContext,
+	validateUpdateAuditPresetInput,
+	ValidationError,
+} from '../utils/validation'
 
 import type { RequestOptions } from '../core/base-resource'
 import type { AuditClientConfig } from '../core/config'
@@ -329,12 +344,22 @@ export class PresetsService extends BaseResource {
 	 * ```
 	 */
 	async create(preset: CreateAuditPresetInput): Promise<AuditPreset> {
-		const options: RequestOptions = {
-			method: 'POST',
-			body: preset,
+		// Validate input using centralized validation
+		const validationResult = validateCreateAuditPresetInput(preset)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid audit preset input', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
 		}
 
-		return this.request<AuditPreset>('/audit-presets', options)
+		const response = await this.request<AuditPreset>('/audit-presets', {
+			method: 'POST',
+			body: validationResult.data,
+		})
+
+		// Validate response
+		assertType(response, isAuditPreset, 'Invalid audit preset response from server')
+		return response
 	}
 
 	/**
@@ -356,12 +381,27 @@ export class PresetsService extends BaseResource {
 	 * ```
 	 */
 	async update(name: string, updates: UpdateAuditPresetInput): Promise<AuditPreset> {
-		const options: RequestOptions = {
-			method: 'PUT',
-			body: updates,
+		// Validate input
+		assertDefined(name, 'Preset name is required')
+		if (!isNonEmptyString(name)) {
+			throw new ValidationError('Preset name must be a non-empty string')
 		}
 
-		return this.request<AuditPreset>(`/audit-presets/${encodeURIComponent(name)}`, options)
+		const validationResult = validateUpdateAuditPresetInput(updates)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid audit preset update input', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const response = await this.request<AuditPreset>(`/audit-presets/${encodeURIComponent(name)}`, {
+			method: 'PUT',
+			body: validationResult.data,
+		})
+
+		// Validate response
+		assertType(response, isAuditPreset, 'Invalid audit preset response from server')
+		return response
 	}
 
 	/**
@@ -407,15 +447,32 @@ export class PresetsService extends BaseResource {
 	 * ```
 	 */
 	async validate(name: string, context: PresetContext): Promise<ValidationResult> {
-		const options: RequestOptions = {
-			method: 'POST',
-			body: context,
+		// Validate input
+		assertDefined(name, 'Preset name is required')
+		if (!isNonEmptyString(name)) {
+			throw new ValidationError('Preset name must be a non-empty string')
 		}
 
-		return this.request<ValidationResult>(
+		const validationResult = validatePresetContext(context)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid preset context', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const response = await this.request<ValidationResult>(
 			`/audit-presets/${encodeURIComponent(name)}/validate`,
-			options
+			{
+				method: 'POST',
+				body: validationResult.data,
+			}
 		)
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid validation result response from server')
+		assertDefined(response.isValid, 'Validation result missing isValid field')
+
+		return response
 	}
 
 	/**
@@ -448,15 +505,33 @@ export class PresetsService extends BaseResource {
 	 * ```
 	 */
 	async apply(name: string, context: PresetContext): Promise<PresetApplicationResult> {
-		const options: RequestOptions = {
-			method: 'POST',
-			body: context,
+		// Validate input
+		assertDefined(name, 'Preset name is required')
+		if (!isNonEmptyString(name)) {
+			throw new ValidationError('Preset name must be a non-empty string')
 		}
 
-		return this.request<PresetApplicationResult>(
+		const validationResult = validatePresetContext(context)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid preset context', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		const response = await this.request<PresetApplicationResult>(
 			`/audit-presets/${encodeURIComponent(name)}/apply`,
-			options
+			{
+				method: 'POST',
+				body: validationResult.data,
+			}
 		)
+
+		// Validate response structure
+		assertType(response, isObject, 'Invalid preset application result from server')
+		assertDefined(response.success, 'Preset application result missing success field')
+		assertDefined(response.validationResult, 'Preset application result missing validation result')
+
+		return response
 	}
 
 	/**
