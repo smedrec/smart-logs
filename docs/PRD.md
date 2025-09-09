@@ -46,7 +46,7 @@
 
 ### 4.5. Technology Stack
 
-- **FR5.1:** The backend will be built with Hono and tRPC on Node.js for a lightweight and type-safe API.
+- **FR5.1:** The backend will be built with Hono and tRPC, Rest API, Graphql on Node.js for a lightweight and type-safe API.
 - **FR5.2:** The frontend will be a web application built with React and TanStack Router.
 - **FR5.3:** A mobile application will be developed using React Native and Expo.
 - **FR5.4:** The database will be PostgreSQL, with Drizzle as the ORM.
