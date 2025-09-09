@@ -79,7 +79,32 @@ export const CreateAuditEventInputSchema = z.object({
 	correlationId: z.string().optional(),
 	metadata: AuditEventMetadataSchema.optional(),
 })
+
+/* Options for audit event creation */
+const CreateAuditEventOptionsSchema = z.object({
+	priority: z.number().optional(),
+	delay: z.number().optional(),
+	durabilityGuarantees: z.boolean().optional(),
+	generateHash: z.boolean().optional(),
+	generateSignature: z.boolean().optional(),
+	correlationId: z.string().optional(),
+	eventVersion: z.string().optional(),
+	skipValidation: z.boolean().optional(),
+	validationConfig: z
+		.object({
+			maxStringLength: z.number().default(10000),
+			allowedDataClassifications: z
+				.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']))
+				.default(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']),
+			requiredFields: z.array(z.string()).default(['timestamp', 'action', 'status']),
+			maxCustomFieldDepth: z.number().default(3),
+			allowedEventVersions: z.array(z.string()).default(['1.0', '1.1', '2.0']),
+		})
+		.optional(),
+})
+
 export type CreateAuditEventInput = z.infer<typeof CreateAuditEventInputSchema>
+export type CreateAuditEventOptions = z.infer<typeof CreateAuditEventOptionsSchema>
 
 // ============================================================================
 // Pagination and Query Types

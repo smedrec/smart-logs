@@ -10,6 +10,49 @@ import type { HonoEnv } from '../hono/context.js'
 import type { Context as TRPCContext } from '../trpc/context.js'
 
 /**
+ * Combined authentication middleware that supports both session and API key auth
+ */
+export const requireAuthOrApiKey = createMiddleware<HonoEnv>(async (c, next) => {
+	const session = c.get('session')
+	const { audit } = c.get('services')
+	const isApiKeyAuth = c.get('isApiKeyAuth')
+
+	// If session not exists and API key is not provided, use session auth
+	if (!session && !isApiKeyAuth) {
+		return requireAuth(c, next)
+	}
+
+	// If API key provided, use API key auth
+	if (!session && isApiKeyAuth) {
+		return requireApiKey(c, next)
+	}
+
+	audit.logAuth({
+		action: 'session',
+		status: 'failure',
+		sessionContext: {
+			sessionId: 'anonymous',
+			ipAddress: c.get('location'),
+			userAgent: c.get('userAgent'),
+			requestId: c.get('requestId'),
+			path: c.req.path,
+			method: c.req.method,
+			component: 'auth-middleware',
+			operation: 'requireAuthOrApiKey',
+		},
+		reason: isApiKeyAuth
+			? 'Authentication required. Provide a valid API key.'
+			: 'Authentication required.',
+	})
+	// No authentication provided
+	throw new HTTPException(401, {
+		message: isApiKeyAuth
+			? 'Authentication required. Provide a valid API key.'
+			: 'Authentication required.',
+	})
+})
+
+/**
  * Authentication middleware that validates session tokens
  */
 export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
@@ -115,6 +158,109 @@ export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 				method: c.req.method,
 				component: 'auth-middleware',
 				operation: 'requireAuth',
+			},
+			reason: session.user.banReason || 'Account is banned',
+		})
+
+		throw err
+	}
+
+	await next()
+})
+
+/**
+ * API key authentication middleware for third-party access
+ */
+export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
+	const { db, auth, audit } = c.get('services')
+	const requestId = c.get('requestId')
+
+	const apiKey = c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
+
+	// Try API key authentication first
+	if (apiKey) {
+		try {
+			// Validate API key using Better Auth's API key plugin
+			let apiKeySession = (await auth.api.getSession({
+				headers: new Headers({
+					'x-api-key': apiKey,
+				}),
+			})) as Session
+
+			if (apiKeySession) {
+				if (!apiKeySession.session.ipAddress || apiKeySession.session.ipAddress === '') {
+					apiKeySession.session.ipAddress = c.get('location')
+				}
+
+				if (!apiKeySession.session.userAgent || apiKeySession.session.userAgent === '') {
+					apiKeySession.session.userAgent = c.get('userAgent')
+				}
+
+				const org = await getActiveOrganization(apiKeySession.session.userId, db.auth)
+				if (org) {
+					apiKeySession = {
+						session: {
+							...apiKeySession.session,
+							activeOrganizationId: org.organizationId,
+							activeOrganizationRole: org.role,
+						},
+						user: {
+							...apiKeySession.user,
+						},
+					}
+				}
+				c.set('session', apiKeySession as Session)
+			}
+		} catch (error) {
+			// API key validation failed, continue with session auth
+			console.warn('API key validation failed:', error)
+			c.set('session', null)
+		}
+	}
+
+	const session = c.get('session')
+
+	if (!session) {
+		audit.logAuth({
+			action: 'session',
+			status: 'failure',
+			sessionContext: {
+				sessionId: 'anonymous',
+				ipAddress: c.get('location'),
+				userAgent: c.get('userAgent'),
+				requestId,
+				path: c.req.path,
+				method: c.req.method,
+				component: 'auth-middleware',
+				operation: 'requireApiKey',
+			},
+			reason: 'Authentication required',
+		})
+		throw new HTTPException(401, { message: 'Authentication required' })
+	}
+
+	// Check if user is banned
+	if (session.user.banned) {
+		const err = new HTTPException(403, {
+			message: session.user.banReason || 'Account is banned',
+		})
+
+		audit.logAuth({
+			principalId: session.user.id,
+			organizationId: session.session.activeOrganizationId || undefined,
+			action: 'account',
+			status: 'failure',
+			sessionContext: {
+				sessionId: session.session.id,
+				ipAddress: session.session.ipAddress,
+				userAgent: session.session.userAgent,
+				banReason: session.user.banReason,
+				banExpires: session.user.banExpires,
+				requestId,
+				path: c.req.path,
+				method: c.req.method,
+				component: 'auth-middleware',
+				operation: 'requireApiKey',
 			},
 			reason: session.user.banReason || 'Account is banned',
 		})
@@ -336,152 +482,6 @@ export const requireOrganizationRole = (roles: string[]) =>
 
 		await next()
 	})
-
-/**
- * API key authentication middleware for third-party access
- */
-export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
-	const { db, auth, audit } = c.get('services')
-	const requestId = c.get('requestId')
-
-	const apiKey = c.req.header('x-api-key') || c.req.header('authorization')?.replace('Bearer ', '')
-
-	// Try API key authentication first
-	if (apiKey) {
-		try {
-			// Validate API key using Better Auth's API key plugin
-			let apiKeySession = (await auth.api.getSession({
-				headers: new Headers({
-					'x-api-key': apiKey,
-				}),
-			})) as Session
-
-			if (apiKeySession) {
-				if (!apiKeySession.session.ipAddress || apiKeySession.session.ipAddress === '') {
-					apiKeySession.session.ipAddress = c.get('location')
-				}
-
-				if (!apiKeySession.session.userAgent || apiKeySession.session.userAgent === '') {
-					apiKeySession.session.userAgent = c.get('userAgent')
-				}
-
-				const org = await getActiveOrganization(apiKeySession.session.userId, db.auth)
-				if (org) {
-					apiKeySession = {
-						session: {
-							...apiKeySession.session,
-							activeOrganizationId: org.organizationId,
-							activeOrganizationRole: org.role,
-						},
-						user: {
-							...apiKeySession.user,
-						},
-					}
-				}
-				c.set('session', apiKeySession as Session)
-			}
-		} catch (error) {
-			// API key validation failed, continue with session auth
-			console.warn('API key validation failed:', error)
-			c.set('session', null)
-		}
-	}
-
-	const session = c.get('session')
-
-	if (!session) {
-		audit.logAuth({
-			action: 'session',
-			status: 'failure',
-			sessionContext: {
-				sessionId: 'anonymous',
-				ipAddress: c.get('location'),
-				userAgent: c.get('userAgent'),
-				requestId,
-				path: c.req.path,
-				method: c.req.method,
-				component: 'auth-middleware',
-				operation: 'requireApiKey',
-			},
-			reason: 'Authentication required',
-		})
-		throw new HTTPException(401, { message: 'Authentication required' })
-	}
-
-	// Check if user is banned
-	if (session.user.banned) {
-		const err = new HTTPException(403, {
-			message: session.user.banReason || 'Account is banned',
-		})
-
-		audit.logAuth({
-			principalId: session.user.id,
-			organizationId: session.session.activeOrganizationId || undefined,
-			action: 'account',
-			status: 'failure',
-			sessionContext: {
-				sessionId: session.session.id,
-				ipAddress: session.session.ipAddress,
-				userAgent: session.session.userAgent,
-				banReason: session.user.banReason,
-				banExpires: session.user.banExpires,
-				requestId,
-				path: c.req.path,
-				method: c.req.method,
-				component: 'auth-middleware',
-				operation: 'requireApiKey',
-			},
-			reason: session.user.banReason || 'Account is banned',
-		})
-
-		throw err
-	}
-
-	await next()
-})
-
-/**
- * Combined authentication middleware that supports both session and API key auth
- */
-export const requireAuthOrApiKey = createMiddleware<HonoEnv>(async (c, next) => {
-	const session = c.get('session')
-	const { audit } = c.get('services')
-	const isApiKeyAuth = c.get('isApiKeyAuth')
-
-	// If session not exists, use session auth
-	if (!session && !isApiKeyAuth) {
-		return requireAuth(c, next)
-	}
-
-	// If API key provided, use API key auth
-	if (!session && isApiKeyAuth) {
-		return requireApiKey(c, next)
-	}
-
-	audit.logAuth({
-		action: 'session',
-		status: 'failure',
-		sessionContext: {
-			sessionId: 'anonymous',
-			ipAddress: c.get('location'),
-			userAgent: c.get('userAgent'),
-			requestId: c.get('requestId'),
-			path: c.req.path,
-			method: c.req.method,
-			component: 'auth-middleware',
-			operation: 'requireAuthOrApiKey',
-		},
-		reason: isApiKeyAuth
-			? 'Authentication required. Provide a valid API key.'
-			: 'Authentication required.',
-	})
-	// No authentication provided
-	throw new HTTPException(401, {
-		message: isApiKeyAuth
-			? 'Authentication required. Provide a valid API key.'
-			: 'Authentication required.',
-	})
-})
 
 /**
  * Permission-based access control middleware

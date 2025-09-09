@@ -49,6 +49,28 @@ const CreateAuditEventSchema = z.object({
 	details: z.record(z.string(), z.any()).optional(),
 })
 
+const CreateAuditEventOptionsSchema = z.object({
+	priority: z.number().optional(),
+	delay: z.number().optional(),
+	durabilityGuarantees: z.boolean().optional(),
+	generateHash: z.boolean().optional(),
+	generateSignature: z.boolean().optional(),
+	correlationId: z.string().optional(),
+	eventVersion: z.string().optional(),
+	skipValidation: z.boolean().optional(),
+	validationConfig: z
+		.object({
+			maxStringLength: z.number().default(10000),
+			allowedDataClassifications: z
+				.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']))
+				.default(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI']),
+			requiredFields: z.array(z.string()).default(['timestamp', 'action', 'status']),
+			maxCustomFieldDepth: z.number().default(3),
+			allowedEventVersions: z.array(z.string()).default(['1.0', '1.1', '2.0']),
+		})
+		.optional(),
+})
+
 const QueryAuditEventsSchema = z.object({
 	startDate: z.string().datetime().optional(),
 	endDate: z.string().datetime().optional(),
@@ -130,7 +152,10 @@ const createAuditEventRoute = createRoute({
 		body: {
 			content: {
 				'application/json': {
-					schema: CreateAuditEventSchema,
+					schema: z.object({
+						eventData: CreateAuditEventSchema,
+						options: CreateAuditEventOptionsSchema,
+					}),
 				},
 			},
 		},
@@ -239,17 +264,18 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 		}
 
 		try {
-			const eventData = c.req.valid('json')
+			const { eventData, options } = c.req.valid('json')
 
 			// Create audit event using the log method
 			const auditEvent = {
 				...eventData,
-				principalId: session.session.userId,
-				organizationId: session.session.activeOrganizationId as string,
+				principalId: eventData.principalId || session.session.userId,
+				organizationId:
+					eventData.organizationId || (session.session.activeOrganizationId as string),
 			}
 
 			// Log the event (this will queue it for processing)
-			await audit.log(auditEvent)
+			await audit.log(auditEvent, options)
 
 			// TODO: For the REST API response, we need to return the event with an ID
 			// In a real implementation, this would come from the database after processing

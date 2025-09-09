@@ -141,8 +141,8 @@ async function startServer() {
 	// Configure GraphQL endpoint if enabled
 	if (config.server.api.enableGraphql) {
 		// Apply authentication middleware to GraphQL endpoints
-		app.use(`${config.server.api.graphqlPath}/*`, requireAuthOrApiKey)
-		app.use(config.server.api.graphqlPath, requireAuthOrApiKey)
+		//app.use(`${config.server.api.graphqlPath}/*`, requireAuthOrApiKey)
+		//app.use(config.server.api.graphqlPath, requireAuthOrApiKey)
 
 		app.all(`${config.server.api.graphqlPath}/*`, async (c) => {
 			return handleGraphQLRequest(c)

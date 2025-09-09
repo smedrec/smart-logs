@@ -78,6 +78,40 @@ export interface CreateAuditEventInput {
 	details?: Record<string, any>
 }
 
+export interface CreateAuditEventOptions {
+	priority?: number
+	delay?: number
+	durabilityGuarantees?: boolean
+	generateHash?: boolean
+	generateSignature?: boolean
+	correlationId?: string
+	eventVersion?: string
+	skipValidation?: boolean
+	validationConfig?: ValidationConfig
+}
+
+/**
+ * Configuration for validation rules
+ */
+export interface ValidationConfig {
+	maxStringLength: number
+	allowedDataClassifications: DataClassification[]
+	requiredFields: Array<keyof AuditEvent>
+	maxCustomFieldDepth: number
+	allowedEventVersions: string[]
+}
+
+/**
+ * Default validation configuration
+ */
+export const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
+	maxStringLength: 10000,
+	allowedDataClassifications: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'],
+	requiredFields: ['timestamp', 'action', 'status'],
+	maxCustomFieldDepth: 3,
+	allowedEventVersions: ['1.0', '1.1', '2.0'],
+}
+
 /**
  * Bulk create input interface
  */
@@ -481,7 +515,10 @@ export class EventsService extends BaseResource {
 	 *
 	 * Requirements: 4.1 - WHEN creating audit events THEN the client SHALL validate event data and submit to the server API
 	 */
-	async create(event: CreateAuditEventInput): Promise<AuditEvent> {
+	async create(
+		event: CreateAuditEventInput,
+		options: CreateAuditEventOptions = {}
+	): Promise<AuditEvent> {
 		// Validate input data
 		const validationResult = validateCreateAuditEventInput(event)
 		if (!validationResult.success) {
@@ -492,7 +529,7 @@ export class EventsService extends BaseResource {
 
 		const response = await this.request<AuditEvent>('/audit/events', {
 			method: 'POST',
-			body: validationResult.data,
+			body: { eventData: validationResult.data, options },
 		})
 
 		// Validate response
