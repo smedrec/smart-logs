@@ -13,7 +13,7 @@ export default defineConfig({
 				'src/types.ts',
 				'src/**/*.types.ts',
 				'src/**/types.ts',
-				'src/test/**/*',
+				'src/__tests__/**/*',
 				'src/**/*.test.ts',
 				'src/**/*.spec.ts',
 				'src/examples/**/*',
