@@ -5,7 +5,7 @@ import {
 	ConfigManager,
 	ConfigurationError,
 	PartialAuditClientConfig,
-} from '../core/config'
+} from '../../core/config'
 
 describe('ConfigManager', () => {
 	let validConfig: PartialAuditClientConfig

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest'
 
-import { AuthenticationError, AuthManager } from '../infrastructure/auth'
+import { AuthenticationError, AuthManager } from '../../infrastructure/auth'
 
-import type { AuthenticationConfig } from '../core/config'
+import type { AuthenticationConfig } from '../../core/config'
 
 // Mock fetch globally
 const mockFetch = vi.fn() as Mock

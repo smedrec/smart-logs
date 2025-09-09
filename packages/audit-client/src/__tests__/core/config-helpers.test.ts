@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { ConfigManager } from '../core/config'
+import { ConfigManager } from '../../core/config'
 import {
 	ConfigBuilder,
 	ConfigMigration,
 	ConfigPresets,
 	ConfigValidators,
-} from '../utils/config-helpers'
+} from '../../utils/config-helpers'
 
 describe('ConfigBuilder', () => {
 	it('should build configuration fluently', () => {

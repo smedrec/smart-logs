@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ComplianceService } from '../../services/compliance'
 import { EventsService } from '../../services/events'
 import { PresetsService } from '../../services/presets'
-import { ValidationError } from '../validation'
+import { ValidationError } from '../../utils/validation'
 
 import type { AuditClientConfig } from '../../core/config'
 
