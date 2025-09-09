@@ -186,7 +186,12 @@ pnpm check:lint     # Lint check
 
 ## Documentation
 
-See the [docs](./docs) directory for comprehensive documentation and examples.
+- [Getting Started Guide](./docs/GETTING_STARTED.md)
+- [API Reference](./docs/API_REFERENCE.md)
+- [Tutorials](./docs/TUTORIALS.md)
+- [Code Examples](./docs/CODE_EXAMPLES.md)
+- [Troubleshooting & FAQ](./docs/TROUBLESHOOTING_AND_FAQ.md)
+- [Framework Integration](./docs/FRAMEWORK_INTEGRATION.md)
 
 ## License
 
