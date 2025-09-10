@@ -53,7 +53,7 @@ The client provides access to several services:
 
 Used for creating, querying, and managing audit events.
 
-- `create(event)`: Creates a single audit event. Returns `Promise<AuditEvent>`.
+- `create(event, options)`: Creates a single audit event. Returns `Promise<AuditEvent>`.
 - `bulkCreate(events)`: Creates multiple events. Returns `Promise<BulkCreateResult>`.
 - `query(params)`: Queries events with filters, pagination, and sorting. Returns `Promise<PaginatedAuditEvents>`.
 - `getById(id)`: Retrieves a single event by its ID. Returns `Promise<AuditEvent | null>`.
@@ -185,6 +185,38 @@ export interface AuditEvent {
 	targetResourceType?: string
 	targetResourceId?: string
 	// ... and many more fields
+}
+```
+
+### `Audit Event create options`
+
+Options for creating an audit event.
+
+```typescript
+export interface CreateAuditEventOptions {
+	priority?: number
+	delay?: number
+	durabilityGuarantees?: boolean
+	generateHash?: boolean
+	generateSignature?: boolean
+	correlationId?: string
+	eventVersion?: string
+	skipValidation?: boolean
+	validationConfig?: ValidationConfig
+}
+```
+
+### `Audit Event validation config`
+
+Validation rules for audit events.
+
+```typescript
+export interface ValidationConfig {
+	maxStringLength: number
+	allowedDataClassifications: DataClassification[]
+	requiredFields: Array<keyof AuditEvent>
+	maxCustomFieldDepth: number
+	allowedEventVersions: string[]
 }
 ```
 

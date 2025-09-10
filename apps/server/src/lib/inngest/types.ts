@@ -1,5 +1,7 @@
 import { EventSchemas } from 'inngest'
 
+import type { ScheduledReportConfig } from '@repo/audit'
+
 type DemoEventSent = {
 	name: 'demo/event.sent'
 	data: {
@@ -22,6 +24,20 @@ type CleanupOldErrors = {
 	}
 }
 
+type ScheduleReport = {
+	name: 'reports/schedule.report'
+	data: {
+		config: ScheduledReportConfig
+	}
+}
+
+type UnscheduleReport = {
+	name: 'reports/unschedule.report'
+	data: {
+		reportId: string
+	}
+}
+
 export const schemas = new EventSchemas().fromUnion<
-	DemoEventSent | CleanupResolvedAlerts | CleanupOldErrors
+	DemoEventSent | CleanupResolvedAlerts | CleanupOldErrors | ScheduleReport | UnscheduleReport
 >()

@@ -7,7 +7,7 @@
 // The `[key: string]: any` part of `AuditLogEvent` will be mapped to the `details` jsonb field.
 // It's important that the insertion logic correctly maps these.
 // The `status` column uses .$type<AuditEventStatus>() for type safety with Drizzle.
-// Lengths for varchars are set to 255 as a general default, can be adjusted.
+// Lengths for varchar are set to 255 as a general default, can be adjusted.
 // `principalId` is often a UUID or similar identifier.
 // `organizationId` is often a UUID or similar identifier.
 // `action` could be like 'user.login', 'document.update'.
@@ -458,6 +458,7 @@ export const scheduledReports = pgTable(
 		enabled: varchar('enabled', { length: 10 }).notNull().default('true'),
 		lastRun: timestamp('last_run', { withTimezone: true, mode: 'string' }),
 		nextRun: timestamp('next_run', { withTimezone: true, mode: 'string' }),
+		runId: varchar('run_id', { length: 255 }),
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
 			.notNull()
 			.defaultNow(),
@@ -544,6 +545,7 @@ export const reportExecutions = pgTable(
 			.references(() => scheduledReports.id)
 			.notNull(),
 		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		runId: varchar('run_id', { length: 255 }).notNull(),
 		scheduledTime: timestamp('scheduled_time', { withTimezone: true, mode: 'string' }).notNull(),
 		executionTime: timestamp('execution_time', { withTimezone: true, mode: 'string' }).notNull(),
 		status: varchar('status', { length: 20 }).notNull(), // running, completed, failed
