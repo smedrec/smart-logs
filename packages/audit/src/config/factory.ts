@@ -108,6 +108,14 @@ export function createDevelopmentConfig(): AuditConfig {
 				dbUrl: process.env.BETTER_AUTH_DB_URL || 'postgresql://localhost:5432/auth_dev',
 				poolSize: 10,
 			},
+			inngest: {
+				enabled: true,
+				inngestPath: '/api/inngest',
+				id: 'smart-logs-app-dev',
+				eventKey: process.env.INNGEST_EVENT_KEY || 'your-event-key-here',
+				signingKey: process.env.INNGEST_SIGNING_KEY || 'your-signing-key-here',
+				baseUrl: process.env.INNGEST_BASE_URL || 'https://inngest.teachhowtofish.org',
+			},
 			monitoring: {
 				enableMetrics: true,
 				metricsPath: '/metrics',

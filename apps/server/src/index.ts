@@ -3,6 +3,7 @@ import 'dotenv/config'
 import { serve } from '@hono/node-server'
 import { trpcServer } from '@hono/trpc-server'
 import { cors } from 'hono/cors'
+import { serve as inngestServe } from 'inngest/hono'
 
 import { ConfigurationManager } from '@repo/audit'
 
@@ -10,6 +11,7 @@ import { handleGraphQLRequest } from './lib/graphql/index.js'
 import { newApp } from './lib/hono/index.js'
 import { init } from './lib/hono/init.js'
 import { nodeEnv } from './lib/hono/node-env.js'
+import { functions } from './lib/inngest/index.js'
 import { requireAuthOrApiKey } from './lib/middleware/auth.js'
 import { createComprehensiveErrorHandling } from './lib/middleware/error-handling.js'
 import {
@@ -103,6 +105,16 @@ async function startServer() {
 	)
 
 	app.on(['POST', 'GET'], '/api/auth/*', (c) => c.get('services').auth.handler(c.req.raw))
+
+	if (config.server.inngest.enabled) {
+		app.on(['GET', 'PUT', 'POST'], `${config.server.inngest.inngestPath}`, (c) => {
+			const handler = inngestServe({
+				client: c.get('services').inngest,
+				functions,
+			})
+			return handler(c)
+		})
+	}
 
 	// Configure TRPC with path from configuration
 	if (config.server.api.enableTrpc) {
@@ -283,6 +295,12 @@ async function startServer() {
 						`🎮 GraphQL Playground: http://${config.server.host}:${config.server.port}${config.server.api.graphqlPath}`
 					)
 				}
+			}
+
+			if (config.server.inngest.enabled) {
+				console.log(
+					`🌐 Inngest API: http://${config.server.host}:${config.server.port}${config.server.inngest.inngestPath}`
+				)
 			}
 
 			if (configManager?.isDevelopment()) {

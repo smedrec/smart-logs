@@ -1,5 +1,6 @@
 import type { betterAuth } from 'better-auth'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { Inngest } from 'inngest'
 import type {
 	Audit,
 	AuditBottleneckAnalyzer,
@@ -36,6 +37,7 @@ export type Env = SharedHonoEnv & {
 export type ServiceContext = {
 	config: ConfigurationManager
 	auth: ReturnType<typeof betterAuth>
+	inngest: Inngest
 	//cerbos: typeof cerbos
 	//fhir: typeof fhir
 	//cache: Cache;

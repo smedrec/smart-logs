@@ -813,6 +813,12 @@ export class ConfigurationManager extends EventEmitter {
 		if (sanitized.monitoring.notification.credentials.secret) {
 			sanitized.monitoring.notification.credentials.secret = '***MASKED***'
 		}
+		if (sanitized.server.inngest.eventKey) {
+			sanitized.server.inngest.eventKey = '***MASKED***'
+		}
+		if (sanitized.server.inngest.signingKey) {
+			sanitized.server.inngest.signingKey = '***MASKED***'
+		}
 
 		return sanitized
 	}

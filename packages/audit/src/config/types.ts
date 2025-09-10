@@ -273,6 +273,14 @@ export interface ServerConfig {
 		dbUrl?: string
 		poolSize?: number
 	}
+	inngest: {
+		enabled: boolean
+		inngestPath: string
+		id: string
+		eventKey: string
+		signingKey: string
+		baseUrl: string
+	}
 	monitoring: {
 		enableMetrics: boolean
 		metricsPath: string

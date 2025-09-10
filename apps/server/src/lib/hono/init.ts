@@ -1,3 +1,5 @@
+import { Inngest } from 'inngest'
+
 import {
 	Audit,
 	AuditBottleneckAnalyzer,
@@ -31,6 +33,8 @@ import {
 import { Auth, createAuthorizationService } from '@repo/auth'
 import { getRedisConnectionStatus, getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
+import { bindingsMiddleware } from '../inngest/middleware.js'
+import { schemas } from '../inngest/types.js'
 import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { PerformanceService } from '../services/performance.js'
 import { createResilienceService } from '../services/resilience.js'
@@ -60,6 +64,7 @@ let connection: Redis | undefined = undefined
 let auditDbInstance: EnhancedAuditDb | undefined = undefined
 
 let authInstance: Auth | undefined = undefined
+let inngest: Inngest | undefined = undefined
 let audit: Audit | undefined = undefined
 
 // Alert and health check services
@@ -327,6 +332,16 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			gdpr: gdprComplianceService,
 		}
 
+		if (!inngest)
+			inngest = new Inngest({
+				id: config.server.inngest.id,
+				eventKey: config.server.inngest.eventKey,
+				signingKey: config.server.inngest.signingKey,
+				baseUrl: config.server.inngest.baseUrl,
+				schemas,
+				middleware: [bindingsMiddleware],
+			})
+
 		/**const kms = new InfisicalKmsClient({
 			baseUrl: c.env.INFISICAL_URL!,
 			keyId: c.env.KMS_KEY_ID!,
@@ -352,6 +367,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		c.set('services', {
 			config: configManager,
 			auth,
+			inngest,
 			//cerbos,
 			//fhir,
 			db,

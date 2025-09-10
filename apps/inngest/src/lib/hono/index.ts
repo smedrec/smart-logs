@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { prettyJSON } from 'hono/pretty-json'
 
-import { auth } from '@repo/auth'
+import { Auth } from '@repo/auth'
 import { useNotFound } from '@repo/hono-helpers'
 
 import { handleError, handleZodError } from '../errors/index.js'
