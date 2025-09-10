@@ -11,7 +11,7 @@ export const helloWorld = inngest.createFunction(
 		// (e.g. env.TEST_ENV_VAR)
 		// This is passed using the bindingsMiddleware in middleware.ts
 		return {
-			message: `Hello ${session?.user.name}!`,
+			message: `Hello ${event.data.message}!`,
 			healthStatus,
 		}
 	}

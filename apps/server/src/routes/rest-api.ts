@@ -25,6 +25,7 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 
 import { createAuditAPI } from './audit-api'
 import { createComplianceAPI } from './compliance-api'
+import { createFunctionsAPI } from './functions-api'
 import { createMetricsAPI } from './metrics-api'
 import { createObservabilityAPI } from './observability-api'
 import { createPerformanceAPI } from './performance-api'
@@ -251,10 +252,12 @@ Pagination information is included in the response:
 	app.use('/metrics/*', requireAuthOrApiKey)
 	app.use('/observability/*', requireAuthOrApiKey)
 	app.use('/performance/*', requireAuthOrApiKey)
+	app.use('/functions/*', requireAuthOrApiKey)
 
 	// Organization access control for audit and compliance endpoints
 	app.use('/audit/*', requireOrganizationAccess())
 	app.use('/compliance/*', requireOrganizationAccess())
+	app.use('/functions/*', requireOrganizationAccess())
 
 	// Admin-only access for system metrics and observability
 	app.use('/metrics/system/*', requireRole(['admin']))
@@ -267,6 +270,7 @@ Pagination information is included in the response:
 	app.route('/metrics', createMetricsAPI())
 	app.route('/observability', createObservabilityAPI())
 	app.route('/performance', createPerformanceAPI())
+	app.route('/functions', createFunctionsAPI())
 
 	// Swagger UI
 	app.get(
