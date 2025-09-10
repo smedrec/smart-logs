@@ -11,7 +11,8 @@
 		"sdk",
 		"client",
 		"hipaa",
-		"gdpr"
+		"gdpr",
+		"fhir"
 	],
 	"homepage": "https://github.com/smart-logs/smartlogs",
 	"bugs": {

@@ -16,4 +16,4 @@ This directory contains comprehensive documentation for the @smart-logs/audit-cl
 
 - [Installation](../README.md#installation)
 - [Quick Start](../README.md#quick-start)
-- [Examples Directory](../examples/)
+- [Examples Directory](../src/examples/)
