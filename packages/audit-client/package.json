@@ -1,5 +1,5 @@
 {
-	"name": "@smart-logs/audit-client",
+	"name": "@smedrec/audit-client",
 	"version": "0.1.0",
 	"private": true,
 	"description": "Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features including retry mechanisms, caching, authentication, and type safety",
@@ -14,13 +14,13 @@
 		"gdpr",
 		"fhir"
 	],
-	"homepage": "https://github.com/smart-logs/smartlogs",
+	"homepage": "https://github.com/smedrec/smart-logs",
 	"bugs": {
-		"url": "https://github.com/smart-logs/smartlogs/issues"
+		"url": "https://github.com/smedrec/smart-logs/issues"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/smart-logs/smartlogs",
+		"url": "https://github.com/smedrec/smart-logs",
 		"directory": "packages/audit-client"
 	},
 	"license": "MIT",

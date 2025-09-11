@@ -1,4 +1,4 @@
-# @smart-logs/audit-client
+# @smedrec/audit-client
 
 Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features including retry mechanisms, caching, authentication, and type safety.
 
@@ -22,7 +22,7 @@ pnpm add @smart-logs/audit-client
 ## Quick Start
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	baseUrl: 'https://api.smartlogs.com',
@@ -75,9 +75,9 @@ packages/audit-client/
 The client supports comprehensive configuration options:
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
-import type { AuditClientConfig } from '@smart-logs/audit-client'
+import type { AuditClientConfig } from '@smedrec/audit-client'
 
 const config: AuditClientConfig = {
 	baseUrl: 'https://api.smartlogs.com',
