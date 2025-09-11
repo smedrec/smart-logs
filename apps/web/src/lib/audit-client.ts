@@ -1,6 +1,6 @@
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
-import type { PartialAuditClientConfig } from '@smart-logs/audit-client'
+import type { PartialAuditClientConfig } from '@smedrec/audit-client'
 
 const options: PartialAuditClientConfig = {
 	baseUrl: 'http://localhost:3000',

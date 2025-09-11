@@ -37,7 +37,7 @@
 		"@radix-ui/react-tooltip": "^1.2.8",
 		"@repo/audit": "workspace:*",
 		"@repo/auth": "workspace:*",
-		"@smart-logs/audit-client": "workspace:*",
+		"@smedrec/audit-client": "workspace:*",
 		"@tabler/icons-react": "^3.34.0",
 		"@tailwindcss/vite": "^4.1.12",
 		"@tanstack/react-form": "^1.19.3",
