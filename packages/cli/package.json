@@ -1,5 +1,5 @@
 {
-	"name": "@smart-logs/cli",
+	"name": "@smedrec/cli",
 	"version": "0.1.0",
 	"description": "Smart Logs CLI - Run Smart Logs utils",
 	"keywords": [

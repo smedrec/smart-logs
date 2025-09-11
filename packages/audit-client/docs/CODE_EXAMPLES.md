@@ -1,6 +1,6 @@
 # Code Examples
 
-This file provides practical code examples for common use cases of the `@smart-logs/audit-client`.
+This file provides practical code examples for common use cases of the `@smedrec/audit-client`.
 
 ## 1. Client Initialization
 
@@ -9,7 +9,7 @@ This file provides practical code examples for common use cases of the `@smart-l
 Minimal configuration to get the client running.
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	baseUrl: 'https://api.example.com',
@@ -25,9 +25,9 @@ const client = new AuditClient({
 A more complex setup with retries, caching, and logging enabled.
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
-import type { AuditClientConfig } from '@smart-logs/audit-client'
+import type { AuditClientConfig } from '@smedrec/audit-client'
 
 const config: AuditClientConfig = {
 	baseUrl: 'https://api.example.com',
@@ -62,7 +62,7 @@ const client = new AuditClient(config)
 Use static methods to create clients for different environments.
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 // Development client with debug logging
 const devClient = AuditClient.createForEnvironment('development', 'https://dev-api.example.com', {
@@ -201,7 +201,7 @@ Interceptors allow you to modify requests and responses globally.
 ### Logging Request and Response
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	/* ...config */
@@ -223,7 +223,7 @@ client.addResponseInterceptor((response) => {
 ### Adding a Custom Header to All Requests
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	/* ...config */
@@ -245,7 +245,7 @@ client.addRequestInterceptor((options) => {
 Example of handling specific errors thrown by the client.
 
 ```typescript
-import { AuditClient, RetryExhaustedError, ValidationError } from '@smart-logs/audit-client'
+import { AuditClient, RetryExhaustedError, ValidationError } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	/* ...config */

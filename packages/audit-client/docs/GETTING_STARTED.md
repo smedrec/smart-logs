@@ -1,6 +1,6 @@
 # Getting Started with the Smart Logs Audit Client
 
-This guide will walk you through the process of installing, configuring, and making your first API call with the `@smart-logs/audit-client`.
+This guide will walk you through the process of installing, configuring, and making your first API call with the `@smedrec/audit-client`.
 
 ## 1. Installation
 
@@ -8,13 +8,13 @@ First, install the package using your preferred package manager.
 
 ```bash
 # With pnpm
-pnpm add @smart-logs/audit-client
+pnpm add @smedrec/audit-client
 
 # With npm
-npm install @smart-logs/audit-client
+npm install @smedrec/audit-client
 
 # With yarn
-yarn add @smart-logs/audit-client
+yarn add @smedrec/audit-client
 ```
 
 ## 2. Initializing the Client
@@ -24,7 +24,7 @@ The `AuditClient` is the main entry point of the library. To get started, you ne
 The only required options are `baseUrl` and `authentication`.
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	baseUrl: 'https://api.smartlogs.com',
@@ -54,7 +54,7 @@ Once the client is initialized, you can use its services to interact with the Sm
 Here's how to log a `user.login` action:
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 async function logUserLogin() {
 	const client = new AuditClient({
@@ -106,7 +106,7 @@ After creating events, you'll want to retrieve them. The `events` service provid
 This example fetches all successful `user.login` events from the last 7 days:
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 async function queryLoginEvents() {
 	const client = new AuditClient({
@@ -160,9 +160,9 @@ queryLoginEvents()
 The client is highly configurable. You can enable features like automatic retries, caching, and detailed logging to enhance reliability and performance.
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
-import type { AuditClientConfig } from '@smart-logs/audit-client'
+import type { AuditClientConfig } from '@smedrec/audit-client'
 
 const config: AuditClientConfig = {
 	baseUrl: 'https://api.smartlogs.com',
@@ -192,7 +192,7 @@ const client = new AuditClient(config)
 
 ## Next Steps
 
-You've now learned the basics of using the `@smart-logs/audit-client`. From here, you can explore more advanced topics:
+You've now learned the basics of using the `@smedrec/audit-client`. From here, you can explore more advanced topics:
 
 - **API Reference**: Dive deep into all available services and methods.
 - **Code Examples**: See practical examples for common use cases.

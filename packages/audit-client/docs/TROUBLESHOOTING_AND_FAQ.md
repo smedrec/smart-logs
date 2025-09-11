@@ -1,6 +1,6 @@
 # Troubleshooting and FAQ
 
-This guide helps you solve common problems and answers frequently asked questions about the `@smart-logs/audit-client`.
+This guide helps you solve common problems and answers frequently asked questions about the `@smedrec/audit-client`.
 
 ---
 
@@ -17,12 +17,12 @@ This error occurs during client initialization if the configuration object is mi
 3.  **Use Static Validation**: You can validate a configuration object without creating a full client instance:
 
     ```typescript
-    import { AuditClient } from '@smart-logs/audit-client';
+    import { AuditClient } from '@smedrec/audit-client'
 
-    const result = AuditClient.validateConfig(myConfig);
+    const result = AuditClient.validateConfig(myConfig)
 
     if (!result.isValid) {
-      console.error('Configuration errors:', result.errors.errors);
+    	console.error('Configuration errors:', result.errors.errors)
     }
     ```
 
@@ -46,9 +46,9 @@ This could be a network issue, a problem with the downstream API, or a client-si
 2.  **Enable Caching**: For frequently repeated `GET` requests, enabling the `cache` can significantly improve performance.
     ```typescript
     const client = new AuditClient({
-      // ...
-      cache: { enabled: true, defaultTtlMs: 60000 },
-    });
+    	// ...
+    	cache: { enabled: true, defaultTtlMs: 60000 },
+    })
     ```
 3.  **Check Network**: Ensure your server has a stable connection to the `baseUrl`.
 4.  **Enable Debug Logging**: Set `logging: { level: 'debug' }` to get detailed timing information for each stage of the request lifecycle.
@@ -89,12 +89,12 @@ A: Set the logging level to `debug`.
 
 ```typescript
 const client = new AuditClient({
-  // ...
-  logging: {
-    enabled: true,
-    level: 'debug',
-    includeRequestBody: true, // Optional: to see request bodies
-    includeResponseBody: true, // Optional: to see response bodies
-  },
-});
+	// ...
+	logging: {
+		enabled: true,
+		level: 'debug',
+		includeRequestBody: true, // Optional: to see request bodies
+		includeResponseBody: true, // Optional: to see response bodies
+	},
+})
 ```

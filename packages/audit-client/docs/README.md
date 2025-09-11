@@ -1,6 +1,6 @@
 # Documentation
 
-This directory contains comprehensive documentation for the @smart-logs/audit-client library.
+This directory contains comprehensive documentation for the @smedrec/audit-client library.
 
 ## Contents
 

@@ -16,7 +16,7 @@ Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features inc
 ## Installation
 
 ```bash
-pnpm add @smart-logs/audit-client
+pnpm add @smedrec/audit-client
 ```
 
 ## Quick Start

@@ -35,7 +35,7 @@ This implementation satisfies all requirements from the specification:
 ### Basic Usage
 
 ```typescript
-import { EventsService } from '@smart-logs/audit-client'
+import { EventsService } from '@smedrec/audit-client'
 
 const eventsService = new EventsService(config)
 

@@ -1,6 +1,6 @@
 # Examples
 
-This directory contains practical examples of using the @smart-logs/audit-client library.
+This directory contains practical examples of using the @smedrec/audit-client library.
 
 ## Available Examples
 

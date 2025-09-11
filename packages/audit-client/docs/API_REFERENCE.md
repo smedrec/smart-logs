@@ -1,6 +1,6 @@
 # API Reference
 
-This document provides a detailed reference for the `@smart-logs/audit-client` library, including the main `AuditClient`, its services, configuration options, and type definitions.
+This document provides a detailed reference for the `@smedrec/audit-client` library, including the main `AuditClient`, its services, configuration options, and type definitions.
 
 ## `AuditClient`
 
@@ -15,7 +15,7 @@ Creates a new client instance.
 **Example**
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	baseUrl: 'https://api.smartlogs.com',

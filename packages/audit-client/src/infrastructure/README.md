@@ -20,7 +20,7 @@ The error handling system provides comprehensive error management with structure
 #### Base Error Class
 
 ```typescript
-import { AuditClientError } from '@smart-logs/audit-client'
+import { AuditClientError } from '@smedrec/audit-client'
 
 // All audit client errors extend this base class
 class AuditClientError extends Error {
@@ -35,7 +35,7 @@ class AuditClientError extends Error {
 #### HTTP Errors
 
 ```typescript
-import { HttpError } from '@smart-logs/audit-client'
+import { HttpError } from '@smedrec/audit-client'
 
 // HTTP response errors (4xx, 5xx status codes)
 const error = new HttpError(404, 'Not Found', 'User not found', 'req-123')
@@ -47,7 +47,7 @@ console.log(error.getUserMessage()) // "The requested resource was not found."
 #### Network Errors
 
 ```typescript
-import { NetworkError } from '@smart-logs/audit-client'
+import { NetworkError } from '@smedrec/audit-client'
 
 // Network connectivity issues
 const error = new NetworkError('Connection timeout', 'req-124')
@@ -58,7 +58,7 @@ console.log(error.getUserMessage()) // "Network connection failed. Please check 
 #### Validation Errors
 
 ```typescript
-import { ValidationError } from '@smart-logs/audit-client'
+import { ValidationError } from '@smedrec/audit-client'
 
 // Input validation failures
 const fieldErrors = {
@@ -77,7 +77,7 @@ The `ErrorHandler` class provides centralized error processing with logging, tra
 #### Basic Setup
 
 ```typescript
-import { ErrorHandler } from '@smart-logs/audit-client'
+import { ErrorHandler } from '@smedrec/audit-client'
 
 const loggingConfig = {
 	enabled: true,
@@ -133,7 +133,7 @@ Recovery strategies allow automatic error recovery for certain types of errors.
 ##### Auth Token Refresh
 
 ```typescript
-import { AuthTokenRefreshStrategy } from '@smart-logs/audit-client'
+import { AuthTokenRefreshStrategy } from '@smedrec/audit-client'
 
 const authManager = {
 	refreshToken: async () => {
@@ -149,7 +149,7 @@ errorHandler.addRecoveryStrategy(strategy)
 ##### Cache Invalidation
 
 ```typescript
-import { CacheInvalidationStrategy } from '@smart-logs/audit-client'
+import { CacheInvalidationStrategy } from '@smedrec/audit-client'
 
 const cacheManager = {
 	invalidatePattern: async (pattern: string) => {
@@ -165,7 +165,7 @@ errorHandler.addRecoveryStrategy(strategy)
 #### Custom Recovery Strategy
 
 ```typescript
-import { ErrorRecoveryStrategy } from '@smart-logs/audit-client'
+import { ErrorRecoveryStrategy } from '@smedrec/audit-client'
 
 class CustomRetryStrategy implements ErrorRecoveryStrategy {
 	canRecover(error: AuditClientError): boolean {
@@ -188,7 +188,7 @@ errorHandler.addRecoveryStrategy(new CustomRetryStrategy())
 #### Creating HTTP Errors from Responses
 
 ```typescript
-import { ErrorHandler } from '@smart-logs/audit-client'
+import { ErrorHandler } from '@smedrec/audit-client'
 
 const response = await fetch('/api/users')
 if (!response.ok) {
@@ -204,7 +204,7 @@ if (!response.ok) {
 #### Creating Validation Errors
 
 ```typescript
-import { ErrorHandler } from '@smart-logs/audit-client'
+import { ErrorHandler } from '@smedrec/audit-client'
 
 const fieldErrors = {
 	email: ['Email is required', 'Invalid email format'],
@@ -218,7 +218,7 @@ throw validationError
 #### Checking Error Retryability
 
 ```typescript
-import { ErrorHandler } from '@smart-logs/audit-client'
+import { ErrorHandler } from '@smedrec/audit-client'
 
 const error = new NetworkError('Connection failed')
 const isRetryable = ErrorHandler.isRetryable(error) // true
@@ -272,7 +272,7 @@ import {
 	AuthTokenRefreshStrategy,
 	CacheInvalidationStrategy,
 	ErrorHandler,
-} from '@smart-logs/audit-client'
+} from '@smedrec/audit-client'
 
 // Setup error handler with recovery strategies
 const errorHandler = new ErrorHandler(loggingConfig, errorConfig, logger)

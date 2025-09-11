@@ -1,6 +1,6 @@
 # Framework Integration
 
-This guide provides examples of how to integrate the `@smart-logs/audit-client` with popular web frameworks.
+This guide provides examples of how to integrate the `@smedrec/audit-client` with popular web frameworks.
 
 ---
 
@@ -15,7 +15,7 @@ Create a dedicated file to initialize and export the client. This ensures a sing
 **`src/audit-client.ts`**
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 export const auditClient = new AuditClient({
 	baseUrl: process.env.AUDIT_API_URL || 'https://api.smartlogs.com',
@@ -112,7 +112,7 @@ Create a singleton instance of the client to avoid creating new connections on e
 **`lib/audit-client.ts`**
 
 ```typescript
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 // Use a global variable to preserve the client across hot reloads in development
 declare global {

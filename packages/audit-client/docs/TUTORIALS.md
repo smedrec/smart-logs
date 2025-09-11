@@ -109,7 +109,7 @@ Create an API endpoint in your backend application (e.g., using Express.js) that
 
 ```typescript
 // In your Express app
-import { AuditClient } from '@smart-logs/audit-client'
+import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
 	/* ... */

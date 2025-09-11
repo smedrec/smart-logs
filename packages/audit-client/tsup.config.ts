@@ -18,7 +18,7 @@ export default defineConfig({
 		'@angular/core',
 	],
 	banner: {
-		js: '// @smart-logs/audit-client - Enhanced TypeScript SDK for Smart Logs Audit API',
+		js: '// @smedrec/audit-client - Enhanced TypeScript SDK for Smart Logs Audit API',
 	},
 	esbuildOptions(options) {
 		options.conditions = ['module']
