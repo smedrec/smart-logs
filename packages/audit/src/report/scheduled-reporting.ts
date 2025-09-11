@@ -185,6 +185,7 @@ export class ScheduledReportingService {
 			enabled: config.enabled ? 'true' : 'false',
 			lastRun: null,
 			nextRun,
+			runId: null,
 			createdBy: config.createdBy,
 			updatedBy: null,
 		}
@@ -271,6 +272,7 @@ export class ScheduledReportingService {
 			enabled: updated.enabled === 'true',
 			lastRun: updated.lastRun || undefined,
 			nextRun: updated.nextRun || undefined,
+			runId: updated.runId || undefined,
 			createdAt: updated.createdAt,
 			createdBy: updated.createdBy,
 		}
@@ -319,9 +321,9 @@ export class ScheduledReportingService {
 
 				return organizationId
 					? await query.where(eq(scheduledReports.organizationId, organizationId))
-					: await query
+					: await query.limit(100)
 			},
-			{ cacheKey: `scheduled-reports-${organizationId}` }
+			{ cacheKey: `scheduled-reports-${organizationId || 'all'}` }
 		)
 
 		return records.map((record) => ({
@@ -337,6 +339,7 @@ export class ScheduledReportingService {
 			enabled: record.enabled === 'true',
 			lastRun: record.lastRun || undefined,
 			nextRun: record.nextRun || undefined,
+			runId: record.runId || undefined,
 			createdAt: record.createdAt,
 			createdBy: record.createdBy,
 		}))
@@ -369,6 +372,7 @@ export class ScheduledReportingService {
 			enabled: record.enabled === 'true',
 			lastRun: record.lastRun || undefined,
 			nextRun: record.nextRun || undefined,
+			runId: record.runId || undefined,
 			createdAt: record.createdAt,
 			createdBy: record.createdBy,
 		}
@@ -381,6 +385,9 @@ export class ScheduledReportingService {
 		const config = await this.getScheduledReport(reportId)
 		if (!config) {
 			throw new Error(`Scheduled report not found: ${reportId}`)
+		}
+		if (!config.runId) {
+			throw new Error(`Scheduled report job not found: ${reportId}`)
 		}
 
 		const executionId = this.generateId('execution')
@@ -404,6 +411,7 @@ export class ScheduledReportingService {
 				id: executionId,
 				reportConfigId: reportId,
 				organizationId: (config as any).organizationId || 'unknown',
+				runId: config.runId,
 				scheduledTime: now,
 				executionTime: now,
 				status: 'running' as const,
@@ -460,6 +468,7 @@ export class ScheduledReportingService {
 					nextRun,
 				})
 				.where(eq(scheduledReports.id, reportId))
+			// TODO: schedule next run
 		} catch (error) {
 			execution.status = 'failed'
 			execution.error = error instanceof Error ? error.message : 'Unknown error'
@@ -762,6 +771,7 @@ export class ScheduledReportingService {
 	 */
 
 	private async scheduleReport(config: ScheduledReportConfig): Promise<void> {
+		const db = this.client.getDatabase()
 		// Send an event to Inngest
 		const event = await this.inngest.send({
 			// The event name
@@ -771,13 +781,21 @@ export class ScheduledReportingService {
 				config: config,
 			},
 		})
+
 		if (!event) {
 			throw new Error(`Failed to schedule report ${config.id}`)
 		}
+
+		await db
+			.update(scheduledReports)
+			.set({ runId: event.ids[0], updatedBy: 'inngest' })
+			.where(eq(scheduledReports.id, config.id))
+
 		console.log(`Scheduling report ${config.id} for ${config.nextRun}. Run ID: ${event.ids[0]}`)
 	}
 
 	private async unscheduleReport(reportId: string): Promise<void> {
+		const db = this.client.getDatabase()
 		// Send an event to Inngest
 		const event = await this.inngest.send({
 			// The event name
@@ -787,9 +805,16 @@ export class ScheduledReportingService {
 				reportId: reportId,
 			},
 		})
+
 		if (!event) {
 			throw new Error(`Failed to unschedule report ${reportId}`)
 		}
+
+		await db
+			.update(scheduledReports)
+			.set({ runId: null, updatedBy: 'inngest' })
+			.where(eq(scheduledReports.id, reportId))
+
 		console.log(`Unscheduling report ${reportId}. Run ID: ${event.ids[0]}`)
 	}
 

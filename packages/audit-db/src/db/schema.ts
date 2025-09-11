@@ -46,8 +46,6 @@
 // - [key: string]: any -> jsonb 'details' - OK (nullable)
 // This looks good.
 
-import { report } from 'process'
-import { en } from '@faker-js/faker'
 import { sql } from 'drizzle-orm'
 import {
 	index,
@@ -79,7 +77,7 @@ const DEFAULT_VALIDATION_CONFIG = {
 export const auditLog = pgTable(
 	'audit_log',
 	{
-		id: serial('id'),
+		id: serial('id').primaryKey(),
 		// The timestamp from the AuditLogEvent is an ISO string.
 		// Storing it as 'timestamp with time zone' is appropriate.
 		// mode: 'string' ensures Drizzle treats it as a string when reading/writing,
@@ -117,7 +115,6 @@ export const auditLog = pgTable(
 	(table) => {
 		return [
 			// Core audit indexes
-			index('audit_log_id_idx').on(table.id),
 			index('audit_log_timestamp_idx').on(table.timestamp),
 			index('audit_log_principal_id_idx').on(table.principalId),
 			index('audit_log_organization_id_idx').on(table.organizationId),

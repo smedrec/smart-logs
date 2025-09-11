@@ -1,0 +1,31 @@
+{
+	"name": "@repo/infisical-kms",
+	"version": "0.1.0",
+	"private": true,
+	"description": "A reusable TypeScript package for encrypt/decrypt data within a backend application.",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup src/index.ts --format cjs,esm --dts",
+		"check-types": "tsc --noEmit",
+		"check:lint": "eslint . --ext .ts,.tsx",
+		"clean": "rm -rf dist node_modules .turbo",
+		"coverage": "vitest run --coverage",
+		"dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"devDependencies": {
+		"@repo/eslint-config": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"tsup": "8.5.0",
+		"typescript": "5.8.2",
+		"vitest": "3.2.4"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}

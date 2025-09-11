@@ -31,6 +31,7 @@ import {
 	scheduledReports,
 } from '@repo/audit-db'
 import { Auth, createAuthorizationService } from '@repo/auth'
+import { InfisicalKmsClient } from '@repo/infisical-kms'
 import { getRedisConnectionStatus, getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { bindingsMiddleware } from '../inngest/middleware.js'
@@ -65,6 +66,7 @@ let auditDbInstance: EnhancedAuditDb | undefined = undefined
 
 let authInstance: Auth | undefined = undefined
 let inngest: Inngest | undefined = undefined
+let kms: InfisicalKmsClient | undefined = undefined
 let audit: Audit | undefined = undefined
 
 // Alert and health check services
@@ -209,6 +211,16 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 
 		const client: EnhancedAuditDatabaseClient = auditDbInstance.getEnhancedClientInstance()
 
+		if (!inngest)
+			inngest = new Inngest({
+				id: config.server.inngest.id,
+				eventKey: config.server.inngest.eventKey,
+				signingKey: config.server.inngest.signingKey,
+				baseUrl: config.server.inngest.baseUrl,
+				schemas,
+				middleware: [bindingsMiddleware],
+			})
+
 		if (!healthCheckService) {
 			healthCheckService = new HealthCheckService()
 			// Register health checks
@@ -220,7 +232,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 
 		if (!audit) audit = new Audit(config, auditDbInstance.getDrizzleInstance(), connection)
 
-		if (!authInstance) authInstance = new Auth(config, audit)
+		if (!authInstance) authInstance = new Auth(config, inngest, audit)
 
 		const auth = authInstance.getAuthInstance()
 		// Get the Drizzle ORM instances
@@ -314,10 +326,8 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			scheduledReportingService = new ScheduledReportingService(
 				reportingService,
 				dataExportService,
-				db.audit,
-				scheduledReports,
-				reportTemplates,
-				reportExecutions,
+				client,
+				inngest,
 				deliveryConfig
 			)
 		}
@@ -332,21 +342,12 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			gdpr: gdprComplianceService,
 		}
 
-		if (!inngest)
-			inngest = new Inngest({
-				id: config.server.inngest.id,
-				eventKey: config.server.inngest.eventKey,
-				signingKey: config.server.inngest.signingKey,
-				baseUrl: config.server.inngest.baseUrl,
-				schemas,
-				middleware: [bindingsMiddleware],
+		if (!kms)
+			kms = new InfisicalKmsClient({
+				baseUrl: config.security.kms.baseUrl,
+				keyId: config.security.kms.keyId,
+				accessToken: config.security.kms.accessToken,
 			})
-
-		/**const kms = new InfisicalKmsClient({
-			baseUrl: c.env.INFISICAL_URL!,
-			keyId: c.env.KMS_KEY_ID!,
-			accessToken: c.env.INFISICAL_ACCESS_TOKEN!,
-		})*/
 
 		//const cache = initCache(c);
 		//const cache = null
@@ -372,7 +373,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			//fhir,
 			db,
 			client,
-			//kms,
+			kms,
 			redis: connection,
 			health: healthCheckService,
 			authorization: authorizationService,

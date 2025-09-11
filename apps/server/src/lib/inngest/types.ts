@@ -38,6 +38,48 @@ type UnscheduleReport = {
 	}
 }
 
+type SendEmail = {
+	name: 'email/send'
+	data: {
+		/**
+		 * The unique identifier of the principal (e.g., user) initiating the action
+		 * or on whose behalf the email is being sent.
+		 */
+		principalId: string
+		/**
+		 * The unique identifier of the organization associated with this email event.
+		 * This can be used for tenant-specific logic or logging.
+		 */
+		organizationId: string
+		/**
+		 * The unique identifier of the service associated with this email event.
+		 * This can be used for tenant-specific logic or logging.
+		 */
+		service: string
+		/**
+		 * A string describing the action that triggered this email.
+		 * For example, "user_registration", "password_reset", "order_confirmation".
+		 */
+		action: string
+		/**
+		 * The detailed options for the email to be sent, conforming to the `MailerSendOptions`
+		 * interface from the `@repo/mailer` package. This includes recipient(s), subject, body, etc.
+		 */
+		emailDetails: {
+			from: string
+			to: string | string[]
+			subject: string
+			html: string
+			text?: string
+		}
+	}
+}
+
 export const schemas = new EventSchemas().fromUnion<
-	DemoEventSent | CleanupResolvedAlerts | CleanupOldErrors | ScheduleReport | UnscheduleReport
+	| DemoEventSent
+	| CleanupResolvedAlerts
+	| CleanupOldErrors
+	| ScheduleReport
+	| UnscheduleReport
+	| SendEmail
 >()

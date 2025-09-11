@@ -23,6 +23,7 @@ import type * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import type { AuthorizationService, Session } from '@repo/auth'
 import type * as authSchema from '@repo/auth/dist/db/schema/index.js'
 import type { HonoApp, SharedHonoEnv, SharedHonoVariables } from '@repo/hono-helpers'
+import type { InfisicalKmsClient } from '@repo/infisical-kms'
 import type { Redis } from '@repo/redis-client'
 import type { HealthStatus } from '../graphql/types.js'
 import type { StructuredLogger } from '../services/logging.js'
@@ -47,7 +48,7 @@ export type ServiceContext = {
 		audit: PostgresJsDatabase<typeof auditSchema>
 	}
 	client: EnhancedAuditDatabaseClient
-	//kms: InfisicalKmsClient
+	kms: InfisicalKmsClient
 	redis: Redis
 	health: HealthCheckService
 	authorization: AuthorizationService

@@ -56,7 +56,7 @@ async function getActiveOrganization(
  * Generates a session ID
  */
 function generateSessionId(): string {
-	return `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+	return `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
 }
 
 export { getActiveOrganization, generateSessionId }

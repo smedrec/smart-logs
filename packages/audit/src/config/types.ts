@@ -443,6 +443,33 @@ export interface SecurityConfig {
 
 	/** Enable audit log encryption */
 	enableLogEncryption: boolean
+
+	/** KMS encryption settings */
+	kms: {
+		/** Enable KMS encryption */
+		enabled: boolean
+
+		/** KMS key ID */
+		keyId: string
+
+		/** KMS access token */
+		accessToken: string
+
+		/** KMS base URL */
+		baseUrl: string
+
+		/** KMS encryption algorithm */
+		algorithm?: 'AES-256-GCM' | 'AES-256-CBC'
+
+		/** KMS key derivation function */
+		kdf?: 'PBKDF2' | 'scrypt'
+
+		/** KMS salt for key derivation */
+		salt?: string
+
+		/** KMS number of iterations for key derivation */
+		iterations?: number
+	}
 }
 
 export interface LoggingConfig {

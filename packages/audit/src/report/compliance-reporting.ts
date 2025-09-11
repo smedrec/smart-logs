@@ -285,6 +285,7 @@ export interface ScheduledReportConfig {
 	createdBy: string
 	lastRun?: string
 	nextRun?: string
+	runId?: string
 }
 
 /**

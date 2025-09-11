@@ -2,6 +2,7 @@ import {
 	alertsCleanupPrepareDailyDigest,
 	cleanupResolvedAlerts,
 } from './functions/alerts/cleanup-old-alerts.js'
+import { sendEmail } from './functions/emails/sendEmail.js'
 import {
 	cleanupOldErrors,
 	errorsCleanupPrepareDailyDigest,
@@ -16,6 +17,7 @@ export const functions = [
 	errorsCleanupPrepareDailyDigest,
 	cleanupOldErrors,
 	scheduleReport,
+	sendEmail,
 ]
 
 export { inngest } from './client.js'

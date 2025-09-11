@@ -33,6 +33,8 @@
 		"@repo/audit-db": "workspace:*",
 		"@repo/auth": "workspace:*",
 		"@repo/hono-helpers": "workspace:*",
+		"@repo/infisical-kms": "workspace:*",
+		"@repo/mailer": "workspace:*",
 		"@repo/redis-client": "workspace:*",
 		"@repo/send-mail": "workspace:*",
 		"@trpc/client": "^11.5.0",

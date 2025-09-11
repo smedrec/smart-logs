@@ -246,6 +246,12 @@ export function createDevelopmentConfig(): AuditConfig {
 			enableEventSigning: false,
 			encryptionKey: process.env.AUDIT_CRYPTO_SECRET || generateDefaultSecret(),
 			enableLogEncryption: false,
+			kms: {
+				enabled: true,
+				keyId: process.env.KMS_KEY_ID || 'your-key-id',
+				accessToken: process.env.INFISICAL_ACCESS_TOKEN || 'your-access-token',
+				baseUrl: process.env.INFISICAL_URL || 'https://infisical.teachhowtofish.org',
+			},
 		},
 		compliance: {
 			hipaa: {

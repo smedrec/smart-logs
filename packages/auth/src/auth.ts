@@ -2,8 +2,7 @@ import { expo } from '@better-auth/expo'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, apiKey, mcp, oidcProvider, openAPI, organization } from 'better-auth/plugins'
-
-import { SendMail } from '@repo/send-mail'
+import { Inngest } from 'inngest'
 
 import { initDrizzle } from './db/index.js'
 import * as schema from './db/schema/auth.js'
@@ -12,7 +11,7 @@ import { getRedisConnection } from './redis.js'
 
 import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Audit, AuditConfig } from '@repo/audit'
-import type { MailerSendOptions } from '@repo/send-mail'
+import type { MailerSendOptions } from '@repo/mailer'
 
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
@@ -25,7 +24,7 @@ class Auth {
 	 *                    the process.env environment variables.
 	 * @throws Error if the config not provided and cannot be found in environment variables.
 	 */
-	constructor(config: AuditConfig, audit?: Audit) {
+	constructor(config: AuditConfig, inngest: Inngest, audit?: Audit) {
 		/**const effectiveConfig = config || getEnvConfig()
 
 		if (!effectiveConfig) {
@@ -45,8 +44,6 @@ class Auth {
 		//} else {
 		//	console.error('🔴 Postgres connection error for Better Auth service')
 		//}
-
-		const email = new SendMail('mail', config.redis.url)
 
 		if (audit) {
 			this.audit = audit
@@ -77,12 +74,19 @@ class Auth {
 					<p><a href="${url}">${url}</a></p>
 				`,
 					}
-					await email.send({
-						principalId: user.id,
-						organizationId: org.organizationId,
-						service: 'smart-logs',
-						action: 'sendResetPassword',
-						emailDetails,
+					await inngest.send({
+						name: 'email/send',
+						data: {
+							principalId: user.id,
+							organizationId: org.organizationId,
+							service: 'smart-logs',
+							action: 'sendResetPassword',
+							emailDetails,
+						},
+						user: {
+							id: user.id,
+							organizationId: org.organizationId,
+						},
 					})
 				},
 			},
@@ -101,12 +105,18 @@ class Auth {
 					<p><a href="${url}">${url}</a></p>
 				`,
 					}
-					await email.send({
-						principalId: user.id,
-						organizationId: '',
-						service: 'smart-logs',
-						action: 'sendVerificationEmail',
-						emailDetails,
+					await inngest.send({
+						name: 'email/send',
+						data: {
+							principalId: user.id,
+							organizationId: '',
+							service: 'smart-logs',
+							action: 'sendVerificationEmail',
+							emailDetails,
+						},
+						user: {
+							id: user.id,
+						},
 					})
 				},
 			},
@@ -189,10 +199,10 @@ class Auth {
 					await redis.del(`auth:${key}`)
 				},
 			},
-			rateLimit: {
-				enabled: true,
-				storage: 'secondary-storage',
-			},
+			//rateLimit: {
+			//	enabled: true,
+			//	storage: 'secondary-storage',
+			//},
 			plugins: [
 				admin({
 					defaultRole: 'user',
@@ -230,12 +240,19 @@ class Auth {
 						<p>If you have any doubt please send a email to: ${data.inviter.user.email}.</p>
 					`,
 						}
-						await email.send({
-							principalId: data.inviter.user.id,
-							organizationId: data.organization.id,
-							service: 'smart-logs',
-							action: 'sendInvitationEmail',
-							emailDetails,
+						await inngest.send({
+							name: 'email/send',
+							data: {
+								principalId: data.inviter.user.id,
+								organizationId: data.organization.id,
+								service: 'smart-logs',
+								action: 'sendInvitationEmail',
+								emailDetails,
+							},
+							user: {
+								id: data.inviter.user.id,
+								organizationId: data.organization.id,
+							},
 						})
 					},
 				}),

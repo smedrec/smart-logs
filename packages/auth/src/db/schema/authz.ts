@@ -1,6 +1,7 @@
 import {
 	boolean,
 	index,
+	integer,
 	jsonb,
 	pgTable,
 	primaryKey,
@@ -76,3 +77,23 @@ export const events = pgTable('events', {
 
 export type EventTypes = typeof events.$inferSelect
 export type newEvent = typeof events.$inferInsert
+
+type MailProvider = 'smtp' | 'resend' | 'sendgrid'
+
+export const emailProvider = pgTable('email_provider', {
+	organizationId: varchar('organization_id', { length: 50 })
+		.primaryKey()
+		.references(() => organization.id, { onDelete: 'cascade' }),
+	provider: varchar('provider', { length: 50 })
+		.$type<MailProvider>() // Enforces the type against MailProvider
+		.notNull()
+		.default('smtp'), // e.g., 'smtp', 'resend', 'sendgrid'
+	host: varchar('smtp_host', { length: 100 }),
+	port: integer('smtp_port').default(465),
+	secure: boolean('smtp_secure').default(true),
+	user: varchar('smtp_user', { length: 50 }),
+	password: text('smtp_pass'),
+	apiKey: text('api_key'),
+	fromName: varchar('from_name', { length: 50 }),
+	fromEmail: varchar('from_email', { length: 50 }),
+})

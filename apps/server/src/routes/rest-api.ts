@@ -28,6 +28,7 @@ import { createComplianceAPI } from './compliance-api'
 import { createFunctionsAPI } from './functions-api'
 import { createMetricsAPI } from './metrics-api'
 import { createObservabilityAPI } from './observability-api'
+import { createOrganizationAPI } from './organization-api'
 import { createPerformanceAPI } from './performance-api'
 
 import type { HonoEnv } from '@/lib/hono/context'
@@ -253,11 +254,13 @@ Pagination information is included in the response:
 	app.use('/observability/*', requireAuthOrApiKey)
 	app.use('/performance/*', requireAuthOrApiKey)
 	app.use('/functions/*', requireAuthOrApiKey)
+	app.use('/organization/*', requireAuthOrApiKey)
 
 	// Organization access control for audit and compliance endpoints
 	app.use('/audit/*', requireOrganizationAccess())
 	app.use('/compliance/*', requireOrganizationAccess())
 	app.use('/functions/*', requireOrganizationAccess())
+	app.use('/organization/*', requireOrganizationAccess())
 
 	// Admin-only access for system metrics and observability
 	app.use('/metrics/system/*', requireRole(['admin']))
@@ -271,6 +274,7 @@ Pagination information is included in the response:
 	app.route('/observability', createObservabilityAPI())
 	app.route('/performance', createPerformanceAPI())
 	app.route('/functions', createFunctionsAPI())
+	app.route('/organization', createOrganizationAPI())
 
 	// Swagger UI
 	app.get(

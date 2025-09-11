@@ -1,0 +1,37 @@
+{
+	"name": "@repo/mailer",
+	"version": "0.1.0",
+	"private": true,
+	"description": "A shared package for sending emails via different providers.",
+	"sideEffects": false,
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist",
+		"src"
+	],
+	"scripts": {
+		"build": "tsup src/index.ts --format cjs,esm --dts",
+		"check-types": "tsc --noEmit",
+		"check:lint": "eslint . --ext .ts,.tsx",
+		"clean": "rm -rf dist node_modules .turbo",
+		"test": "vitest"
+	},
+	"dependencies": {
+		"@sendgrid/mail": "8.1.5",
+		"nodemailer": "7.0.6",
+		"resend": "6.0.3"
+	},
+	"devDependencies": {
+		"@repo/eslint-config": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "24.0.13",
+		"@types/nodemailer": "7.0.1",
+		"@vitest/coverage-v8": "3.2.4",
+		"jest-mock-extended": "4.0.0",
+		"tsup": "8.5.0",
+		"typescript": "5.8.2",
+		"vitest": "3.2.4"
+	}
+}
