@@ -3,6 +3,7 @@ import { BatchManager } from '../infrastructure/batch'
 import { CacheManager } from '../infrastructure/cache'
 import { ErrorHandler } from '../infrastructure/error'
 import { DefaultLogger } from '../infrastructure/logger'
+import { PluginManager } from '../infrastructure/plugins'
 import { RetryManager } from '../infrastructure/retry'
 import { ComplianceService } from '../services/compliance'
 // Import all services
@@ -63,6 +64,7 @@ export class AuditClient {
 	private retryManager!: RetryManager
 	private batchManager!: BatchManager
 	private errorHandler!: ErrorHandler
+	private pluginManager!: PluginManager
 
 	// Service instances
 	private _events!: EventsService
@@ -92,13 +94,17 @@ export class AuditClient {
 			// Initialize infrastructure components
 			this.initializeInfrastructure()
 
+			// Initialize plugin system (async initialization will be handled separately)
+			this.pluginManager = new PluginManager(this.getLogger())
+			this.pluginManager.setClientConfig(this.config)
+
 			// Initialize services
 			this.initializeServices()
 
 			// Set up cleanup tasks
 			this.setupCleanupTasks()
 
-			// Mark as ready
+			// Mark as ready (plugins will be loaded separately if needed)
 			this.state = 'ready'
 
 			this.getLogger().info('AuditClient initialized successfully', {
@@ -106,6 +112,13 @@ export class AuditClient {
 				environment: this.config.environment,
 				features: this.getEnabledFeatures(),
 			})
+
+			// Initialize plugins asynchronously if auto-load is enabled
+			if (this.config.plugins.enabled && this.config.plugins.autoLoad) {
+				this.initializePlugins().catch((error) => {
+					this.getLogger().error('Failed to initialize plugins', { error })
+				})
+			}
 		} catch (error) {
 			this.state = 'error'
 			// Initialize logger first if it failed during initialization
@@ -155,6 +168,145 @@ export class AuditClient {
 	}
 
 	/**
+	 * Initialize plugin system
+	 */
+	private async initializePlugins(): Promise<void> {
+		// Initialize plugin manager
+		this.pluginManager = new PluginManager(this.getLogger())
+		this.pluginManager.setClientConfig(this.config)
+
+		// Load built-in plugins if enabled
+		if (this.config.plugins.enabled && this.config.plugins.autoLoad) {
+			await this.loadBuiltInPlugins()
+		}
+
+		// Load configured plugins
+		if (this.config.plugins.plugins.length > 0) {
+			await this.loadConfiguredPlugins()
+		}
+
+		this.getLogger().debug('Plugin system initialized', {
+			pluginCount: this.pluginManager.getRegistry().getAllPlugins().length,
+			middlewareCount: this.pluginManager.getRegistry().getMiddlewareChain().length,
+			storagePlugins: this.pluginManager.getRegistry().getStoragePlugins().length,
+			authPlugins: this.pluginManager.getRegistry().getAuthPlugins().length,
+		})
+	}
+
+	/**
+	 * Load built-in plugins based on configuration
+	 */
+	private async loadBuiltInPlugins(): Promise<void> {
+		const { BuiltInPluginFactory } = await import('../infrastructure/plugins/built-in')
+
+		// Load middleware plugins
+		if (this.config.plugins.middleware.enabled) {
+			for (const pluginName of this.config.plugins.middleware.plugins) {
+				try {
+					let plugin
+					switch (pluginName) {
+						case 'request-logging':
+							plugin = BuiltInPluginFactory.createRequestLoggingPlugin()
+							break
+						case 'correlation-id':
+							plugin = BuiltInPluginFactory.createCorrelationIdPlugin()
+							break
+						case 'rate-limiting':
+							plugin = BuiltInPluginFactory.createRateLimitingPlugin()
+							break
+						default:
+							this.getLogger().warn(`Unknown built-in middleware plugin: ${pluginName}`)
+							continue
+					}
+
+					await this.pluginManager.getRegistry().register(plugin, {})
+				} catch (error) {
+					this.getLogger().error(`Failed to load built-in middleware plugin '${pluginName}'`, {
+						error,
+					})
+				}
+			}
+		}
+
+		// Load storage plugins
+		if (this.config.plugins.storage.enabled) {
+			for (const [pluginName, pluginConfig] of Object.entries(
+				this.config.plugins.storage.plugins
+			)) {
+				try {
+					let plugin
+					switch (pluginName) {
+						case 'redis-storage':
+							plugin = BuiltInPluginFactory.createRedisStoragePlugin()
+							break
+						case 'indexeddb-storage':
+							plugin = BuiltInPluginFactory.createIndexedDBStoragePlugin()
+							break
+						default:
+							this.getLogger().warn(`Unknown built-in storage plugin: ${pluginName}`)
+							continue
+					}
+
+					await this.pluginManager.getRegistry().register(plugin, pluginConfig)
+				} catch (error) {
+					this.getLogger().error(`Failed to load built-in storage plugin '${pluginName}'`, {
+						error,
+					})
+				}
+			}
+		}
+
+		// Load auth plugins
+		if (this.config.plugins.auth.enabled) {
+			for (const [pluginName, pluginConfig] of Object.entries(this.config.plugins.auth.plugins)) {
+				try {
+					let plugin
+					switch (pluginName) {
+						case 'jwt-auth':
+							plugin = BuiltInPluginFactory.createJWTAuthPlugin()
+							break
+						case 'oauth2-auth':
+							plugin = BuiltInPluginFactory.createOAuth2AuthPlugin()
+							break
+						case 'custom-header-auth':
+							plugin = BuiltInPluginFactory.createCustomHeaderAuthPlugin()
+							break
+						default:
+							this.getLogger().warn(`Unknown built-in auth plugin: ${pluginName}`)
+							continue
+					}
+
+					await this.pluginManager.getRegistry().register(plugin, pluginConfig)
+				} catch (error) {
+					this.getLogger().error(`Failed to load built-in auth plugin '${pluginName}'`, { error })
+				}
+			}
+		}
+	}
+
+	/**
+	 * Load plugins from configuration
+	 */
+	private async loadConfiguredPlugins(): Promise<void> {
+		for (const pluginConfig of this.config.plugins.plugins) {
+			if (!pluginConfig.enabled) {
+				continue
+			}
+
+			try {
+				// In a real implementation, this would dynamically load plugins
+				// For now, we'll just log that the plugin would be loaded
+				this.getLogger().info(`Would load configured plugin: ${pluginConfig.name}`, {
+					type: pluginConfig.type,
+					priority: pluginConfig.priority,
+				})
+			} catch (error) {
+				this.getLogger().error(`Failed to load configured plugin '${pluginConfig.name}'`, { error })
+			}
+		}
+	}
+
+	/**
 	 * Initialize all service instances
 	 */
 	private initializeServices(): void {
@@ -180,6 +332,7 @@ export class AuditClient {
 		this.cleanupTasks.push(() => this.cacheManager.destroy())
 		this.cleanupTasks.push(() => this.batchManager.clear())
 		this.cleanupTasks.push(() => this.authManager.clearAllTokenCache())
+		this.cleanupTasks.push(() => this.pluginManager.cleanup())
 
 		// Add cleanup for services
 		this.cleanupTasks.push(() => this._events.destroy())
@@ -273,6 +426,14 @@ export class AuditClient {
 	}
 
 	/**
+	 * Plugin manager for managing plugins
+	 */
+	public get plugins(): PluginManager {
+		this.validateClientState()
+		return this.pluginManager
+	}
+
+	/**
 	 * Get logger instance, ensuring it's always available
 	 */
 	private getLogger(): Logger {
@@ -306,6 +467,14 @@ export class AuditClient {
 	public getConfig(): AuditClientConfig {
 		this.validateClientState()
 		return this.configManager.getConfig()
+	}
+
+	/**
+	 * Initialize plugins manually
+	 */
+	public async initializePluginsManually(): Promise<void> {
+		this.validateClientState()
+		await this.initializePlugins()
 	}
 
 	/**

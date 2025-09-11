@@ -6,6 +6,7 @@ export * from './cache'
 export * from './retry'
 export * from './batch'
 export * from './logger'
+export * from './plugins'
 
 // Export error module with explicit re-exports to avoid naming conflicts
 export {

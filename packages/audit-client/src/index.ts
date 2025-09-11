@@ -15,6 +15,7 @@ export type {
 	LoggingConfig,
 	ErrorHandlingConfig,
 	InterceptorConfig,
+	PluginConfig,
 	EnvironmentConfig,
 	ConfigValidationResult,
 } from './core/config'
@@ -58,6 +59,64 @@ export {
 	CacheInvalidationStrategy,
 } from './infrastructure/error'
 export type { ErrorContext, ErrorRecoveryStrategy } from './infrastructure/error'
+
+// Plugin system exports
+export {
+	PluginManager,
+	PluginRegistry,
+	PluginError,
+	PluginRegistrationError,
+	PluginConfigurationError,
+	PluginExecutionError,
+} from './infrastructure/plugins'
+export type {
+	Plugin,
+	MiddlewarePlugin,
+	StoragePlugin,
+	AuthPlugin,
+	PluginContext,
+	ValidationResult,
+	MiddlewareRequest,
+	MiddlewareResponse,
+	MiddlewareNext,
+	MiddlewareErrorContext,
+	PluginCacheStorage,
+	StorageStats,
+	AuthContext,
+	PluginRegistryStats,
+} from './infrastructure/plugins'
+
+// Built-in plugins
+export {
+	BuiltInPluginFactory,
+	RequestLoggingPlugin,
+	CorrelationIdPlugin,
+	RateLimitingPlugin,
+	RedisStoragePlugin,
+	IndexedDBStoragePlugin,
+	JWTAuthPlugin,
+	OAuth2AuthPlugin,
+	CustomHeaderAuthPlugin,
+} from './infrastructure/plugins/built-in'
+
+// Plugin utilities
+export {
+	validatePlugin,
+	validateMiddlewarePlugin,
+	validateStoragePlugin,
+	validateAuthPlugin,
+	discoverPlugins,
+	loadPluginsFromConfig,
+	resolveDependencies,
+	mergePluginConfig,
+	validatePluginConfig,
+	PluginPerformanceTracker,
+} from './infrastructure/plugins/utils'
+export type {
+	PluginDiscoveryResult,
+	PluginLoadResult,
+	PluginPerformanceMetrics,
+} from './infrastructure/plugins/utils'
 
 // Logging exports
 export {
@@ -142,7 +201,7 @@ export {
 	type CreateAuditPresetInput,
 	type UpdateAuditPresetInput,
 	type PresetContext,
-	type ValidationResult,
+	type ValidationResult as PresetValidationResult,
 	type PresetApplicationResult,
 	type ListAuditPresetsParams,
 	type PaginatedAuditPresets,

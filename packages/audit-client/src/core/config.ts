@@ -76,6 +76,42 @@ const InterceptorConfigSchema = z.object({
 	response: z.array(z.any()).optional(),
 })
 
+const PluginConfigSchema = z.object({
+	enabled: z.boolean().default(true),
+	autoLoad: z.boolean().default(true),
+	plugins: z
+		.array(
+			z.object({
+				name: z.string(),
+				type: z.enum(['middleware', 'storage', 'auth']).optional(),
+				enabled: z.boolean().default(true),
+				config: z.any().optional(),
+				priority: z.number().default(0),
+			})
+		)
+		.default([]),
+	middleware: z
+		.object({
+			enabled: z.boolean().default(true),
+			plugins: z.array(z.string()).default([]),
+		})
+		.default({}),
+	storage: z
+		.object({
+			enabled: z.boolean().default(true),
+			defaultPlugin: z.string().optional(),
+			plugins: z.record(z.any()).default({}),
+		})
+		.default({}),
+	auth: z
+		.object({
+			enabled: z.boolean().default(true),
+			defaultPlugin: z.string().optional(),
+			plugins: z.record(z.any()).default({}),
+		})
+		.default({}),
+})
+
 // Main configuration schema
 const AuditClientConfigSchema = z.object({
 	// Connection settings
@@ -104,6 +140,9 @@ const AuditClientConfigSchema = z.object({
 	// Error handling
 	errorHandling: ErrorHandlingConfigSchema.default({}),
 
+	// Plugin configuration
+	plugins: PluginConfigSchema.default({}),
+
 	// Environment-specific settings
 	environment: z.enum(['development', 'staging', 'production']).optional(),
 	customHeaders: z.record(z.string()).default({}),
@@ -119,6 +158,7 @@ export type PerformanceConfig = z.infer<typeof PerformanceConfigSchema>
 export type LoggingConfig = z.infer<typeof LoggingConfigSchema>
 export type ErrorHandlingConfig = z.infer<typeof ErrorHandlingConfigSchema>
 export type InterceptorConfig = z.infer<typeof InterceptorConfigSchema>
+export type PluginConfig = z.infer<typeof PluginConfigSchema>
 export type AuditClientConfig = z.infer<typeof AuditClientConfigSchema>
 
 // Partial configuration for updates
@@ -485,4 +525,5 @@ export {
 	PerformanceConfigSchema,
 	LoggingConfigSchema,
 	ErrorHandlingConfigSchema,
+	PluginConfigSchema,
 }
