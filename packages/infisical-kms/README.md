@@ -1,11 +1,13 @@
 # @repo/infisical-kms
 
-A reusable TypeScript package for encrypting and decrypting data using Infisical KMS.
+A reusable TypeScript package for encrypting, decrypting, signing, and verifying data using Infisical KMS.
 
 ## Features
 
 - Encrypt plaintext data.
 - Decrypt ciphertext data.
+- Sign data.
+- Verify data.
 
 ## Installation
 
@@ -125,6 +127,7 @@ try {
 │   └── test/
 │       └── unit/
 │           └── client.test.ts # Unit tests for the KmsClient
+│           └── base.test.ts   # Unit tests for the BaseResource class
 ├── package.json     # Project metadata and dependencies
 ├── README.md        # This file
 ├── tsconfig.json    # TypeScript configuration
