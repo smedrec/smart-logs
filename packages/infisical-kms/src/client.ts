@@ -62,7 +62,6 @@ export class InfisicalKmsClient extends BaseResource {
 	 * @throws {KmsApiError} If the decryption request fails due to network issues or an unsuccessful API response.
 	 */
 	public async decrypt(ciphertext: string): Promise<DecryptResponse> {
-		let response: Response
 		try {
 			const data = await this.request<DecryptResponse>(`/${this.encryptionKey}/decrypt`, {
 				body: { ciphertext: ciphertext },
