@@ -23,7 +23,8 @@ import { InfisicalKmsClient } from '@repo/infisical-kms'
 // 1. Initialize the InfisicalKmsClient
 const kmsClient = new InfisicalKmsClient({
 	baseUrl: 'https://app.infisical.com',
-	keyId: 'your-key-id',
+	encryptionKey: 'your-encryption-key-id',
+	signingKey: 'your-signing-key-id',
 	accessToken: 'your-access-token',
 })
 
@@ -42,6 +43,40 @@ try {
 		console.error(`KMS API Error: ${error.message}`, `Status: ${error.status}`)
 	} else if (error instanceof KmsError) {
 		console.error(`KMS Error: ${error.message}`)
+	} else {
+		console.error('An unexpected error occurred:', error)
+	}
+}
+
+// 4. Sign data
+const dataToSign = 'This is a message to be signed.'
+const signingAlgorithm = 'RSA_4096' // Optional, defaults to 'RSA_4096'
+try {
+	const signature = await kmsClient.sign(dataToSign, signingAlgorithm)
+	console.log('Signature:', signature.signature)
+} catch (error) {
+	// Handle specific KMS errors
+	if (error instanceof KmsApiError) {
+		console.error(`KMS API Error: ${error.message}`, `Status: ${error.status}`)
+	} else if (error instanceof KmsError) {
+		console.error(`KMS Error: ${error.message}`)
+	} else {
+		console.error('An unexpected error occurred:', error)
+	}
+}
+
+// 5. Verify data
+const dataToVerify = 'This is a message to be verified.'
+const signature = 'your-signature' // Base64-encoded signature
+const signingAlgorithm = 'RSA_4096' // Optional, defaults to 'RSA_4096'
+try {
+	const verificationResult = await kmsClient.verify(dataToVerify, signature, signingAlgorithm)
+	console.log('Verification result:', verificationResult.signatureValid)
+} catch (error) {
+	if (error instanceof KmsError) {
+		console.error('Error:', error.message)
+	} else if (error instanceof KmsApiError) {
+		console.error('API Error:', error.message)
 	} else {
 		console.error('An unexpected error occurred:', error)
 	}
