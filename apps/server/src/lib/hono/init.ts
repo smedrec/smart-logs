@@ -345,7 +345,8 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		if (!kms)
 			kms = new InfisicalKmsClient({
 				baseUrl: config.security.kms.baseUrl,
-				keyId: config.security.kms.keyId,
+				encryptionKey: config.security.kms.encryptionKey,
+				signingKey: config.security.kms.signingKey,
 				accessToken: config.security.kms.accessToken,
 			})
 

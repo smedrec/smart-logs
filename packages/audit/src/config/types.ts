@@ -449,8 +449,11 @@ export interface SecurityConfig {
 		/** Enable KMS encryption */
 		enabled: boolean
 
-		/** KMS key ID */
-		keyId: string
+		/** KMS encryption key ID */
+		encryptionKey: string
+
+		/** KMS signing key ID */
+		signingKey: string
 
 		/** KMS access token */
 		accessToken: string

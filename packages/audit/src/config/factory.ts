@@ -248,7 +248,8 @@ export function createDevelopmentConfig(): AuditConfig {
 			enableLogEncryption: false,
 			kms: {
 				enabled: true,
-				keyId: process.env.KMS_KEY_ID || 'your-key-id',
+				encryptionKey: process.env.KMS_ENCRYPTION_KEY_ID || 'your-encryption-key-id',
+				signingKey: process.env.KMS_SIGNING_KEY_ID || 'your-signing-key-id',
 				accessToken: process.env.INFISICAL_ACCESS_TOKEN || 'your-access-token',
 				baseUrl: process.env.INFISICAL_URL || 'https://infisical.teachhowtofish.org',
 			},

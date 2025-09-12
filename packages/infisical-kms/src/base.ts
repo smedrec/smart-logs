@@ -54,17 +54,14 @@ export class BaseResource {
 
 		for (let attempt = 0; attempt <= retries; attempt++) {
 			try {
-				const response = await fetch(
-					`${baseUrl.replace(/\/$/, '')}/api/v1/kms/keys/${this.config.keyId}${path}`,
-					{
-						method: 'POST',
-						headers: {
-							...headers,
-							...options.headers,
-						},
-						body: options.body ? JSON.stringify(options.body) : undefined,
-					}
-				)
+				const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/kms/keys${path}`, {
+					method: 'POST',
+					headers: {
+						...headers,
+						...options.headers,
+					},
+					body: options.body ? JSON.stringify(options.body) : undefined,
+				})
 
 				if (!response.ok) {
 					const errorBody = await response.text()

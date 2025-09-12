@@ -819,8 +819,11 @@ export class ConfigurationManager extends EventEmitter {
 		if (sanitized.server.inngest.signingKey) {
 			sanitized.server.inngest.signingKey = '***MASKED***'
 		}
-		if (sanitized.security.kms.keyId) {
-			sanitized.security.kms.keyId = '***MASKED***'
+		if (sanitized.security.kms.encryptionKey) {
+			sanitized.security.kms.encryptionKey = '***MASKED***'
+		}
+		if (sanitized.security.kms.signingKey) {
+			sanitized.security.kms.signingKey = '***MASKED***'
 		}
 		if (sanitized.security.kms.accessToken) {
 			sanitized.security.kms.accessToken = '***MASKED***'
