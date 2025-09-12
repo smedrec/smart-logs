@@ -18,9 +18,9 @@ Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features inc
 
 The audit client now features a comprehensive plugin architecture, allowing developers to extend and customize its functionality. This system supports:
 
--   **Middleware Plugins**: For processing requests and responses.
--   **Storage Plugins**: For implementing custom caching or storage backends.
--   **Authentication Plugins**: For integrating custom authentication methods.
+- **Middleware Plugins**: For processing requests and responses.
+- **Storage Plugins**: For implementing custom caching or storage backends.
+- **Authentication Plugins**: For integrating custom authentication methods.
 
 The client includes a variety of built-in plugins for common use cases like request logging, correlation IDs, rate limiting, Redis/IndexedDB caching, and JWT/OAuth2 authentication.
 
@@ -137,7 +137,7 @@ The client provides several specialized services:
 
 ```typescript
 // Create audit events
-await client.events.create(eventData)
+await client.events.create(eventData, options)
 await client.events.bulkCreate([event1, event2])
 
 // Query events
@@ -205,6 +205,7 @@ pnpm check:lint     # Lint check
 - [Code Examples](./docs/CODE_EXAMPLES.md)
 - [Troubleshooting & FAQ](./docs/TROUBLESHOOTING_AND_FAQ.md)
 - [Framework Integration](./docs/FRAMEWORK_INTEGRATION.md)
+- [Plugin Architecture](./docs/PLUGIN_ARCHITECTURE.md)
 
 ## License
 
