@@ -2,7 +2,7 @@
 	"name": "@repo/infisical-kms",
 	"version": "0.1.0",
 	"private": true,
-	"description": "A reusable TypeScript package for encrypt/decrypt data within a backend application.",
+	"description": "A reusable TypeScript package for encrypt/decrypt/sign/verify data within a backend application.",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"files": [
@@ -14,7 +14,6 @@
 		"check:lint": "eslint . --ext .ts,.tsx",
 		"clean": "rm -rf dist node_modules .turbo",
 		"coverage": "vitest run --coverage",
-		"dev": "tsup src/index.ts --format cjs,esm --dts --watch",
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},

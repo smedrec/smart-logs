@@ -38,7 +38,6 @@ export class BaseResource {
 	 * @returns Promise containing the response data
 	 */
 	public async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-		let lastError: KmsApiError | null = null
 		const {
 			baseUrl,
 			retries = 3,
@@ -50,6 +49,7 @@ export class BaseResource {
 			},
 		} = this.config
 
+		let lastError: Error | null = null
 		let delay = backoffMs
 
 		for (let attempt = 0; attempt <= retries; attempt++) {
@@ -77,20 +77,23 @@ export class BaseResource {
 					throw new KmsApiError(errorMessage, response.status, response.statusText)
 				}
 
-				const data = await response.json()
-				return data as T
+				// Only if the request was successful, we parse and return the JSON
+				return (await response.json()) as T
 			} catch (error) {
-				lastError = error as KmsApiError
-
-				if (attempt === retries) {
-					break
+				lastError = error as Error
+				if (attempt < retries) {
+					await new Promise((resolve) => setTimeout(resolve, delay))
+					delay = Math.min(delay * 2, maxBackoffMs)
+				} else {
+					// After all retries, throw a KmsError that wraps the last error
+					throw new KmsApiError(
+						`Request failed after ${retries} retries: ${lastError.message}`,
+					)
 				}
-
-				await new Promise((resolve) => setTimeout(resolve, delay))
-				delay = Math.min(delay * 2, maxBackoffMs)
 			}
 		}
 
-		throw lastError || new KmsError('Request failed')
+		// This part should not be reachable if the loop always throws on the last attempt
+		throw new KmsError('Request failed unexpectedly after all retries')
 	}
 }

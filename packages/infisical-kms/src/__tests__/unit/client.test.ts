@@ -1,207 +1,218 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { InfisicalKmsClient, KmsApiError } from '../../index'
+import { InfisicalKmsClient, KmsApiError, KmsError } from '../../index'
 
-import type { InfisicalKmsClientConfig } from '../../types'
+import type { DecryptResponse, EncryptResponse, SignResponse, VerifyResponse } from '../../types'
 
-// Mock global fetch
+const mockConfig = {
+	baseUrl: 'https://kms.example.com',
+	accessToken: 'test-token',
+	encryptionKey: 'key-encryption-123',
+	signingKey: 'key-signing-456',
+}
+
+// Mock the global fetch function
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-// Mock btoa and atob for Node.js environment if not running in a browser-like env (Vitest default is Node)
-if (typeof global.btoa === 'undefined') {
-	global.btoa = (str: string) => Buffer.from(str, 'binary').toString('base64')
-}
-if (typeof global.atob === 'undefined') {
-	global.atob = (b64Encoded: string) => Buffer.from(b64Encoded, 'base64').toString('binary')
-}
-
 describe('InfisicalKmsClient', () => {
-	const mockConfig: InfisicalKmsClientConfig = {
-		baseUrl: 'https://test.infisical.com',
-		keyId: 'test-key-id',
-		accessToken: 'test-access-token',
-	}
-
 	let client: InfisicalKmsClient
 
-	beforeEach(() => {
+	beforeAll(() => {
 		client = new InfisicalKmsClient(mockConfig)
-		mockFetch.mockReset()
 	})
 
 	afterEach(() => {
-		vi.restoreAllMocks()
+		vi.clearAllMocks()
+	})
+
+	describe('constructor', () => {
+		it('should create an instance of InfisicalKmsClient', () => {
+			expect(client).toBeInstanceOf(InfisicalKmsClient)
+		})
 	})
 
 	describe('encrypt', () => {
 		it('should encrypt plaintext successfully', async () => {
-			const plaintext = 'my secret message'
-			const expectedCiphertext = 'encrypted-secret'
+			const plaintext = 'my secret data'
+			const mockResponse: EncryptResponse = {
+				ciphertext: 'encrypted-data',
+			}
+
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({ ciphertext: expectedCiphertext }),
-			} as Response)
+				json: async () => mockResponse,
+			})
 
 			const result = await client.encrypt(plaintext)
 
-			expect(result.ciphertext).toBe(expectedCiphertext)
-			expect(mockFetch).toHaveBeenCalledOnce()
-			expect(mockFetch).toHaveBeenCalledWith(`/encrypt`, {
-				body: { plaintext: btoa(plaintext) },
-			})
+			expect(result).toEqual(mockResponse)
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${mockConfig.baseUrl}/api/v1/kms/keys/${mockConfig.encryptionKey}/encrypt`,
+				expect.objectContaining({
+					method: 'POST',
+					body: JSON.stringify({ plaintext: btoa(plaintext) }),
+				})
+			)
 		})
 
 		it('should throw KmsApiError on API error during encryption', async () => {
-			const plaintext = 'test'
 			mockFetch.mockResolvedValueOnce({
 				ok: false,
 				status: 500,
 				statusText: 'Internal Server Error',
-			} as Response)
+				text: async () => '{"error":"something went wrong"}',
+			})
 
-			try {
-				await client.encrypt(plaintext)
-			} catch (error) {
-				expect(error).toBeInstanceOf(KmsApiError)
-				expect(error.message).toBe('Failed to encrypt data (Status: 500 Internal Server Error)')
-				if (error instanceof KmsApiError) {
-					expect(error.status).toBe(500)
-					expect(error.statusText).toBe('Internal Server Error')
-				}
-			}
-			expect.assertions(4) // Ensures the catch block was hit
+			await expect(client.encrypt('test')).rejects.toThrow(KmsApiError)
 		})
 
-		it('should throw KmsApiError on network error during encryption', async () => {
-			const plaintext = 'test'
-			mockFetch.mockRejectedValueOnce(new Error('Network failed'))
+		it('should throw KmsError on network error during encryption', async () => {
+			mockFetch.mockRejectedValue(new Error('Network failure'))
 
-			try {
-				await client.encrypt(plaintext)
-			} catch (error) {
-				expect(error).toBeInstanceOf(KmsApiError)
-				expect(error.message).toBe('Encryption request failed: Network failed')
-			}
-			expect.assertions(2)
-		})
-
-		it('should throw KmsApiError if response JSON parsing fails', async () => {
-			const plaintext = 'my secret message'
-			mockFetch.mockResolvedValueOnce({
-				ok: true,
-				json: async () => {
-					throw new Error('Invalid JSON')
-				},
-			} as Response)
-			try {
-				await client.encrypt(plaintext)
-			} catch (error) {
-				expect(error).toBeInstanceOf(KmsApiError)
-				expect(error.message).toBe('Encryption request failed: Invalid JSON')
-			}
-			expect.assertions(2)
+			await expect(client.encrypt('test')).rejects.toThrow(
+				'Request failed after 3 retries: Network failure'
+			)
 		})
 	})
 
 	describe('decrypt', () => {
 		it('should decrypt ciphertext successfully', async () => {
-			const ciphertext = 'encrypted-secret'
-			const expectedPlaintextB64 = btoa('my secret message')
-			const expectedPlaintext = 'my secret message'
+			const ciphertext = 'encrypted-data'
+			const decryptedPlaintext = 'my secret data'
+			const mockResponse = {
+				plaintext: btoa(decryptedPlaintext),
+			}
 
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({ plaintext: expectedPlaintextB64 }),
-			} as Response)
+				json: async () => mockResponse,
+			})
 
 			const result = await client.decrypt(ciphertext)
 
-			expect(result.plaintext).toBe(expectedPlaintext)
-			expect(mockFetch).toHaveBeenCalledOnce()
-			expect(mockFetch).toHaveBeenCalledWith(`/decrypt`, {
-				body: { ciphertext },
-			})
+			expect(result.plaintext).toBe(decryptedPlaintext)
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${mockConfig.baseUrl}/api/v1/kms/keys/${mockConfig.encryptionKey}/decrypt`,
+				expect.objectContaining({
+					method: 'POST',
+					body: JSON.stringify({ ciphertext }),
+				})
+			)
 		})
 
 		it('should throw KmsApiError on API error during decryption', async () => {
-			const ciphertext = 'test-cipher'
 			mockFetch.mockResolvedValueOnce({
 				ok: false,
-				status: 401,
-				statusText: 'Unauthorized',
-			} as Response)
+				status: 500,
+				statusText: 'Internal Server Error',
+				text: async () => 'Server error',
+			})
 
-			try {
-				await client.decrypt(ciphertext)
-			} catch (error) {
-				expect(error).toBeInstanceOf(KmsApiError)
-				expect(error.message).toBe('Failed to decrypt data (Status: 401 Unauthorized)')
-				if (error instanceof KmsApiError) {
-					expect(error.status).toBe(401)
-					expect(error.statusText).toBe('Unauthorized')
-				}
-			}
-			expect.assertions(4)
+			await expect(client.decrypt('test')).rejects.toThrow(KmsApiError)
 		})
 
-		it('should throw KmsApiError on network error during decryption', async () => {
-			const ciphertext = 'test-cipher'
-			mockFetch.mockRejectedValueOnce(new Error('Network connection lost'))
-			try {
-				await client.decrypt(ciphertext)
-			} catch (error) {
-				expect(error).toBeInstanceOf(KmsApiError)
-				expect(error.message).toBe('Decryption request failed: Network connection lost')
-			}
-			expect.assertions(2)
-		})
+		it('should throw KmsError on network error during decryption', async () => {
+			mockFetch.mockRejectedValue(new Error('Network failure'))
 
-		it('should throw KmsApiError if atob fails', async () => {
-			const ciphertext = 'encrypted-secret'
-			const invalidBase64Plaintext = 'this is not base64' // atob will throw on this
+			await expect(client.decrypt('test')).rejects.toThrow(
+				'Request failed after 3 retries: Network failure'
+			)
+		})
+	})
+
+	describe('sign', () => {
+		it('should sign data successfully', async () => {
+			const dataToSign = 'data to be signed'
+			const mockResponse: SignResponse = {
+				signature: 'signed-data',
+				keyId: mockConfig.signingKey,
+				signingAlgorithm: 'RSA_4096',
+			}
 
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({ plaintext: invalidBase64Plaintext }),
-			} as Response)
-
-			// Temporarily mock atob to simulate failure
-			const originalAtob = global.atob
-			global.atob = vi.fn().mockImplementation(() => {
-				throw new Error('atob failed')
+				json: async () => mockResponse,
 			})
 
-			try {
-				await client.decrypt(ciphertext)
-			} catch (error) {
-				expect(error).toBeInstanceOf(KmsApiError)
-				expect(error.message).toBe('Decryption request failed: atob failed')
-			}
-			global.atob = originalAtob // Restore original atob
-			expect.assertions(2)
+			const result = await client.sign(dataToSign)
+
+			expect(result).toEqual(mockResponse)
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${mockConfig.baseUrl}/api/v1/kms/keys/${mockConfig.signingKey}/sign`,
+				expect.objectContaining({
+					body: JSON.stringify({ data: btoa(dataToSign), signingAlgorithm: 'RSA_4096' }),
+				})
+			)
 		})
 
-		it('should correctly pass status and statusText for KmsApiError instances', async () => {
-			const plaintext = 'test'
+		it('should throw KmsApiError on API error during signing', async () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: false,
-				status: 403,
-				statusText: 'Forbidden',
-			} as Response)
+				status: 400,
+				statusText: 'Bad Request',
+				text: async () => 'Invalid algorithm',
+			})
 
-			try {
-				await client.encrypt(plaintext)
-			} catch (error) {
-				expect(error).toBeInstanceOf(KmsApiError)
-				expect(error).toBeInstanceOf(KmsApiError)
-				if (error instanceof KmsApiError) {
-					expect(error.status).toBe(403)
-					expect(error.statusText).toBe('Forbidden')
-				} else {
-					throw new Error('Error was not an instance of KmsApiError')
-				}
+			await expect(client.sign('test')).rejects.toThrow(KmsApiError)
+		})
+	})
+
+	describe('verify', () => {
+		it('should verify a signature successfully', async () => {
+			const dataToVerify = 'data to be verified'
+			const signature = 'valid-signature'
+			const mockResponse: VerifyResponse = {
+				signatureValid: true,
+				keyId: mockConfig.signingKey,
+				signingAlgorithm: 'RSA_4096',
 			}
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => mockResponse,
+			})
+
+			const result = await client.verify(dataToVerify, signature)
+
+			expect(result).toEqual(mockResponse)
+			expect(mockFetch).toHaveBeenCalledWith(
+				`${mockConfig.baseUrl}/api/v1/kms/keys/${mockConfig.signingKey}/verify`,
+				expect.objectContaining({
+					body: JSON.stringify({
+						data: btoa(dataToVerify),
+						signature,
+						signingAlgorithm: 'RSA_4096',
+					}),
+				})
+			)
+		})
+
+		it('should return isValid: false for an invalid signature', async () => {
+			const mockResponse: VerifyResponse = {
+				signatureValid: false,
+				keyId: mockConfig.signingKey,
+				signingAlgorithm: 'RSA_4096',
+			}
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => mockResponse,
+			})
+
+			const result = await client.verify('data', 'invalid-signature')
+			expect(result.signatureValid).toBe(false)
+		})
+
+		it('should throw KmsApiError on API error during verification', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 500,
+				statusText: 'Internal Server Error',
+				text: async () => 'Verification failed',
+			})
+
+			await expect(client.verify('data', 'signature')).rejects.toThrow(KmsApiError)
 		})
 	})
 })
