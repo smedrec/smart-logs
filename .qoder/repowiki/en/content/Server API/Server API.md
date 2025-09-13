@@ -13,6 +13,7 @@
 - [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts)
 - [openapi_responses.ts](file://apps/server/src/lib/errors/openapi_responses.ts)
 - [http.ts](file://apps/server/src/lib/errors/http.ts)
+- [alerts.ts](file://apps/server/src/routers/alerts.ts) - *Updated in recent commit*
 </cite>
 
 ## Table of Contents

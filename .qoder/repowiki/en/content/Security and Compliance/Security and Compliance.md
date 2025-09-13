@@ -2,21 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [types.ts](file://packages/audit/src/types.ts)
-- [client.ts](file://packages/infisical-kms/src/client.ts) - *Updated in recent commit*
-- [types.ts](file://packages/infisical-kms/src/types.ts) - *Updated in recent commit*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
+- [gdpr.tsx](file://apps/web/src/routes/dashboard/compliance/gdpr.tsx) - *Updated in recent commit*
+- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated cryptographic standards section to reflect new default signing algorithm
-- Added details on secure configuration storage and compliance reporting enhancements
+- Updated GDPR compliance implementation with enhanced pseudonymization strategies and data retention policies
+- Added detailed information on compliance reporting workflows and template management
 - Enhanced security measures section with updated KMS integration details
-- Maintained existing structure while incorporating new cryptographic standards
+- Added new sections on compliance reporting and export workflows
+- Updated code examples and diagrams to reflect current implementation
+- Maintained existing structure while incorporating new compliance features
 
 ## Table of Contents
 1. [Introduction](#introduction)

@@ -2,15 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [types.ts](file://packages/audit/src/config/types.ts)
-- [client.ts](file://packages/infisical-kms/src/client.ts)
-- [base.ts](file://packages/infisical-kms/src/base.ts)
-- [types.ts](file://packages/infisical-kms/src/types.ts)
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
-- [compliance.ts](file://apps/server/src/lib/graphql/resolvers/compliance.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\config\types.ts) - *Updated in recent commit*
+- [client.ts](file://packages\infisical-kms\src\client.ts) - *Updated in recent commit*
+- [base.ts](file://packages\infisical-kms\src\base.ts) - *Updated in recent commit*
+- [types.ts](file://packages\infisical-kms\src\types.ts) - *Updated in recent commit*
+- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts) - *Updated in recent commit*
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts) - *Updated in recent commit*
+- [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Completely rewritten documentation to reflect updated cryptographic protocols, KMS integration, compliance requirements, and practical examples
+- Added detailed implementation specifics from code analysis
+- Updated all diagrams to accurately represent current architecture
+- Enhanced troubleshooting guidance with specific error scenarios
+- Improved source tracking with precise file references and line numbers
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -44,11 +52,11 @@ H --> I[Store Signed Event]
 ```
 
 **Diagram sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L53)
-- [crypto.ts](file://packages/audit/src/crypto.ts#L150-L280)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L0-L53)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L150-L280)
 
 **Section sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L383)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L0-L383)
 
 ## KMS Integration
 The framework integrates with Infisical KMS for secure cryptographic operations, providing encryption, decryption, signing, and verification capabilities. The integration follows a standardized client pattern with built-in retry mechanisms and error handling.
@@ -89,14 +97,14 @@ InfisicalKmsClient ..> KmsError : "throws"
 ```
 
 **Diagram sources**
-- [client.ts](file://packages/infisical-kms/src/client.ts#L0-L38)
-- [base.ts](file://packages/infisical-kms/src/base.ts#L0-L50)
-- [types.ts](file://packages/infisical-kms/src/types.ts#L0-L56)
+- [client.ts](file://packages\infisical-kms\src\client.ts#L0-L38)
+- [base.ts](file://packages\infisical-kms\src\base.ts#L0-L50)
+- [types.ts](file://packages\infisical-kms\src\types.ts#L0-L56)
 
 **Section sources**
-- [client.ts](file://packages/infisical-kms/src/client.ts#L0-L146)
-- [base.ts](file://packages/infisical-kms/src/base.ts#L0-L99)
-- [types.ts](file://packages/infisical-kms/src/types.ts#L0-L56)
+- [client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
+- [base.ts](file://packages\infisical-kms\src\base.ts#L0-L99)
+- [types.ts](file://packages\infisical-kms\src\types.ts#L0-L56)
 
 ## Compliance Requirements
 The framework supports comprehensive compliance reporting for HIPAA and GDPR regulations. Compliance reports include detailed event summaries, integrity verification results, and risk assessments tailored to specific regulatory requirements.
@@ -151,14 +159,14 @@ RiskAssessment --> SuspiciousPattern : "suspiciousPatterns"
 ```
 
 **Diagram sources**
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L99-L156)
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L201-L241)
-- [types.ts](file://apps/server/src/lib/graphql/types.ts#L104-L171)
+- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts#L99-L156)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts#L201-L241)
+- [types.ts](file://apps\server\src\lib\graphql\types.ts#L104-L171)
 
 **Section sources**
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L99-L156)
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L201-L241)
-- [compliance.ts](file://apps/server/src/lib/graphql/resolvers/compliance.ts#L0-L56)
+- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts#L99-L156)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts#L201-L241)
+- [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts#L0-L56)
 
 ## Practical Examples
 The Security and Compliance framework provides practical implementations for common security scenarios. Organizations can configure the system to meet their specific regulatory requirements and security policies.
@@ -210,8 +218,8 @@ query {
 ```
 
 **Section sources**
-- [compliance.ts](file://apps/server/src/lib/graphql/resolvers/compliance.ts#L0-L56)
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L201-L241)
+- [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts#L0-L56)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts#L201-L241)
 
 ## Troubleshooting Guide
 When encountering issues with the Security and Compliance framework, follow these troubleshooting steps:
@@ -247,7 +255,7 @@ When event integrity verification fails, consider the following:
 The framework logs detailed error messages for cryptographic operations, which can be used to diagnose and resolve issues.
 
 **Section sources**
-- [base.ts](file://packages/infisical-kms/src/base.ts#L0-L50)
-- [client.ts](file://packages/infisical-kms/src/client.ts#L0-L146)
-- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L383)
-- [compliance.ts](file://apps/server/src/lib/graphql/resolvers/compliance.ts#L0-L56)
+- [base.ts](file://packages\infisical-kms\src\base.ts#L0-L50)
+- [client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L0-L383)
+- [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts#L0-L56)

@@ -5,457 +5,830 @@
 - [README.md](file://packages/audit-client/README.md)
 - [client.ts](file://packages/audit-client/src/core/client.ts)
 - [config.ts](file://packages/audit-client/src/core/config.ts)
-- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts)
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts)
+- [events.ts](file://packages/audit-client/src/services/events.ts)
+- [compliance.ts](file://packages/audit-client/src/services/compliance.ts)
+- [metrics.ts](file://packages/audit-client/src/services/metrics.ts)
 - [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts)
 - [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts)
+- [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts)
 </cite>
 
 ## Table of Contents
 1. [Introduction](#introduction)
-2. [Design Principles](#design-principles)
-3. [Architecture Overview](#architecture-overview)
-4. [Core Components](#core-components)
-5. [Configuration System](#configuration-system)
-6. [Plugin Architecture](#plugin-architecture)
-7. [Integration Patterns](#integration-patterns)
-8. [Implementation Tasks](#implementation-tasks)
-9. [Best Practices](#best-practices)
+2. [Architecture Overview](#architecture-overview)
+3. [Core Components](#core-components)
+4. [API Interfaces](#api-interfaces)
+5. [Configuration Management](#configuration-management)
+6. [Integration Patterns](#integration-patterns)
+7. [Practical Examples](#practical-examples)
+8. [Troubleshooting Guide](#troubleshooting-guide)
+9. [Performance Considerations](#performance-considerations)
 
 ## Introduction
 
-The Audit Client Library is a comprehensive TypeScript SDK designed to provide enhanced functionality for interacting with the Smart Logs Audit API. This library offers a robust set of features including type safety, retry mechanisms, intelligent caching, authentication management, request batching, and comprehensive error handling. The library is specifically engineered to simplify integration with audit systems while ensuring reliability, performance, and observability in various application environments.
+The Audit Client Library is a comprehensive TypeScript SDK designed for seamless integration with the Smart Logs Audit API. It provides a robust, type-safe interface for managing audit events, compliance reporting, and system monitoring with built-in features for reliability, performance, and security.
 
-Built with a modular architecture, the Audit Client Library separates concerns into distinct layers: core functionality, service implementations, infrastructure components, and utility functions. This separation enables developers to leverage specific features as needed while maintaining a consistent interface across different use cases. The library supports multiple authentication methods, configurable retry policies, and flexible caching strategies to accommodate various deployment scenarios and performance requirements.
+The library follows a modular architecture with clear separation of concerns, making it easy to use while providing advanced capabilities for complex use cases. It supports modern development practices including TypeScript type safety, promise-based async operations, and configurable retry mechanisms.
 
-The client is designed to be developer-friendly with comprehensive TypeScript support, strict type checking, and detailed documentation. It includes built-in support for common development workflows and integrates seamlessly with modern JavaScript frameworks and Node.js applications. The library's extensible plugin architecture allows for customization and extension of its capabilities to meet specific application needs.
+Key features of the Audit Client Library include:
+- **Type Safety**: Full TypeScript support with strict type checking
+- **Reliability**: Exponential backoff retry logic with circuit breaker pattern
+- **Performance**: Intelligent caching with multiple storage backends
+- **Security**: Flexible authentication support including API keys and session tokens
+- **Observability**: Structured logging and request/response inspection
+- **Extensibility**: Plugin architecture for custom middleware, storage, and auth
 
-**Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
-
-## Design Principles
-
-The Audit Client Library is built on several core design principles that guide its architecture and implementation. These principles ensure the library is reliable, maintainable, and easy to use in various application contexts.
-
-First, the library emphasizes type safety through comprehensive TypeScript support. All interfaces, configuration options, and API responses are strictly typed, reducing runtime errors and improving developer experience through better tooling support and autocomplete functionality. This type safety extends to configuration validation using Zod schemas, which ensure that all configuration options are properly validated at runtime.
-
-Second, the library follows a modular architecture that separates concerns into distinct components. This modularity allows for independent development and testing of different features while maintaining a cohesive interface. The separation of core functionality, services, infrastructure, and utilities enables developers to understand and extend the library more easily.
-
-Third, the library prioritizes reliability through robust error handling and retry mechanisms. The client implements exponential backoff with configurable retry policies, circuit breakers, and comprehensive error management with correlation IDs for tracing. These features ensure that transient failures are handled gracefully and that applications can maintain functionality even under adverse network conditions.
-
-Fourth, performance optimization is a key design consideration. The library includes request compression, streaming capabilities, and intelligent caching with multiple storage backends. These features reduce network overhead and improve response times, particularly in high-throughput scenarios.
-
-Finally, the library emphasizes extensibility through its plugin architecture. This design allows developers to customize and extend the client's functionality without modifying the core codebase. The plugin system supports middleware, storage, and authentication extensions, enabling integration with various third-party services and custom business logic.
+The library is designed to work in both browser and Node.js environments, making it suitable for frontend applications, backend services, and serverless functions.
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L25-L100)
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
+- [README.md](file://packages/audit-client/README.md#L1-L50)
 
 ## Architecture Overview
 
-The Audit Client Library follows a layered architecture that organizes functionality into distinct components with clear responsibilities and dependencies. This architecture enables maintainability, testability, and extensibility while providing a consistent interface for developers.
+The Audit Client Library follows a layered architectural pattern with four main layers that provide separation of concerns and maintainability.
 
 ```mermaid
-graph TD
-subgraph "Core Layer"
-A[AuditClient] --> B[ConfigManager]
-A --> C[BaseResource]
+graph TB
+subgraph "Client Layer"
+Client[AuditClient]
 end
 subgraph "Service Layer"
-D[EventsService] --> A
-E[ComplianceService] --> A
-F[ScheduledReportsService] --> A
-G[PresetsService] --> A
-H[MetricsService] --> A
-I[HealthService] --> A
+Events[EventsService]
+Compliance[ComplianceService]
+Metrics[MetricsService]
+Health[HealthService]
+Presets[PresetsService]
+Reports[ScheduledReportsService]
 end
 subgraph "Infrastructure Layer"
-J[AuthManager] --> A
-K[CacheManager] --> A
-L[RetryManager] --> A
-M[BatchManager] --> A
-N[ErrorHandler] --> A
-O[PluginManager] --> A
+Auth[AuthManager]
+Cache[CacheManager]
+Retry[RetryManager]
+Batch[BatchManager]
+Logger[Logger]
+Plugins[PluginManager]
 end
-subgraph "Utils Layer"
-P[API Helpers] --> A
-Q[Config Helpers] --> A
-R[Validation] --> A
+subgraph "Core Layer"
+Config[ConfigManager]
+Base[BaseResource]
 end
-A --> D
-A --> E
-A --> F
-A --> G
-A --> H
-A --> I
-A --> J
-A --> K
-A --> L
-A --> M
-A --> N
-A --> O
+Client --> Events
+Client --> Compliance
+Client --> Metrics
+Client --> Health
+Client --> Presets
+Client --> Reports
+Events --> Auth
+Events --> Cache
+Events --> Retry
+Events --> Batch
+Events --> Logger
+Events --> Plugins
+Compliance --> Auth
+Compliance --> Cache
+Compliance --> Retry
+Compliance --> Batch
+Compliance --> Logger
+Compliance --> Plugins
+Metrics --> Auth
+Metrics --> Cache
+Metrics --> Retry
+Metrics --> Batch
+Metrics --> Logger
+Metrics --> Plugins
+Client --> Config
+Client --> Base
+Events --> Config
+Events --> Base
+Compliance --> Config
+Compliance --> Base
+Metrics --> Config
+Metrics --> Base
 ```
 
 **Diagram sources **
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
-
-The architecture consists of four main layers:
-
-1. **Core Layer**: Contains the main AuditClient class and configuration management. The AuditClient serves as the primary entry point and orchestrates interactions between different components.
-
-2. **Service Layer**: Implements domain-specific functionality such as event management, compliance reporting, scheduled reports, configuration presets, metrics collection, and health monitoring. Each service provides a focused API for specific audit-related operations.
-
-3. **Infrastructure Layer**: Handles cross-cutting concerns including authentication, caching, retry logic, request batching, error handling, and plugin management. These components provide shared functionality used by multiple services.
-
-4. **Utils Layer**: Contains helper functions and utilities for API interactions, configuration management, data validation, and type checking.
-
-The architecture follows dependency inversion principles, with higher-level components depending on abstractions rather than concrete implementations. This design enables easier testing and allows for swapping implementations without affecting dependent components.
+- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L100)
+- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L50)
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L150-L200)
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
+- [README.md](file://packages/audit-client/README.md#L51-L100)
 
 ## Core Components
 
-The Audit Client Library consists of several core components that work together to provide a comprehensive audit solution. These components are designed to be loosely coupled while maintaining a cohesive interface for developers.
+The Audit Client Library is composed of several core components that work together to provide a comprehensive audit management solution.
 
-The **AuditClient** class serves as the main entry point and orchestrator for all operations. It manages configuration, initializes infrastructure components, and provides access to various services. The client handles lifecycle management, including initialization, cleanup, and error handling, ensuring proper resource management.
+### AuditClient Class
 
-The **ConfigManager** component is responsible for managing configuration options and validation. It uses Zod schemas to validate configuration at runtime, ensuring that all settings are correct before use. The configuration system supports environment-specific settings, default values, and merging of configuration from multiple sources.
+The `AuditClient` class serves as the main entry point for the library. It orchestrates all services and manages the client lifecycle, configuration, and infrastructure components.
 
-The **Service Components** provide domain-specific functionality:
-- **EventsService**: Manages audit event creation, querying, and verification
-- **ComplianceService**: Handles compliance reporting for standards like HIPAA and GDPR
-- **ScheduledReportsService**: Manages automated reporting schedules
-- **PresetsService**: Handles configuration templates for audit settings
-- **MetricsService**: Provides system monitoring and performance tracking
-- **HealthService**: Offers health checking capabilities for the audit system
+Key responsibilities of the AuditClient include:
+- Service initialization and dependency injection
+- Unified configuration management
+- Client lifecycle management and cleanup
+- Centralized error handling
+- Performance monitoring and statistics
+- Request/response interceptor management
 
-The **Infrastructure Components** handle cross-cutting concerns:
-- **AuthManager**: Manages authentication with support for API keys, session tokens, and custom methods
-- **CacheManager**: Provides intelligent caching with multiple storage backends
-- **RetryManager**: Implements retry logic with exponential backoff
-- **BatchManager**: Handles request batching and deduplication
-- **ErrorHandler**: Centralizes error handling and reporting
-- **PluginManager**: Manages the plugin system for extensibility
+The client follows a factory pattern, creating service instances during initialization and providing them through getter properties that validate the client state before returning the service.
 
-These components work together through well-defined interfaces, allowing for independent development and testing while maintaining a consistent experience for developers using the library.
+```mermaid
+classDiagram
+class AuditClient {
+-configManager : ConfigManager
+-config : AuditClientConfig
+-state : ClientState
+-startTime : number
++events : EventsService
++compliance : ComplianceService
++metrics : MetricsService
++health : HealthService
++presets : PresetsService
++scheduledReports : ScheduledReportsService
++plugins : PluginManager
++getConfig() : AuditClientConfig
++updateConfig(updates : PartialAuditClientConfig) : void
++getStats() : ClientStats
++isReady() : boolean
++destroy() : Promise~void~
+}
+class ClientState {
+<<enumeration>>
+initializing
+ready
+error
+destroyed
+}
+class ClientStats {
++state : ClientState
++uptime : number
++requestCount : number
++errorCount : number
++cacheStats : any
++retryStats : any
++batchStats : any
++authStats : any
+}
+AuditClient --> ConfigManager : "uses"
+AuditClient --> EventsService : "creates"
+AuditClient --> ComplianceService : "creates"
+AuditClient --> MetricsService : "creates"
+AuditClient --> HealthService : "creates"
+AuditClient --> PresetsService : "creates"
+AuditClient --> ScheduledReportsService : "creates"
+AuditClient --> PluginManager : "uses"
+```
+
+**Diagram sources **
+- [client.ts](file://packages/audit-client/src/core/client.ts#L101-L200)
 
 **Section sources**
 - [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
 
-## Configuration System
+### Configuration Management
 
-The Audit Client Library features a comprehensive configuration system that provides flexibility, validation, and ease of use. The configuration system is designed to handle various deployment scenarios while ensuring correctness and security.
+The configuration system provides comprehensive options for customizing the client behavior. The `ConfigManager` class validates and normalizes configuration using Zod schemas, ensuring type safety and correctness.
+
+Configuration options are organized into logical groups:
+- **Connection settings**: Base URL, API version, timeout
+- **Authentication**: API keys, session tokens, bearer tokens
+- **Retry configuration**: Maximum attempts, delay settings, retryable status codes
+- **Caching**: TTL, storage backend, compression
+- **Performance**: Request batching, compression, streaming
+- **Logging**: Log level, format, sensitive data masking
+- **Error handling**: Error transformation, recovery options
+- **Plugins**: Middleware, storage, and authentication plugins
 
 ```mermaid
 classDiagram
 class AuditClientConfig {
-+string baseUrl
-+string apiVersion
-+number timeout
-+AuthenticationConfig authentication
-+RetryConfig retry
-+CacheConfig cache
-+BatchingConfig batching
-+PerformanceConfig performance
-+LoggingConfig logging
-+ErrorHandlingConfig errorHandling
-+PluginConfig plugins
-+string environment
-+Record~string, string~ customHeaders
-+InterceptorConfig interceptors
++baseUrl : string
++apiVersion : string
++timeout : number
++authentication : AuthenticationConfig
++retry : RetryConfig
++cache : CacheConfig
++batching : BatchingConfig
++performance : PerformanceConfig
++logging : LoggingConfig
++errorHandling : ErrorHandlingConfig
++plugins : PluginConfig
++environment : string
++customHeaders : Record~string, string~
++interceptors : InterceptorConfig
 }
 class AuthenticationConfig {
-+string type
-+string apiKey
-+string sessionToken
-+string bearerToken
-+Record~string, string~ customHeaders
-+boolean autoRefresh
-+string refreshEndpoint
++type : 'apiKey' | 'session' | 'bearer' | 'custom'
++apiKey : string
++sessionToken : string
++bearerToken : string
++customHeaders : Record~string, string~
++autoRefresh : boolean
++refreshEndpoint : string
 }
 class RetryConfig {
-+boolean enabled
-+number maxAttempts
-+number initialDelayMs
-+number maxDelayMs
-+number backoffMultiplier
-+number[] retryableStatusCodes
-+string[] retryableErrors
++enabled : boolean
++maxAttempts : number
++initialDelayMs : number
++maxDelayMs : number
++backoffMultiplier : number
++retryableStatusCodes : number[]
++retryableErrors : string[]
 }
 class CacheConfig {
-+boolean enabled
-+number defaultTtlMs
-+number maxSize
-+string storage
-+any customStorage
-+string keyPrefix
-+boolean compressionEnabled
++enabled : boolean
++defaultTtlMs : number
++maxSize : number
++storage : 'memory' | 'localStorage' | 'sessionStorage' | 'custom'
++customStorage : any
++keyPrefix : string
++compressionEnabled : boolean
 }
-class PluginConfig {
-+boolean enabled
-+boolean autoLoad
-+PluginConfigItem[] plugins
-+MiddlewarePluginConfig middleware
-+StoragePluginConfig storage
-+AuthPluginConfig auth
-}
-AuditClientConfig --> AuthenticationConfig : "contains"
-AuditClientConfig --> RetryConfig : "contains"
-AuditClientConfig --> CacheConfig : "contains"
-AuditClientConfig --> PluginConfig : "contains"
+AuditClientConfig --> AuthenticationConfig
+AuditClientConfig --> RetryConfig
+AuditClientConfig --> CacheConfig
+AuditClientConfig --> BatchingConfig
+AuditClientConfig --> PerformanceConfig
+AuditClientConfig --> LoggingConfig
+AuditClientConfig --> ErrorHandlingConfig
+AuditClientConfig --> PluginConfig
 ```
 
 **Diagram sources **
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
-
-The configuration system is built around several key principles:
-
-1. **Type Safety**: All configuration options are strongly typed using TypeScript interfaces derived from Zod schemas. This ensures that configuration errors are caught at compile time when possible.
-
-2. **Validation**: Configuration is validated at runtime using Zod schemas, which provide detailed error messages when invalid configuration is provided. The validation process checks for required fields, correct data types, and valid value ranges.
-
-3. **Default Values**: The system provides sensible defaults for all configuration options, reducing the configuration burden for common use cases while allowing customization when needed.
-
-4. **Environment Support**: The configuration system supports environment-specific settings for development, staging, and production environments. Each environment has appropriate defaults that balance usability and security.
-
-5. **Flexibility**: Configuration can be provided through multiple sources including direct object configuration, environment variables, and programmatic updates. This flexibility allows the library to be used in various deployment scenarios.
-
-6. **Security**: Sensitive configuration options are handled securely, with options to mask sensitive data in logs and restrict access to configuration values.
-
-The configuration system also supports dynamic updates, allowing configuration to be modified at runtime without requiring client recreation. This capability enables adaptive behavior based on changing conditions or user preferences.
+- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L100)
 
 **Section sources**
 - [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
 
-## Plugin Architecture
+## API Interfaces
 
-The Audit Client Library features a comprehensive plugin architecture that allows developers to extend and customize its functionality. This system supports middleware, storage, and authentication plugins, enabling integration with various third-party services and custom business logic.
+The Audit Client Library provides several specialized services for different aspects of audit management.
+
+### Events Service
+
+The `EventsService` provides comprehensive functionality for managing audit events, including creation, querying, verification, and export.
 
 ```mermaid
 classDiagram
-class Plugin {
-<<interface>>
-+string name
-+string version
-+string description
-+string[] dependencies
-+initialize(config, context)
-+destroy()
-+validateConfig(config)
+class EventsService {
++create(event : CreateAuditEventInput, options : CreateAuditEventOptions) : Promise~AuditEvent~
++bulkCreate(events : CreateAuditEventInput[]) : Promise~BulkCreateResult~
++query(params : QueryAuditEventsParams) : Promise~PaginatedAuditEvents~
++getById(id : string) : Promise~AuditEvent | null~
++verify(id : string) : Promise~IntegrityVerificationResult~
++export(params : ExportEventsParams) : Promise~ExportResult~
++stream(params : StreamEventsParams) : Promise~ReadableStream~
++subscribe(params : SubscriptionParams) : EventSubscription
 }
-class MiddlewarePlugin {
-<<interface>>
-+string type = "middleware"
-+processRequest(request, next)
-+processResponse(response, next)
-+handleError(error, context)
+class CreateAuditEventInput {
++action : string
++targetResourceType : string
++targetResourceId : string
++principalId : string
++organizationId : string
++status : AuditEventStatus
++outcomeDescription : string
++dataClassification : DataClassification
++sessionContext : SessionContext
++details : Record~string, any~
 }
-class StoragePlugin {
-<<interface>>
-+string type = "storage"
-+createStorage(config)
+class AuditEvent {
++id : string
++timestamp : string
++action : string
++targetResourceType : string
++targetResourceId : string
++principalId : string
++organizationId : string
++status : AuditEventStatus
++outcomeDescription : string
++dataClassification : DataClassification
++details : Record~string, any~
++hash : string
++correlationId : string
++sessionContext : SessionContext
 }
-class AuthPlugin {
-<<interface>>
-+string type = "auth"
-+getAuthHeaders(config, context)
-+refreshToken(config, context)
-+validateAuthConfig(config)
+class QueryAuditEventsParams {
++filter : Filter
++pagination : Pagination
++sort : Sort
 }
-class PluginRegistry {
-+Map~string, Plugin~ plugins
-+MiddlewarePlugin[] middlewareChain
-+Map~string, StoragePlugin~ storagePlugins
-+Map~string, AuthPlugin~ authPlugins
-+register(plugin, config)
-+unregister(name)
-+getPlugin(name)
-+getMiddlewareChain()
-+getStoragePlugin(name)
-+getAuthPlugin(name)
+class Filter {
++dateRange : DateRange
++principalIds : string[]
++organizationIds : string[]
++actions : string[]
++statuses : AuditEventStatus[]
++dataClassifications : DataClassification[]
++resourceTypes : string[]
++verifiedOnly : boolean
++correlationId : string
 }
-class PluginManager {
-+PluginRegistry registry
-+setClientConfig(config)
-+executeRequestMiddleware(request)
-+executeResponseMiddleware(response)
-+createStorage(pluginName, config)
-+getAuthHeaders(pluginName, config, context)
-+refreshToken(pluginName, config, context)
-+cleanup()
+class DateRange {
++startDate : string
++endDate : string
 }
-Plugin <|-- MiddlewarePlugin
-Plugin <|-- StoragePlugin
-Plugin <|-- AuthPlugin
-PluginManager --> PluginRegistry : "uses"
+class Pagination {
++limit : number
++offset : number
+}
+class Sort {
++field : 'timestamp' | 'status' | 'action'
++direction : 'asc' | 'desc'
+}
+EventsService --> CreateAuditEventInput
+EventsService --> AuditEvent
+EventsService --> QueryAuditEventsParams
+QueryAuditEventsParams --> Filter
+Filter --> DateRange
+QueryAuditEventsParams --> Pagination
+QueryAuditEventsParams --> Sort
 ```
 
 **Diagram sources **
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
-- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783)
-
-The plugin architecture consists of several key components:
-
-1. **Plugin Interfaces**: Define the contracts for different plugin types including middleware, storage, and authentication plugins. These interfaces ensure consistency across plugins while allowing for specific functionality.
-
-2. **Plugin Registry**: Manages the lifecycle of registered plugins, handling registration, dependency resolution, and cleanup. The registry maintains separate collections for different plugin types and enforces dependency constraints.
-
-3. **Plugin Manager**: Coordinates plugin operations and provides a unified interface for interacting with plugins. It handles execution of middleware chains, creation of storage instances, and authentication header generation.
-
-4. **Built-in Plugins**: The library includes several built-in plugins for common use cases:
-   - **Request Logging**: Logs all HTTP requests and responses
-   - **Correlation ID**: Adds correlation IDs to requests for tracing
-   - **Rate Limiting**: Implements client-side rate limiting
-   - **Redis Storage**: Provides Redis-based cache storage
-   - **IndexedDB Storage**: Offers IndexedDB-based storage for browsers
-   - **JWT Authentication**: Supports JWT-based authentication
-   - **OAuth2 Authentication**: Implements OAuth2-based authentication
-   - **Custom Header Authentication**: Allows custom header-based authentication
-
-The plugin system supports dependency resolution with cycle detection, ensuring that plugins are initialized in the correct order. It also provides validation for plugin configuration and handles error conditions gracefully.
-
-Plugins can be loaded automatically based on configuration or manually through the API. The system supports both synchronous and asynchronous initialization, allowing for complex setup procedures when needed.
+- [events.ts](file://packages/audit-client/src/services/events.ts#L1-L100)
 
 **Section sources**
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
-- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783)
-- [utils.ts](file://packages/audit-client/src/infrastructure/plugins/utils.ts#L1-L540)
+- [events.ts](file://packages/audit-client/src/services/events.ts#L1-L952)
 
-## Integration Patterns
+### Compliance Service
 
-The Audit Client Library supports various integration patterns that enable seamless incorporation into different application architectures and deployment scenarios. These patterns leverage the library's modular design and extensible architecture to provide flexible integration options.
+The `ComplianceService` provides functionality for generating compliance reports and handling GDPR data export requests.
 
 ```mermaid
-sequenceDiagram
-participant Application
-participant AuditClient
-participant Plugin
-participant ExternalService
-Application->>AuditClient : Initialize Client(config)
-AuditClient->>Plugin : Load Built-in Plugins
-AuditClient->>Plugin : Register Configured Plugins
-Application->>AuditClient : client.events.create(event)
-AuditClient->>Plugin : Execute Request Middleware
-Plugin->>AuditClient : Process Request
-AuditClient->>ExternalService : Send API Request
-ExternalService-->>AuditClient : Return Response
-AuditClient->>Plugin : Execute Response Middleware
-Plugin->>AuditClient : Process Response
-AuditClient-->>Application : Return Result
-Application->>AuditClient : client.destroy()
-AuditClient->>Plugin : Cleanup Plugins
-AuditClient->>AuditClient : Release Resources
+classDiagram
+class ComplianceService {
++generateHipaaReport(criteria : ReportCriteria) : Promise~HIPAAReport~
++generateGdprReport(criteria : ReportCriteria) : Promise~GDPRReport~
++generateCustomReport(params : CustomReportParams) : Promise~CustomReport~
++exportGdprData(params : GdprExportParams) : Promise~GdprExportResult~
++pseudonymizeData(params : PseudonymizationParams) : Promise~PseudonymizationResult~
++getReportTemplates() : Promise~ReportTemplate[]~
++getReportTemplate(templateId : string) : Promise~ReportTemplate | null~
++createReportTemplate(template : Omit~ReportTemplate, 'id' | 'createdAt' | 'updatedAt~) : Promise~ReportTemplate~
++updateReportTemplate(templateId : string, updates : Partial~ReportTemplate~) : Promise~ReportTemplate~
++deleteReportTemplate(templateId : string) : Promise~void~
++downloadReport(reportId : string, options : ReportDownloadOptions) : Promise~Blob~
++getReportStatus(reportId : string) : Promise~ReportStatus~
++cancelReport(reportId : string) : Promise~void~
++streamReport(reportId : string, format : 'json' | 'csv') : Promise~ReadableStream~
++getReportHistory(organizationId : string, params : ReportHistoryParams) : Promise~ReportHistory~
+}
+class ReportCriteria {
++dateRange : DateRange
++organizationIds : string[]
++principalIds : string[]
++resourceTypes : string[]
++actions : string[]
++dataClassifications : DataClassification[]
++includeDetails : boolean
++includeMetadata : boolean
+}
+class HIPAAReport {
++id : string
++generatedAt : string
++criteria : ReportCriteria
++summary : HIPAASummary
++sections : HIPAASection[]
++metadata : ReportMetadata
+}
+class GDPRReport {
++id : string
++generatedAt : string
++criteria : ReportCriteria
++summary : GDPRSummary
++sections : GDPRSection[]
++metadata : ReportMetadata
+}
+class CustomReport {
++id : string
++name : string
++description : string
++generatedAt : string
++template : string
++parameters : Record~string, any~
++data : any[]
++summary : Record~string, any~
++charts : Chart[]
++metadata : ReportMetadata
+}
+ReportCriteria --> DateRange
+HIPAAReport --> HIPAASummary
+HIPAAReport --> HIPAASection
+HIPAAReport --> ReportMetadata
+GDPRReport --> GDPRSummary
+GDPRReport --> GDPRSection
+GDPRReport --> ReportMetadata
+CustomReport --> Chart
+CustomReport --> ReportMetadata
 ```
 
 **Diagram sources **
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
-
-Key integration patterns include:
-
-1. **Direct Integration**: Applications can directly instantiate the AuditClient and use its services through the provided API. This pattern is suitable for applications that need fine-grained control over audit operations.
-
-2. **Configuration-Driven Integration**: Applications can configure the client through environment variables or configuration files, allowing for different settings in various environments without code changes.
-
-3. **Plugin-Based Integration**: Applications can extend the client's functionality through plugins, adding custom middleware, storage backends, or authentication methods. This pattern enables integration with existing infrastructure and services.
-
-4. **Event-Driven Integration**: Applications can use the client to publish audit events that trigger downstream processes or workflows. This pattern supports decoupled architectures and event sourcing.
-
-5. **Batch Integration**: Applications can use the client's batching capabilities to group multiple audit operations into single requests, improving performance and reducing network overhead.
-
-6. **Hybrid Integration**: Applications can combine multiple patterns based on specific needs, using direct integration for critical paths and plugin-based extension for specialized functionality.
-
-The library also supports integration with popular frameworks and platforms through specific configuration and usage patterns. For example, it can be integrated into Express.js applications as middleware, used in React applications for client-side auditing, or incorporated into serverless functions for event processing.
+- [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L1-L100)
 
 **Section sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
+- [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L1-L718)
 
-## Implementation Tasks
+### Metrics Service
 
-Implementing the Audit Client Library involves several key tasks that ensure proper configuration, integration, and operation within an application. These tasks cover initialization, configuration, usage patterns, and lifecycle management.
+The `MetricsService` provides comprehensive system monitoring capabilities including system metrics, audit metrics, performance metrics, and alert management.
+
+```mermaid
+classDiagram
+class MetricsService {
++getSystemMetrics() : Promise~SystemMetrics~
++getAuditMetrics(params : AuditMetricsParams) : Promise~AuditMetrics~
++getPerformanceMetrics() : Promise~PerformanceMetrics~
++getUsageMetrics(params : UsageMetricsParams) : Promise~UsageMetrics~
++getAlerts(params : AlertsParams) : Promise~PaginatedAlerts~
++getAlert(id : string) : Promise~Alert | null~
++acknowledgeAlert(id : string, request : AcknowledgeAlertRequest) : Promise~Alert~
++resolveAlert(id : string, request : ResolveAlertRequest) : Promise~Alert~
++suppressAlert(id : string, duration : number, reason : string) : Promise~Alert~
++getHistoricalMetrics(type : MetricsType, timeRange : DateRange, granularity : Granularity) : Promise~any[]~
++exportMetrics(type : MetricsType, timeRange : DateRange, format : ExportFormat) : Promise~Blob~
++subscribeToMetrics(params : MetricsSubscriptionParams) : MetricsSubscription
++getDashboardSummary() : Promise~DashboardSummary~
++customQuery(query : CustomQuery) : Promise~any~
++getMetricsConfig() : Promise~MetricsConfig~
++updateMetricsConfig(config : Partial~MetricsConfig~) : Promise~any~
+}
+class SystemMetrics {
++timestamp : string
++server : ServerMetrics
++database : DatabaseMetrics
++cache : CacheMetrics
++api : ApiMetrics
+}
+class AuditMetrics {
++timestamp : string
++timeRange : DateRange
++eventsProcessed : number
++processingLatency : LatencyMetrics
++integrityVerifications : VerificationMetrics
++complianceReports : ReportMetrics
++errorRates : ErrorMetrics
++dataClassificationStats : ClassificationStats
+}
+class PerformanceMetrics {
++timestamp : string
++responseTime : ResponseTimeMetrics
++throughput : ThroughputMetrics
++resourceUtilization : ResourceUtilizationMetrics
++concurrency : ConcurrencyMetrics
+}
+class UsageMetrics {
++timestamp : string
++timeRange : DateRange
++apiUsage : ApiUsageMetrics
++auditEvents : EventMetrics
++reports : ReportMetrics
++storage : StorageMetrics
+}
+MetricsService --> SystemMetrics
+MetricsService --> AuditMetrics
+MetricsService --> PerformanceMetrics
+MetricsService --> UsageMetrics
+MetricsService --> Alert
+MetricsService --> MetricsSubscription
+```
+
+**Diagram sources **
+- [metrics.ts](file://packages/audit-client/src/services/metrics.ts#L1-L100)
+
+**Section sources**
+- [metrics.ts](file://packages/audit-client/src/services/metrics.ts#L1-L903)
+
+## Configuration Management
+
+The Audit Client Library provides flexible configuration options through the `ConfigManager` class, which validates and normalizes configuration using Zod schemas.
+
+### Configuration Validation
+
+Configuration validation ensures that all settings are correct and within acceptable ranges. The library uses Zod schemas to define the structure and constraints for each configuration option.
 
 ```mermaid
 flowchart TD
-A[Initialize Client] --> B[Configure Options]
-B --> C{Environment}
-C --> |Development| D[Enable Debug Logging]
-C --> |Staging| E[Enable Info Logging]
-C --> |Production| F[Enable Warning Logging]
-D --> G[Set Up Authentication]
-E --> G
-F --> G
-G --> H[Configure Retry Policy]
-H --> I[Set Up Caching]
-I --> J[Register Plugins]
-J --> K[Use Services]
-K --> L[Handle Errors]
-L --> M[Monitor Performance]
-M --> N[Clean Up Resources]
+Start([Configuration Input]) --> Validate["Validate with Zod Schemas"]
+Validate --> Valid{"Valid?"}
+Valid --> |Yes| Normalize["Normalize Configuration"]
+Valid --> |No| HandleError["Throw ConfigurationError"]
+Normalize --> Apply["Apply Configuration"]
+Apply --> Initialize["Initialize Components"]
+Initialize --> Complete([Configuration Complete])
+HandleError --> Complete
 ```
 
 **Diagram sources **
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
-
-Key implementation tasks include:
-
-1. **Client Initialization**: Create an instance of the AuditClient with appropriate configuration. This involves setting the base URL, authentication credentials, and other essential options.
-
-2. **Configuration Setup**: Configure the client with environment-specific settings, including retry policies, caching options, and logging levels. This may involve loading configuration from environment variables or configuration files.
-
-3. **Authentication Configuration**: Set up the appropriate authentication method based on the application's requirements. This could involve API keys, session tokens, or custom authentication schemes.
-
-4. **Plugin Registration**: Register any required plugins for extended functionality. This includes middleware for request logging or rate limiting, storage plugins for alternative cache backends, or authentication plugins for custom auth methods.
-
-5. **Service Usage**: Implement the required audit operations using the appropriate service methods. This includes creating audit events, generating compliance reports, scheduling automated reports, or retrieving system metrics.
-
-6. **Error Handling**: Implement proper error handling for audit operations, including retry logic for transient failures and appropriate responses for permanent errors.
-
-7. **Performance Monitoring**: Monitor the performance of audit operations and adjust configuration as needed. This includes tracking request rates, response times, and error rates.
-
-8. **Resource Cleanup**: Ensure proper cleanup of client resources when they are no longer needed, particularly in long-running applications or when the client is being reconfigured.
-
-9. **Testing and Validation**: Implement comprehensive testing of the audit integration, including unit tests for individual operations and integration tests for end-to-end workflows.
-
-10. **Documentation and Maintenance**: Document the implementation details and maintain the integration as requirements evolve or the library is updated.
+- [config.ts](file://packages/audit-client/src/core/config.ts#L101-L200)
 
 **Section sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
 - [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
 
-## Best Practices
+### Environment-Specific Configuration
 
-Adopting best practices when using the Audit Client Library ensures optimal performance, reliability, and maintainability of audit functionality in applications. These practices cover configuration, usage patterns, error handling, and security considerations.
+The library supports environment-specific configuration through the `createDefaultConfig` method, which provides sensible defaults for different environments.
 
-1. **Configuration Management**: Use environment-specific configuration to balance usability and security across different deployment environments. In development, enable verbose logging and shorter timeouts for easier debugging. In production, prioritize security and performance with appropriate logging levels and caching settings.
+```typescript
+// Create client for specific environment
+const client = AuditClient.createForEnvironment(
+  'production',
+  'https://api.smartlogs.com',
+  {
+    type: 'apiKey',
+    apiKey: 'your-api-key'
+  }
+);
+```
 
-2. **Authentication Security**: Store authentication credentials securely using environment variables or secure configuration management systems. Avoid hardcoding credentials in source code. Use the most restrictive authentication method appropriate for the use case.
-
-3. **Error Handling**: Implement comprehensive error handling that distinguishes between transient and permanent errors. Use the client's built-in retry mechanisms for transient failures, but implement appropriate fallbacks or user notifications for permanent errors.
-
-4. **Performance Optimization**: Leverage the client's caching and batching capabilities to reduce network overhead and improve response times. Configure appropriate cache TTL values based on data volatility and consistency requirements.
-
-5. **Resource Management**: Properly manage client lifecycle by cleaning up resources when they are no longer needed. This is particularly important in long-running applications or when creating multiple client instances.
-
-6. **Monitoring and Observability**: Enable appropriate logging and monitoring to track audit operations and detect issues early. Use correlation IDs to trace requests across system boundaries and facilitate debugging.
-
-7. **Plugin Usage**: Use built-in plugins for common functionality rather than implementing custom solutions when possible. When creating custom plugins, follow the same quality standards as the core library.
-
-8. **Type Safety**: Leverage TypeScript's type checking to catch errors early in the development process. Use the provided type definitions and avoid type assertions unless absolutely necessary.
-
-9. **Testing**: Implement comprehensive testing of audit functionality, including unit tests for individual operations and integration tests for end-to-end workflows. Test error conditions and edge cases to ensure robustness.
-
-10. **Documentation**: Document the audit implementation details, including configuration options, usage patterns, and error handling strategies. This documentation helps maintain consistency across development teams and facilitates onboarding of new developers.
-
-Following these best practices ensures that audit functionality is reliable, secure, and maintainable while providing valuable insights into application behavior and compliance status.
+Environment-specific defaults:
+- **Development**: Debug logging, lower retry limits, detailed error messages
+- **Staging**: Info logging, standard retry configuration, performance monitoring
+- **Production**: Warning logging, aggressive caching, high concurrency limits
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [config.ts](file://packages/audit-client/src/core/config.ts#L400-L500)
+
+## Integration Patterns
+
+The Audit Client Library supports several integration patterns for different use cases and environments.
+
+### Authentication Integration
+
+The library supports multiple authentication methods through the `AuthManager` class.
+
+```mermaid
+sequenceDiagram
+participant App as "Application"
+participant Client as "AuditClient"
+participant Auth as "AuthManager"
+participant API as "Audit API"
+App->>Client : Create client with config
+Client->>Auth : Initialize with auth config
+App->>Client : Make API request
+Client->>Auth : Get auth headers
+Auth->>Auth : Check token cache
+Auth->>Auth : Refresh token if needed
+Auth-->>Client : Return auth headers
+Client->>API : Make request with auth headers
+API-->>Client : Return response
+Client-->>App : Return result
+```
+
+**Diagram sources **
+- [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts#L1-L100)
+
+**Section sources**
+- [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts#L1-L439)
+
+### Caching Strategy
+
+The `CacheManager` provides intelligent caching with multiple storage backends and automatic cleanup.
+
+```mermaid
+flowchart TD
+Request["API Request"] --> CheckCache["Check Cache"]
+CheckCache --> CacheHit{"Cache Hit?"}
+CacheHit --> |Yes| ReturnCache["Return Cached Data"]
+CacheHit --> |No| CallAPI["Call API"]
+CallAPI --> StoreCache["Store in Cache"]
+StoreCache --> ReturnResult["Return Result"]
+ReturnCache --> End([End])
+ReturnResult --> End
+```
+
+Supported cache storage backends:
+- **Memory**: In-memory cache for Node.js environments
+- **localStorage**: Persistent browser storage
+- **sessionStorage**: Session-scoped browser storage
+- **Custom**: Custom storage implementation
+
+**Diagram sources **
+- [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts#L1-L100)
+
+**Section sources**
+- [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts#L1-L781)
+
+### Retry and Circuit Breaker
+
+The `RetryManager` implements exponential backoff retry logic with circuit breaker pattern.
+
+```mermaid
+flowchart TD
+Start([Request]) --> CheckCircuit["Check Circuit Breaker"]
+CheckCircuit --> Open{"Circuit Open?"}
+Open --> |Yes| Wait["Wait for Recovery"]
+Open --> |No| Attempt["Make Request Attempt"]
+Attempt --> Success{"Success?"}
+Success --> |Yes| Complete([Request Complete])
+Success --> |No| ShouldRetry{"Should Retry?"}
+ShouldRetry --> |Yes| CalculateDelay["Calculate Delay"]
+CalculateDelay --> WaitDelay["Wait"]
+WaitDelay --> Attempt
+ShouldRetry --> |No| Fail([Request Failed])
+Wait --> CheckCircuit
+```
+
+**Diagram sources **
+- [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts#L1-L100)
+
+**Section sources**
+- [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts#L1-L522)
+
+## Practical Examples
+
+### Basic Usage
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+// Create client instance
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'your-api-key',
+  },
+})
+
+// Create an audit event
+const event = await client.events.create({
+  action: 'user.login',
+  principalId: 'user-123',
+  organizationId: 'org-456',
+  status: 'success',
+  targetResourceType: 'user',
+  dataClassification: 'PUBLIC',
+})
+```
+
+**Section sources**
+- [README.md](file://packages/audit-client/README.md#L101-L150)
+
+### Advanced Configuration
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+const config = {
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'your-api-key',
+    autoRefresh: true,
+  },
+  retry: {
+    enabled: true,
+    maxAttempts: 3,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    backoffMultiplier: 2,
+  },
+  cache: {
+    enabled: true,
+    defaultTtlMs: 300000, // 5 minutes
+    storage: 'memory',
+  },
+  logging: {
+    enabled: true,
+    level: 'info',
+    maskSensitiveData: true,
+  },
+}
+
+const client = new AuditClient(config)
+```
+
+**Section sources**
+- [README.md](file://packages/audit-client/README.md#L151-L200)
+
+### Event Querying
+
+```typescript
+// Query events with filtering and pagination
+const events = await client.events.query({
+  filter: {
+    dateRange: {
+      startDate: '2024-01-01',
+      endDate: '2024-01-31',
+    },
+    principalIds: ['user-123'],
+    actions: ['user.login', 'user.logout'],
+  },
+  pagination: {
+    limit: 50,
+    offset: 0,
+  },
+  sort: {
+    field: 'timestamp',
+    direction: 'desc',
+  },
+})
+```
+
+**Section sources**
+- [events.ts](file://packages/audit-client/src/services/events.ts#L300-L400)
+
+### Compliance Reporting
+
+```typescript
+// Generate HIPAA compliance report
+const hipaaReport = await client.compliance.generateHipaaReport({
+  dateRange: {
+    startDate: '2024-01-01',
+    endDate: '2024-01-31',
+  },
+  organizationIds: ['org-456'],
+})
+
+// Export GDPR data
+const exportResult = await client.compliance.exportGdprData({
+  dataSubjectId: 'user-123',
+  organizationId: 'org-456',
+  includePersonalData: true,
+  format: 'json',
+})
+```
+
+**Section sources**
+- [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L100-L200)
+
+## Troubleshooting Guide
+
+### Common Issues and Solutions
+
+| Issue | Possible Cause | Solution |
+|------|---------------|----------|
+| Authentication errors | Invalid API key or token | Verify credentials and check expiration |
+| Rate limiting | Too many requests | Implement retry logic with exponential backoff |
+| Network timeouts | Poor connectivity | Increase timeout settings |
+| Cache issues | Storage quota exceeded | Clear cache or switch to different storage backend |
+| Type errors | Version mismatch | Ensure compatible TypeScript and library versions |
+
+**Section sources**
+- [README.md](file://packages/audit-client/README.md#L201-L250)
+
+### Error Handling
+
+The library provides comprehensive error handling with specific error types for different scenarios.
+
+```typescript
+try {
+  const event = await client.events.create(eventData)
+} catch (error) {
+  if (error instanceof ConfigurationError) {
+    console.error('Configuration error:', error.getFormattedErrors())
+  } else if (error instanceof AuthenticationError) {
+    console.error('Authentication failed:', error.message)
+  } else if (error instanceof RetryExhaustedError) {
+    console.error('Request failed after retries:', error.attempts)
+  } else {
+    console.error('Unexpected error:', error)
+  }
+}
+```
+
+**Section sources**
+- [client.ts](file://packages/audit-client/src/core/client.ts#L500-L600)
+
+### Debugging Tips
+
+1. Enable debug logging to see detailed request/response information
+2. Use the `getStats()` method to monitor client performance
+3. Check the health status with `healthCheck()` method
+4. Validate configuration with `ConfigManager.validateConfig()`
+5. Monitor cache statistics with `cacheManager.getStats()`
+
+**Section sources**
+- [client.ts](file://packages/audit-client/src/core/client.ts#L600-L700)
+
+## Performance Considerations
+
+### Request Optimization
+
+The library provides several features to optimize performance:
+
+- **Request batching**: Group multiple requests into a single HTTP call
+- **Caching**: Store responses locally to avoid redundant API calls
+- **Compression**: Compress request/response payloads
+- **Streaming**: Handle large datasets efficiently
+- **Connection pooling**: Reuse HTTP connections
+
+### Memory Management
+
+The client implements proper cleanup to prevent memory leaks:
+
+- Automatic cleanup of event listeners
+- Proper disposal of WebSocket connections
+- Cache cleanup with LRU eviction
+- Interval cleanup for periodic tasks
+
+### Best Practices
+
+1. Reuse client instances when possible
+2. Configure appropriate cache TTL values
+3. Use bulk operations for multiple events
+4. Implement proper error handling and retry logic
+5. Monitor client statistics for performance issues
+
+**Section sources**
+- [client.ts](file://packages/audit-client/src/core/client.ts#L700-L800)

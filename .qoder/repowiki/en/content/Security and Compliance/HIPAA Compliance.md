@@ -3,7 +3,6 @@
 <cite>
 **Referenced Files in This Document**   
 - [compliance.ts](file://packages/audit-sdk/src/compliance.ts)
-- [types.ts](file://packages/audit-sdk/src/types.ts)
 - [types.ts](file://packages/audit/src/types.ts)
 - [event-types.ts](file://packages/audit/src/event/event-types.ts)
 - [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx)
@@ -16,6 +15,7 @@
 - [security.md](file://apps/docs/src/content/docs/audit/security.md)
 - [compliance.test.ts](file://packages/audit-sdk/src/__tests__/compliance.test.ts)
 - [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
+- [reports.ts](file://apps/server/src/routers/reports.ts)
 </cite>
 
 ## Table of Contents
@@ -208,7 +208,7 @@ PresetHandler --> AuditPreset : "manages"
 The web interface provides comprehensive tools for monitoring PHI access and generating compliance reports.
 
 ### HIPAA Compliance Dashboard
-The HIPAA compliance dashboard allows administrators to monitor and analyze PHI access patterns across the organization.
+The HIPAA compliance dashboard allows administrators to monitor and analyze PHI access patterns across the organization. The dashboard has been updated to reflect new reporting requirements and security protocols, including enhanced date range selection and improved data visualization.
 
 ```mermaid
 graph TD
@@ -235,13 +235,13 @@ E --> U[By Classification Pie Chart]
 ```
 
 **Diagram sources**
-- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx#L0-L199)
+- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx#L0-L346)
 
 **Section sources**
-- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx#L0-L199)
+- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx#L0-L346)
 
 ### Data Table Implementation
-The data table component renders audit events with sortable and filterable columns, providing an interactive interface for examining PHI access records.
+The data table component renders audit events with sortable and filterable columns, providing an interactive interface for examining PHI access records. The implementation has been updated to use React Query for data fetching and improved loading states with spinner components.
 
 ```mermaid
 sequenceDiagram
@@ -272,7 +272,7 @@ Table->>Browser : Update table display
 - [column.tsx](file://apps/web/src/components/hipaa/column.tsx#L0-L55)
 
 ### Column Configuration
-The column configuration defines which fields are displayed in the audit event table and how they are rendered.
+The column configuration defines which fields are displayed in the audit event table and how they are rendered. The configuration includes specific formatting for status and integrity fields to enhance readability.
 
 ```typescript
 export const createColumns = (): ColumnDef<ComplianceReportEvent>[] => {
@@ -329,7 +329,7 @@ export const createColumns = (): ColumnDef<ComplianceReportEvent>[] => {
 The system provides robust compliance reporting capabilities that generate detailed HIPAA audit reports based on specified criteria.
 
 ### Compliance Report Generation
-The compliance reporting system generates comprehensive reports that summarize audit events according to HIPAA requirements.
+The compliance reporting system generates comprehensive reports that summarize audit events according to HIPAA requirements. The implementation uses TRPC for API communication and includes error handling for report generation failures.
 
 ```mermaid
 sequenceDiagram
@@ -350,9 +350,11 @@ TRPC-->>Client : Send report data
 **Diagram sources**
 - [compliance.ts](file://apps/server/src/routers/compliance.ts#L0-L199)
 - [compliance.ts](file://apps/server/src/lib/graphql/resolvers/compliance.ts#L0-L136)
+- [reports.ts](file://apps/server/src/routers/reports.ts#L26-L63)
 
 **Section sources**
 - [compliance.ts](file://apps/server/src/routers/compliance.ts#L0-L199)
+- [reports.ts](file://apps/server/src/routers/reports.ts#L26-L63)
 
 ### Report Data Structure
 The HIPAA compliance report includes comprehensive information about audit events, with specific metrics relevant to HIPAA compliance.
@@ -404,7 +406,7 @@ interface HIPAAComplianceReport {
 The system integrates with healthcare-specific resolvers and schema definitions to ensure proper handling of PHI and compliance with healthcare regulations.
 
 ### GraphQL Compliance Resolver
-The GraphQL resolver provides an API endpoint for generating compliance reports, including HIPAA-specific reports.
+The GraphQL resolver provides an API endpoint for generating compliance reports, including HIPAA-specific reports. The resolver enforces organization isolation and handles different report types through a switch statement.
 
 ```mermaid
 classDiagram
