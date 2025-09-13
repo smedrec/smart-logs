@@ -2,7 +2,7 @@
 # tmp docker
 .docker
 # tmp kiro
-.kiro
+# .kiro
 # Wrangler
 .wrangler
 .dev.vars
