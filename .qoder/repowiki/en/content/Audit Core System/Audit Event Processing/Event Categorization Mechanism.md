@@ -2,40 +2,50 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
-- [event-types.ts](file://packages/audit/src/event/event-types.ts)
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
-- [event-categorization.test.ts](file://packages/audit/src/__tests__/event-categorization.test.ts)
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts) - *Updated in recent commit*
+- [event-types.ts](file://packages\audit\src\event\event-types.ts) - *Updated in recent commit*
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts) - *Updated in recent commit*
+- [event-categorization.test.ts](file://packages\audit\src\__tests__\event-categorization.test.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated core categorization logic to reflect actual implementation using predefined action arrays instead of string prefix matching
+- Revised category-specific validation rules with accurate field requirements and validation logic
+- Enhanced database event integration example with correct alert handling workflow
+- Added new sections for event factory functions and recommended/required fields
+- Updated all diagrams to accurately represent current code structure
+- Improved downstream processing impact section with accurate storage and compliance details
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Core Categorization Logic](#core-categorization-logic)
 3. [Category-Specific Validation Rules](#category-specific-validation-rules)
-4. [Database Event Integration Example](#database-event-integration-example)
-5. [Downstream Processing Impact](#downstream-processing-impact)
-6. [Common Issues and Mitigations](#common-issues-and-mitigations)
-7. [Extending the Categorization System](#extending-the-categorization-system)
+4. [Event Factory Functions](#event-factory-functions)
+5. [Database Event Integration Example](#database-event-integration-example)
+6. [Downstream Processing Impact](#downstream-processing-impact)
+7. [Common Issues and Mitigations](#common-issues-and-mitigations)
+8. [Extending the Categorization System](#extending-the-categorization-system)
 
 ## Introduction
-The Event Categorization Mechanism is a critical component of the audit logging system that classifies raw audit events into meaningful categories based on event types and contextual metadata. This categorization enables efficient downstream processing, storage partitioning, and compliance reporting. The system uses a rule-based classification approach with pattern matching to determine the appropriate category for each audit event, ensuring consistency and accuracy in event classification across the platform.
+The Event Categorization Mechanism is a critical component of the audit logging system that classifies raw audit events into meaningful categories based on event types and contextual metadata. This categorization enables efficient downstream processing, storage partitioning, and compliance reporting. The system uses a rule-based classification approach with exact action matching to determine the appropriate category for each audit event, ensuring consistency and accuracy in event classification across the platform.
 
 The categorization process is implemented in the `event-categorization.ts` file and works in conjunction with the event type definitions in `event-types.ts`. The mechanism supports four primary categories: system, authentication, data, and FHIR (Fast Healthcare Interoperability Resources), each with specific validation rules and recommended fields. This document provides a comprehensive analysis of the categorization system, including its implementation details, integration examples, and guidance for extension.
 
 ## Core Categorization Logic
 
-The event categorization system employs a hierarchical classification approach using type guard functions and category determination logic. The implementation is centered around several key functions that work together to classify events and validate their structure.
+The event categorization system employs a precise classification approach using predefined action arrays and type guard functions. The implementation is centered around several key functions that work together to classify events and validate their structure.
 
 ```mermaid
 flowchart TD
 Start([Event Received]) --> DetermineCategory["Determine Event Category"]
-DetermineCategory --> IsSystem{"Is System Action?"}
+DetermineCategory --> IsSystem{"Is Valid System Action?"}
 IsSystem --> |Yes| CategorySystem["Category: system"]
-IsSystem --> |No| IsAuth{"Is Auth Action?"}
+IsSystem --> |No| IsAuth{"Is Valid Auth Action?"}
 IsAuth --> |Yes| CategoryAuth["Category: auth"]
-IsAuth --> |No| IsData{"Is Data Action?"}
+IsAuth --> |No| IsData{"Is Valid Data Action?"}
 IsData --> |Yes| CategoryData["Category: data"]
-IsData --> |No| IsFHIR{"Is FHIR Action?"}
+IsData --> |No| IsFHIR{"Is Valid FHIR Action?"}
 IsFHIR --> |Yes| CategoryFHIR["Category: fhir"]
 IsFHIR --> |No| CategoryUnknown["Category: unknown"]
 CategorySystem --> ValidateEvent["Validate Event Structure"]
@@ -49,23 +59,23 @@ IsValid --> |No| LogWarnings["Log Warnings/Errors"]
 LogWarnings --> ProcessEvent
 ```
 
-**Diagram sources**
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L74-L114)
+**Diagram sources**   
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L74-L114)
 
-**Section sources**
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L74-L114)
-- [event-categorization.test.ts](file://packages/audit/src/__tests__/event-categorization.test.ts#L0-L45)
+**Section sources**   
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L74-L114)
+- [event-categorization.test.ts](file://packages\audit\src\__tests__\event-categorization.test.ts#L0-L45)
 
 The core categorization logic is implemented through a series of type guard functions that check whether an action string matches a specific category pattern:
 
-- `isSystemAction(action: string)`: Determines if an action belongs to the system category by checking if it starts with "system."
-- `isAuthAction(action: string)`: Identifies authentication-related actions that begin with "auth."
-- `isDataAction(action: string)`: Recognizes data operations that start with "data."
-- `isFHIRAction(action: string)`: Detects FHIR-specific actions that begin with "fhir."
+- `isSystemAction(action: string)`: Determines if an action belongs to the system category by checking if it exists in the predefined `SYSTEM_ACTIONS` array
+- `isAuthAction(action: string)`: Identifies authentication-related actions that exist in the `AUTH_ACTIONS` array
+- `isDataAction(action: string)`: Recognizes data operations that exist in the `DATA_ACTIONS` array
+- `isFHIRAction(action: string)`: Detects FHIR-specific actions that exist in the `FHIR_ACTIONS` array
 
 The `getActionCategory` function serves as the primary categorization engine, applying these type guards in sequence to determine the appropriate category for an event. The function returns one of five possible values: 'system', 'auth', 'data', 'fhir', or 'unknown'. The `isValidAuditAction` function leverages `getActionCategory` to validate whether an action is recognized by the system, returning false for actions categorized as 'unknown'.
 
-The categorization follows a priority order where system actions are evaluated first, followed by authentication, data, and FHIR actions. This hierarchy ensures that events are classified consistently, even if an action string could potentially match multiple patterns. The type guard functions use simple string prefix matching rather than regular expressions for performance reasons, making the categorization process efficient even under high event volumes.
+The categorization follows a priority order where system actions are evaluated first, followed by authentication, data, and FHIR actions. This hierarchy ensures that events are classified consistently, even if an action string could potentially match multiple patterns. The type guard functions use exact array inclusion checks rather than string prefix matching, making the categorization process more precise and maintainable.
 
 ## Category-Specific Validation Rules
 
@@ -94,13 +104,13 @@ EventValidator --> ValidationResult : "returns"
 EventValidator --> FieldRequirements : "uses"
 ```
 
-**Diagram sources**
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L155-L382)
-- [event-categorization.test.ts](file://packages/audit/src/__tests__/event-categorization.test.ts#L200-L399)
+**Diagram sources**   
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L155-L382)
+- [event-categorization.test.ts](file://packages\audit\src\__tests__\event-categorization.test.ts#L200-L399)
 
-**Section sources**
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L155-L382)
-- [event-categorization.test.ts](file://packages/audit/src/__tests__/event-categorization.test.ts#L200-L399)
+**Section sources**   
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L155-L382)
+- [event-categorization.test.ts](file://packages\audit\src\__tests__\event-categorization.test.ts#L200-L399)
 
 ### System Event Validation
 System events relate to infrastructure operations and require specific metadata depending on the action type:
@@ -138,6 +148,42 @@ FHIR-specific events have stringent validation requirements due to their healthc
 
 The FHIR validation rules are particularly important for healthcare compliance, ensuring that patient data access is properly documented and traceable.
 
+## Event Factory Functions
+
+The system provides factory functions to create properly categorized audit events with consistent structure and default values.
+
+```mermaid
+classDiagram
+class EventFactory {
++createSystemAuditEvent(action, details, config)
++createAuthAuditEvent(action, details, config)
++createDataAuditEvent(action, details, config)
++createFHIRAuditEvent(action, details, config)
++createAuditEvent(action, details, config)
+}
+class Config {
++generateTimestamp
++generateCorrelationId
++defaultDataClassification
++defaultRetentionPolicy
++defaultEventVersion
+}
+EventFactory --> Config : "uses"
+```
+
+**Diagram sources**   
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L150-L308)
+
+**Section sources**   
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L150-L308)
+
+The factory functions ensure consistent event creation:
+- **Default configuration**: Uses `DEFAULT_FACTORY_CONFIG` with sensible defaults
+- **Timestamp generation**: Automatically adds ISO timestamp when enabled
+- **Correlation IDs**: Generates unique correlation IDs for event tracking
+- **Data classification**: Applies appropriate default classification (PHI for FHIR events)
+- **Generic creation**: `createAuditEvent` function routes to specific factories based on action type
+
 ## Database Event Integration Example
 
 The database alert integration example demonstrates how categorized events are used in practice, particularly for security monitoring and alerting. This example shows the complete workflow from event processing to alert generation and management.
@@ -161,12 +207,12 @@ Monitoring-->>Event : Processing complete
 Note over Monitoring,Handler : Suspicious pattern detected<br/>Multiple failed login attempts
 ```
 
-**Diagram sources**
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L0-L282)
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L102-L114)
+**Diagram sources**   
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts#L0-L282)
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L102-L114)
 
-**Section sources**
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L0-L282)
+**Section sources**   
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts#L0-L282)
 
 The integration example illustrates a scenario where multiple failed authentication events trigger an alert. When the monitoring service processes a series of `auth.login.failure` events from the same user, it recognizes a potential security threat and creates an alert through the database alert handler. The categorization system plays a crucial role in this process by:
 
@@ -223,7 +269,7 @@ Ambiguous event types occur when action strings don't clearly fit into a single 
 
 ### Misclassification Risks
 Misclassification can occur due to:
-- Incorrect action naming that matches the wrong category pattern
+- Incorrect action naming that doesn't match any predefined action
 - Missing or malformed event data
 - Race conditions in high-volume scenarios
 
@@ -234,15 +280,15 @@ Misclassification can occur due to:
 - Implement automated tests that verify correct categorization
 
 ### Performance Implications
-Complex categorization rules can impact performance, especially under high event volumes. The current implementation uses simple string prefix matching to minimize processing overhead.
+Complex categorization rules can impact performance, especially under high event volumes. The current implementation uses array inclusion checks which are optimized for performance.
 
 **Performance optimization strategies:**
 - Cache frequently used categorization results
-- Use efficient string operations rather than regular expressions
+- Use efficient array operations
 - Implement batch processing for high-volume scenarios
 - Monitor categorization performance and optimize hot paths
 
-The system includes performance considerations in its design, with the categorization functions optimized for speed and efficiency. The use of simple string operations rather than complex pattern matching ensures that the categorization process adds minimal overhead to event processing.
+The system includes performance considerations in its design, with the categorization functions optimized for speed and efficiency.
 
 ## Extending the Categorization System
 
@@ -257,8 +303,16 @@ To add custom event types, follow these steps:
 
 For example, to add a custom healthcare event:
 ```typescript
-// Add to isFHIRAction function
-if (action.startsWith('fhir.appointment.')) return true;
+// Add to FHIR_ACTIONS array
+const FHIR_ACTIONS: readonly FHIRAuditAction[] = [
+	'fhir.patient.read',
+	'fhir.patient.create',
+	'fhir.patient.update',
+	'fhir.practitioner.read',
+	'fhir.observation.create',
+	'fhir.bundle.process',
+	'fhir.appointment.schedule' // New custom action
+] as const;
 
 // Add validation in validateFHIREvent
 if (event.action === 'fhir.appointment.schedule' && !event.appointmentDetails) {

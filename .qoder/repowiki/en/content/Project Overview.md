@@ -3,15 +3,15 @@
 <cite>
 **Referenced Files in This Document**   
 - [README.md](file://README.md)
-- [apps/server/src/index.ts](file://apps/server/src/index.ts)
-- [packages/audit/src/index.ts](file://packages/audit/src/index.ts)
-- [packages/audit-db/src/index.ts](file://packages/audit-db/src/index.ts)
-- [packages/audit-sdk/src/index.ts](file://packages/audit-sdk/src/index.ts)
-- [packages/audit-client/src/index.ts](file://packages/audit-client/src/index.ts)
-- [apps/docs/src/content/docs/audit/audit.md](file://apps/docs/src/content/docs/audit/audit.md)
-- [apps/docs/src/content/docs/audit/audit-db.md](file://apps/docs/src/content/docs/audit/audit-db.md)
-- [apps/docs/src/content/docs/audit/audit-sdk.md](file://apps/docs/src/content/docs/audit/audit-sdk.md)
-- [packages/audit-client/src/client.ts](file://packages/audit-client/src/client.ts)
+- [apps/server/src/index.ts](file://apps\server\src\index.ts)
+- [packages/audit/src/index.ts](file://packages\audit\src\index.ts)
+- [packages/audit-db/src/index.ts](file://packages\audit-db\src\index.ts)
+- [packages/audit-client/src/index.ts](file://packages\audit-client\src\index.ts)
+- [apps/docs/src/content/docs/audit/audit.md](file://apps\docs\src\content\docs\audit\audit.md)
+- [apps/docs/src/content/docs/audit/audit-db.md](file://apps\docs\src\content\docs\audit\audit-db.md)
+- [packages/audit-client/src/client.ts](file://packages\audit-client\src\client.ts)
+- [apps/docs/astro.config.mjs](file://apps\docs\astro.config.mjs)
+- [apps/docs/package.json](file://apps\docs\package.json)
 </cite>
 
 ## Table of Contents
@@ -79,7 +79,7 @@ style PostgreSQL fill:#cfc,stroke:#333
 
 **Diagram sources**
 - [README.md](file://README.md)
-- [apps/server/src/index.ts](file://apps/server/src/index.ts)
+- [apps/server/src/index.ts](file://apps\server\src\index.ts)
 
 **Section sources**
 - [README.md](file://README.md)
@@ -147,12 +147,12 @@ Audit --> ComplianceReporting
 ```
 
 **Diagram sources**
-- [packages/audit/src/index.ts](file://packages/audit/src/index.ts)
-- [apps/docs/src/content/docs/audit/audit.md](file://apps/docs/src/content/docs/audit/audit.md)
+- [packages/audit/src/index.ts](file://packages\audit\src\index.ts)
+- [apps/docs/src/content/docs/audit/audit.md](file://apps\docs\src\content\docs\audit\audit.md)
 
 **Section sources**
-- [packages/audit/src/index.ts](file://packages/audit/src/index.ts)
-- [apps/docs/src/content/docs/audit/audit.md](file://apps/docs/src/content/docs/audit/audit.md)
+- [packages/audit/src/index.ts](file://packages\audit\src\index.ts)
+- [apps/docs/src/content/docs/audit/audit.md](file://apps\docs\src\content\docs\audit\audit.md)
 
 ### Audit Database Package (`@repo/audit-db`)
 
@@ -201,79 +201,12 @@ EnhancedAuditDb --> DatabasePerformanceMonitor
 ```
 
 **Diagram sources**
-- [packages/audit-db/src/index.ts](file://packages/audit-db/src/index.ts)
-- [apps/docs/src/content/docs/audit/audit-db.md](file://apps/docs/src/content/docs/audit/audit-db.md)
+- [packages/audit-db/src/index.ts](file://packages\audit-db\src\index.ts)
+- [apps/docs/src/content/docs/audit/audit-db.md](file://apps\docs\src\content\docs\audit\audit-db.md)
 
 **Section sources**
-- [packages/audit-db/src/index.ts](file://packages/audit-db/src/index.ts)
-- [apps/docs/src/content/docs/audit/audit-db.md](file://apps/docs/src/content/docs/audit/audit-db.md)
-
-### Audit SDK (`@repo/audit-sdk`)
-
-The `@repo/audit-sdk` package provides a high-level interface for audit logging, building on top of the core audit and audit-db packages. It offers enhanced features, compliance validation, and developer-friendly APIs.
-
-**Key Features:**
-- **Security First**: Built-in cryptographic hashing and signatures
-- **Healthcare Ready**: FHIR-specific audit events and PHI handling
-- **Compliance Built-in**: HIPAA and GDPR compliance validation
-- **High Performance**: Batching, rate limiting, and guaranteed delivery
-- **Easy Integration**: Express, WebSocket, and GraphQL middleware
-- **Rich Reporting**: Compliance reports and integrity verification
-
-The SDK's architecture is designed to simplify audit logging while providing comprehensive functionality:
-
-```mermaid
-classDiagram
-class AuditSDK {
-+log()
-+logFHIR()
-+logAuth()
-+logCritical()
-+generateComplianceReport()
-+verifyIntegrity()
-+getHealth()
-}
-class AuditEventBatcher {
-+add(event)
-+flush()
-+getStats()
-}
-class AuditRateLimiter {
-+isAllowed()
-+getRemaining()
-+reset()
-}
-class MaskingUtils {
-+maskSensitiveData()
-+sanitizeInput()
-+validateStructure()
-}
-class Middleware {
-+createAuditMiddleware()
-+createWebSocketAuditMiddleware()
-+createGraphQLAuditMiddleware()
-}
-class Presets {
-+applyPreset()
-+getPresetConfig()
-+validatePreset()
-}
-AuditSDK --> AuditEventBatcher
-AuditSDK --> AuditRateLimiter
-AuditSDK --> MaskingUtils
-AuditSDK --> Middleware
-AuditSDK --> Presets
-AuditSDK --> Audit
-AuditSDK --> AuditDb
-```
-
-**Diagram sources**
-- [packages/audit-sdk/src/index.ts](file://packages/audit-sdk/src/index.ts)
-- [apps/docs/src/content/docs/audit/audit-sdk.md](file://apps/docs/src/content/docs/audit/audit-sdk.md)
-
-**Section sources**
-- [packages/audit-sdk/src/index.ts](file://packages/audit-sdk/src/index.ts)
-- [apps/docs/src/content/docs/audit/audit-sdk.md](file://apps/docs/src/content/docs/audit/audit-sdk.md)
+- [packages/audit-db/src/index.ts](file://packages\audit-db\src\index.ts)
+- [apps/docs/src/content/docs/audit/audit-db.md](file://apps\docs\src\content\docs\audit\audit-db.md)
 
 ### Audit Client (`@repo/audit-client`)
 
@@ -284,6 +217,10 @@ The `@repo/audit-client` package provides a lightweight client for interacting w
 - **Health Checking**: Methods to verify API availability
 - **Report Generation**: Client-side access to compliance reporting
 - **Version Management**: API version checking
+- **Type Safety**: Full TypeScript support with strict type checking
+- **Retry Logic**: Exponential backoff with configurable retry policies
+- **Caching**: Intelligent caching with multiple storage backends
+- **Plugin Architecture**: Extensible middleware, storage, and authentication plugins
 
 ```mermaid
 classDiagram
@@ -291,22 +228,46 @@ class AuditClient {
 +ok()
 +version()
 +hipaa(criteria)
++initialize()
++destroy()
++isInitialized()
 }
 class BaseResource {
 +request()
 +setHeaders()
 +handleResponse()
 }
+class IEventsService {
++create()
++get()
++list()
+}
+class IComplianceService {
++hipaa()
++gdpr()
++generateReport()
+}
+class IHealthService {
++check()
++detailed()
++ready()
++getVersion()
+}
 AuditClient --> BaseResource
+AuditClient --> IEventsService
+AuditClient --> IComplianceService
+AuditClient --> IHealthService
 ```
 
 **Diagram sources**
-- [packages/audit-client/src/client.ts](file://packages/audit-client/src/client.ts)
-- [packages/audit-client/src/index.ts](file://packages/audit-client/src/index.ts)
+- [packages/audit-client/src/client.ts](file://packages\audit-client\src\client.ts)
+- [packages/audit-client/src/index.ts](file://packages\audit-client\src\index.ts)
+- [packages/audit-client/src/types/index.ts](file://packages\audit-client\src\types\index.ts)
 
 **Section sources**
-- [packages/audit-client/src/client.ts](file://packages/audit-client/src/client.ts)
-- [packages/audit-client/src/index.ts](file://packages/audit-client/src/index.ts)
+- [packages/audit-client/src/client.ts](file://packages\audit-client\src\client.ts)
+- [packages/audit-client/src/index.ts](file://packages\audit-client\src\index.ts)
+- [packages/audit-client/README.md](file://packages\audit-client\README.md)
 
 ## Data Flow and Processing
 
@@ -341,12 +302,12 @@ Note over Application,Report : End-to-end audit logging and reporting flow
 ```
 
 **Diagram sources**
-- [apps/server/src/index.ts](file://apps/server/src/index.ts)
-- [packages/audit/src/index.ts](file://packages/audit/src/index.ts)
-- [packages/audit-db/src/index.ts](file://packages/audit-db/src/index.ts)
+- [apps/server/src/index.ts](file://apps\server\src\index.ts)
+- [packages/audit/src/index.ts](file://packages\audit\src\index.ts)
+- [packages/audit-db/src/index.ts](file://packages\audit-db\src\index.ts)
 
 **Section sources**
-- [apps/server/src/index.ts](file://apps/server/src/index.ts)
+- [apps/server/src/index.ts](file://apps\server\src\index.ts)
 
 ## Deployment and Integration
 
@@ -390,6 +351,6 @@ The integration architecture allows for flexible deployment patterns while maint
 
 **Section sources**
 - [README.md](file://README.md)
-- [apps/server/Dockerfile](file://apps/server/Dockerfile)
-- [apps/server/docker-compose.yml](file://apps/server/docker-compose.yml)
-- [apps/server/k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
+- [apps/server/Dockerfile](file://apps\server\Dockerfile)
+- [apps/server/docker-compose.yml](file://apps\server\docker-compose.yml)
+- [apps/server/k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)

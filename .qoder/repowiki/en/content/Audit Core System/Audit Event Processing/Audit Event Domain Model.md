@@ -2,18 +2,30 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [types.ts](file://packages/audit/src/types.ts)
-- [event-types.ts](file://packages/audit/src/event/event-types.ts)
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [archival-service.ts](file://packages/audit/src/archival/archival-service.ts)
-- [audit-db/src/db/schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [types.ts](file://packages/audit/src/types.ts) - *Updated with comprehensive audit event definitions*
+- [event-types.ts](file://packages/audit/src/event/event-types.ts) - *Enhanced with factory patterns and categorization*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated with GDPR compliance features*
+- [archival-service.ts](file://packages/audit/src/archival/archival-service.ts) - *Modified with archival functionality*
+- [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated database schema definitions*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated core entity structure with enhanced type definitions and documentation
+- Added detailed event lifecycle and status state information
+- Expanded event taxonomy with new categorization system
+- Enhanced object composition and inheritance patterns with factory implementation details
+- Updated data validation and immutability constraints with cryptographic details
+- Improved versioning and backward compatibility strategies
+- Enhanced retention policies and GDPR compliance features with new implementation details
+- Updated sample JSON representations with current event types
+- Added comprehensive archival system and data lifecycle management
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Core Entity Structure](#core-entity-structure)
 3. [Event Lifecycle and Status States](#event-lifecycle-and-status-states)
-4.. [Event Taxonomy and Categorization](#event-taxonomy-and-categorization)
+4. [Event Taxonomy and Categorization](#event-taxonomy-and-categorization)
 5. [Object Composition and Inheritance Patterns](#object-composition-and-inheritance-patterns)
 6. [Data Validation and Immutability](#data-validation-and-immutability)
 7. [Versioning and Backward Compatibility](#versioning-and-backward-compatibility)
@@ -257,7 +269,7 @@ Authentication events include properties like `authMethod` (password, MFA, SSO, 
 #### Data Audit Events
 Data events monitor data access and manipulation operations under the `data` category. These events capture data governance activities:
 
-**:data.access** - Data retrieval
+**:data.read** - Data retrieval
 **:data.create** - Data creation
 **:data.update** - Data modification
 **:data.delete** - Data removal
@@ -270,7 +282,7 @@ Data events include metadata about the data type, record count, data size, expor
 FHIR events are specialized for healthcare interoperability and follow HL7 FHIR standards. Categorized under `fhir`, these events capture FHIR-specific operations:
 
 **:fhir.patient.read** - Patient data access
-**:fhir.practitioner.search** - Practitioner search
+**:fhir.practitioner.read** - Practitioner search
 **:fhir.observation.create** - Observation creation
 **:fhir.bundle.process** - Bundle processing
 

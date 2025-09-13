@@ -7,7 +7,16 @@
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [types.ts](file://packages/audit/src/types.ts)
+- [client.ts](file://packages/infisical-kms/src/client.ts) - *Updated in recent commit*
+- [types.ts](file://packages/infisical-kms/src/types.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated cryptographic standards section to reflect new default signing algorithm
+- Added details on secure configuration storage and compliance reporting enhancements
+- Enhanced security measures section with updated KMS integration details
+- Maintained existing structure while incorporating new cryptographic standards
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -46,9 +55,6 @@ GDPRService-->>Admin : Return deletion summary
 Note over GDPRService : Compliance records preserved<br/>via pseudonymization
 ```
 
-**Diagram sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
-
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
 
@@ -85,9 +91,6 @@ GDPRComplianceService --> PseudonymizationMapping : "creates"
 GDPRComplianceService --> GDPRDataExportRequest : "processes"
 ```
 
-**Diagram sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
-
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
 
@@ -107,9 +110,6 @@ StoreConsent --> End([Event Processed])
 ApplyDefault --> End
 ThrowError --> End
 ```
-
-**Diagram sources**
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts#L100-L130)
 
 **Section sources**
 - [compliance.ts](file://packages/audit-sdk/src/compliance.ts#L100-L130)
@@ -136,9 +136,6 @@ Validator-->>System : Validation successful
 System->>DB : Store audit event
 Note over Validator : All PHI events require<br/>principalId, action, targetResource,<br/>timestamp, and sessionContext
 ```
-
-**Diagram sources**
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts#L40-L80)
 
 **Section sources**
 - [compliance.ts](file://packages/audit-sdk/src/compliance.ts#L40-L80)
@@ -171,10 +168,6 @@ AuditLogEvent --> DataClassification : "uses"
 AuditLogEvent --> SessionContext : "contains"
 ```
 
-**Diagram sources**
-- [types.ts](file://packages/audit/src/types.ts#L10-L50)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L20-L30)
-
 **Section sources**
 - [types.ts](file://packages/audit/src/types.ts#L10-L50)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L20-L30)
@@ -184,7 +177,7 @@ AuditLogEvent --> SessionContext : "contains"
 The system implements multiple security measures to protect data integrity and ensure secure access.
 
 ### Data Encryption and Integrity
-The system ensures data integrity through cryptographic hashing and provides options for data encryption in exports.
+The system ensures data integrity through cryptographic hashing and provides options for data encryption in exports. The Infisical KMS integration uses RSASSA_PSS_SHA_256 as the default signing algorithm for enhanced security.
 
 ```mermaid
 flowchart TD
@@ -199,13 +192,10 @@ H --> I["Log to auditIntegrityLog"]
 I --> J["Generate Integrity Report"]
 ```
 
-**Diagram sources**
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L300-L400)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L50-L70)
-
 **Section sources**
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L300-L400)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L50-L70)
+- [client.ts](file://packages/infisical-kms/src/client.ts#L100-L120)
 
 ### Secure Authentication and Access Controls
 The system implements secure authentication through audit logging of all authentication events and role-based access controls.
@@ -239,9 +229,6 @@ AuditLogEvent --> AuthAuditAction : "action"
 AuditLogEvent --> SessionContext : "sessionContext"
 ```
 
-**Diagram sources**
-- [types.ts](file://packages/audit/src/types.ts#L150-L180)
-
 **Section sources**
 - [types.ts](file://packages/audit/src/types.ts#L150-L180)
 
@@ -269,10 +256,6 @@ ReportService->>Admin : Deliver report via email/webhook
 Note over ReportService : Reports can be scheduled<br/>daily, weekly, monthly,<br/>or quarterly
 ```
 
-**Diagram sources**
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L200-L300)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L500-L550)
-
 **Section sources**
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L200-L300)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L500-L550)
@@ -291,9 +274,6 @@ F --> G["Return GDPRDataExport"]
 G --> H["Download or Email"]
 Note over D: Supports JSON, CSV, and XML<br/>formats with optional metadata
 ```
-
-**Diagram sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L180-L250)
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L180-L250)
@@ -324,12 +304,6 @@ style A fill:#f9f,stroke:#333
 style L fill:#bbf,stroke:#333
 style P fill:#bbf,stroke:#333
 ```
-
-**Diagram sources**
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts)
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
 
 **Section sources**
 - [compliance.ts](file://packages/audit-sdk/src/compliance.ts)

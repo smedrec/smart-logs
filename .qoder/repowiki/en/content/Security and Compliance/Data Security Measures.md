@@ -2,13 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L218)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L218) - *Updated cryptographic implementation*
+- [client.ts](file://packages/infisical-kms/src/client.ts#L0-L146) - *Updated in commit 1fb280cfc30f7d0053b43ff0abd5ffbe6494b84a*
+- [types.ts](file://packages/infisical-kms/src/types.ts#L0-L48) - *Updated in commit 1fb280cfc30f7d0053b43ff0abd5ffbe6494b84a*
 - [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L765)
 - [permissions.ts](file://packages/auth/src/permissions.ts#L0-L593)
 - [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L487)
 - [validation.ts](file://packages/audit/src/validation.ts#L0-L866)
 - [types.ts](file://packages/audit/src/types.ts#L0-L286)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated cryptographic algorithms section to reflect new default signing algorithm
+- Added documentation for Infisical KMS integration and its signing capabilities
+- Enhanced key management section to include external KMS solutions
+- Updated diagram sources to reflect new cryptographic service implementation
+- Maintained existing security framework documentation while incorporating new KMS details
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -75,10 +85,15 @@ CryptoUtils --> CryptoService : "delegates to"
 The system uses industry-standard cryptographic algorithms:
 - **SHA-256**: For generating deterministic hashes of audit event critical fields
 - **HMAC-SHA256**: For creating cryptographic signatures using a secret key
+- **RSASSA-PSS-SHA-256**: For digital signatures via Infisical KMS integration
 
-Key management is implemented through environment-based configuration. The system requires a secret key for cryptographic operations, which should be set via environment variables in production. If no key is provided, the system generates a random 32-byte secret (256 bits), but this is not recommended for production environments.
+Key management is implemented through multiple approaches:
+1. **Local key management**: Environment-based configuration with secret keys set via environment variables
+2. **External KMS integration**: Infisical KMS for secure key management and cryptographic operations
 
 The `CryptoService` extracts critical fields from audit events in a deterministic order, creates a standardized string representation, and applies SHA-256 hashing. This ensures consistency across the system regardless of object property order. The HMAC-SHA256 signature provides additional security by incorporating the secret key, preventing tampering even if an attacker gains access to the hash algorithm.
+
+For enhanced security requirements, the system integrates with Infisical KMS, which supports advanced signing algorithms including RSASSA-PSS-SHA-256 (now the default), RSASSA-PSS-SHA-384, RSASSA-PSS-SHA-512, and PKCS#1 v1.5 variants. This integration allows for hardware-backed key storage and more robust cryptographic operations.
 
 ### Data Integrity Verification
 The cryptographic implementation focuses on integrity verification rather than encryption of data at rest. Each audit event can include:

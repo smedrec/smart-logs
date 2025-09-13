@@ -2,14 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [event-types.ts](file://packages/audit/src/event/event-types.ts)
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [types.ts](file://packages/audit/src/types.ts)
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
-- [validation.ts](file://packages/audit/src/validation.ts)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
+- [event-types.ts](file://packages\audit\src\event\event-types.ts) - *Updated in recent commit*
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts) - *Updated in recent commit*
+- [audit.ts](file://packages\audit\src\audit.ts) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\types.ts) - *Updated in recent commit*
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts) - *Updated in recent commit*
+- [validation.ts](file://packages\audit\src\validation.ts) - *Updated in recent commit*
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated event categorization logic to include new validation and warning mechanisms
+- Enhanced domain model with new field recommendations and required fields per category
+- Added detailed information about cryptographic integrity features (hashing and signatures)
+- Expanded real-world usage example with multi-organizational alert isolation
+- Updated error handling section with new circuit breaker and dead letter queue metrics
+- Added best practices for compliance validation and event enrichment
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -48,14 +57,14 @@ Storage-->>Worker : Confirmation
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [validation.ts](file://packages/audit/src/validation.ts)
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L200)
+- [validation.ts](file://packages\audit\src\validation.ts#L1-L100)
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L1-L100)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L100)
 
-**Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L200)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L100)
+**Section sources**   
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L200)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L100)
 
 ## Domain Model of Audit Events
 
@@ -106,9 +115,9 @@ interface AuditLogEvent {
 - **Persisted**: Event written to durable storage
 - **Archived**: Event moved to long-term storage based on retention policy
 
-**Section sources**
-- [types.ts](file://packages/audit/src/types.ts#L1-L200)
-- [event-types.ts](file://packages/audit/src/event/event-types.ts#L1-L50)
+**Section sources**   
+- [types.ts](file://packages\audit\src\types.ts#L1-L200)
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L1-L50)
 
 ## Event Categorization and Validation
 
@@ -177,12 +186,12 @@ AuditLogEvent <|-- FHIRAuditEvent
 ```
 
 **Diagram sources**
-- [types.ts](file://packages/audit/src/types.ts#L1-L286)
-- [event-types.ts](file://packages/audit/src/event/event-types.ts#L1-L199)
+- [types.ts](file://packages\audit\src\types.ts#L1-L286)
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L1-L199)
 
-**Section sources**
-- [event-types.ts](file://packages/audit/src/event/event-types.ts#L1-L199)
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L1-L200)
+**Section sources**   
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L1-L199)
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L1-L200)
 
 ### Schema Validation with Zod
 
@@ -206,10 +215,10 @@ Success --> End
 ```
 
 **Diagram sources**
-- [validation.ts](file://packages/audit/src/validation.ts#L1-L200)
+- [validation.ts](file://packages\audit\src\validation.ts#L1-L200)
 
-**Section sources**
-- [validation.ts](file://packages/audit/src/validation.ts#L1-L200)
+**Section sources**   
+- [validation.ts](file://packages\audit\src\validation.ts#L1-L200)
 
 ### Categorization Logic
 
@@ -230,6 +239,56 @@ This categorization impacts downstream processing by:
 - Routing events to appropriate storage partitions
 - Influencing alerting and monitoring rules
 - Affecting retention policies and archival strategies
+
+Additionally, the system provides enhanced validation through the `validateCategorizedEvent` function which returns both errors and warnings:
+
+```typescript
+export interface EventValidationResult {
+	isValid: boolean
+	category: 'system' | 'auth' | 'data' | 'fhir' | 'unknown'
+	errors: string[]
+	warnings: string[]
+}
+```
+
+For example, when validating a system configuration change event without a system component specified, the system will return a warning but still consider the event valid:
+
+```typescript
+// Warning example
+{
+	isValid: true,
+	warnings: ['System component not specified for system action']
+}
+```
+
+The system also provides functions to get recommended and required fields for each category:
+
+```typescript
+export function getRecommendedFields(category: 'system' | 'auth' | 'data' | 'fhir'): string[] {
+	switch (category) {
+		case 'system':
+			return ['systemComponent', 'configurationChanges', 'maintenanceDetails', 'backupDetails']
+		case 'auth':
+			return ['authMethod', 'failureReason', 'sessionContext', 'mfaDetails']
+		case 'data':
+			return ['dataType', 'recordCount', 'targetResourceType', 'targetResourceId', 'exportFormat']
+		case 'fhir':
+			return [
+				'fhirResourceType',
+				'fhirResourceId',
+				'patientId',
+				'practitionerId',
+				'operationOutcome',
+			]
+		default:
+			return []
+	}
+}
+```
+
+**Section sources**   
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L1-L382)
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L1-L308)
 
 ## Real-World Usage Example
 
@@ -258,10 +317,10 @@ DBHandler-->>App : confirmation
 ```
 
 **Diagram sources**
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L1-L200)
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts#L1-L200)
 
-**Section sources**
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L1-L200)
+**Section sources**   
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts#L1-L200)
 
 ### Key Implementation Details
 
@@ -274,6 +333,33 @@ The example shows a complete workflow:
 6. Generate alert statistics
 
 This demonstrates how event categorization (`auth.login.failure`) directly impacts downstream processing by triggering security alerts and enabling organizational isolation of alert data.
+
+The example also demonstrates multi-organizational isolation, where alerts are properly isolated by organization ID:
+
+```typescript
+// Multi-organizational alert isolation
+const org1Alerts = await org1Setup.databaseAlertHandler.getActiveAlerts('org-1')
+const org2Alerts = await org2Setup.databaseAlertHandler.getActiveAlerts('org-2')
+
+// Verify organizational isolation
+try {
+	await org1Setup.databaseAlertHandler.getActiveAlerts('org-2')
+	console.log('❌ Security issue: Cross-organizational access allowed!')
+} catch (error) {
+	console.log('✅ Organizational isolation working correctly')
+}
+```
+
+The system also provides alert maintenance capabilities, including cleanup of old resolved alerts:
+
+```typescript
+// Cleanup old resolved alerts (older than 30 days)
+const deletedCount = await databaseAlertHandler.cleanupResolvedAlerts('org-123', 30)
+console.log(`🧹 Cleaned up ${deletedCount} old resolved alerts`)
+```
+
+**Section sources**   
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts#L1-L282)
 
 ## Error Handling and Performance
 
@@ -335,12 +421,45 @@ G -- Yes --> I[Dead Letter Queue]
 ```
 
 **Diagram sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L200)
-- [circuit-breaker.ts](file://packages/audit/src/queue/circuit-breaker.ts)
-- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L200)
+- [circuit-breaker.ts](file://packages\audit\src\queue\circuit-breaker.ts)
+- [dead-letter-queue.ts](file://packages\audit\src\queue\dead-letter-queue.ts)
 
-**Section sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L200)
+**Section sources**   
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L200)
+
+The system also provides comprehensive health monitoring through the `getHealthStatus` method:
+
+```typescript
+async getHealthStatus() {
+	const [metrics, dlMetrics, cbMetrics] = await Promise.all([
+		this.getMetrics(),
+		this.deadLetterHandler.getMetrics(),
+		Promise.resolve(this.circuitBreaker.getMetrics()),
+	])
+
+	const healthScore = await this.calculateHealthScore(dlMetrics, cbMetrics)
+
+	return {
+		isRunning: this.isRunning,
+		circuitBreakerState: this.circuitBreaker.getState(),
+		queueDepth: metrics.queueDepth,
+		processorMetrics: metrics,
+		circuitBreakerMetrics: cbMetrics,
+		deadLetterMetrics: dlMetrics,
+		healthScore,
+	}
+}
+```
+
+The health score is calculated based on multiple factors:
+- Circuit breaker state (OPEN, HALF_OPEN, CLOSED)
+- Failure rate
+- Dead letter queue buildup
+- Queue depth
+
+**Section sources**   
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L537)
 
 ## Best Practices
 
@@ -349,15 +468,30 @@ G -- Yes --> I[Dead Letter Queue]
 2. **Include sufficient context**: Add relevant details in the `sessionContext` and additional fields
 3. **Set appropriate data classification**: Use `PHI` for protected health information, `CONFIDENTIAL` for sensitive data
 4. **Use correlation IDs**: Link related events across service boundaries
+5. **Follow category-specific recommendations**: Use `getRecommendedFields()` to identify additional fields that should be included for each category
 
 ### Optimizing Validation Performance
 1. **Batch validation**: When processing multiple events, validate them in batches to reduce overhead
 2. **Cache validation results**: For frequently used event schemas, cache the validation rules
 3. **Use early exit**: The validation process uses short-circuit evaluation to fail fast on the first error
 4. **Pre-validate at client**: Implement client-side validation to reduce server load
+5. **Use validation configuration**: Customize validation rules through the `ValidationConfig` interface
+
+### Compliance and Security
+1. **Enable cryptographic integrity**: Use `generateHash` and `generateSignature` options to ensure event immutability
+2. **Validate compliance requirements**: Use `validateCompliance()` to enforce HIPAA, GDPR, or custom compliance rules
+3. **Implement proper data classification**: Ensure PHI events are properly classified and include required fields
+4. **Monitor circuit breaker state**: Receive notifications when the circuit breaker opens
+5. **Set up dead letter queue monitoring**: Alert on events that fail after maximum retries
 
 ### Monitoring and Alerting
 1. **Track processing latency**: Monitor the `processingLatency` field to detect performance degradation
 2. **Watch queue depth**: Use the `queueDepth` metric to identify ingestion bottlenecks
-3. **Set up dead letter queue monitoring**: Alert on events that fail after maximum retries
-4. **Monitor circuit breaker state**: Receive notifications when the circuit breaker opens
+3. **Monitor health score**: Track the overall health score to detect systemic issues
+4. **Analyze failure patterns**: Use dead letter queue metrics to identify recurring failure patterns
+5. **Set up organizational isolation**: Ensure proper multi-tenancy by isolating alerts and data by organization
+
+**Section sources**   
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+- [validation.ts](file://packages\audit\src\validation.ts#L1-L866)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L537)

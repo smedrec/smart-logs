@@ -9,6 +9,7 @@
 - [config/manager.ts](file://packages/audit/src/config/manager.ts)
 - [config/validator.ts](file://packages/audit/src/config/validator.ts)
 - [event/event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
+- [event/event-types.ts](file://packages/audit/src/event/event-types.ts)
 - [crypto.ts](file://packages/audit/src/crypto.ts)
 - [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
 - [index.ts](file://packages/audit/src/index.ts)
@@ -227,8 +228,18 @@ The system defines several action categories:
 
 The categorization process uses predefined lists of valid actions for each category and provides functions to validate that an action belongs to a specific category. This enables category-specific validation rules and processing logic.
 
+The `validateCategorizedEvent` function performs category-specific validation and returns warnings for missing recommended fields:
+
+- **System events**: Warns about missing systemComponent, configurationChanges, maintenanceDetails, or backupDetails
+- **Authentication events**: Warns about missing principalId, failureReason, sessionContext, or mfaDetails
+- **Data events**: Warns about incomplete target resource information, missing export format, or share recipient
+- **FHIR events**: Warns about incomplete FHIR resource information, missing patientId, or practitionerId
+
+The system also provides factory functions in `event-types.ts` for creating properly structured events with recommended defaults, including automatic timestamp generation and appropriate data classification defaults (e.g., PHI for FHIR events).
+
 **Section sources**
 - [event/event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
+- [event/event-types.ts](file://packages/audit/src/event/event-types.ts)
 - [types.ts](file://packages/audit/src/types.ts)
 
 ## Configuration Management

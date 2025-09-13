@@ -24,7 +24,16 @@
 - [packages/redis-client/package.json](file://packages/redis-client/package.json)
 - [packages/send-mail/package.json](file://packages/send-mail/package.json)
 - [packages/typescript-config/package.json](file://packages/typescript-config/package.json)
+- [apps/docs/astro.config.mjs](file://apps/docs/astro.config.mjs) - *Updated in recent commit*
+- [apps/docs/package.json](file://apps/docs/package.json) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation section to reflect recent changes in documentation tooling
+- Added information about TypeDoc integration status and future plans
+- Clarified the current state of API and type documentation generation
+- Updated references to include newly relevant configuration files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -518,19 +527,28 @@ API endpoints should be documented with:
 
 GraphQL APIs are automatically documented through schema introspection, but important endpoints should also have guide-level documentation.
 
-### Keeping Documentation Updated
-Documentation should be updated alongside code changes. When adding new features:
-1. Update user documentation
-2. Add JSDoc comments to code
-3. Update package READMEs if applicable
-4. Add examples when appropriate
+### Type Documentation
+The project uses TypeDoc for generating API reference documentation from TypeScript code. However, due to a current compatibility issue between TypeDoc and the CommonJS module system, the TypeDoc integration is temporarily disabled in the documentation site configuration.
 
-The `pnpm dev` command starts the documentation site in development mode, allowing you to preview changes locally.
+As noted in the `apps/docs/astro.config.mjs` file, the TypeDoc plugin is currently commented out with a TODO comment indicating it should be re-enabled when the compatibility issue is resolved:
+
+```javascript
+// TODO: Temporarily disabled due to TypeDoc CommonJS compatibility issue
+// import { createStarlightTypeDocPlugin } from 'starlight-typedoc'
+
+// TODO: Re-enable when TypeDoc compatibility is fixed
+// const [publicStarlightTypeDoc, publicTypeDocSidebarGroup] = createStarlightTypeDocPlugin()
+```
+
+Until this issue is resolved, type documentation will not be automatically generated on the documentation site. Contributors should ensure that JSDoc comments are properly maintained in the source code, particularly in the core packages like `packages/audit/src/index.ts`, which is designated as the entry point for TypeDoc generation.
+
+When the compatibility issue is resolved, the TypeDoc integration will be re-enabled by uncommenting the relevant code in `astro.config.mjs` and the sidebar configuration will automatically include the generated type documentation.
 
 **Section sources**
 - [CONTRIBUTING.md](file://CONTRIBUTING.md#L1-L21)
 - [apps/docs/package.json](file://apps/docs/package.json)
 - [apps/docs/src/content/docs/](file://apps/docs/src/content/docs/)
+- [apps/docs/astro.config.mjs](file://apps/docs/astro.config.mjs)
 
 ## Common Contribution Scenarios
 
@@ -556,7 +574,7 @@ For features that span multiple packages, consider the architecture:
 3. Implement the fix
 4. Verify the test passes
 5. Commit using `pnpm commit`
-6. Create a pull request referencing the issue
+6. Create a pull request
 
 Include steps to reproduce the bug in the PR description.
 
