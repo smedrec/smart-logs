@@ -227,6 +227,11 @@ Pagination information is included in the response:
 		],
 	}))
 
+	app.openAPIRegistry.registerComponent('securitySchemes', 'BearerAuth', {
+		type: 'http',
+		scheme: 'bearer',
+	})
+
 	// Add global middleware
 	app.use('*', errorHandler())
 
