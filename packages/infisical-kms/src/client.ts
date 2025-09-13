@@ -4,6 +4,7 @@ import type {
 	DecryptResponse,
 	EncryptResponse,
 	InfisicalKmsClientConfig,
+	SigningAlgorithm,
 	SignResponse,
 	VerifyResponse,
 } from './types.js'
@@ -91,7 +92,7 @@ export class InfisicalKmsClient extends BaseResource {
 	 * @returns {Promise<SignResponse>} A promise that resolves with the signature and key ID.
 	 * @throws {KmsApiError} If the signing request fails due to network issues or an unsuccessful API response.
 	 */
-	public async sign(data: string, signingAlgorithm: string = 'RSA_4096'): Promise<SignResponse> {
+	public async sign(data: string, signingAlgorithm: SigningAlgorithm = 'RSASSA_PSS_SHA_256'): Promise<SignResponse> {
 		// Base64 encode the plaintext as required by the API.
 		const b64 = btoa(data)
 
@@ -122,7 +123,7 @@ export class InfisicalKmsClient extends BaseResource {
 	public async verify(
 		data: string,
 		signature: string,
-		signingAlgorithm: string = 'RSA_4096'
+		signingAlgorithm: SigningAlgorithm = 'RSASSA_PSS_SHA_256'
 	): Promise<VerifyResponse> {
 		// Base64 encode the plaintext as required by the API.
 		const b64 = btoa(data)

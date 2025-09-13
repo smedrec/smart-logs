@@ -6,4 +6,5 @@ export type {
 	DecryptResponse,
 	SignResponse,
 	VerifyResponse,
+	SigningAlgorithm
 } from './types.js'

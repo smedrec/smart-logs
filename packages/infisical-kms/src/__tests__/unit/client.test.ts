@@ -127,7 +127,7 @@ describe('InfisicalKmsClient', () => {
 			const mockResponse: SignResponse = {
 				signature: 'signed-data',
 				keyId: mockConfig.signingKey,
-				signingAlgorithm: 'RSA_4096',
+				signingAlgorithm: 'RSASSA_PSS_SHA_256',
 			}
 
 			mockFetch.mockResolvedValueOnce({
@@ -141,7 +141,7 @@ describe('InfisicalKmsClient', () => {
 			expect(mockFetch).toHaveBeenCalledWith(
 				`${mockConfig.baseUrl}/api/v1/kms/keys/${mockConfig.signingKey}/sign`,
 				expect.objectContaining({
-					body: JSON.stringify({ data: btoa(dataToSign), signingAlgorithm: 'RSA_4096' }),
+					body: JSON.stringify({ data: btoa(dataToSign), signingAlgorithm: 'RSASSA_PSS_SHA_256' }),
 				})
 			)
 		})
@@ -165,7 +165,7 @@ describe('InfisicalKmsClient', () => {
 			const mockResponse: VerifyResponse = {
 				signatureValid: true,
 				keyId: mockConfig.signingKey,
-				signingAlgorithm: 'RSA_4096',
+				signingAlgorithm: 'RSASSA_PSS_SHA_256',
 			}
 
 			mockFetch.mockResolvedValueOnce({
@@ -182,7 +182,7 @@ describe('InfisicalKmsClient', () => {
 					body: JSON.stringify({
 						data: btoa(dataToVerify),
 						signature,
-						signingAlgorithm: 'RSA_4096',
+						signingAlgorithm: 'RSASSA_PSS_SHA_256',
 					}),
 				})
 			)
@@ -192,7 +192,7 @@ describe('InfisicalKmsClient', () => {
 			const mockResponse: VerifyResponse = {
 				signatureValid: false,
 				keyId: mockConfig.signingKey,
-				signingAlgorithm: 'RSA_4096',
+				signingAlgorithm: 'RSASSA_PSS_SHA_256',
 			}
 
 			mockFetch.mockResolvedValueOnce({

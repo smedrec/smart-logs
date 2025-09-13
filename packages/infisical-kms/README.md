@@ -52,7 +52,7 @@ try {
 
 // 4. Sign data
 const dataToSign = 'This is a message to be signed.'
-const signingAlgorithm = 'RSA_4096' // Optional, defaults to 'RSA_4096'
+const signingAlgorithm = 'RSASSA_PSS_SHA_256' // Optional, defaults to 'RSASSA_PSS_SHA_256'
 try {
 	const signature = await kmsClient.sign(dataToSign, signingAlgorithm)
 	console.log('Signature:', signature.signature)
@@ -70,7 +70,7 @@ try {
 // 5. Verify data
 const dataToVerify = 'This is a message to be verified.'
 const signature = 'your-signature' // Base64-encoded signature
-const signingAlgorithm = 'RSA_4096' // Optional, defaults to 'RSA_4096'
+const signingAlgorithm = 'RSASSA_PSS_SHA_256' // Optional, defaults to 'RSASSA_PSS_SHA_256'
 try {
 	const verificationResult = await kmsClient.verify(dataToVerify, signature, signingAlgorithm)
 	console.log('Verification result:', verificationResult.signatureValid)
