@@ -2,12 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts)
-- [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts)
-- [event-types.ts](file://packages/audit/src/event/event-types.ts)
+- [audit-api.ts](file://apps/server/src/routes/audit-api.ts) - *Updated in recent commit*
+- [rest-api.ts](file://apps/server/src/routes/rest-api.ts) - *Added BearerAuth security scheme*
+- [auth.ts](file://apps/server/src/lib/middleware/auth.ts) - *Authentication and authorization logic*
+- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts) - *Rate limiting implementation*
+- [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts) - *API versioning logic*
+- [event-types.ts](file://packages/audit/src/event/event-types.ts) - *Event categorization and types*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated authentication section to include Bearer token authentication via Authorization header
+- Added BearerAuth security scheme details from OpenAPI specification
+- Enhanced authentication methods section with updated code examples
+- Updated request examples to show proper Bearer token usage
+- Added OpenAPI security schemes documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -33,9 +42,15 @@ The API is designed around REST principles with predictable resource-oriented UR
 The Audit API implements a comprehensive authentication and authorization system using JWT tokens and role-based access control. All endpoints require valid authentication unless explicitly documented otherwise.
 
 ### Authentication Methods
-The API supports two authentication methods:
+The API supports three authentication methods:
 - **Session-based authentication** using JWT tokens in the Authorization header
 - **API key authentication** using the x-api-key header or Authorization header with Bearer prefix
+- **Bearer token authentication** using the Authorization header with Bearer prefix
+
+The OpenAPI specification defines the following security schemes:
+- **cookieAuth**: Session token in cookie (better-auth.session_token)
+- **BearerAuth**: Bearer token in Authorization header
+- **ApiKeyAuth**: API key in x-api-key header
 
 ```mermaid
 sequenceDiagram
@@ -55,6 +70,7 @@ AuthMiddleware->>Client : Proceed with request or return error
 
 **Diagram sources**
 - [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L1-L200)
+- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L180-L243)
 
 ### Role-Based Access Control
 The API implements fine-grained permission controls based on user roles and organizational context. The following roles are supported:

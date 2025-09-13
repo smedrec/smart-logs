@@ -2,13 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [crypto.ts](file://packages/audit/src/crypto.ts)
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated in recent commit*
 - [error-handling.ts](file://packages/audit/src/error/error-handling.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 - [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
 - [error-handling.test.ts](file://packages/audit/src/__tests__/error-handling.test.ts)
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts)
 </cite>
+
+## Update Summary
+- Added documentation for the new async sha256 method in CryptoService that returns base64 encoded strings
+- Updated Cryptographic Functions section to include information about the Web Crypto API implementation
+- Enhanced the Deterministic Hashing section with details about the base64 encoding utility
+- Updated code examples and diagrams to reflect the new asynchronous hashing capability
+- Maintained all existing security documentation while adding new content for the updated cryptographic functions
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -49,6 +56,7 @@ class CryptoService {
 +verifyHash(event, hash) boolean
 +generateEventSignature(event) string
 +verifyEventSignature(event, signature) boolean
++sha256(source) Promise~string~
 -extractCriticalFields(event) Record
 -createDeterministicString(fields) string
 }
@@ -74,7 +82,7 @@ To ensure consistent hashing regardless of object property order, the system:
 3. Creates a deterministic string using `key:value` pairs joined by `|`
 4. Applies SHA-256 to this normalized string
 
-This approach guarantees that identical events produce identical hashes even when serialized with different property ordering.
+This approach guarantees that identical events produce identical hashes even when serialized with different property ordering. The system also includes a base64 encoding utility that converts binary hash data into RFC4648 compliant base64 strings for easier transmission and storage.
 
 ### HMAC Signature Verification
 The HMAC-SHA256 signature provides an additional layer of security by incorporating a secret key. The process:
@@ -83,6 +91,27 @@ The HMAC-SHA256 signature provides an additional layer of security by incorporat
 3. Produces a 64-character hexadecimal signature
 
 This prevents attackers from modifying both the data and hash without access to the secret key.
+
+### Asynchronous SHA-256 Hashing with Base64 Encoding
+The `CryptoService` now includes an asynchronous `sha256` method that leverages the Web Crypto API for secure hashing operations. This method:
+- Accepts string or Uint8Array input
+- Returns a Promise that resolves to a base64-encoded string
+- Uses the browser's or Node.js's built-in Web Crypto API for cryptographic operations
+- Implements RFC4648 compliant base64 encoding
+
+```typescript
+async sha256(source: string | Uint8Array): Promise<string> {
+    const buf = typeof source === 'string' ? new TextEncoder().encode(source) : source
+    const hash = await crypto.subtle.digest('sha-256', buf)
+    return this.b64(hash)
+}
+```
+
+The base64 encoding is implemented using a custom algorithm that handles various input types (string, ArrayBuffer, or Uint8Array) and produces properly padded base64 strings with '=' padding characters as needed.
+
+**Section sources**
+- [crypto.ts](file://packages/audit/src/crypto.ts#L80-L90)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L188-L218)
 
 ## Error Handling and Secure Logging
 

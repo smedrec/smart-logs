@@ -6,6 +6,8 @@
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
 </cite>
 
 ## Table of Contents
@@ -20,7 +22,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides a comprehensive analysis of the security and access control mechanisms implemented in the smart-logs repository. The system is designed to ensure robust database security, enforce strict access policies, and maintain compliance with data protection regulations. The architecture incorporates encryption at rest, secure connection handling, authentication protocols, tenant isolation, and comprehensive audit trail generation. The enhanced client plays a central role in enforcing access policies, preventing injection attacks through parameterized queries, and managing secure database operations.
+This document provides a comprehensive analysis of the security and access control mechanisms implemented in the smart-logs repository. The system is designed to ensure robust database security, enforce strict access policies, and maintain compliance with data protection regulations. The architecture incorporates encryption at rest, secure connection handling, authentication protocols, tenant isolation, and comprehensive audit trail generation. The enhanced client plays a central role in enforcing access policies, preventing injection attacks through parameterized queries, and managing secure database operations. Recent updates have enhanced the alert persistence system by integrating the EnhancedAuditDb client and configuration management, improving the security and reliability of monitoring operations.
 
 ## Project Structure
 The repository follows a monorepo structure with multiple applications and packages organized under the `apps` and `packages` directories. The core security components are primarily located in the `packages` directory, specifically within `audit-db`, `audit`, and `auth`. The `apps` directory contains various application implementations including web, native, server, and documentation. The structure supports modular development with clear separation of concerns, enabling independent development and deployment of security-critical components.
@@ -62,12 +64,13 @@ auditDb --> redisClient
 - [package.json](file://package.json)
 
 ## Core Components
-The security architecture is built around several core components that work together to provide comprehensive database security and access control. The enhanced database client serves as the primary interface for secure database operations, integrating connection pooling, query caching, and performance monitoring. The audit database package provides the foundation for secure data storage with tenant isolation and compliance features. The configuration manager handles encryption at rest for sensitive configuration data, while the authentication package manages user access and permissions.
+The security architecture is built around several core components that work together to provide comprehensive database security and access control. The enhanced database client serves as the primary interface for secure database operations, integrating connection pooling, query caching, and performance monitoring. The audit database package provides the foundation for secure data storage with tenant isolation and compliance features. The configuration manager handles encryption at rest for sensitive configuration data, while the authentication package manages user access and permissions. The DatabaseAlertHandler component has been updated to use the EnhancedAuditDb client, ensuring that all alert persistence operations benefit from the same security and performance features as other database operations.
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 
 ## Architecture Overview
 The security architecture implements a multi-layered approach to database security and access control. At the foundation is encryption at rest for sensitive data, complemented by secure connection handling with SSL/TLS support. The enhanced client enforces access policies and prevents injection attacks through parameterized queries. Tenant isolation is achieved through organizational identifiers in database tables, ensuring data separation between different organizations. Row-level security considerations are addressed through comprehensive audit trails and cryptographic integrity verification.
@@ -331,8 +334,46 @@ AUDIT_LOG }|--|| REPORT_TEMPLATES : "supports"
 **Section sources**
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 
+### Database Alert Handler Implementation
+The DatabaseAlertHandler component has been updated to use the EnhancedAuditDb client, ensuring that all alert persistence operations benefit from the same security and performance features as other database operations. This implementation provides a robust interface for storing alerts in PostgreSQL with organization-based access control. The handler uses the enhanced client's monitoring and caching capabilities to improve performance and reliability.
+
+```mermaid
+classDiagram
+class DatabaseAlertHandler {
+-client : EnhancedAuditDatabaseClient
+-db : PostgresJsDatabase
++handlerName() : string
++sendAlert(alert : Alert) : Promise~void~
++acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{success : boolean}~
++resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{success : boolean}~
++getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++numberOfActiveAlerts(organizationId? : string) : Promise~number~
++getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++getAlertById(alertId : string, organizationId : string) : Promise~Alert | null~
++getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
++cleanupResolvedAlerts(organizationId : string, retentionDays : number) : Promise~number~
+}
+class EnhancedAuditDb {
+-client : EnhancedAuditDatabaseClient
++getEnhancedClientInstance() : EnhancedAuditDatabaseClient
++getDrizzleInstance() : PostgresJsDatabase~typeof schema~
++checkAuditDbConnection() : Promise~boolean~
++healthStatus() : Promise~HealthStatus~
++end() : Promise~void~
+}
+DatabaseAlertHandler --> EnhancedAuditDb : "uses"
+```
+
+**Diagram sources**
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+
+**Section sources**
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
+
 ## Dependency Analysis
-The security components have well-defined dependencies that ensure proper isolation and modularity. The enhanced client depends on the connection pool, partition manager, and performance monitor, creating a layered architecture. The connection pool depends on the postgres.js driver and Drizzle ORM for database interactions. The configuration manager depends on Node.js crypto modules for encryption operations. These dependencies are managed through the monorepo structure, allowing for independent versioning and testing of security-critical components.
+The security components have well-defined dependencies that ensure proper isolation and modular. The enhanced client depends on the connection pool, partition manager, and performance monitor, creating a layered architecture. The connection pool depends on the postgres.js driver and Drizzle ORM for database interactions. The configuration manager depends on Node.js crypto modules for encryption operations. These dependencies are managed through the monorepo structure, allowing for independent versioning and testing of security-critical components.
 
 ```mermaid
 graph TD

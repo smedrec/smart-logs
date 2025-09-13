@@ -2,14 +2,24 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
-- [event-types.ts](file://packages/audit/src/event/event-types.ts)
-- [types.ts](file://packages/audit/src/types.ts)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
-- [preset-types.ts](file://packages/audit/src/preset/preset-types.ts)
-- [audit-preset.ts](file://packages/audit/src/preset/audit-preset.ts)
+- [audit.ts](file://packages\audit\src\audit.ts) - *Updated in recent commit*
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts) - *Updated in recent commit*
+- [event-types.ts](file://packages\audit\src\event\event-types.ts) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\types.ts) - *Updated in recent commit*
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts) - *Updated in recent commit*
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts) - *Updated in recent commit*
+- [audit-preset.ts](file://packages\audit\src\preset\audit-preset.ts) - *Updated in recent commit*
+- [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Database schema reference*
+- [error-handling.ts](file://packages\audit\src\error\error-handling.ts) - *Error handling implementation*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect modular architecture changes in audit-client
+- Enhanced categorization mechanisms with improved validation rules
+- Added detailed error handling strategies based on new error classification system
+- Updated domain models with additional context from database schema
+- Improved integration points documentation with real-time monitoring capabilities
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -43,12 +53,12 @@ B --> L[Metrics Collector]
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 ## Event Lifecycle
 
@@ -81,12 +91,12 @@ end
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 ## Domain Models
 
@@ -124,7 +134,7 @@ class SessionContext {
 ```
 
 **Diagram sources**
-- [types.ts](file://packages/audit/src/types.ts#L1-L286)
+- [types.ts](file://packages\audit\src\types.ts#L1-L286)
 
 ### Categorized Event Types
 ```mermaid
@@ -176,12 +186,12 @@ class FHIRAuditEvent {
 ```
 
 **Diagram sources**
-- [event-types.ts](file://packages/audit/src/event/event-types.ts#L1-L309)
-- [types.ts](file://packages/audit/src/types.ts#L1-L286)
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L1-L309)
+- [types.ts](file://packages\audit\src\types.ts#L1-L286)
 
 **Section sources**
-- [event-types.ts](file://packages/audit/src/event/event-types.ts#L1-L309)
-- [types.ts](file://packages/audit/src/types.ts#L1-L286)
+- [event-types.ts](file://packages\audit\src\event\event-types.ts#L1-L309)
+- [types.ts](file://packages\audit\src\types.ts#L1-L286)
 
 ## Categorization Mechanisms
 
@@ -202,7 +212,7 @@ G --> L[Reject or Flag for Review]
 ```
 
 **Diagram sources**
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L1-L383)
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L1-L383)
 
 ### Category Validation Rules
 ```mermaid
@@ -223,10 +233,10 @@ class EventValidationResult {
 ```
 
 **Diagram sources**
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L1-L383)
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L1-L383)
 
 **Section sources**
-- [event-categorization.ts](file://packages/audit/src/event/event-categorization.ts#L1-L383)
+- [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts#L1-L383)
 
 ## Processing Rules
 
@@ -246,8 +256,8 @@ J --> K[Queue for Reliable Processing]
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
-- [validation.js](file://packages/audit/src/validation.js)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+- [validation.ts](file://packages\audit\src\validation.ts)
 
 ### Preset Configuration Model
 ```mermaid
@@ -272,12 +282,12 @@ class PresetHandler {
 ```
 
 **Diagram sources**
-- [preset-types.ts](file://packages/audit/src/preset/preset-types.ts#L1-L17)
-- [audit-preset.ts](file://packages/audit/src/preset/audit-preset.ts#L1-L15)
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts#L1-L17)
+- [audit-preset.ts](file://packages\audit\src\preset\audit-preset.ts#L1-L15)
 
 **Section sources**
-- [preset-types.ts](file://packages/audit/src/preset/preset-types.ts#L1-L17)
-- [audit-preset.ts](file://packages/audit/src/preset/audit-preset.ts#L1-L15)
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts#L1-L17)
+- [audit-preset.ts](file://packages\audit\src\preset\audit-preset.ts#L1-L15)
 
 ## Error Handling Strategies
 
@@ -326,7 +336,7 @@ ReliableEventProcessor --> ProcessorMetricsCollector
 ```
 
 **Diagram sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 ### Error Handling Workflow
 ```mermaid
@@ -348,10 +358,10 @@ M --> |No| O[Keep Circuit Open]
 ```
 
 **Diagram sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 **Section sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 ## Integration Points
 
@@ -393,8 +403,8 @@ I --> F
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L538)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+- [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
 
 ### API Integration Methods
 ```mermaid
@@ -466,7 +476,7 @@ class DataLogDetails {
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L906)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L906)

@@ -2,12 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts) - *Updated in recent commit*
 - [database-alert-handler.test.ts](file://packages/audit/src/__tests__/database-alert-handler.test.ts)
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
+- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts) - *Updated in recent commit*
+- [manager.ts](file://packages/audit/src/config/manager.ts) - *Configuration management*
+- [index.ts](file://packages/audit-db/src/db/index.ts) - *EnhancedAuditDb client*
+- [connection.ts](file://packages/redis-client/src/connection.ts) - *Redis connection management*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated the Real-World Deployment Example section to reflect changes in the integration example
+- Added information about the new configuration management system
+- Updated code examples to show the use of EnhancedAuditDb client instead of direct database connection
+- Added details about centralized configuration and improved Redis integration
+- Updated section sources to reflect the new files analyzed
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -345,7 +356,7 @@ The `database-alert-integration.ts` example demonstrates a complete real-world d
 
 ```mermaid
 flowchart LR
-A[Database Connection] --> B[DatabaseAlertHandler]
+A[Configuration Manager] --> B[DatabaseAlertHandler]
 C[MonitoringService] --> B
 D[Audit Events] --> C
 B --> E[PostgreSQL Database]
@@ -364,16 +375,24 @@ style H fill:#6f6,stroke:#333
 style I fill:#6f6,stroke:#333
 ```
 
+**Updated** The diagram has been updated to reflect the new configuration management system and the use of EnhancedAuditDb client.
+
 **Diagram sources**
 - [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L1-L283)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L33-L843)
+- [index.ts](file://packages/audit-db/src/db/index.ts#L160-L222)
+- [connection.ts](file://packages/redis-client/src/connection.ts#L73-L135)
 
 **Section sources**
 - [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L1-L283)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L33-L843)
+- [index.ts](file://packages/audit-db/src/db/index.ts#L160-L222)
+- [connection.ts](file://packages/redis-client/src/connection.ts#L73-L135)
 
 ### Integration Example Walkthrough
 The example demonstrates several key aspects of real-world deployment:
 
-1. **Setup**: The `setupMonitoringWithDatabaseAlerts` function creates a database connection, initializes the `DatabaseAlertHandler`, and configures the `MonitoringService` with the handler.
+1. **Setup**: The `setupMonitoringWithDatabaseAlerts` function now uses a `ConfigurationManager` to centralize configuration management, replaces direct database connection with the `EnhancedAuditDb` client, and improves Redis integration and error handling.
 
 2. **Event Processing**: The `processAuditEventsWithAlerts` function simulates suspicious activity (multiple failed login attempts) and processes these events through the monitoring service, demonstrating how alerts are automatically generated.
 
@@ -383,4 +402,4 @@ The example demonstrates several key aspects of real-world deployment:
 
 5. **Maintenance Operations**: The `demonstrateAlertMaintenance` function shows how to clean up old resolved alerts based on retention policies, helping to manage database size and performance.
 
-This comprehensive example provides a blueprint for integrating the Database Security Alerting system into production environments, demonstrating best practices for configuration, usage, and maintenance.
+This comprehensive example provides a blueprint for integrating the Database Security Alerting system into production environments, demonstrating best practices for configuration, usage, and maintenance with the updated architecture.

@@ -1,5 +1,9 @@
 import { createHash, createHmac, randomBytes } from 'crypto'
 
+import { InfisicalKmsClient } from '@repo/infisical-kms'
+
+import { SecurityConfig } from './config/types.js'
+
 import type { AuditLogEvent } from './types.js'
 
 /**
@@ -45,16 +49,20 @@ export interface CryptographicService {
  * Implements SHA-256 hashing and HMAC-SHA256 signatures for tamper detection
  */
 export class CryptoService implements CryptographicService {
-	private config: CryptoConfig
-
-	constructor(config: Partial<CryptoConfig>) {
-		this.config = { ...DEFAULT_CRYPTO_CONFIG, ...config }
-
-		if (!this.config.secretKey) {
-			throw new Error('[CryptoService] Secret key is required for cryptographic operations')
-		}
+	private kms: InfisicalKmsClient | undefined = undefined
+	constructor(private config: SecurityConfig) {
+		if (this.config.kms.enabled) this.init()
 	}
 
+	private init() {
+		if (!this.kms)
+			this.kms = new InfisicalKmsClient({
+				baseUrl: this.config.kms.baseUrl,
+				encryptionKey: this.config.kms.encryptionKey,
+				signingKey: this.config.kms.signingKey,
+				accessToken: this.config.kms.accessToken,
+			})
+	}
 	/**
 	 * Generates a SHA-256 hash of critical audit event fields
 	 * Uses a standardized algorithm to ensure consistency across the system
@@ -114,7 +122,7 @@ export class CryptoService implements CryptographicService {
 		const eventHash = this.generateHash(event)
 
 		// Create HMAC signature using the hash and secret key
-		return createHmac('sha256', this.config.secretKey!).update(eventHash, 'utf8').digest('hex')
+		return createHmac('sha256', this.config.encryptionKey!).update(eventHash, 'utf8').digest('hex')
 	}
 
 	/**
@@ -244,42 +252,6 @@ export class CryptoService implements CryptographicService {
 			signatureAlgorithm: this.config.signatureAlgorithm,
 		}
 	}
-}
-
-/**
- * Default instance of the cryptographic service
- * Uses environment configuration
- */
-export const defaultCryptoService = new CryptoService({
-	secretKey: generateDefaultSecret(),
-})
-
-/**
- * Utility functions for direct hash operations
- */
-export const CryptoUtils = {
-	/**
-	 * Generate SHA-256 hash using the default service
-	 */
-	generateHash: (event: AuditLogEvent): string => defaultCryptoService.generateHash(event),
-
-	/**
-	 * Verify hash using the default service
-	 */
-	verifyHash: (event: AuditLogEvent, expectedHash: string): boolean =>
-		defaultCryptoService.verifyHash(event, expectedHash),
-
-	/**
-	 * Generate signature using the default service
-	 */
-	generateSignature: (event: AuditLogEvent): string =>
-		defaultCryptoService.generateEventSignature(event),
-
-	/**
-	 * Verify signature using the default service
-	 */
-	verifySignature: (event: AuditLogEvent, signature: string): boolean =>
-		defaultCryptoService.verifyEventSignature(event, signature),
 }
 
 const base64abc = [

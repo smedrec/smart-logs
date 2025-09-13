@@ -2,7 +2,7 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts)
+- [rest-api.ts](file://apps/server/src/routes/rest-api.ts) - *Updated in recent commit*
 - [audit-api.ts](file://apps/server/src/routes/audit-api.ts)
 - [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
 - [health-api.ts](file://apps/server/src/routes/health-api.ts)
@@ -88,8 +88,15 @@ Two authentication methods are supported:
    ```
 
 The security schemes are defined in the OpenAPI specification as:
+- `cookieAuth`: Cookie-based authentication using session token
 - `BearerAuth`: HTTP Bearer authentication
 - `ApiKeyAuth`: API key in header
+
+The OpenAPI specification includes all three security schemes, and endpoints can require one or more of these authentication methods. The `BearerAuth` scheme was recently added to support token-based authentication in addition to cookie-based authentication.
+
+**Section sources**
+- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L180-L243)
+- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L1-L765)
 
 ### Access Control Rules
 The API implements a multi-layered access control system:

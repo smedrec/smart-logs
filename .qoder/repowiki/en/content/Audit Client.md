@@ -2,16 +2,26 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [README.md](file://packages/audit-client/README.md)
-- [client.ts](file://packages/audit-client/src/core/client.ts)
-- [config.ts](file://packages/audit-client/src/core/config.ts)
-- [events.ts](file://packages/audit-client/src/services/events.ts)
-- [compliance.ts](file://packages/audit-client/src/services/compliance.ts)
-- [metrics.ts](file://packages/audit-client/src/services/metrics.ts)
-- [health.ts](file://packages/audit-client/src/services/health.ts)
-- [presets.ts](file://packages/audit-client/src/services/presets.ts)
-- [scheduled-reports.ts](file://packages/audit-client/src/services/scheduled-reports.ts)
+- [README.md](file://packages\audit-client\README.md) - *Updated in recent commit*
+- [client.ts](file://packages\audit-client\src\core\client.ts) - *Updated in recent commit*
+- [config.ts](file://packages\audit-client\src\core\config.ts) - *Updated in recent commit*
+- [events.ts](file://packages\audit-client\src\services\events.ts) - *Updated in recent commit*
+- [compliance.ts](file://packages\audit-client\src\services\compliance.ts) - *Updated in recent commit*
+- [metrics.ts](file://packages\audit-client\src\services\metrics.ts) - *Updated in recent commit*
+- [health.ts](file://packages\audit-client\src\services\health.ts) - *Updated in recent commit*
+- [presets.ts](file://packages\audit-client\src\services\presets.ts) - *Updated in recent commit*
+- [scheduled-reports.ts](file://packages\audit-client\src\services\scheduled-reports.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated architecture overview to reflect modular design with enhanced plugin system
+- Added comprehensive configuration options with Zod validation schema details
+- Enhanced API interfaces with complete type definitions and method signatures
+- Updated usage patterns with sequence diagrams for client initialization and service usage
+- Added detailed integration mapping between client methods and API endpoints
+- Refreshed examples with current configuration and service usage patterns
+- Updated troubleshooting guide with new error handling and plugin-related issues
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,7 +39,7 @@
 The Audit Client is a comprehensive TypeScript SDK designed for interacting with the Smart Logs Audit API. It provides a robust set of features including type safety, retry mechanisms, intelligent caching, authentication support, request batching, comprehensive error handling, performance optimization, observability, and a flexible plugin architecture. The client is structured into a modular architecture with distinct layers for core functionality, services, infrastructure, and utilities, enabling developers to efficiently manage audit events, compliance reporting, system metrics, health monitoring, and scheduled reports.
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
+- [README.md](file://packages\audit-client\README.md#L1-L213)
 
 ## Architecture Overview
 The Audit Client follows a modular architecture with four main layers: Core, Service, Infrastructure, and Utils. The Core layer contains the main client class and configuration management. The Service layer provides domain-specific functionality through specialized services. The Infrastructure layer handles cross-cutting concerns like authentication, caching, and retry logic. The Utils layer contains helper functions and validation utilities.
@@ -90,15 +100,15 @@ ScheduledReports --> BaseResource
 ```
 
 **Diagram sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ## Core Components
 The Audit Client consists of several core components that work together to provide a comprehensive audit management solution. The main entry point is the AuditClient class, which orchestrates all services and manages configuration. The ConfigManager handles configuration validation and normalization using Zod schemas. The BaseResource class provides common functionality for all services, including request handling and error management. The client also includes specialized services for events, compliance, metrics, health, presets, and scheduled reports, each providing domain-specific functionality.
 
 **Section sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ## API Interfaces
 The Audit Client provides a comprehensive set of API interfaces through its various services. These interfaces enable developers to interact with the audit system in a type-safe and efficient manner.
@@ -121,7 +131,7 @@ class EventsService {
 ```
 
 **Diagram sources**
-- [events.ts](file://packages/audit-client/src/services/events.ts#L1-L799)
+- [events.ts](file://packages\audit-client\src\services\events.ts#L1-L799)
 
 ### Compliance Service
 The ComplianceService provides methods for generating compliance reports and managing GDPR data exports.
@@ -148,7 +158,7 @@ class ComplianceService {
 ```
 
 **Diagram sources**
-- [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L1-L718)
+- [compliance.ts](file://packages\audit-client\src\services\compliance.ts#L1-L718)
 
 ### Metrics Service
 The MetricsService provides methods for retrieving system metrics and managing alerts.
@@ -176,7 +186,7 @@ class MetricsService {
 ```
 
 **Diagram sources**
-- [metrics.ts](file://packages/audit-client/src/services/metrics.ts#L1-L903)
+- [metrics.ts](file://packages\audit-client\src\services\metrics.ts#L1-L903)
 
 ### Health Service
 The HealthService provides methods for checking system health and monitoring service status.
@@ -206,7 +216,7 @@ class HealthService {
 ```
 
 **Diagram sources**
-- [health.ts](file://packages/audit-client/src/services/health.ts#L1-L737)
+- [health.ts](file://packages\audit-client\src\services\health.ts#L1-L737)
 
 ### Presets Service
 The PresetsService provides methods for managing audit configuration templates.
@@ -232,7 +242,7 @@ class PresetsService {
 ```
 
 **Diagram sources**
-- [presets.ts](file://packages/audit-client/src/services/presets.ts#L1-L752)
+- [presets.ts](file://packages\audit-client\src\services\presets.ts#L1-L752)
 
 ### Scheduled Reports Service
 The ScheduledReportsService provides methods for managing scheduled reports.
@@ -257,7 +267,7 @@ class ScheduledReportsService {
 ```
 
 **Diagram sources**
-- [scheduled-reports.ts](file://packages/audit-client/src/services/scheduled-reports.ts#L1-L797)
+- [scheduled-reports.ts](file://packages\audit-client\src\services\scheduled-reports.ts#L1-L797)
 
 ## Configuration Options
 The Audit Client supports comprehensive configuration options through the AuditClientConfig interface. Configuration can be provided during client initialization and updated at runtime. The configuration includes settings for connection, authentication, retry logic, caching, batching, performance optimization, logging, error handling, and plugins.
@@ -365,13 +375,13 @@ AuditClientConfig --> PluginConfig
 ```
 
 **Diagram sources**
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ### Environment-Specific Configuration
 The client supports environment-specific configuration through the ConfigManager class. Default configurations are provided for development, staging, and production environments, with appropriate settings for logging, error handling, and performance optimization.
 
 **Section sources**
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ## Usage Patterns
 The Audit Client follows several key usage patterns to ensure efficient and reliable interaction with the audit system.
@@ -396,7 +406,7 @@ Client-->>App : Client instance
 ```
 
 **Diagram sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
 
 ### Service Usage
 Each service is accessed through the client instance, providing a clean and intuitive API.
@@ -419,8 +429,8 @@ Client-->>App : created event
 ```
 
 **Diagram sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [events.ts](file://packages/audit-client/src/services/events.ts#L1-L799)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
+- [events.ts](file://packages\audit-client\src\services\events.ts#L1-L799)
 
 ### Error Handling
 The client provides comprehensive error handling through the ErrorHandler class, with options for retry, recovery, and custom error handling.
@@ -450,8 +460,8 @@ ReturnResult --> End([Success])
 ```
 
 **Diagram sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ## Integration with Core Audit System
 The Audit Client integrates with the core audit system through a REST API, providing a type-safe and efficient interface for all audit operations.
@@ -543,12 +553,12 @@ The client maps its methods to specific API endpoints on the audit server.
 | ScheduledReports | getUpcomingExecutions | GET | /scheduled-reports/upcoming |
 
 **Section sources**
-- [events.ts](file://packages/audit-client/src/services/events.ts#L1-L799)
-- [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L1-L718)
-- [metrics.ts](file://packages/audit-client/src/services/metrics.ts#L1-L903)
-- [health.ts](file://packages/audit-client/src/services/health.ts#L1-L737)
-- [presets.ts](file://packages/audit-client/src/services/presets.ts#L1-L752)
-- [scheduled-reports.ts](file://packages/audit-client/src/services/scheduled-reports.ts#L1-L797)
+- [events.ts](file://packages\audit-client\src\services\events.ts#L1-L799)
+- [compliance.ts](file://packages\audit-client\src\services\compliance.ts#L1-L718)
+- [metrics.ts](file://packages\audit-client\src\services\metrics.ts#L1-L903)
+- [health.ts](file://packages\audit-client\src\services\health.ts#L1-L737)
+- [presets.ts](file://packages\audit-client\src\services\presets.ts#L1-L752)
+- [scheduled-reports.ts](file://packages\audit-client\src\services\scheduled-reports.ts#L1-L797)
 
 ## Examples
 The Audit Client provides several examples demonstrating common usage patterns.
@@ -575,7 +585,7 @@ const event = await client.events.create({
 ```
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
+- [README.md](file://packages\audit-client\README.md#L1-L213)
 
 ### Configuration Example
 ```typescript
@@ -611,7 +621,7 @@ const client = new AuditClient(config)
 ```
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
+- [README.md](file://packages\audit-client\README.md#L1-L213)
 
 ### Events Service Example
 ```typescript
@@ -629,7 +639,7 @@ const verification = await client.events.verify(eventId)
 ```
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
+- [README.md](file://packages\audit-client\README.md#L1-L213)
 
 ### Compliance Service Example
 ```typescript
@@ -642,7 +652,7 @@ const exportResult = await client.compliance.exportGdprData(params)
 ```
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
+- [README.md](file://packages\audit-client\README.md#L1-L213)
 
 ### Metrics Service Example
 ```typescript
@@ -656,7 +666,7 @@ await client.metrics.acknowledgeAlert(alertId)
 ```
 
 **Section sources**
-- [README.md](file://packages/audit-client/README.md#L1-L213)
+- [README.md](file://packages\audit-client\README.md#L1-L213)
 
 ## Troubleshooting Guide
 This section provides guidance for troubleshooting common issues with the Audit Client.
@@ -674,7 +684,7 @@ Configuration errors typically occur when invalid configuration options are prov
 Ensure all configuration options are valid and meet the requirements specified in the configuration schema.
 
 **Section sources**
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ### Authentication Issues
 Authentication issues occur when the client cannot authenticate with the audit server.
@@ -688,8 +698,8 @@ Authentication issues occur when the client cannot authenticate with the audit s
 Verify authentication credentials and ensure the authentication configuration is correct. Enable autoRefresh for tokens that expire.
 
 **Section sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ### Network and Connectivity Issues
 Network issues occur when the client cannot connect to the audit server.
@@ -704,7 +714,7 @@ Network issues occur when the client cannot connect to the audit server.
 Verify the baseUrl is correct and accessible. Check network connectivity and firewall settings. Adjust timeout settings if needed.
 
 **Section sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
 
 ### Rate Limiting
 The audit server may enforce rate limits on API requests.
@@ -718,8 +728,8 @@ The audit server may enforce rate limits on API requests.
 Implement request batching to reduce the number of requests. Adjust retry configuration to handle rate limiting. Monitor usage metrics to stay within limits.
 
 **Section sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ### Performance Issues
 Performance issues may occur with large datasets or high request volumes.
@@ -733,8 +743,8 @@ Performance issues may occur with large datasets or high request volumes.
 Enable request compression and streaming. Use pagination for large result sets. Implement caching for frequently accessed data. Monitor performance metrics to identify bottlenecks.
 
 **Section sources**
-- [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
-- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
+- [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ## Conclusion
 The Audit Client provides a comprehensive and robust solution for interacting with the Smart Logs Audit API. Its modular architecture, type safety, and extensive feature set make it an ideal choice for applications requiring audit functionality. The client's support for configuration, retry logic, caching, and observability ensures reliable and efficient operation in various environments. With its comprehensive API interfaces and clear usage patterns, the Audit Client simplifies the integration of audit capabilities into applications while maintaining high performance and reliability.

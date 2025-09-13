@@ -40,6 +40,7 @@
 		"@repo/audit-db": "workspace:*",
 		"@repo/logs": "workspace:*",
 		"@repo/redis-client": "workspace:*",
+		"@repo/infisical-kms": "workspace:*",
 		"bullmq": "5.56.4",
 		"dotenv": "17.2.0",
 		"drizzle-orm": "0.44.5",

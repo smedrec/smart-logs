@@ -9,7 +9,17 @@
 - [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts)
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
+- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts) - *Updated in recent commit*
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+- Updated database integration examples to use EnhancedAuditDb client instead of direct database connections
+- Added documentation for DatabaseAlertHandler class and its integration with EnhancedAuditDb
+- Updated connection handling documentation to reflect the use of enhanced client
+- Added new section on alert persistence with database integration
+- Updated architecture overview to include alert handling components
+- Added new diagram for alert handling architecture
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -21,7 +31,8 @@
 7. [Access Control and Security](#access-control-and-security)
 8. [Migration and Version Management](#migration-and-version-management)
 9. [Architecture Overview](#architecture-overview)
-10. [Conclusion](#conclusion)
+10. [Alert Persistence with Database Integration](#alert-persistence-with-database-integration)
+11. [Conclusion](#conclusion)
 
 ## Introduction
 
@@ -835,6 +846,154 @@ The system integrates with several external components:
 
 The architecture is designed to be scalable and maintainable, with clear separation of concerns and well-defined interfaces between components.
 
+## Alert Persistence with Database Integration
+
+The Audit Database now supports persistent alert storage through the DatabaseAlertHandler class, which integrates with the EnhancedAuditDatabaseClient to store and manage alerts in the PostgreSQL database.
+
+### Database Alert Handler Architecture
+
+```mermaid
+graph TD
+MS[MonitoringService] --> DAH[DatabaseAlertHandler]
+DAH --> EADB[EnhancedAuditDatabaseClient]
+EADB --> DB[(PostgreSQL)]
+EADB --> RC[Redis Cache]
+DAH --> RC
+MS --> RC
+subgraph "Alert Persistence"
+DAH
+EADB
+end
+subgraph "Data Storage"
+DB
+RC
+end
+style DAH fill:#f96,stroke:#333
+style EADB fill:#f96,stroke:#333
+style DB fill:#bbf,stroke:#333
+style RC fill:#bbf,stroke:#333
+```
+
+**Diagram sources**
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+
+**Section sources**
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
+
+### DatabaseAlertHandler Class
+
+The DatabaseAlertHandler class implements the AlertHandler interface to provide persistent storage of alerts in the database:
+
+```typescript
+class DatabaseAlertHandler implements AlertHandler {
+  private client: EnhancedAuditDatabaseClient
+  private db: PostgresJsDatabase<any>
+  
+  constructor(auditDbInstance: EnhancedAuditDb) {
+    this.client = auditDbInstance.getEnhancedClientInstance()
+    this.db = this.client.getDatabase()
+  }
+  
+  async sendAlert(alert: Alert): Promise<void>
+  async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }>
+  async resolveAlert(alertId: string, resolvedBy: string, resolutionData?: AlertResolution): Promise<{ success: boolean }>
+  async getActiveAlerts(organizationId?: string): Promise<Alert[]>
+  async getAlerts(filters: AlertQueryFilters): Promise<Alert[]>
+  async getAlertById(alertId: string, organizationId: string): Promise<Alert | null>
+  async getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
+  async cleanupResolvedAlerts(organizationId: string, retentionDays: number = 90): Promise<number>
+}
+```
+
+### Key Features
+
+- **Multi-organizational support**: All alerts are stored with organization_id for tenant isolation
+- **Persistent storage**: Alerts are stored in the PostgreSQL database for reliability
+- **Caching integration**: Uses Redis caching for improved query performance
+- **Comprehensive querying**: Supports filtering by severity, type, status, and other criteria
+- **Statistics and metrics**: Provides alert statistics by severity, type, and status
+- **Retention management**: Automatically cleans up resolved alerts based on retention policy
+
+### Integration Example
+
+The integration example has been updated to use the EnhancedAuditDb client instead of direct database connections:
+
+```typescript
+export async function setupMonitoringWithDatabaseAlerts() {
+  // Initialize configuration
+  if (!configManager) {
+    configManager = new ConfigurationManager(process.env.CONFIG_PATH!, 's3')
+    await configManager.initialize()
+  }
+  const config = configManager.getConfig()
+
+  if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
+
+  if (!auditDbInstance) {
+    auditDbInstance = new EnhancedAuditDb(connection, config.enhancedClient)
+    const isConnected = await auditDbInstance.checkAuditDbConnection()
+    if (!isConnected) {
+      console.error('Failed to connect to the audit database. Exiting.')
+      process.exit(1)
+    }
+  }
+
+  // Create database alert handler
+  if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(auditDbInstance)
+
+  if (!monitoringService) {
+    if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
+    monitoringService = new MonitoringService(config.monitoring, metricsCollector)
+    monitoringService.addAlertHandler(databaseAlertHandler)
+  }
+
+  return {
+    monitoringService,
+    databaseAlertHandler,
+    cleanup: () => auditDbInstance?.getEnhancedClientInstance().close(),
+  }
+}
+```
+
+**Section sources**
+- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
+
+### Alert Data Model
+
+The alerts table in the database stores the following fields:
+
+- **id**: varchar(255) - Alert identifier (UUID)
+- **organizationId**: varchar(255) - Tenant identifier for multi-organizational support
+- **severity**: varchar(20) - Alert severity ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')
+- **type**: varchar(20) - Alert type ('SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM')
+- **title**: varchar(500) - Alert title
+- **description**: text - Detailed alert description
+- **source**: varchar(100) - Component that generated the alert
+- **correlationId**: varchar(255) - Link to related events
+- **metadata**: jsonb - Additional alert context
+- **acknowledged**: varchar(10) - Acknowledgment status ('true'/'false')
+- **acknowledgedAt**: timestamp - Timestamp when acknowledged
+- **acknowledgedBy**: varchar(255) - User who acknowledged
+- **resolved**: varchar(10) - Resolution status ('true'/'false')
+- **resolvedAt**: timestamp - Timestamp when resolved
+- **resolvedBy**: varchar(255) - User who resolved
+- **resolutionNotes**: text - Notes about resolution
+- **createdAt**: timestamp - Creation timestamp
+- **updatedAt**: timestamp - Last update timestamp
+
+### Usage Patterns
+
+The DatabaseAlertHandler supports several key usage patterns:
+
+1. **Alert creation**: Persist alerts generated by monitoring systems
+2. **Alert acknowledgment**: Track when alerts have been acknowledged by users
+3. **Alert resolution**: Record when alerts have been resolved and by whom
+4. **Alert querying**: Retrieve alerts with various filters and sorting options
+5. **Alert statistics**: Get summary statistics about active alerts
+6. **Alert cleanup**: Automatically remove old resolved alerts based on retention policy
+
 ## Conclusion
 
 The Audit Database is a comprehensive, high-performance system designed to meet the demanding requirements of modern audit and compliance scenarios. By implementing advanced database techniques such as time-based partitioning, Redis caching, and comprehensive performance monitoring, the system delivers excellent performance even with large volumes of audit data.
@@ -846,5 +1005,6 @@ Key strengths of the system include:
 - **Security**: Robust access control, encryption at rest, and multi-tenant isolation ensure data protection.
 - **Maintainability**: Automated maintenance tasks and comprehensive monitoring reduce operational overhead.
 - **Extensibility**: The modular architecture and Drizzle ORM integration make it easy to evolve the schema as requirements change.
+- **Alert Persistence**: The new DatabaseAlertHandler provides reliable, persistent storage of alerts with multi-organizational support and comprehensive querying capabilities.
 
 The system is well-positioned to serve as the foundation for audit and compliance capabilities across various domains, with particular strength in healthcare applications requiring HIPAA compliance. By following the documented patterns and best practices, organizations can ensure their audit data is secure, reliable, and available when needed.

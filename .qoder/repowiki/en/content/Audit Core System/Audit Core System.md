@@ -350,6 +350,8 @@ The cryptographic service performs the following operations:
 
 The hash is generated from a deterministic string representation of critical fields, including timestamp, action, status, principalId, organizationId, targetResourceType, targetResourceId, and outcomeDescription. This ensures that the same event will always produce the same hash, regardless of property order in the object.
 
+The `CryptoService` class has been extended with a new asynchronous method `sha256` that generates a base64-encoded SHA-256 hash from a string or Uint8Array input. This method uses the Web Crypto API's `crypto.subtle.digest` function for hashing and implements RFC4648 base64 encoding through the `b64` helper method. This enhancement provides additional cryptographic utility for scenarios requiring base64-encoded hashes rather than hexadecimal representations.
+
 **Section sources**
 - [crypto.ts](file://packages/audit/src/crypto.ts)
 - [types.ts](file://packages/audit/src/types.ts)

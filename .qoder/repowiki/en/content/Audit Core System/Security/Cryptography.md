@@ -2,22 +2,30 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [crypto.ts](file://packages/audit/src/crypto.ts)
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated in recent commit*
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [types.ts](file://packages/audit/src/types.ts)
 - [types.ts](file://packages/audit/src/config/types.ts)
 </cite>
 
+## Update Summary
+- Added documentation for the new async sha256 method in CryptoService
+- Updated Secure Hashing Algorithms section to include Web Crypto API implementation
+- Added new section for Async SHA-256 Base64 Encoding
+- Updated code examples to demonstrate the new async functionality
+- Enhanced section sources to reflect updated content
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Secure Hashing Algorithms](#secure-hashing-algorithms)
-3. [Secure Random Value Generation](#secure-random-value-generation)
-4. [Encryption and Decryption Utilities](#encryption-and-decryption-utilities)
-5. [Cryptographic Operations Examples](#cryptographic-operations-examples)
-6. [Integration with Security Components](#integration-with-security-components)
-7. [Best Practices](#best-practices)
-8. [Configuration Options](#configuration-options)
+3. [Async SHA-256 Base64 Encoding](#async-sha-256-base64-encoding)
+4. [Secure Random Value Generation](#secure-random-value-generation)
+5. [Encryption and Decryption Utilities](#encryption-and-decryption-utilities)
+6. [Cryptographic Operations Examples](#cryptographic-operations-examples)
+7. [Integration with Security Components](#integration-with-security-components)
+8. [Best Practices](#best-practices)
+9. [Configuration Options](#configuration-options)
 
 ## Introduction
 The Cryptography module provides essential security services for the audit logging system, ensuring data integrity, confidentiality, and authenticity. This document details the implementation of cryptographic functions used throughout the system, with a focus on secure hashing, random value generation, encryption, and their integration with other security components. The primary implementation is located in `crypto.ts`, with comprehensive test coverage in `crypto.test.ts` that demonstrates various usage scenarios and edge cases.
@@ -33,6 +41,7 @@ class CryptoService {
 +verifyHash(event : AuditLogEvent, expectedHash : string) : boolean
 +generateEventSignature(event : AuditLogEvent) : string
 +verifyEventSignature(event : AuditLogEvent, signature : string) : boolean
++sha256(source : string | Uint8Array) : Promise~string~
 +getConfig() : Omit<CryptoConfig, 'secretKey'>
 -extractCriticalFields(event : AuditLogEvent) : Record<string, any>
 -createDeterministicString(fields : Record<string, any>) : string
@@ -64,7 +73,7 @@ CryptoUtils --> CryptoService : "delegates to"
 **Diagram sources**
 - [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
 
-**Section sources**
+**Section sources**   
 - [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts#L0-L460)
 
@@ -98,6 +107,46 @@ The system implements HMAC-SHA256 signatures for additional security through sec
 3. Returns the signature as a hexadecimal string
 
 This two-layer approach (hash + HMAC) provides both data integrity and authentication, ensuring that only parties with the secret key can generate valid signatures.
+
+## Async SHA-256 Base64 Encoding
+The system has been extended with an async SHA-256 hashing method that returns results in RFC4648-compliant base64 encoding. This implementation leverages the Web Crypto API for enhanced security and performance.
+
+**Updated** Added documentation for the new async sha256 method
+
+```typescript
+/**
+ * Generate a base64 string from a Uint8Array
+ * @param source string or Uint8Array to hash
+ * @returns base64 string
+ */
+async sha256(source: string | Uint8Array): Promise<string> {
+    const buf = typeof source === 'string' ? new TextEncoder().encode(source) : source
+
+    const hash = await crypto.subtle.digest('sha-256', buf)
+    return this.b64(hash)
+}
+```
+
+The implementation uses the following components:
+- **Web Crypto API**: Uses `crypto.subtle.digest()` for secure hashing operations
+- **RFC4648 Base64 Encoding**: Implements standard-compliant base64 encoding through the `b64()` method
+- **TextEncoder**: Converts string input to Uint8Array for consistent processing
+
+The `b64()` method provides RFC4648-compliant base64 encoding:
+```typescript
+/**
+ * CREDIT: https://gist.github.com/enepomnyaschih/72c423f727d395eeaa09697058238727
+ * Encodes a given Uint8Array, ArrayBuffer or string into RFC4648 base64 representation
+ * @param data
+ * @returns
+ */
+private b64(data: ArrayBuffer | string): string {
+    // Implementation details...
+}
+```
+
+**Section sources**   
+- [crypto.ts](file://packages/audit/src/crypto.ts#L100-L125) - *Updated in recent commit*
 
 ## Secure Random Value Generation
 
@@ -200,6 +249,21 @@ The tests verify:
 - Consistent signature generation with the same secret key
 - Different signatures with different secret keys
 - Rejection of signatures when the event is tampered with
+
+### Async SHA-256 Base64 Usage
+```typescript
+// Generate SHA-256 hash in base64 format
+const base64Hash = await cryptoService.sha256('sample data')
+
+// Verify the base64 hash format
+expect(base64Hash).toMatch(/^[A-Za-z0-9+/]+={0,2}$/)
+```
+
+The tests validate:
+- Proper RFC4648 base64 encoding
+- Consistent results for identical inputs
+- Support for both string and Uint8Array inputs
+- Error handling for invalid inputs
 
 ### Edge Case Handling
 The system handles various edge cases:
