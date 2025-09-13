@@ -14,31 +14,31 @@ export const alertsCleanupPrepareDailyDigest = inngest.createFunction(
 	async ({ step, event, services, logger }) => {
 		const { db, error } = services
 		// Load all the organizations from database:
-		const organizations = await step.run('load-organizations', async () => {
-			try {
-				return await db.auth.execute(sql`
-            SELECT id, retention_days FROM organization
-          `)
-			} catch (e) {
-				const message = e instanceof Error ? e.message : 'Unknown error'
-				logger.error(`Failed to prepare daily digest for alerts: ${message}`)
-				const err = e instanceof Error ? e : new Error(message)
-				await error.handleError(
-					err,
-					{
-						metadata: {
-							message: err.message,
-							name: err.name,
-							cause: err.cause,
-							event,
-						},
-					},
-					'inngest',
-					'alerts-cleanup-prepare-daily-digest'
-				)
-				throw err
-			}
+		const organizations = await db.auth.query.organization.findMany({
+			columns: {
+				id: true,
+				retentionDays: true,
+			},
 		})
+		if (organizations.length === 0) {
+			const message = 'No organizations found'
+			logger.error(`Failed to prepare daily digest for alerts: ${message}`)
+			const err = new Error(message)
+			await error.handleError(
+				err,
+				{
+					metadata: {
+						message: err.message,
+						name: err.name,
+						cause: err.cause,
+						event,
+					},
+				},
+				'inngest',
+				'alerts-cleanup-prepare-daily-digest'
+			)
+			throw err
+		}
 
 		// 💡 Since we want to send a daily digest to each one of these organizations
 		// it may take a long time to iterate through each organization and clean up
@@ -53,13 +53,13 @@ export const alertsCleanupPrepareDailyDigest = inngest.createFunction(
 				name: 'alerts/cleanup.resolved.alerts',
 				data: {
 					organization_id: organization.id as string,
-					retention_days: organization.retention_days as number,
+					retention_days: organization.retentionDays || 90,
 				},
 			}
 		})
 
 		// 2️⃣ Now, we'll send all events in a single batch:
-		await step.sendEvent('cleanup-resolved-alerts', events)
+		await step.sendEvent('send-all-events', events)
 
 		// This function can now quickly finish and the rest of the logic will
 		// be handled in the function below ⬇️

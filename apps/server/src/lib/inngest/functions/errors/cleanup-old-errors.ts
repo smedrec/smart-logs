@@ -6,7 +6,7 @@ import { inngest } from '../../client.js'
 let databaseErrorLogger: DatabaseErrorLogger | undefined = undefined
 
 /**
- *
+ * cron job to cleanup old errors
  */
 export const errorsCleanupPrepareDailyDigest = inngest.createFunction(
 	{ id: 'errors-cleanup-prepare-daily-digest' },
@@ -20,7 +20,7 @@ export const errorsCleanupPrepareDailyDigest = inngest.createFunction(
 )
 
 /**
- *
+ * cleanup old errors
  */
 export const cleanupOldErrors = inngest.createFunction(
 	{ id: 'cleanup-old-errors' },

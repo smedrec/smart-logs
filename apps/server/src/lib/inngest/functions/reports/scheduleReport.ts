@@ -1,5 +1,15 @@
 import { inngest } from '../../client.js'
 
+/**
+ * This function is used to schedule a report to be executed at a later time.
+ *
+ * It uses the `waitForEvent` step to wait for an event to be received from the
+ * `unscheduleReport` function.
+ *
+ * If the event is received, the report is disabled.
+ *
+ * If the event is not received, the report is executed.
+ */
 export const scheduleReport = inngest.createFunction(
 	{
 		id: 'schedule-report',

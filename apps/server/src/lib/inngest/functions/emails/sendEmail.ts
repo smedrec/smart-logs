@@ -27,6 +27,9 @@ const mailerConfig: NodeMailerSmtpOptions = {
 
 const mailer = new NodeMailer(mailerConfig)
 
+/*
+ * Get the email provider details from the database.
+ */
 async function getEmailProvider(
 	organizationId: string,
 	action: string,
@@ -89,6 +92,9 @@ async function getEmailProvider(
 	return transport
 }
 
+/**
+ * Send an email using the Mailer service.
+ */
 export const sendEmail = inngest.createFunction(
 	{
 		id: 'send-email',
@@ -113,75 +119,8 @@ export const sendEmail = inngest.createFunction(
 				status: 'failure',
 				outcomeDescription: `Mailer send error: Mailer connection error for Email service`,
 			})
-			//logger.error(`❌ Error processing job ${job.id} for action '${action}':`, error)
-			// Depending on the error, you might want to:
-			// - Let BullMQ handle retries (default behavior for unhandled promise rejections)
-			// - Implement custom retry logic
-			// - Move the job to a dead-letter queue if it's consistently failing
-			// For now, re-throwing the error to let BullMQ handle it based on its configuration.
 			throw error
 		}
-		// Get the transport from the database
-		/**const transport: Mailer = await step.run('get-email-transport', async (): Promise<Mailer> => {
-			// Create default transport with explicit typing
-			const defaultTransport: Mailer = {
-				from: 'SMEDREC <no-reply@smedrec.com>',
-				mailer: mailer,
-			}
-			if (action === 'sendVerificationEmail') return defaultTransport
-
-			const provider = await db.auth.query.emailProvider.findFirst({
-				where: eq(emailProvider.organizationId, organizationId),
-			})
-
-			if (!provider) {
-				throw Error('Mailer connection details from database error.')
-			}
-
-			// TODO - improve the possible error
-			if (provider.password) {
-				const password = await kms.decrypt(provider.password!)
-				provider.password = password.plaintext
-			}
-
-			if (provider.apiKey) {
-				const apiKey = await kms.decrypt(provider.apiKey!)
-				provider.apiKey = apiKey.plaintext
-			}
-
-			defaultTransport.from = `${provider.fromName} <${provider.fromEmail}>`
-
-			switch (provider.provider) {
-				case 'smtp':
-					defaultTransport.mailer = new NodeMailer({
-						host: provider.host!,
-						port: provider.port as number,
-						secure: provider.secure as boolean,
-						auth: {
-							user: provider.user!,
-							pass: provider.password!,
-						},
-					})
-					break
-				case 'resend':
-					defaultTransport.mailer = new ResendMailer({
-						apiKey: provider.apiKey!,
-					})
-					break
-				case 'sendgrid':
-					defaultTransport.mailer = new SendGridMailer({
-						apiKey: provider.apiKey!,
-					})
-					break
-				default:
-					defaultTransport.mailer = mailer
-					break
-			}
-			if (!defaultTransport.mailer) {
-				throw Error('Mailer connection details from database error.')
-			}
-			return defaultTransport
-		}) **/
 
 		await step.run('send-email-with-transport', async () => {
 			try {
