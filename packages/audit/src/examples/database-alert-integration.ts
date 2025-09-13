@@ -1,45 +1,77 @@
+import { EnhancedAuditDb } from '@repo/audit-db'
+import { getSharedRedisConnectionWithConfig, Redis } from '@repo/redis-client'
+
+import {
+	AlertQueryFilters,
+	AuditLogEvent,
+	ConfigurationManager,
+	createDatabaseAlertHandler,
+	DatabaseAlertHandler,
+	MonitoringService,
+	RedisMetricsCollector,
+} from '../index.js'
+
 /**
  * Example integration of DatabaseAlertHandler with MonitoringService
  * Demonstrates multi-organizational alert persistence and management
  */
 
-import { drizzle } from 'drizzle-orm/postgres-js'
-import postgres from 'postgres'
-
-import { createDatabaseAlertHandler, DatabaseAlertHandler, MonitoringService } from '../index.js'
-
-import type { AlertQueryFilters, AuditLogEvent } from '../index.js'
+// Configuration manager
+let configManager: ConfigurationManager | undefined = undefined
+let connection: Redis | undefined = undefined
+let auditDbInstance: EnhancedAuditDb | undefined = undefined
+// Alert and health check services
+let metricsCollector: RedisMetricsCollector | undefined = undefined
+let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
+let monitoringService: MonitoringService | undefined = undefined
 
 /**
  * Example: Setting up monitoring with database alert persistence
  */
-export async function setupMonitoringWithDatabaseAlerts(
-	databaseUrl: string,
-	organizationId: string
-) {
-	// Setup database connection
-	const client = postgres(databaseUrl, {
-		max: 10,
-	})
+export async function setupMonitoringWithDatabaseAlerts() {
+	// Initialize configuration
+	if (!configManager) {
+		console.info('🔗 Initializing configuration manager...')
+		configManager = new ConfigurationManager(process.env.CONFIG_PATH!, 's3')
+		try {
+			await configManager.initialize()
+		} catch (error) {
+			// Exit if initialization fails
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unknown error during configuration manager initialization'
+			console.error('🔴 Configuration manager initialization failed:', message)
+			throw new Error(message)
+		}
+	}
+	const config = configManager.getConfig()
 
-	const db = drizzle(client)
+	if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
+
+	if (!auditDbInstance) {
+		auditDbInstance = new EnhancedAuditDb(connection, config.enhancedClient)
+		// Check the database connection
+		const isConnected = await auditDbInstance.checkAuditDbConnection()
+		if (!isConnected) {
+			console.error('Failed to connect to the audit database. Exiting.')
+			process.exit(1)
+		}
+	}
 
 	// Create database alert handler
-	const databaseAlertHandler = createDatabaseAlertHandler(db)
+	if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(auditDbInstance)
 
-	// Create monitoring service with organization context
-	const monitoringService = new MonitoringService(
-		undefined, // Use default config
-		undefined // Use default metrics collector
-	)
-
-	// Add database alert handler to monitoring service
-	monitoringService.addAlertHandler(databaseAlertHandler)
+	if (!monitoringService) {
+		if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
+		monitoringService = new MonitoringService(config.monitoring, metricsCollector)
+		monitoringService.addAlertHandler(databaseAlertHandler)
+	}
 
 	return {
 		monitoringService,
 		databaseAlertHandler,
-		cleanup: () => client.end(),
+		cleanup: () => auditDbInstance?.getEnhancedClientInstance().close(),
 	}
 }
 
@@ -48,10 +80,7 @@ export async function setupMonitoringWithDatabaseAlerts(
  */
 export async function processAuditEventsWithAlerts() {
 	const { monitoringService, databaseAlertHandler, cleanup } =
-		await setupMonitoringWithDatabaseAlerts(
-			process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_db',
-			'org-123'
-		)
+		await setupMonitoringWithDatabaseAlerts()
 
 	try {
 		// Simulate suspicious audit events that should trigger alerts
@@ -129,10 +158,7 @@ export async function processAuditEventsWithAlerts() {
  * Example: Querying alerts with filters
  */
 export async function demonstrateAlertQuerying() {
-	const { databaseAlertHandler, cleanup } = await setupMonitoringWithDatabaseAlerts(
-		process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_db',
-		'org-123'
-	)
+	const { databaseAlertHandler, cleanup } = await setupMonitoringWithDatabaseAlerts()
 
 	try {
 		// Query high-severity security alerts
@@ -178,11 +204,9 @@ export async function demonstrateAlertQuerying() {
  * Example: Multi-organizational alert isolation
  */
 export async function demonstrateMultiOrganizationalIsolation() {
-	const databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_db'
-
 	// Setup monitoring for two different organizations
-	const org1Setup = await setupMonitoringWithDatabaseAlerts(databaseUrl, 'org-1')
-	const org2Setup = await setupMonitoringWithDatabaseAlerts(databaseUrl, 'org-2')
+	const org1Setup = await setupMonitoringWithDatabaseAlerts()
+	const org2Setup = await setupMonitoringWithDatabaseAlerts()
 
 	try {
 		// Create alerts for organization 1
@@ -240,10 +264,7 @@ export async function demonstrateMultiOrganizationalIsolation() {
  * Example: Alert cleanup and maintenance
  */
 export async function demonstrateAlertMaintenance() {
-	const { databaseAlertHandler, cleanup } = await setupMonitoringWithDatabaseAlerts(
-		process.env.DATABASE_URL || 'postgresql://localhost:5432/audit_db',
-		'org-123'
-	)
+	const { databaseAlertHandler, cleanup } = await setupMonitoringWithDatabaseAlerts()
 
 	try {
 		// Cleanup old resolved alerts (older than 30 days)
