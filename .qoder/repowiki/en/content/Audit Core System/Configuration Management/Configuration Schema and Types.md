@@ -1,0 +1,552 @@
+# Configuration Schema and Types
+
+<cite>
+**Referenced Files in This Document**   
+- [types.ts](file://packages/audit/src/config/types.ts)
+- [manager.ts](file://packages/audit/src/config/manager.ts)
+- [integration.ts](file://packages/audit/src/config/integration.ts)
+- [archival-service.ts](file://packages/audit/src/archival/archival-service.ts)
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+- [audit-preset.ts](file://packages/audit/src/preset/audit-preset.ts)
+- [preset-types.ts](file://packages/audit/src/preset/preset-types.ts)
+</cite>
+
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Configuration Schema Overview](#configuration-schema-overview)
+3. [Core Configuration Types](#core-configuration-types)
+4. [Compliance Configuration](#compliance-configuration)
+5. [Archival Configuration](#archival-configuration)
+6. [Monitoring Configuration](#monitoring-configuration)
+7. [Security and Validation](#security-and-validation)
+8. [Configuration Management](#configuration-management)
+9. [Integration and Extensibility](#integration-and-extensibility)
+10. [Configuration Change Tracking](#configuration-change-tracking)
+
+## Introduction
+The Configuration Schema and Types system provides a comprehensive, type-safe framework for managing audit system configuration across environments. Built with TypeScript, the system enforces compile-time validation, supports IDE autocompletion, and enables runtime safety through comprehensive validation. The configuration schema is structured hierarchically, covering database connections, retention policies, compliance requirements (GDPR/HIPAA), integration endpoints, and monitoring thresholds. This documentation details every configuration option, type hierarchy, and integration point, providing guidance for both standard and custom deployments.
+
+## Configuration Schema Overview
+
+The configuration system is centered around the `AuditConfig` interface, which serves as the root type for all configuration options. The schema is organized into logical modules, each with its own configuration interface that is composed into the main configuration object. This modular approach enables focused configuration management while maintaining a unified configuration structure.
+
+```mermaid
+classDiagram
+class AuditConfig {
++environment : Environment
++version : string
++lastUpdated : string
++redis : RedisConfig
++database : DatabaseConfig
++server : ServerConfig
++worker : WorkerConfig
++monitoring : MonitoringConfig
++security : SecurityConfig
++compliance : ComplianceConfig
++archive : ArchiveConfig
++logging : LoggingConfig
+}
+class RedisConfig {
++url : string
++connectTimeout : number
++commandTimeout : number
++maxRetriesPerRequest : number | null
++retryDelayOnFailover : number
++enableOfflineQueue : boolean
++enableAutoPipelining : boolean
+}
+class DatabaseConfig {
++url : string
++poolSize : number
++connectionTimeout : number
++queryTimeout : number
++ssl : boolean
++maxConnectionAttempts : number
+}
+class ServerConfig {
++port : number
++host : string
++timeout : number
++cors : CorsConfig
++rateLimit : RateLimitConfig
++auth : AuthConfig
++monitoring : ServerMonitoringConfig
+}
+class WorkerConfig {
++concurrency : number
++queueName : string
++port : number
++gracefulShutdown : boolean
++shutdownTimeout : number
+}
+AuditConfig --> RedisConfig : "contains"
+AuditConfig --> DatabaseConfig : "contains"
+AuditConfig --> ServerConfig : "contains"
+AuditConfig --> WorkerConfig : "contains"
+AuditConfig --> MonitoringConfig : "contains"
+AuditConfig --> SecurityConfig : "contains"
+AuditConfig --> ComplianceConfig : "contains"
+AuditConfig --> ArchiveConfig : "contains"
+AuditConfig --> LoggingConfig : "contains"
+```
+
+**Diagram sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L45-L110)
+
+**Section sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L45-L110)
+
+## Core Configuration Types
+
+The configuration schema defines several core types that represent fundamental system components. These types include connection settings, server configurations, and worker parameters that control the basic operation of the audit system.
+
+### Database and Redis Configuration
+The database and Redis configurations provide connection parameters for the primary data stores used by the audit system. These configurations include connection URLs, timeout settings, and pool management options.
+
+```mermaid
+classDiagram
+class DatabaseConfig {
++url : string
++poolSize : number
++connectionTimeout : number
++queryTimeout : number
++ssl : boolean
++maxConnectionAttempts : number
+}
+class RedisConfig {
++url : string
++connectTimeout : number
++commandTimeout : number
++maxRetriesPerRequest : number | null
++retryDelayOnFailover : number
++enableOfflineQueue : boolean
++enableAutoPipelining : boolean
+}
+class ConnectionPoolConfig {
++minConnections : number
++maxConnections : number
++idleTimeout : number
++acquireTimeout : number
++validateConnections : boolean
++retryAttempts : number
++retryDelay : number
++ssl : boolean
+}
+class EnhancedClientConfig {
++connectionPool : ConnectionPoolConfig
++queryCacheFactory : CacheFactoryConfig
++partitioning : PartitioningConfig
++monitoring : PerformanceMonitoringConfig
+}
+DatabaseConfig --> ConnectionPoolConfig : "includes"
+EnhancedClientConfig --> ConnectionPoolConfig : "references"
+EnhancedClientConfig --> CacheFactoryConfig : "references"
+```
+
+**Diagram sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L112-L188)
+
+**Section sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L112-L188)
+
+### Server and Worker Configuration
+The server and worker configurations define the operational parameters for the HTTP server and background worker processes. These settings control port assignments, concurrency levels, and shutdown behavior.
+
+```mermaid
+classDiagram
+class ServerConfig {
++port : number
++host : string
++timeout : number
++cors : CorsConfig
++rateLimit : RateLimitConfig
++auth : AuthConfig
++monitoring : ServerMonitoringConfig
++security : SecurityConfig
++performance : PerformanceConfig
++api : ApiConfig
++externalServices : ExternalServicesConfig
+}
+class WorkerConfig {
++concurrency : number
++queueName : string
++port : number
++gracefulShutdown : boolean
++shutdownTimeout : number
+}
+class CorsConfig {
++origin : string | string[]
++credentials : boolean
++allowedMethods : string[]
++allowedHeaders : string[]
+}
+class RateLimitConfig {
++windowMs : number
++maxRequests : number
++skipSuccessfulRequests : boolean
++keyGenerator : 'ip' | 'user' | 'session'
+}
+ServerConfig --> CorsConfig : "contains"
+ServerConfig --> RateLimitConfig : "contains"
+ServerConfig --> AuthConfig : "contains"
+```
+
+**Diagram sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L288-L318)
+
+**Section sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L288-L318)
+
+## Compliance Configuration
+
+The compliance configuration module provides settings for regulatory requirements including GDPR and HIPAA. These configurations enable or disable compliance features, set retention policies, and define reporting schedules.
+
+### GDPR and HIPAA Settings
+The compliance configuration includes specific settings for GDPR and HIPAA regulations, allowing organizations to configure their audit system according to applicable legal requirements.
+
+```mermaid
+classDiagram
+class ComplianceConfig {
++hipaa : HIPAAConfig
++gdpr : GDPRConfig
++defaultRetentionDays : number
++defaultDataClassification : DataClassification
++generateHash : boolean
++generateSignature : boolean
++enableAutoArchival : boolean
++enablePseudonymization : boolean
++reportingSchedule : ReportingScheduleConfig
++custom : ComplianceRule[]
+}
+class HIPAAConfig {
++enabled : boolean
++requiredFields? : string[]
++retentionYears? : number
+}
+class GDPRConfig {
++enabled : boolean
++defaultLegalBasis? : string
++retentionDays? : number
+}
+class ReportingScheduleConfig {
++enabled : boolean
++frequency : 'daily' | 'weekly' | 'monthly'
++recipients : string[]
++includeHIPAA : boolean
++includeGDPR : boolean
+}
+class ComplianceRule {
++field : string
++required? : boolean
++validator? : (value : any) => boolean
++message? : string
+}
+ComplianceConfig --> HIPAAConfig : "contains"
+ComplianceConfig --> GDPRConfig : "contains"
+ComplianceConfig --> ReportingScheduleConfig : "contains"
+ComplianceConfig --> ComplianceRule : "contains"
+```
+
+**Diagram sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L386-L428)
+
+**Section sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L386-L428)
+
+### GDPR Compliance Implementation
+The GDPR compliance service implements data subject rights and privacy-by-design principles, enabling data export, pseudonymization, and retention policy enforcement.
+
+```mermaid
+sequenceDiagram
+participant Request as "GDPR Data Export Request"
+participant Service as "GDPRComplianceService"
+participant DB as "Database"
+participant Audit as "Audit System"
+participant Response as "GDPR Data Export"
+Request->>Service : exportUserData(request)
+Service->>DB : Query audit logs by principalId
+DB-->>Service : Return audit logs
+Service->>Service : Collect metadata (categories, policies)
+Service->>Service : Format data according to request.format
+Service->>Audit : Log GDPR activity
+Audit-->>Service : Confirmation
+Service-->>Response : Return formatted export data
+```
+
+**Diagram sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
+
+## Archival Configuration
+
+The archival configuration defines settings for data archiving, including compression algorithms, batch sizes, and integrity verification. This configuration controls how audit data is archived and stored for long-term retention.
+
+### Archival Settings
+The archival configuration includes options for compression, encryption, and format selection, allowing organizations to optimize storage and retrieval of archived data.
+
+```mermaid
+classDiagram
+class ArchiveConfig {
++compressionAlgorithm : 'gzip' | 'deflate' | 'none'
++compressionLevel : number
++format : 'json' | 'jsonl' | 'parquet'
++batchSize : number
++verifyIntegrity : boolean
++encryptArchive : boolean
+}
+class ArchiveResult {
++archiveId : string
++recordCount : number
++originalSize : number
++compressedSize : number
++compressionRatio : number
++checksumOriginal : string
++checksumCompressed : string
++verificationStatus : 'verified' | 'failed' | 'skipped'
++timestamp : string
++processingTime : number
+}
+class ArchiveRetrievalRequest {
++archiveId? : string
++principalId? : string
++organizationId? : string
++dateRange? : DateRange
++actions? : string[]
++dataClassifications? : string[]
++retentionPolicies? : string[]
++limit? : number
++offset? : number
+}
+ArchiveConfig --> ArchiveResult : "produces"
+ArchiveRetrievalRequest --> ArchiveResult : "retrieves"
+```
+
+**Diagram sources**
+- [archival-service.ts](file://packages/audit/src/archival/archival-service.ts#L15-L100)
+
+**Section sources**
+- [archival-service.ts](file://packages/audit/src/archival/archival-service.ts#L15-L100)
+
+## Monitoring Configuration
+
+The monitoring configuration defines settings for real-time monitoring, alerting, and metrics collection. These settings control how the system detects suspicious patterns, generates alerts, and collects performance metrics.
+
+### Monitoring and Alerting Settings
+The monitoring configuration includes thresholds for error rates, processing latency, queue depth, and memory usage, enabling proactive system monitoring and alerting.
+
+```mermaid
+classDiagram
+class MonitoringConfig {
++enabled : boolean
++metricsInterval : number
++alertThresholds : AlertThresholds
++healthCheckInterval : number
+}
+class AlertThresholds {
++errorRate : number
++processingLatency : number
++queueDepth : number
++memoryUsage : number
+}
+class PatternDetectionConfig {
++failedAuthThreshold : number
++failedAuthTimeWindow : number
++unauthorizedAccessThreshold : number
++unauthorizedAccessTimeWindow : number
++dataAccessVelocityThreshold : number
++dataAccessTimeWindow : number
++bulkOperationThreshold : number
++bulkOperationTimeWindow : number
++offHoursStart : number
++offHoursEnd : number
+}
+class MetricsCollector {
++recordEvent()
++recordError()
++recordSuspiciousPattern(count : number)
++recordProcessingLatency(latency : number)
++getMetrics() : AuditMetrics
+}
+MonitoringConfig --> AlertThresholds : "contains"
+MonitoringConfig --> PatternDetectionConfig : "references"
+MonitoringConfig --> MetricsCollector : "uses"
+```
+
+**Diagram sources**
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L25-L75)
+
+**Section sources**
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L25-L75)
+
+## Security and Validation
+
+The security and validation configuration defines settings for data integrity, encryption, and input validation. These settings ensure that audit data remains secure and tamper-proof throughout its lifecycle.
+
+### Security Configuration
+The security configuration includes options for integrity verification, event signing, and log encryption, providing multiple layers of protection for audit data.
+
+```mermaid
+classDiagram
+class SecurityConfig {
++enableIntegrityVerification : boolean
++hashAlgorithm : 'SHA-256'
++enableEventSigning : boolean
++encryptionKey : string
++enableLogEncryption : boolean
+}
+class ValidationConfig {
++requiredFields : string[]
++fieldValidators : FieldValidator[]
++maxEventSize : number
++allowedActions : string[]
++requiredContextFields : string[]
+}
+class FieldValidator {
++fieldName : string
++validationRules : ValidationRule[]
++errorMessage : string
+}
+class ValidationRule {
++type : 'required' | 'format' | 'range' | 'enum'
++value : any
++pattern? : string
+}
+SecurityConfig --> ValidationConfig : "works with"
+ValidationConfig --> FieldValidator : "contains"
+FieldValidator --> ValidationRule : "contains"
+```
+
+**Diagram sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L320-L360)
+
+**Section sources**
+- [types.ts](file://packages/audit/src/config/types.ts#L320-L360)
+
+## Configuration Management
+
+The configuration management system provides a robust framework for loading, validating, updating, and persisting configuration. The system supports multiple storage types, hot reloading, and secure storage with encryption.
+
+### Configuration Manager
+The ConfigurationManager class serves as the central component for configuration management, handling initialization, validation, updates, and change tracking.
+
+```mermaid
+sequenceDiagram
+participant App as "Application"
+participant Manager as "ConfigurationManager"
+participant Storage as "Storage (File/S3)"
+participant Validator as "ConfigValidator"
+participant DB as "Database"
+App->>Manager : initialize()
+Manager->>Storage : loadConfiguration()
+Storage-->>Manager : Return config data
+Manager->>Validator : validateConfiguration()
+Validator-->>Manager : Validation result
+Manager->>Manager : Initialize database connection
+Manager->>Manager : Start hot reloading (if enabled)
+Manager-->>App : Configuration ready
+App->>Manager : updateConfig(path, value)
+Manager->>Validator : validateConfiguration(testConfig)
+Validator-->>Manager : Validation result
+Manager->>Manager : Apply configuration change
+Manager->>DB : Record change event
+Manager->>Storage : saveConfiguration()
+Manager->>Manager : Emit configChanged event
+Manager->>Manager : Emit hotReload event (if applicable)
+Manager-->>App : Update complete
+```
+
+**Diagram sources**
+- [manager.ts](file://packages/audit/src/config/manager.ts#L50-L150)
+
+**Section sources**
+- [manager.ts](file://packages/audit/src/config/manager.ts#L50-L150)
+
+## Integration and Extensibility
+
+The configuration system provides integration points for extending the base configuration and adapting it to specific deployment requirements. The integration module offers utilities for initializing configuration with environment-specific defaults and handling configuration changes.
+
+### Configuration Integration
+The configuration integration module provides functions for initializing audit configuration with environment-specific defaults and setting up event handlers for configuration changes.
+
+```mermaid
+classDiagram
+class ConfigIntegrationOptions {
++configPath? : string
++storageType? : StorageType
++environment? : string
++enableHotReload? : boolean
++hotReloadConfig? : Partial<HotReloadConfig>
++enableSecureStorage? : boolean
++secureStorageConfig? : Partial<SecureStorageConfig>
++createDefaultIfMissing? : boolean
+}
+class AuditConfigChangeHandler {
++callbacks : Map<string, Function[]>
++onConfigChange(fieldPath, callback)
++handleChange(fieldPath, newValue, oldValue)
++removeCallbacks(fieldPath)
++removeAllCallbacks()
+}
+class PresetHandler {
++getPresets(organizationId?)
++getPreset(name, organizationId?)
++createPreset(preset)
++updatePreset(preset)
++deletePreset(name, organizationId)
+}
+class AuditPreset {
++name : string
++description? : string
++organizationId : string
++action : string
++dataClassification : DataClassification
++requiredFields : string[]
++defaultValues? : Record<string, any>
++validation? : Partial<ValidationConfig>
+}
+ConfigIntegrationOptions --> AuditConfigChangeHandler : "uses"
+PresetHandler --> AuditPreset : "manages"
+```
+
+**Diagram sources**
+- [integration.ts](file://packages/audit/src/config/integration.ts#L50-L100)
+- [preset-types.ts](file://packages/audit/src/preset/preset-types.ts#L10-L25)
+
+**Section sources**
+- [integration.ts](file://packages/audit/src/config/integration.ts#L50-L100)
+- [preset-types.ts](file://packages/audit/src/preset/preset-types.ts#L10-L25)
+
+## Configuration Change Tracking
+
+The configuration system includes comprehensive change tracking that records all configuration modifications, providing an audit trail of configuration changes. Each change is stored with metadata including timestamps, previous and new values, and the user or system that made the change.
+
+### Configuration Change Events
+The system records configuration changes in a dedicated database table, capturing detailed information about each modification for audit and troubleshooting purposes.
+
+```mermaid
+erDiagram
+CONFIG_CHANGE_EVENT {
+int id PK
+string timestamp
+string field
+json previous_value
+json new_value
+string changed_by
+string reason
+string environment
+string previous_version
+string new_version
+}
+CONFIG_CHANGE_EVENT ||--|| AuditConfig : "tracks changes to"
+```
+
+**Diagram sources**
+- [manager.ts](file://packages/audit/src/config/manager.ts#L200-L240)
+- [types.ts](file://packages/audit/src/config/types.ts#L377-L400)
+
+**Section sources**
+- [manager.ts](file://packages/audit/src/config/manager.ts#L200-L240)
+- [types.ts](file://packages/audit/src/config/types.ts#L377-L400)

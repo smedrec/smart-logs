@@ -1,0 +1,371 @@
+# Security
+
+<cite>
+**Referenced Files in This Document**   
+- [crypto.ts](file://packages/audit/src/crypto.ts)
+- [error-handling.ts](file://packages/audit/src/error/error-handling.ts)
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
+- [error-handling.test.ts](file://packages/audit/src/__tests__/error-handling.test.ts)
+- [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts)
+</cite>
+
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Cryptographic Functions for Data Protection](#cryptographic-functions-for-data-protection)
+3. [Error Handling and Secure Logging](#error-handling-and-secure-logging)
+4. [Security Alerting System](#security-alerting-system)
+5. [Dead-Letter Queue for Message Integrity](#dead-letter-queue-for-message-integrity)
+6. [Security Testing and Attack Scenarios](#security-testing-and-attack-scenarios)
+7. [Common Vulnerabilities and Mitigations](#common-vulnerabilities-and-mitigations)
+8. [Configuration and Incident Response](#configuration-and-incident-response)
+
+## Introduction
+The Security subsystem ensures data integrity, confidentiality, and availability across the audit logging system. It implements cryptographic verification, secure error handling, alerting mechanisms, and message durability to protect against tampering, data leakage, and service disruption. This document details the implementation of key security components, including cryptographic functions, error sanitization, database monitoring, and secure message queuing.
+
+## Cryptographic Functions for Data Protection
+
+The cryptographic system ensures the integrity and authenticity of audit log events through SHA-256 hashing and HMAC-SHA256 signatures. It prevents tampering by allowing verification of event data consistency and origin.
+
+### Hashing and Signature Generation
+The `CryptoService` class implements two primary functions:
+- **Hash Generation**: Uses SHA-256 on critical event fields to detect data modification
+- **Signature Generation**: Applies HMAC-SHA256 using a secret key to authenticate event origin
+
+Critical fields used for hashing include:
+- **timestamp**
+- **action**
+- **status**
+- **principalId**
+- **organizationId**
+- **targetResourceType**
+- **targetResourceId**
+- **outcomeDescription**
+
+```mermaid
+classDiagram
+class CryptoService {
++generateHash(event) string
++verifyHash(event, hash) boolean
++generateEventSignature(event) string
++verifyEventSignature(event, signature) boolean
+-extractCriticalFields(event) Record
+-createDeterministicString(fields) string
+}
+class CryptoUtils {
++generateHash(event) string
++verifyHash(event, hash) boolean
++generateSignature(event) string
++verifySignature(event, signature) boolean
+}
+CryptoUtils --> CryptoService : "delegates to"
+```
+
+**Diagram sources**
+- [crypto.ts](file://packages/audit/src/crypto.ts#L100-L200)
+
+**Section sources**
+- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L218)
+
+### Deterministic Hashing
+To ensure consistent hashing regardless of object property order, the system:
+1. Extracts critical fields into a dedicated object
+2. Sorts field names alphabetically
+3. Creates a deterministic string using `key:value` pairs joined by `|`
+4. Applies SHA-256 to this normalized string
+
+This approach guarantees that identical events produce identical hashes even when serialized with different property ordering.
+
+### HMAC Signature Verification
+The HMAC-SHA256 signature provides an additional layer of security by incorporating a secret key. The process:
+1. Generates a hash of the event using `generateHash`
+2. Applies HMAC-SHA256 using the secret key and the hash as input
+3. Produces a 64-character hexadecimal signature
+
+This prevents attackers from modifying both the data and hash without access to the secret key.
+
+## Error Handling and Secure Logging
+
+The error handling system implements structured logging, classification, and aggregation while preventing sensitive data exposure.
+
+### Error Classification and Sanitization
+The `ErrorHandler` class classifies errors into categories such as:
+- **DATABASE_ERROR**
+- **NETWORK_ERROR**
+- **VALIDATION_ERROR**
+- **AUTHENTICATION_ERROR**
+- **INTEGRITY_ERROR**
+
+Each error is processed to:
+- Remove sensitive stack traces when disabled
+- Sanitize error messages of PII
+- Generate non-identifiable error codes
+- Create aggregation keys that normalize dynamic values
+
+```mermaid
+sequenceDiagram
+participant Application as "Application"
+participant ErrorHandler as "ErrorHandler"
+participant Logger as "ErrorLogger"
+Application->>ErrorHandler : handleError(error, context)
+ErrorHandler->>ErrorHandler : classifyError(error)
+ErrorHandler->>ErrorHandler : generateAggregationKey()
+ErrorHandler->>ErrorHandler : buildStructuredError()
+ErrorHandler->>Logger : logError(structuredError)
+ErrorHandler->>ErrorHandler : updateAggregation()
+ErrorHandler-->>Application : return StructuredError
+```
+
+**Diagram sources**
+- [error-handling.ts](file://packages/audit/src/error/error-handling.ts#L400-L600)
+
+**Section sources**
+- [error-handling.ts](file://packages/audit/src/error/error-handling.ts#L0-L758)
+
+### Secure Context Management
+Error context includes:
+- **correlationId**: For tracing related operations
+- **component** and **operation**: For troubleshooting
+- **userId** and **sessionId**: For impact analysis
+- **metadata**: Custom diagnostic data
+- **environment**: Node version, platform, hostname
+
+Sensitive information is protected by:
+- Optional stack trace inclusion
+- Environment information toggling
+- Metadata scrubbing in production
+- Correlation ID generation that avoids sensitive data
+
+### Aggregation and Trend Analysis
+Errors are aggregated by:
+- Category
+- Component
+- Normalized message (with UUIDs, timestamps, numbers replaced)
+
+The system tracks:
+- **Count**: Total occurrences
+- **Affected users and components**
+- **Trend analysis**: Increasing, decreasing, or stable
+- **Error rate**: Per-minute frequency
+
+Aggregations trigger alerts when thresholds are exceeded, enabling proactive monitoring of systemic issues.
+
+## Security Alerting System
+
+The database alert handler detects and responds to suspicious activities through persistent storage and multi-organizational access control.
+
+### Alert Persistence
+The `DatabaseAlertHandler` stores alerts in PostgreSQL with organization-based isolation:
+- Each alert belongs to a specific **organization_id**
+- Fields include severity, type, status, and resolution metadata
+- Supports acknowledgment and resolution workflows
+
+```mermaid
+erDiagram
+ALERTS {
+string id PK
+string organization_id FK
+string severity
+string type
+string title
+string description
+timestamp created_at
+timestamp updated_at
+boolean acknowledged
+timestamp acknowledged_at
+string acknowledged_by
+boolean resolved
+timestamp resolved_at
+string resolved_by
+string resolution_notes
+string correlation_id
+json metadata
+}
+ORGANIZATIONS {
+string id PK
+string name
+}
+ORGANIZATIONS ||--o{ ALERTS : "has"
+```
+
+**Diagram sources**
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L0-L450)
+
+**Section sources**
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L0-L450)
+
+### Alert Lifecycle Management
+The system supports:
+- **Creation**: New alerts are inserted with initial metadata
+- **Acknowledgment**: Users mark alerts as seen
+- **Resolution**: Alerts are closed with resolution notes
+- **Querying**: Filter by status, severity, type, and organization
+- **Statistics**: Real-time metrics on alert volume and distribution
+
+### Multi-Tenant Security
+Organization-based access control ensures:
+- Users can only access alerts for their organization
+- Queries include `organization_id` filtering
+- Cross-tenant data leakage is prevented
+- Administrative views can aggregate across organizations
+
+## Dead-Letter Queue for Message Integrity
+
+The dead-letter queue (DLQ) securely handles undeliverable messages without data loss, ensuring audit event durability.
+
+### DLQ Architecture
+The `DeadLetterHandler` uses Redis and BullMQ to:
+- Store failed audit events
+- Preserve original event data and failure context
+- Track retry history and error stacks
+- Enable post-mortem analysis
+
+```mermaid
+classDiagram
+class DeadLetterHandler {
++addFailedEvent() Promise~void~
++startWorker() void
++stopWorker() Promise~void~
++getMetrics() Promise~DeadLetterMetrics~
++onAlert() void
++processPendingEvents() Promise~void~
++cleanup() Promise~void~
+}
+class DeadLetterEvent {
++originalEvent : AuditLogEvent
++failureReason : string
++failureCount : number
++firstFailureTime : string
++lastFailureTime : string
++metadata : DeadLetterEventMetadata
+}
+class DeadLetterEventMetadata {
++errorStack? : string
++retryHistory : RetryRecord[]
+}
+DeadLetterHandler --> DeadLetterEvent : "contains"
+DeadLetterEvent --> DeadLetterEventMetadata : "has"
+```
+
+**Diagram sources**
+- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts#L0-L366)
+
+**Section sources**
+- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts#L0-L366)
+
+### Failure Preservation
+When an audit event fails processing after retries:
+1. The original event is preserved intact
+2. Failure reason and count are recorded
+3. Full error stack trace is captured
+4. Retry history is maintained
+5. Event is added to the DLQ with metadata
+
+### Automated Processing and Alerts
+The system:
+- Processes DLQ events every 5 minutes
+- Archives events older than configured threshold
+- Deletes events exceeding retention period
+- Triggers alerts when DLQ size exceeds threshold
+- Provides metrics on failure patterns
+
+This ensures failed audit events are not lost while enabling investigation and remediation.
+
+## Security Testing and Attack Scenarios
+
+Comprehensive tests validate the security system's resilience against various attack scenarios.
+
+### Cryptographic Integrity Testing
+Tests verify:
+- Hash consistency for identical events
+- Hash changes when critical fields are modified
+- Signature verification failure with tampered data
+- Resistance to timing attacks through constant-time comparison
+
+```mermaid
+flowchart TD
+Start["Test: Tampering Detection"] --> Generate["Generate hash/signature"]
+Generate --> Tamper["Modify event action field"]
+Tamper --> VerifyHash["Verify original hash"]
+VerifyHash --> ExpectFail1["Expect: Hash verification fails"]
+ExpectFail1 --> VerifySig["Verify original signature"]
+VerifySig --> ExpectFail2["Expect: Signature verification fails"]
+ExpectFail2 --> End["Test passed"]
+```
+
+**Diagram sources**
+- [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts#L0-L460)
+
+**Section sources**
+- [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts#L0-L460)
+
+### Error Handling Validation
+Tests confirm:
+- Correct classification of database, network, and validation errors
+- Proper aggregation of similar errors
+- Accurate error statistics reporting
+- Secure context handling without data leakage
+- External logger integration
+
+The test suite includes scenarios for:
+- Database connection failures
+- Network timeouts
+- Authentication errors
+- Configuration issues
+- Data integrity violations
+
+## Common Vulnerabilities and Mitigations
+
+### Injection Attacks
+Prevented by:
+- Using parameterized queries with Drizzle ORM
+- Input validation through Zod schemas
+- Context-aware escaping in SQL templates
+- Stored procedures for complex operations
+
+### Data Leakage Prevention
+Mitigated through:
+- Error message sanitization
+- Stack trace suppression in production
+- Environment variable protection
+- Correlation IDs without sensitive data
+- Metadata scrubbing in logs
+
+### Secure Key Management
+Implemented via:
+- Environment variables for secret keys
+- Default key generation with warnings
+- HMAC-SHA256 for signature authentication
+- Key rotation support
+- Secure storage in configuration management
+
+## Configuration and Incident Response
+
+### Security Configuration
+Key settings include:
+- **AUDIT_CRYPTO_SECRET**: Cryptographic secret key
+- **enableStructuredLogging**: Structured JSON output
+- **enableAggregation**: Error grouping and trending
+- **aggregationWindowMinutes**: Time window for aggregation
+- **maxRetentionDays**: DLQ retention period
+- **alertThreshold**: DLQ size alert threshold
+
+### Incident Response Procedures
+When security incidents occur:
+1. **Identify**: Use correlation IDs to trace related events
+2. **Contain**: Isolate affected components
+3. **Analyze**: Examine DLQ entries and error aggregations
+4. **Remediate**: Fix root cause and verify resolution
+5. **Report**: Document findings and update prevention measures
+
+For cryptographic integrity failures:
+- Investigate the source of tampering
+- Review access logs for unauthorized access
+- Rotate cryptographic keys if compromised
+- Validate all audit events during the affected period
+
+For high error volumes:
+- Check system resources and performance
+- Review recent deployments for regressions
+- Examine network connectivity and dependencies
+- Scale resources if necessary
