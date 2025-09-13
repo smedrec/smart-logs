@@ -2,21 +2,37 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [types.ts](file://packages/audit/src/types.ts)
-- [validation.ts](file://packages/audit/src/validation.ts)
+- [audit.ts](file://packages/audit/src/audit.ts) - *Updated in recent commit*
+- [types.ts](file://packages/audit/src/types.ts) - *Updated in recent commit*
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated in recent commit*
 - [config/types.ts](file://packages/audit/src/config/types.ts)
+- [validation.ts](file://packages/audit/src/validation.ts)
 - [config/manager.ts](file://packages/audit/src/config/manager.ts)
-- [config/validator.ts](file://packages/audit/src/config/validator.ts)
 - [event/event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
 - [event/event-types.ts](file://packages/audit/src/event/event-types.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
 - [index.ts](file://packages/audit/src/index.ts)
 - [audit.md](file://apps/docs/src/content/docs/audit/audit.md)
 - [examples.md](file://apps/docs/src/content/docs/audit/examples.md)
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated Cryptographic Security section to reflect new asynchronous event signature capabilities with KMS algorithms
+- Added documentation for the new async SHA-256 method with base64 encoding
+- Enhanced the Audit Event Structure section to include the new algorithm field
+- Updated Usage Examples to demonstrate the new signature generation method
+- Modified the Cryptographic Security diagram to reflect the updated interface
+
+**List of new sections added**
+- None
+
+**List of deprecated/removed sections**
+- None
+
+**Source tracking system updates and new source files**
+- Added annotations to updated files in referenced files list
+- Updated section sources to reflect changes in crypto.ts, audit.ts, and types.ts
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -93,6 +109,14 @@ interface AuditLogEvent {
 	hash?: string
 	hashAlgorithm?: 'SHA-256'
 	signature?: string
+	algorithm?:
+		| 'HMAC-SHA256'
+		| 'RSASSA_PSS_SHA_256'
+		| 'RSASSA_PSS_SHA_384'
+		| 'RSASSA_PSS_SHA_512'
+		| 'RSASSA_PKCS1_V1_5_SHA_256'
+		| 'RSASSA_PKCS1_V1_5_SHA_384'
+		| 'RSASSA_PKCS1_V1_5_SHA_512'
 	eventVersion?: string
 	correlationId?: string
 	sessionContext?: SessionContext
@@ -319,27 +343,29 @@ The cryptographic system ensures the integrity and authenticity of audit events 
 ```mermaid
 classDiagram
 class CryptoService {
--config : CryptoConfig
+-config : SecurityConfig
 +generateHash(event : AuditLogEvent) : string
 +verifyHash(event : AuditLogEvent, expectedHash : string) : boolean
-+generateEventSignature(event : AuditLogEvent) : string
-+verifyEventSignature(event : AuditLogEvent, signature : string) : boolean
++generateEventSignature(event : AuditLogEvent, signingAlgorithm? : SigningAlgorithm) : Promise~EventSignatureResponse~
++verifyEventSignature(event : AuditLogEvent, signature : string, signingAlgorithm? : SigningAlgorithm) : Promise~boolean~
 +extractCriticalFields(event : AuditLogEvent) : Record~string, any~
 +createDeterministicString(fields : Record~string, any~) : string
-+getConfig() : Omit~CryptoConfig, 'secretKey'~
++sha256(source : string | Uint8Array) : Promise~string~
++getConfig() : any
 }
 class CryptographicService {
 <<interface>>
 +generateHash(event : AuditLogEvent) : string
 +verifyHash(event : AuditLogEvent, expectedHash : string) : boolean
-+generateEventSignature(event : AuditLogEvent) : string
-+verifyEventSignature(event : AuditLogEvent, signature : string) : boolean
++generateEventSignature(event : AuditLogEvent, signingAlgorithm? : SigningAlgorithm) : Promise~EventSignatureResponse~
++verifyEventSignature(event : AuditLogEvent, signature : string, signingAlgorithm? : SigningAlgorithm) : Promise~boolean~
 }
 CryptoService --|> CryptographicService
 ```
 
 **Diagram sources**
 - [crypto.ts](file://packages/audit/src/crypto.ts)
+- [types.ts](file://packages/audit/src/types.ts)
 
 The cryptographic service performs the following operations:
 
@@ -350,11 +376,14 @@ The cryptographic service performs the following operations:
 
 The hash is generated from a deterministic string representation of critical fields, including timestamp, action, status, principalId, organizationId, targetResourceType, targetResourceId, and outcomeDescription. This ensures that the same event will always produce the same hash, regardless of property order in the object.
 
-The `CryptoService` class has been extended with a new asynchronous method `sha256` that generates a base64-encoded SHA-256 hash from a string or Uint8Array input. This method uses the Web Crypto API's `crypto.subtle.digest` function for hashing and implements RFC4648 base64 encoding through the `b64` helper method. This enhancement provides additional cryptographic utility for scenarios requiring base64-encoded hashes rather than hexadecimal representations.
+The `CryptoService` class has been extended with new asynchronous methods for event signature generation with KMS algorithms and base64-encoded SHA-256 hashing. The `generateEventSignature` method now supports multiple signing algorithms through the Infisical KMS integration, including RSASSA-PSS and RSASSA-PKCS1-v1_5 with various SHA algorithms. This enhancement provides additional cryptographic flexibility for scenarios requiring stronger security than HMAC-SHA256.
+
+The new `sha256` method generates a base64-encoded SHA-256 hash from a string or Uint8Array input. This method uses the Web Crypto API's `crypto.subtle.digest` function for hashing and implements RFC4648 base64 encoding through the `b64` helper method. This enhancement provides additional cryptographic utility for scenarios requiring base64-encoded hashes rather than hexadecimal representations.
 
 **Section sources**
 - [crypto.ts](file://packages/audit/src/crypto.ts)
 - [types.ts](file://packages/audit/src/types.ts)
+- [config/types.ts](file://packages/audit/src/config/types.ts)
 
 ## Reliable Event Processing
 
@@ -526,6 +555,23 @@ await auditService.logWithGuaranteedDelivery(
     correlationId: 'config-change-2024-001',
   }
 )
+```
+
+### Asynchronous Event Signature with KMS
+
+```typescript
+// Generate signature using KMS with RSASSA-PSS-SHA-256 algorithm
+const { signature, algorithm } = await auditService.generateEventSignature(
+  event,
+  'RSASSA_PSS_SHA_256'
+);
+
+// The event will now include both the signature and the algorithm used
+await auditService.log({
+  ...event,
+  signature,
+  algorithm
+});
 ```
 
 **Section sources**

@@ -7,14 +7,18 @@
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [types.ts](file://packages/audit/src/types.ts)
 - [types.ts](file://packages/audit/src/config/types.ts)
+- [audit.ts](file://packages/audit/src/audit.ts) - *Updated in recent commit*
+- [client.ts](file://packages/infisical-kms/src/client.ts) - *KMS integration*
+- [types.ts](file://packages/infisical-kms/src/types.ts) - *KMS types*
 </cite>
 
 ## Update Summary
-- Added documentation for the new async sha256 method in CryptoService
-- Updated Secure Hashing Algorithms section to include Web Crypto API implementation
-- Added new section for Async SHA-256 Base64 Encoding
-- Updated code examples to demonstrate the new async functionality
-- Enhanced section sources to reflect updated content
+- Added documentation for async event signature generation with KMS algorithms
+- Updated Secure Hashing Algorithms section to include KMS integration
+- Enhanced HMAC-SHA256 Signatures section with KMS support details
+- Updated Cryptographic Operations Examples with KMS usage scenarios
+- Added integration details with Infisical KMS service
+- Updated section sources to reflect new file references
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -39,8 +43,8 @@ classDiagram
 class CryptoService {
 +generateHash(event : AuditLogEvent) : string
 +verifyHash(event : AuditLogEvent, expectedHash : string) : boolean
-+generateEventSignature(event : AuditLogEvent) : string
-+verifyEventSignature(event : AuditLogEvent, signature : string) : boolean
++generateEventSignature(event : AuditLogEvent, signingAlgorithm? : SigningAlgorithm) : Promise~EventSignatureResponse~
++verifyEventSignature(event : AuditLogEvent, signature : string, signingAlgorithm? : SigningAlgorithm) : Promise~boolean~
 +sha256(source : string | Uint8Array) : Promise~string~
 +getConfig() : Omit<CryptoConfig, 'secretKey'>
 -extractCriticalFields(event : AuditLogEvent) : Record<string, any>
@@ -66,15 +70,21 @@ class AuditLogEvent {
 +hash? : string
 +signature? : string
 }
+class InfisicalKmsClient {
++sign(data : string, signingAlgorithm : SigningAlgorithm) : Promise~SignResponse~
++verify(data : string, signature : string, signingAlgorithm : SigningAlgorithm) : Promise~VerifyResponse~
+}
 CryptoService --> AuditLogEvent : "processes"
 CryptoUtils --> CryptoService : "delegates to"
+CryptoService --> InfisicalKmsClient : "uses when KMS enabled"
 ```
 
 **Diagram sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L384)
+- [types.ts](file://packages/infisical-kms/src/types.ts#L1-L57)
 
 **Section sources**   
-- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L384)
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts#L0-L460)
 
 ### Hash Generation Process
@@ -107,6 +117,24 @@ The system implements HMAC-SHA256 signatures for additional security through sec
 3. Returns the signature as a hexadecimal string
 
 This two-layer approach (hash + HMAC) provides both data integrity and authentication, ensuring that only parties with the secret key can generate valid signatures.
+
+**Updated** Added support for KMS-based signatures
+
+When KMS is enabled in the configuration, the system uses the Infisical KMS service for signing operations:
+- Uses `InfisicalKmsClient` to sign event hashes
+- Supports multiple signing algorithms including RSASSA-PSS and RSASSA-PKCS1
+- Returns both signature and algorithm information in `EventSignatureResponse`
+
+The KMS integration provides enhanced security by:
+- Using hardware security modules (HSMs) for key storage
+- Supporting stronger asymmetric algorithms
+- Centralized key management
+- Audit trails for cryptographic operations
+
+**Section sources**
+- [crypto.ts](file://packages/audit/src/crypto.ts#L150-L218)
+- [client.ts](file://packages/infisical-kms/src/client.ts#L15-L145)
+- [types.ts](file://packages/infisical-kms/src/types.ts#L1-L57)
 
 ## Async SHA-256 Base64 Encoding
 The system has been extended with an async SHA-256 hashing method that returns results in RFC4648-compliant base64 encoding. This implementation leverages the Web Crypto API for enhanced security and performance.
@@ -146,7 +174,7 @@ private b64(data: ArrayBuffer | string): string {
 ```
 
 **Section sources**   
-- [crypto.ts](file://packages/audit/src/crypto.ts#L100-L125) - *Updated in recent commit*
+- [crypto.ts](file://packages/audit/src/crypto.ts#L300-L340) - *Updated in recent commit*
 
 ## Secure Random Value Generation
 
@@ -239,16 +267,17 @@ The tests demonstrate:
 ### Signature Operations
 ```typescript
 // Generate signature
-const signature = cryptoService.generateEventSignature(sampleEvent)
+const signatureResponse = await cryptoService.generateEventSignature(sampleEvent)
 
 // Verify signature
-const isValid = cryptoService.verifyEventSignature(sampleEvent, signature)
+const isValid = await cryptoService.verifyEventSignature(sampleEvent, signatureResponse.signature)
 ```
 
 The tests verify:
 - Consistent signature generation with the same secret key
 - Different signatures with different secret keys
 - Rejection of signatures when the event is tampered with
+- Proper handling of KMS-based signatures when enabled
 
 ### Async SHA-256 Base64 Usage
 ```typescript
@@ -265,32 +294,35 @@ The tests validate:
 - Support for both string and Uint8Array inputs
 - Error handling for invalid inputs
 
-### Edge Case Handling
-The system handles various edge cases:
-- Events with null or undefined fields
-- Events with empty string values
-- Special characters and Unicode in event data
-- Different object property ordering
-
-```mermaid
-flowchart TD
-Start([Event Received]) --> ExtractFields["Extract Critical Fields"]
-ExtractFields --> SortKeys["Sort Keys Alphabetically"]
-SortKeys --> CreatePairs["Create Key-Value Pairs"]
-CreatePairs --> JoinString["Join with | Separator"]
-JoinString --> GenerateHash["Generate SHA-256 Hash"]
-GenerateHash --> ReturnHash["Return Hash"]
-GenerateHash --> GenerateHMAC["Generate HMAC-SHA256 Signature"]
-GenerateHMAC --> ReturnSignature["Return Signature"]
-ReturnHash --> End([Hash Generated])
-ReturnSignature --> End
+### KMS Integration Testing
+```typescript
+// Test KMS signature generation
+const config = {
+    security: {
+        enableEventSigning: true,
+        kms: {
+            enabled: true,
+            baseUrl: 'https://kms.example.com',
+            encryptionKey: 'enc-key-123',
+            signingKey: 'sign-key-456',
+            accessToken: 'token-789'
+        }
+    }
+}
+const cryptoService = new CryptoService(config.security)
+const signatureResponse = await cryptoService.generateEventSignature(event)
+expect(signatureResponse.algorithm).toBe('RSASSA_PSS_SHA_256')
 ```
 
-**Diagram sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
+The tests validate:
+- Proper initialization of InfisicalKmsClient
+- Successful signature generation via KMS
+- Correct verification of KMS-generated signatures
+- Error handling for KMS connection failures
 
 **Section sources**
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts#L0-L460)
+- [audit.ts](file://packages/audit/src/audit.ts#L150-L200)
 
 ## Integration with Security Components
 
@@ -317,8 +349,9 @@ The system provides end-to-end protection for audit logs:
 This multi-layered approach ensures the authenticity and integrity of the entire audit trail.
 
 **Section sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L384)
 - [manager.ts](file://packages/audit/src/config/manager.ts#L510-L641)
+- [audit.ts](file://packages/audit/src/audit.ts#L150-L200)
 
 ## Best Practices
 
@@ -328,6 +361,7 @@ The system follows best practices for key storage:
 - **Secure configuration storage**: Configuration files can be encrypted using a separate password
 - **Key derivation**: Uses PBKDF2 or scrypt to derive encryption keys from passwords
 - **Salt usage**: Configurable salt values prevent rainbow table attacks
+- **KMS integration**: For production environments, use Infisical KMS for hardware-backed key storage
 
 The system warns when using generated secrets instead of environment-provided secrets, encouraging proper key management in production.
 
@@ -337,6 +371,7 @@ The system uses industry-standard algorithms:
 - **HMAC-SHA256**: For message authentication
 - **AES-256**: For encryption, available in GCM and CBC modes
 - **PBKDF2/scrypt**: For key derivation
+- **RSASSA-PSS/RSASSA-PKCS1**: For asymmetric signatures via KMS
 
 These algorithms are configurable through the system's configuration, allowing for future updates as cryptographic standards evolve.
 
@@ -346,11 +381,12 @@ The system provides protection against common attacks:
 - **Rainbow table lookups**: Prevented through the use of salts in key derivation and the deterministic string representation that includes all critical fields
 - **Tampering**: Detected through hash verification and HMAC signature validation
 - **Replay attacks**: Mitigated through timestamp inclusion in the hashed data
+- **Key compromise**: Reduced risk through KMS integration and hardware security modules
 
 The deterministic string representation ensures that even if an attacker reorders JSON properties, the hash will remain the same, preventing this potential attack vector.
 
 **Section sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L384)
 - [manager.ts](file://packages/audit/src/config/manager.ts#L510-L641)
 - [types.ts](file://packages/audit/src/config/types.ts#L377-L444)
 
@@ -368,6 +404,23 @@ interface CryptoConfig {
 ```
 
 The default configuration uses SHA-256 for hashing and HMAC-SHA256 for signatures, with the secret key provided via environment variable or generated as a fallback.
+
+### KMS Configuration
+```typescript
+interface KMSConfig {
+	enabled: boolean
+	baseUrl: string
+	encryptionKey: string
+	signingKey: string
+	accessToken: string
+	algorithm?: 'AES-256-GCM' | 'AES-256-CBC'
+	kdf?: 'PBKDF2' | 'scrypt'
+	salt?: string
+	iterations?: number
+}
+```
+
+When KMS is enabled, the system uses the Infisical KMS service for cryptographic operations, providing enhanced security through hardware security modules and centralized key management.
 
 ### Secure Storage Configuration
 ```typescript
@@ -391,10 +444,11 @@ The system balances security strength with computational overhead:
 - **Higher iteration counts** in PBKDF2 increase security but also computational cost
 - **scrypt** provides better resistance to hardware-based attacks but requires more memory
 - **AES-256-GCM** provides authenticated encryption but may have slightly higher overhead than CBC mode
+- **KMS operations** introduce network latency but provide superior key security
 
 Administrators can adjust these parameters based on their security requirements and performance constraints, with higher values providing greater security at the cost of increased processing time.
 
 **Section sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L218)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L384)
 - [manager.ts](file://packages/audit/src/config/manager.ts#L510-L641)
 - [types.ts](file://packages/audit/src/config/types.ts#L377-L444)

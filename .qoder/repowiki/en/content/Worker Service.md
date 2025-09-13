@@ -2,7 +2,7 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [index.ts](file://apps/worker/src/index.ts)
+- [index.ts](file://apps/worker/src/index.ts) - *Updated in recent commit*
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
 - [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
@@ -10,6 +10,15 @@
 - [types.ts](file://packages/audit/src/observability/types.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated initialization sequence for monitoring service and alert handlers in the Worker Service
+- Corrected service instantiation order to ensure proper dependency injection
+- Added explicit configuration manager initialization before other services
+- Updated health check service registration to include processor-dependent checks
+- Enhanced error handling during service initialization
+- Updated diagram sources to reflect corrected initialization flow
 
 ## Table of Contents
 1. [Introduction](#introduction)

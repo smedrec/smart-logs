@@ -2,20 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated in recent commit*
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated with KMS support in commit ce262627*
+- [types.ts](file://packages/audit/src/types.ts) - *Updated with new signing algorithms in commit ce262627*
+- [audit.ts](file://packages/audit/src/audit.ts) - *Updated with async signature methods in commit ce262627*
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts) - *Enhanced alert persistence in commit 6be5dd6c*
 - [error-handling.ts](file://packages/audit/src/error/error-handling.ts)
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 - [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
 - [error-handling.test.ts](file://packages/audit/src/__tests__/error-handling.test.ts)
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts)
 </cite>
 
 ## Update Summary
-- Added documentation for the new async sha256 method in CryptoService that returns base64 encoded strings
-- Updated Cryptographic Functions section to include information about the Web Crypto API implementation
-- Enhanced the Deterministic Hashing section with details about the base64 encoding utility
-- Updated code examples and diagrams to reflect the new asynchronous hashing capability
-- Maintained all existing security documentation while adding new content for the updated cryptographic functions
+- Added documentation for asynchronous event signature generation with KMS support in CryptoService
+- Updated Cryptographic Functions section to include KMS integration and multiple signing algorithms
+- Enhanced the HMAC Signature Verification section with details about the new async signature response format
+- Updated the Security Alerting System section with enhanced alert persistence features and cleanup functionality
+- Added new code examples and diagrams to reflect the updated security architecture
+- Maintained all existing security documentation while adding new content for the updated cryptographic functions and alert persistence
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -54,11 +57,15 @@ classDiagram
 class CryptoService {
 +generateHash(event) string
 +verifyHash(event, hash) boolean
-+generateEventSignature(event) string
-+verifyEventSignature(event, signature) boolean
++generateEventSignature(event, algorithm?) Promise~EventSignatureResponse~
++verifyEventSignature(event, signature, algorithm?) Promise~boolean~
 +sha256(source) Promise~string~
 -extractCriticalFields(event) Record
 -createDeterministicString(fields) string
+}
+class EventSignatureResponse {
++signature : string
++algorithm : SigningAlgorithm
 }
 class CryptoUtils {
 +generateHash(event) string
@@ -84,7 +91,7 @@ To ensure consistent hashing regardless of object property order, the system:
 
 This approach guarantees that identical events produce identical hashes even when serialized with different property ordering. The system also includes a base64 encoding utility that converts binary hash data into RFC4648 compliant base64 strings for easier transmission and storage.
 
-### HMAC Signature Verification
+### HMAC Signature Verification with KMS Support
 The HMAC-SHA256 signature provides an additional layer of security by incorporating a secret key. The process:
 1. Generates a hash of the event using `generateHash`
 2. Applies HMAC-SHA256 using the secret key and the hash as input
@@ -92,8 +99,64 @@ The HMAC-SHA256 signature provides an additional layer of security by incorporat
 
 This prevents attackers from modifying both the data and hash without access to the secret key.
 
+#### Asynchronous Signature Generation
+The `CryptoService` now includes an asynchronous `generateEventSignature` method that supports both local HMAC-SHA256 and external KMS-based signing algorithms. When KMS is enabled in the configuration, the system delegates signing to the Infisical KMS service.
+
+```typescript
+async generateEventSignature(
+    event: AuditLogEvent,
+    signingAlgorithm?: SigningAlgorithm
+): Promise<EventSignatureResponse> {
+    const eventHash = this.generateHash(event)
+
+    try {
+        if (this.config.kms.enabled && this.kms) {
+            const signature = await this.kms.sign(eventHash, signingAlgorithm)
+            return {
+                signature: signature.signature,
+                algorithm: signature.signingAlgorithm,
+            }
+        } else {
+            const signature = createHmac('sha256', this.config.encryptionKey!)
+                .update(eventHash, 'utf8')
+                .digest('hex')
+            return {
+                signature,
+                algorithm: 'HMAC-SHA256',
+            }
+        }
+    } catch (error) {
+        console.error('[CryptoService] Signature creation failed:', error)
+        throw error
+    }
+}
+```
+
+The method returns an `EventSignatureResponse` object containing both the signature value and the algorithm used, enabling clients to verify which cryptographic method was applied.
+
+#### Supported Signing Algorithms
+The system supports multiple signing algorithms through the KMS integration, as defined in the `types.ts` file:
+
+```typescript
+export type SigningAlgorithm = 
+    | 'HMAC-SHA256'
+    | 'RSASSA_PSS_SHA_256'
+    | 'RSASSA_PSS_SHA_384'
+    | 'RSASSA_PSS_SHA_512'
+    | 'RSASSA_PKCS1_V1_5_SHA_256'
+    | 'RSASSA_PKCS1_V1_5_SHA_384'
+    | 'RSASSA_PKCS1_V1_5_SHA_512'
+```
+
+This allows for cryptographic flexibility and compliance with various security standards.
+
+**Section sources**
+- [crypto.ts](file://packages/audit/src/crypto.ts#L127-L174)
+- [types.ts](file://packages/audit/src/types.ts#L150-L160)
+- [audit.ts](file://packages/audit/src/audit.ts#L300-L330)
+
 ### Asynchronous SHA-256 Hashing with Base64 Encoding
-The `CryptoService` now includes an asynchronous `sha256` method that leverages the Web Crypto API for secure hashing operations. This method:
+The `CryptoService` includes an asynchronous `sha256` method that leverages the Web Crypto API for secure hashing operations. This method:
 - Accepts string or Uint8Array input
 - Returns a Promise that resolves to a base64-encoded string
 - Uses the browser's or Node.js's built-in Web Crypto API for cryptographic operations
@@ -183,11 +246,12 @@ Aggregations trigger alerts when thresholds are exceeded, enabling proactive mon
 
 The database alert handler detects and responds to suspicious activities through persistent storage and multi-organizational access control.
 
-### Alert Persistence
+### Enhanced Alert Persistence
 The `DatabaseAlertHandler` stores alerts in PostgreSQL with organization-based isolation:
 - Each alert belongs to a specific **organization_id**
 - Fields include severity, type, status, and resolution metadata
 - Supports acknowledgment and resolution workflows
+- Includes automatic cleanup of resolved alerts based on retention policy
 
 ```mermaid
 erDiagram
@@ -230,6 +294,7 @@ The system supports:
 - **Resolution**: Alerts are closed with resolution notes
 - **Querying**: Filter by status, severity, type, and organization
 - **Statistics**: Real-time metrics on alert volume and distribution
+- **Cleanup**: Automatic deletion of resolved alerts older than retention period
 
 ### Multi-Tenant Security
 Organization-based access control ensures:
@@ -237,6 +302,35 @@ Organization-based access control ensures:
 - Queries include `organization_id` filtering
 - Cross-tenant data leakage is prevented
 - Administrative views can aggregate across organizations
+
+### Automatic Alert Cleanup
+The system includes a `cleanupResolvedAlerts` method that automatically removes resolved alerts older than a specified retention period:
+
+```typescript
+async cleanupResolvedAlerts(organizationId: string, retentionDays: number = 90): Promise<number> {
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
+
+    try {
+        const result = await this.db.execute(sql`
+            DELETE FROM alerts 
+            WHERE organization_id = ${organizationId}
+            AND resolved = 'true'
+            AND resolved_at < ${cutoffDate.toISOString()}
+            RETURNING id
+        `)
+
+        return result.length || 0
+    } catch (error) {
+        throw new Error(`Failed to cleanup resolved alerts: ${error}`)
+    }
+}
+```
+
+This ensures that the alert storage remains efficient while maintaining compliance with data retention policies.
+
+**Section sources**
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L400-L430)
 
 ## Dead-Letter Queue for Message Integrity
 
@@ -367,6 +461,7 @@ Implemented via:
 - HMAC-SHA256 for signature authentication
 - Key rotation support
 - Secure storage in configuration management
+- KMS integration for advanced cryptographic operations
 
 ## Configuration and Incident Response
 
@@ -378,6 +473,9 @@ Key settings include:
 - **aggregationWindowMinutes**: Time window for aggregation
 - **maxRetentionDays**: DLQ retention period
 - **alertThreshold**: DLQ size alert threshold
+- **kms.enabled**: Enable KMS-based cryptographic operations
+- **kms.baseUrl**: KMS service endpoint
+- **kms.accessToken**: Authentication token for KMS service
 
 ### Incident Response Procedures
 When security incidents occur:
