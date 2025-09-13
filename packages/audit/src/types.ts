@@ -111,10 +111,24 @@ export interface AuditLogEvent {
 
 	/**
 	 * Cryptographic signature for additional security
-	 * Generated using HMAC-SHA256 with secret key
+	 * Generated using HMAC-SHA256 with secret key or KMS
 	 * @example "x1y2z3a4b5c6..."
 	 */
 	signature?: string
+
+	/**
+	 * Algorithm used for cryptographic signing
+	 * Standardized to HMAC-SHA256 for consistency
+	 * @default "HMAC-SHA256"
+	 */
+	algorithm?:
+		| 'HMAC-SHA256'
+		| 'RSASSA_PSS_SHA_256'
+		| 'RSASSA_PSS_SHA_384'
+		| 'RSASSA_PSS_SHA_512'
+		| 'RSASSA_PKCS1_V1_5_SHA_256'
+		| 'RSASSA_PKCS1_V1_5_SHA_384'
+		| 'RSASSA_PKCS1_V1_5_SHA_512'
 
 	/**
 	 * Event schema version for compatibility tracking

@@ -435,9 +435,6 @@ export interface SecurityConfig {
 	/** Hash algorithm for integrity verification */
 	hashAlgorithm: 'SHA-256'
 
-	/** Signature algorithm for event signing */
-	signatureAlgorithm: 'HMAC-SHA256'
-
 	/** Enable event signing */
 	enableEventSigning: boolean
 

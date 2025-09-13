@@ -2,6 +2,7 @@ import { Queue } from 'bullmq'
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { Redis as RedisInstance } from 'ioredis' // Renamed to avoid conflict
 
+import { SigningAlgorithm } from '@repo/infisical-kms'
 import { ConsoleLogger } from '@repo/logs'
 import { getSharedRedisConnection } from '@repo/redis-client'
 
@@ -20,7 +21,7 @@ import {
 
 import type { RedisOptions, Redis as RedisType } from 'ioredis' // RedisType for type usage
 import type { Logger } from '@repo/logs'
-import type { CryptoConfig } from './crypto.js'
+import type { CryptoConfig, EventSignatureResponse } from './crypto.js'
 import type { ReliableProcessorConfig } from './queue/reliable-processor.js'
 import type { AuditLogEvent } from './types.js'
 import type { ValidationConfig } from './validation.js'
@@ -102,7 +103,7 @@ export class Audit {
 		this.config = config
 		this.queueName = this.config.reliableProcessor.queueName
 		this.isSharedConnection = false
-		this.cryptoService = new CryptoService({ secretKey: this.config.security.encryptionKey })
+		this.cryptoService = new CryptoService(this.config.security)
 		this.presetsService = new DatabasePresetHandler(db)
 
 		this.logger = new ConsoleLogger({
@@ -298,16 +299,23 @@ export class Audit {
 	 * Generates cryptographic signature for audit event
 	 * Uses HMAC-SHA256 for additional security
 	 */
-	public generateEventSignature(event: AuditLogEvent): string {
-		return this.cryptoService.generateEventSignature(event)
+	public async generateEventSignature(
+		event: AuditLogEvent,
+		signingAlgorithm?: SigningAlgorithm
+	): Promise<EventSignatureResponse> {
+		return await this.cryptoService.generateEventSignature(event)
 	}
 
 	/**
 	 * Verifies the cryptographic signature of an audit event
 	 * Provides additional security through secret key authentication
 	 */
-	public verifyEventSignature(event: AuditLogEvent, signature: string): boolean {
-		return this.cryptoService.verifyEventSignature(event, signature)
+	public async verifyEventSignature(
+		event: AuditLogEvent,
+		signature: string,
+		signingAlgorithm?: SigningAlgorithm
+	): Promise<boolean> {
+		return await this.cryptoService.verifyEventSignature(event, signature, signingAlgorithm)
 	}
 
 	/**
@@ -568,8 +576,8 @@ export class Audit {
 		// Generate signature if requested
 		if (options.generateSignature) {
 			try {
-				const signature = this.generateEventSignature(event)
-				event = { ...event, signature }
+				const { signature, algorithm } = await this.generateEventSignature(event)
+				event = { ...event, signature, algorithm }
 			} catch (error) {
 				this.logger.error(
 					`[AuditService] Failed to generate signature for event: ${error instanceof Error ? error.message : String(error)}`,

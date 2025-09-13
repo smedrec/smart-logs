@@ -34,16 +34,23 @@ export interface DecryptResponse {
 	plaintext: string
 }
 
+export type SigningAlgorithm =
+	| 'HMAC-SHA256'
+	| 'RSASSA_PSS_SHA_256'
+	| 'RSASSA_PSS_SHA_384'
+	| 'RSASSA_PSS_SHA_512'
+	| 'RSASSA_PKCS1_V1_5_SHA_256'
+	| 'RSASSA_PKCS1_V1_5_SHA_384'
+	| 'RSASSA_PKCS1_V1_5_SHA_512'
+
 export interface SignResponse {
 	signature: string
 	keyId: string
-	signingAlgorithm: string
+	signingAlgorithm: SigningAlgorithm
 }
 
 export interface VerifyResponse {
 	signatureValid: boolean
 	keyId: string
-	signingAlgorithm: string
+	signingAlgorithm: SigningAlgorithm
 }
-
-export type SigningAlgorithm = 'RSASSA_PSS_SHA_256' | 'RSASSA_PSS_SHA_384' | 'RSASSA_PSS_SHA_512' | 'RSASSA_PKCS1_V1_5_SHA_256' | 'RSASSA_PKCS1_V1_5_SHA_384' | 'RSASSA_PKCS1_V1_5_SHA_512'

@@ -4,6 +4,7 @@ import { InfisicalKmsClient } from '@repo/infisical-kms'
 
 import { SecurityConfig } from './config/types.js'
 
+import type { SigningAlgorithm } from '@repo/infisical-kms'
 import type { AuditLogEvent } from './types.js'
 
 /**
@@ -35,13 +36,34 @@ export function generateDefaultSecret(): string {
 }
 
 /**
+ * The response of the event signature
+ */
+export interface EventSignatureResponse {
+	/**
+	 * The signature of the event
+	 */
+	signature: string
+	/**
+	 * The algorithm used to generate the signature
+	 */
+	algorithm: SigningAlgorithm
+}
+
+/**
  * Interface for cryptographic integrity verification
  */
 export interface CryptographicService {
 	generateHash(event: AuditLogEvent): string
 	verifyHash(event: AuditLogEvent, expectedHash: string): boolean
-	generateEventSignature(event: AuditLogEvent): string
-	verifyEventSignature(event: AuditLogEvent, signature: string): boolean
+	generateEventSignature(
+		event: AuditLogEvent,
+		signingAlgorithm?: SigningAlgorithm
+	): Promise<EventSignatureResponse>
+	verifyEventSignature(
+		event: AuditLogEvent,
+		signature: string,
+		signingAlgorithm?: SigningAlgorithm
+	): Promise<boolean>
 }
 
 /**
@@ -82,18 +104,6 @@ export class CryptoService implements CryptographicService {
 	}
 
 	/**
-	 * Generate a base64 string from a Uint8Array
-	 * @param source string or Uint8Array to hash
-	 * @returns base64 string
-	 */
-	async sha256(source: string | Uint8Array): Promise<string> {
-		const buf = typeof source === 'string' ? new TextEncoder().encode(source) : source
-
-		const hash = await crypto.subtle.digest('sha-256', buf)
-		return this.b64(hash)
-	}
-
-	/**
 	 * Verifies the integrity of an audit event by comparing hashes
 	 *
 	 * @param event The audit event to verify
@@ -117,12 +127,34 @@ export class CryptoService implements CryptographicService {
 	 * @param event The audit event to sign
 	 * @returns HMAC-SHA256 signature as hexadecimal string
 	 */
-	generateEventSignature(event: AuditLogEvent): string {
+	async generateEventSignature(
+		event: AuditLogEvent,
+		signingAlgorithm?: SigningAlgorithm
+	): Promise<EventSignatureResponse> {
 		// First generate the hash of the event
 		const eventHash = this.generateHash(event)
 
-		// Create HMAC signature using the hash and secret key
-		return createHmac('sha256', this.config.encryptionKey!).update(eventHash, 'utf8').digest('hex')
+		try {
+			if (this.config.kms.enabled && this.kms) {
+				const signature = await this.kms.sign(eventHash, signingAlgorithm)
+				return {
+					signature: signature.signature,
+					algorithm: signature.signingAlgorithm,
+				}
+			} else {
+				// Create HMAC signature using the hash and secret key
+				const signature = createHmac('sha256', this.config.encryptionKey!)
+					.update(eventHash, 'utf8')
+					.digest('hex')
+				return {
+					signature,
+					algorithm: 'HMAC-SHA256',
+				}
+			}
+		} catch (error) {
+			console.error('[CryptoService] Signature creation failed:', error)
+			throw error
+		}
 	}
 
 	/**
@@ -132,10 +164,24 @@ export class CryptoService implements CryptographicService {
 	 * @param signature The expected signature
 	 * @returns true if signature is valid, false if invalid or tampered
 	 */
-	verifyEventSignature(event: AuditLogEvent, signature: string): boolean {
+	async verifyEventSignature(
+		event: AuditLogEvent,
+		signature: string,
+		signingAlgorithm?: SigningAlgorithm
+	): Promise<boolean> {
+		const eventHash = this.generateHash(event)
+
 		try {
-			const computedSignature = this.generateEventSignature(event)
-			return computedSignature === signature
+			if (this.config.kms.enabled && this.kms) {
+				const verify = await this.kms.verify(eventHash, signature, signingAlgorithm)
+				return verify.signatureValid
+			} else {
+				// Create HMAC signature using the hash and secret key
+				const computedSignature = createHmac('sha256', this.config.encryptionKey!)
+					.update(eventHash, 'utf8')
+					.digest('hex')
+				return computedSignature === signature
+			}
 		} catch (error) {
 			console.error('[CryptoService] Signature verification failed:', error)
 			return false
@@ -186,6 +232,18 @@ export class CryptoService implements CryptographicService {
 
 		// Join with separator
 		return pairs.join('|')
+	}
+
+	/**
+	 * Generate a base64 string from a Uint8Array
+	 * @param source string or Uint8Array to hash
+	 * @returns base64 string
+	 */
+	private async sha256(source: string | Uint8Array): Promise<string> {
+		const buf = typeof source === 'string' ? new TextEncoder().encode(source) : source
+
+		const hash = await crypto.subtle.digest('sha-256', buf)
+		return this.b64(hash)
 	}
 
 	/**
@@ -246,10 +304,13 @@ export class CryptoService implements CryptographicService {
 	 *
 	 * @returns Current configuration (without secret key for security)
 	 */
-	getConfig(): Omit<CryptoConfig, 'secretKey'> {
+	getConfig(): any {
 		return {
 			hashAlgorithm: this.config.hashAlgorithm,
-			signatureAlgorithm: this.config.signatureAlgorithm,
+			kms: {
+				enabled: this.config.kms.enabled,
+				baseUrl: this.config.kms.baseUrl,
+			},
 		}
 	}
 }
