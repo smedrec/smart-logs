@@ -359,13 +359,13 @@ async function main() {
 
 	// 5. Initialize monitoring and health check services
 	if (!databaseAlertHandler) {
-		databaseAlertHandler = new DatabaseAlertHandler(db)
+		databaseAlertHandler = new DatabaseAlertHandler(auditDbService)
 	}
 	if (!metricsCollector) {
 		metricsCollector = new RedisMetricsCollector(connection)
 	}
 	if (!monitoringService) {
-		monitoringService = new MonitoringService(undefined, metricsCollector)
+		monitoringService = new MonitoringService(config.monitoring, metricsCollector)
 		monitoringService.addAlertHandler(new ConsoleAlertHandler())
 		monitoringService.addAlertHandler(databaseAlertHandler)
 	}
