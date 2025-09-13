@@ -2,6 +2,11 @@
 import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi'
+// TODO: Temporarily disabled due to TypeDoc CommonJS compatibility issue
+// import { createStarlightTypeDocPlugin } from 'starlight-typedoc'
+
+// TODO: Re-enable when TypeDoc compatibility is fixed
+// const [publicStarlightTypeDoc, publicTypeDocSidebarGroup] = createStarlightTypeDocPlugin()
 
 // https://astro.build/config
 export default defineConfig({
@@ -19,6 +24,13 @@ export default defineConfig({
 						schema: 'http://localhost:3000/api/v1/openapi.json',
 					},
 				]),
+				// TODO: Re-enable TypeDoc plugin when compatibility is fixed
+				// Generate the documentation.
+        // publicStarlightTypeDoc({
+        //   entryPoints: ['../../packages/audit/src/index.ts'],
+				// 	output: 'typeDoc-public',
+        //   tsconfig: '../../packages/audit/tsconfig.json',
+        // }),
 			],
 			sidebar: [
 				{
@@ -44,6 +56,12 @@ export default defineConfig({
 				},
 				// Add the generated sidebar group to the sidebar.
 				...openAPISidebarGroups,
+				// TODO: Re-enable when TypeDoc compatibility is fixed
+				// {
+        	// 	label: 'type docs',
+          // Add the generated public sidebar group to the sidebar.
+          // items: [publicTypeDocSidebarGroup],
+				// }
 			],
 		}),
 	],
