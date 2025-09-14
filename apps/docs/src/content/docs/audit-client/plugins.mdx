@@ -1,0 +1,764 @@
+---
+title: Plugin Architecture
+description: Extend the Audit Client with custom middleware, storage backends, authentication methods, and more through the comprehensive plugin system.
+---
+
+# Plugin Architecture
+
+The Smart Logs Audit Client features a powerful plugin architecture that allows you to extend functionality through custom middleware, storage backends, authentication methods, and more. This system provides flexibility while maintaining type safety and performance.
+
+## Overview
+
+The plugin system provides:
+
+- **Middleware Plugins**: Process HTTP requests and responses
+- **Storage Plugins**: Custom cache storage backends  
+- **Authentication Plugins**: Custom authentication methods
+- **Plugin Registry**: Centralized plugin management
+- **Plugin Manager**: Orchestrates plugin operations
+- **Built-in Plugins**: Ready-to-use common functionality
+
+## Core Concepts
+
+### Plugin Interface
+
+All plugins implement the base `Plugin` interface:
+
+```typescript
+interface Plugin {
+  readonly name: string
+  readonly version: string
+  readonly description?: string
+  readonly dependencies?: string[]
+  readonly configSchema?: Record<string, any>
+
+  initialize(config: any, context: PluginContext): Promise<void> | void
+  destroy?(): Promise<void> | void
+  validateConfig?(config: any): ValidationResult
+}
+```
+
+### Plugin Types
+
+#### Middleware Plugin
+
+Processes HTTP requests and responses:
+
+```typescript
+interface MiddlewarePlugin extends Plugin {
+  readonly type: 'middleware'
+
+  processRequest?(request: MiddlewareRequest, next: MiddlewareNext): Promise<MiddlewareRequest>
+  processResponse?(response: MiddlewareResponse, next: MiddlewareNext): Promise<MiddlewareResponse>
+  handleError?(error: Error, context: MiddlewareErrorContext): Promise<void> | void
+}
+```
+
+#### Storage Plugin
+
+Creates custom cache storage backends:
+
+```typescript
+interface StoragePlugin extends Plugin {
+  readonly type: 'storage'
+
+  createStorage(config: any): CacheStorage
+}
+```
+
+#### Authentication Plugin
+
+Provides custom authentication methods:
+
+```typescript
+interface AuthPlugin extends Plugin {
+  readonly type: 'auth'
+
+  getAuthHeaders(config: any, context: AuthContext): Promise<Record<string, string>>
+  refreshToken?(config: any, context: AuthContext): Promise<string | null>
+  validateAuthConfig?(config: any): ValidationResult
+  handleAuthError?(error: Error, config: any, context: AuthContext): Promise<void> | void
+}
+```
+
+## Built-in Plugins
+
+### Middleware Plugins
+
+#### Request Logging Plugin
+
+Logs all HTTP requests and responses with configurable detail levels:
+
+```typescript
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: { /* auth config */ },
+  
+  plugins: {
+    middleware: {
+      enabled: true,
+      plugins: ['request-logging']
+    }
+  }
+})
+```
+
+Configuration options:
+
+```typescript
+{
+  logRequests: true,
+  logResponses: true,
+  logHeaders: false,
+  logBodies: false,
+  logLevel: 'info',
+  redactSensitive: true,
+  redactFields: ['password', 'token', 'ssn']
+}
+```
+
+#### Correlation ID Plugin
+
+Adds correlation IDs to requests for distributed tracing:
+
+```typescript
+const client = new AuditClient({
+  plugins: {
+    middleware: {
+      enabled: true,
+      plugins: {
+        'correlation-id': {
+          headerName: 'X-Correlation-ID',
+          idLength: 16,
+          generator: 'uuid-v4' // 'uuid-v4', 'nanoid', 'custom'
+        }
+      }
+    }
+  }
+})
+```
+
+#### Rate Limiting Plugin
+
+Client-side rate limiting for API requests:
+
+```typescript
+const client = new AuditClient({
+  plugins: {
+    middleware: {
+      enabled: true,
+      plugins: {
+        'rate-limiting': {
+          maxRequests: 100,
+          windowMs: 60000, // 1 minute
+          strategy: 'sliding-window',
+          onLimitReached: (request) => {
+            console.warn('Rate limit reached for:', request.url)
+          }
+        }
+      }
+    }
+  }
+})
+```
+
+#### Request Transformation Plugin
+
+Transform requests and responses:
+
+```typescript
+const client = new AuditClient({
+  plugins: {
+    middleware: {
+      enabled: true,
+      plugins: {
+        'request-transform': {
+          transformRequest: (request) => {
+            // Add custom headers
+            request.headers['X-Client-Version'] = '1.2.3'
+            return request
+          },
+          transformResponse: (response) => {
+            // Process response data
+            return response
+          }
+        }
+      }
+    }
+  }
+})
+```
+
+### Storage Plugins
+
+#### Redis Storage Plugin
+
+Redis-based cache storage for distributed caching:
+
+```typescript
+const client = new AuditClient({
+  cache: {
+    enabled: true,
+    storage: 'redis'
+  },
+  
+  plugins: {
+    storage: {
+      enabled: true,
+      plugins: {
+        'redis-storage': {
+          host: 'localhost',
+          port: 6379,
+          password: 'redis-password',
+          keyPrefix: 'audit-cache:',
+          maxRetries: 3,
+          retryDelayOnFailover: 100
+        }
+      }
+    }
+  }
+})
+```
+
+#### IndexedDB Storage Plugin
+
+Browser-based IndexedDB storage for client-side caching:
+
+```typescript
+const client = new AuditClient({
+  cache: {
+    enabled: true,
+    storage: 'indexeddb'
+  },
+  
+  plugins: {
+    storage: {
+      enabled: true,
+      plugins: {
+        'indexeddb-storage': {
+          databaseName: 'audit-cache',
+          version: 1,
+          storeName: 'cache',
+          maxEntries: 1000
+        }
+      }
+    }
+  }
+})
+```
+
+#### File System Storage Plugin
+
+File-based storage for server-side caching:
+
+```typescript
+const client = new AuditClient({
+  cache: {
+    enabled: true,
+    storage: 'filesystem'
+  },
+  
+  plugins: {
+    storage: {
+      enabled: true,
+      plugins: {
+        'filesystem-storage': {
+          cacheDir: './cache',
+          maxFileSize: 10 * 1024 * 1024, // 10MB
+          cleanupInterval: 3600000 // 1 hour
+        }
+      }
+    }
+  }
+})
+```
+
+### Authentication Plugins
+
+#### JWT Authentication Plugin
+
+JWT-based authentication with automatic token refresh:
+
+```typescript
+const client = new AuditClient({
+  authentication: {
+    type: 'jwt'
+  },
+  
+  plugins: {
+    auth: {
+      enabled: true,
+      plugins: {
+        'jwt-auth': {
+          token: 'your-jwt-token',
+          refreshToken: 'your-refresh-token',
+          refreshEndpoint: '/auth/refresh',
+          autoRefresh: true,
+          refreshThreshold: 300 // Refresh 5 minutes before expiry
+        }
+      }
+    }
+  }
+})
+```
+
+#### OAuth2 Authentication Plugin
+
+OAuth2 client credentials flow authentication:
+
+```typescript
+const client = new AuditClient({
+  authentication: {
+    type: 'oauth2'
+  },
+  
+  plugins: {
+    auth: {
+      enabled: true,
+      plugins: {
+        'oauth2-auth': {
+          clientId: 'your-client-id',
+          clientSecret: 'your-client-secret',
+          tokenEndpoint: 'https://auth.example.com/token',
+          scope: 'audit:read audit:write',
+          grantType: 'client_credentials'
+        }
+      }
+    }
+  }
+})
+```
+
+#### Custom Signature Authentication Plugin
+
+HMAC signature-based authentication:
+
+```typescript
+const client = new AuditClient({
+  authentication: {
+    type: 'signature'
+  },
+  
+  plugins: {
+    auth: {
+      enabled: true,
+      plugins: {
+        'signature-auth': {
+          secretKey: 'your-secret-key',
+          algorithm: 'sha256',
+          headers: {
+            timestamp: 'X-Timestamp',
+            signature: 'X-Signature'
+          }
+        }
+      }
+    }
+  }
+})
+```
+
+## Creating Custom Plugins
+
+### Custom Middleware Plugin
+
+Create a plugin that adds custom timing headers:
+
+```typescript
+import type {
+  MiddlewarePlugin,
+  MiddlewareRequest,
+  MiddlewareResponse,
+  MiddlewareNext,
+  PluginContext
+} from '@smedrec/audit-client'
+
+class CustomTimingPlugin implements MiddlewarePlugin {
+  readonly name = 'custom-timing'
+  readonly version = '1.0.0'
+  readonly description = 'Adds custom timing headers and metrics'
+  readonly type = 'middleware' as const
+  
+  private config: TimingConfig = {}
+  
+  async initialize(config: TimingConfig, context: PluginContext): Promise<void> {
+    this.config = { ...this.defaultConfig(), ...config }
+  }
+  
+  async processRequest(
+    request: MiddlewareRequest,
+    next: MiddlewareNext
+  ): Promise<MiddlewareRequest> {
+    // Add request start time
+    request.headers['X-Request-Start-Time'] = Date.now().toString()
+    request.metadata = { startTime: Date.now() }
+    
+    return request
+  }
+  
+  async processResponse(
+    response: MiddlewareResponse,
+    next: MiddlewareNext
+  ): Promise<MiddlewareResponse> {
+    const startTime = response.request.metadata?.startTime
+    if (startTime) {
+      const duration = Date.now() - startTime
+      response.headers['X-Response-Time'] = `${duration}ms`
+      
+      if (this.config.logSlowRequests && duration > this.config.slowThreshold) {
+        console.warn(`Slow request detected: ${duration}ms for ${response.request.url}`)
+      }
+    }
+    
+    return response
+  }
+  
+  private defaultConfig(): TimingConfig {
+    return {
+      logSlowRequests: true,
+      slowThreshold: 5000 // 5 seconds
+    }
+  }
+}
+
+interface TimingConfig {
+  logSlowRequests?: boolean
+  slowThreshold?: number
+}
+
+// Register and use the plugin
+const timingPlugin = new CustomTimingPlugin()
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: { type: 'apiKey', apiKey: 'key' }
+})
+
+await client.plugins.register(timingPlugin, {
+  logSlowRequests: true,
+  slowThreshold: 3000
+})
+```
+
+### Custom Storage Plugin
+
+Create a custom storage backend:
+
+```typescript
+import type { StoragePlugin, CacheStorage } from '@smedrec/audit-client'
+
+class FileSystemStoragePlugin implements StoragePlugin {
+  readonly name = 'filesystem-storage'
+  readonly version = '1.0.0'
+  readonly description = 'File system-based cache storage'
+  readonly type = 'storage' as const
+  
+  createStorage(config: FileSystemConfig): CacheStorage {
+    return new FileSystemStorage(config)
+  }
+}
+
+class FileSystemStorage implements CacheStorage {
+  constructor(private config: FileSystemConfig) {
+    // Ensure cache directory exists
+    this.ensureCacheDir()
+  }
+  
+  async get(key: string): Promise<string | null> {
+    try {
+      const filePath = this.getFilePath(key)
+      const content = await fs.readFile(filePath, 'utf-8')
+      const data = JSON.parse(content)
+      
+      // Check expiration
+      if (data.expiry && Date.now() > data.expiry) {
+        await this.delete(key)
+        return null
+      }
+      
+      return data.value
+    } catch (error) {
+      return null
+    }
+  }
+  
+  async set(key: string, value: string, ttl?: number): Promise<void> {
+    const filePath = this.getFilePath(key)
+    const data = {
+      value,
+      expiry: ttl ? Date.now() + ttl : null,
+      createdAt: Date.now()
+    }
+    
+    await fs.writeFile(filePath, JSON.stringify(data))
+  }
+  
+  async delete(key: string): Promise<void> {
+    try {
+      const filePath = this.getFilePath(key)
+      await fs.unlink(filePath)
+    } catch (error) {
+      // Ignore if file doesn't exist
+    }
+  }
+  
+  private getFilePath(key: string): string {
+    const hashedKey = crypto.createHash('md5').update(key).digest('hex')
+    return path.join(this.config.cacheDir, `${hashedKey}.json`)
+  }
+  
+  private async ensureCacheDir(): Promise<void> {
+    await fs.mkdir(this.config.cacheDir, { recursive: true })
+  }
+}
+
+interface FileSystemConfig {
+  cacheDir: string
+  maxFileSize?: number
+}
+```
+
+### Custom Authentication Plugin
+
+Create a custom authentication method:
+
+```typescript
+import type { AuthPlugin, AuthContext } from '@smedrec/audit-client'
+
+class ApiKeyAuthPlugin implements AuthPlugin {
+  readonly name = 'api-key-auth'
+  readonly version = '1.0.0'
+  readonly description = 'API key-based authentication'
+  readonly type = 'auth' as const
+  
+  async getAuthHeaders(
+    config: ApiKeyConfig,
+    context: AuthContext
+  ): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {}
+    
+    if (config.headerName) {
+      headers[config.headerName] = config.apiKey
+    } else {
+      headers['Authorization'] = `Bearer ${config.apiKey}`
+    }
+    
+    if (config.includeTimestamp) {
+      headers['X-Timestamp'] = Date.now().toString()
+    }
+    
+    return headers
+  }
+  
+  validateAuthConfig(config: any): ValidationResult {
+    if (!config.apiKey || typeof config.apiKey !== 'string') {
+      return {
+        valid: false,
+        errors: ['apiKey is required and must be a string']
+      }
+    }
+    
+    return { valid: true }
+  }
+}
+
+interface ApiKeyConfig {
+  apiKey: string
+  headerName?: string
+  includeTimestamp?: boolean
+}
+```
+
+## Plugin Management
+
+### Registering Plugins
+
+```typescript
+const client = new AuditClient(config)
+
+// Register a custom plugin
+const myPlugin = new CustomTimingPlugin()
+await client.plugins.register(myPlugin, {
+  logSlowRequests: true,
+  slowThreshold: 3000
+})
+
+// Register multiple plugins
+await client.plugins.registerMany([
+  { plugin: new CorrelationIdPlugin(), config: { headerName: 'X-Trace-ID' } },
+  { plugin: new RateLimitPlugin(), config: { maxRequests: 50 } }
+])
+```
+
+### Plugin Discovery
+
+```typescript
+// List all registered plugins
+const plugins = client.plugins.list()
+console.log('Registered plugins:', plugins.map(p => p.name))
+
+// Get specific plugin
+const timingPlugin = client.plugins.get('custom-timing')
+
+// Check if plugin is registered
+const hasLogging = client.plugins.has('request-logging')
+```
+
+### Plugin Configuration
+
+```typescript
+// Update plugin configuration
+await client.plugins.configure('rate-limiting', {
+  maxRequests: 200,
+  windowMs: 120000
+})
+
+// Get plugin configuration
+const config = client.plugins.getConfig('correlation-id')
+```
+
+### Plugin Lifecycle
+
+```typescript
+// Enable/disable plugins
+await client.plugins.enable('request-logging')
+await client.plugins.disable('rate-limiting')
+
+// Unregister plugins
+await client.plugins.unregister('custom-timing')
+
+// Reload plugin
+await client.plugins.reload('oauth2-auth')
+```
+
+## Plugin Development Best Practices
+
+### Error Handling
+
+```typescript
+class RobustPlugin implements MiddlewarePlugin {
+  async processRequest(request: MiddlewareRequest, next: MiddlewareNext): Promise<MiddlewareRequest> {
+    try {
+      // Plugin logic
+      return this.enhanceRequest(request)
+    } catch (error) {
+      // Log error but don't break the request flow
+      console.error('Plugin error:', error)
+      return request
+    }
+  }
+  
+  handleError(error: Error, context: MiddlewareErrorContext): void {
+    // Handle errors gracefully
+    console.error(`Plugin ${this.name} error:`, error)
+  }
+}
+```
+
+### Performance Considerations
+
+```typescript
+class PerformantPlugin implements MiddlewarePlugin {
+  private cache = new Map()
+  
+  async processRequest(request: MiddlewareRequest, next: MiddlewareNext): Promise<MiddlewareRequest> {
+    // Use caching for expensive operations
+    const cacheKey = this.getCacheKey(request)
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey)
+    }
+    
+    const result = await this.expensiveOperation(request)
+    this.cache.set(cacheKey, result)
+    
+    return result
+  }
+  
+  destroy(): void {
+    // Clean up resources
+    this.cache.clear()
+  }
+}
+```
+
+### Type Safety
+
+```typescript
+// Define strong types for plugin configuration
+interface MyPluginConfig {
+  apiKey: string
+  timeout: number
+  retries?: number
+}
+
+class TypeSafePlugin implements MiddlewarePlugin {
+  private config!: Required<MyPluginConfig>
+  
+  validateConfig(config: any): ValidationResult {
+    // Validate configuration at runtime
+    if (!config.apiKey || typeof config.apiKey !== 'string') {
+      return { valid: false, errors: ['apiKey is required'] }
+    }
+    
+    return { valid: true }
+  }
+  
+  initialize(config: MyPluginConfig): void {
+    this.config = {
+      retries: 3,
+      ...config
+    }
+  }
+}
+```
+
+## Testing Plugins
+
+### Unit Testing
+
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest'
+
+describe('CustomTimingPlugin', () => {
+  let plugin: CustomTimingPlugin
+  
+  beforeEach(() => {
+    plugin = new CustomTimingPlugin()
+  })
+  
+  it('should add timing headers to requests', async () => {
+    const request = {
+      url: 'https://api.example.com/events',
+      headers: {},
+      metadata: {}
+    } as MiddlewareRequest
+    
+    const result = await plugin.processRequest(request, async (req) => req)
+    
+    expect(result.headers['X-Request-Start-Time']).toBeDefined()
+    expect(result.metadata.startTime).toBeTypeOf('number')
+  })
+})
+```
+
+### Integration Testing
+
+```typescript
+describe('Plugin Integration', () => {
+  it('should work with audit client', async () => {
+    const client = new AuditClient({
+      baseUrl: 'https://api.test.com',
+      authentication: { type: 'apiKey', apiKey: 'test' }
+    })
+    
+    const plugin = new CustomTimingPlugin()
+    await client.plugins.register(plugin, {})
+    
+    // Test plugin functionality with real requests
+    const event = await client.events.create({
+      action: 'test.action',
+      principalId: 'test-user'
+    })
+    
+    expect(event).toBeDefined()
+  })
+})
+```

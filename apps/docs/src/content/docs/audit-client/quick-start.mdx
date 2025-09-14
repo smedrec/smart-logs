@@ -1,0 +1,370 @@
+---
+title: Quick Start Guide
+description: Get up and running with the Smart Logs Audit Client in minutes. Learn installation, basic configuration, and your first API calls.
+---
+
+# Quick Start Guide
+
+This guide will walk you through installing, configuring, and making your first API call with the `@smedrec/audit-client`. You'll be logging audit events in minutes!
+
+## Installation
+
+Install the package using your preferred package manager:
+
+```bash
+# With pnpm (recommended)
+pnpm add @smedrec/audit-client
+
+# With npm
+npm install @smedrec/audit-client
+
+# With yarn
+yarn add @smedrec/audit-client
+```
+
+## Basic Setup
+
+### 1. Initialize the Client
+
+The `AuditClient` is your main entry point. Create an instance with minimal configuration:
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'your-api-key-here'
+  }
+})
+```
+
+### 2. Authentication Methods
+
+Choose the authentication method that fits your application:
+
+```typescript
+// API Key (recommended for server-to-server)
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'sk_live_...'
+  }
+})
+
+// Bearer Token (for OAuth 2.0 flows)
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'bearer',
+    bearerToken: 'eyJhbGciOiJIUzI1NiIs...'
+  }
+})
+
+// Session Token (for user-based sessions)
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'session',
+    sessionToken: 'sess_...'
+  }
+})
+```
+
+## Your First Audit Event
+
+### Creating a Simple Event
+
+Let's log a user login event:
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+async function logUserLogin() {
+  const client = new AuditClient({
+    baseUrl: 'https://api.smartlogs.com',
+    authentication: {
+      type: 'apiKey',
+      apiKey: 'your-api-key'
+    }
+  })
+
+  try {
+    const event = await client.events.create({
+      action: 'user.login',
+      principalId: 'user-123',
+      organizationId: 'org-456',
+      status: 'success',
+      outcomeDescription: 'User successfully logged in',
+      targetResourceType: 'User',
+      targetResourceId: 'user-123',
+      sessionContext: {
+        ipAddress: '192.168.1.100',
+        userAgent: 'Mozilla/5.0...'
+      }
+    })
+
+    console.log('✅ Event logged successfully:', event.id)
+    return event
+  } catch (error) {
+    console.error('❌ Failed to log event:', error)
+  } finally {
+    // Clean up resources
+    await client.destroy()
+  }
+}
+
+// Execute the function
+await logUserLogin()
+```
+
+### Enhanced Event with Security Features
+
+For production use, enable cryptographic features:
+
+```typescript
+const event = await client.events.create(
+  {
+    action: 'patient.data.access',
+    principalId: 'dr-smith-123',
+    organizationId: 'hospital-456',
+    status: 'success',
+    outcomeDescription: 'Doctor accessed patient medical records',
+    targetResourceType: 'Patient',
+    targetResourceId: 'patient-789',
+    sessionContext: {
+      ipAddress: '10.0.0.100',
+      userAgent: 'EMR-System/2.1.0'
+    },
+    details: {
+      accessReason: 'routine_checkup',
+      recordsAccessed: ['vitals', 'medications', 'allergies']
+    }
+  },
+  {
+    // Enable cryptographic integrity
+    generateHash: true,
+    generateSignature: true,
+    
+    // Add correlation for distributed tracing
+    correlationId: 'trace-abc-123'
+  }
+)
+```
+
+## Querying Events
+
+### Basic Query
+
+Retrieve events with simple filtering:
+
+```typescript
+const results = await client.events.query({
+  filter: {
+    actions: ['user.login'],
+    statuses: ['success'],
+    dateRange: {
+      startDate: '2024-01-01T00:00:00Z',
+      endDate: '2024-01-31T23:59:59Z'
+    }
+  },
+  pagination: {
+    limit: 50,
+    offset: 0
+  },
+  sort: {
+    field: 'timestamp',
+    direction: 'desc'
+  }
+})
+
+console.log(`Found ${results.events.length} events`)
+results.events.forEach(event => {
+  console.log(`${event.timestamp}: ${event.action} by ${event.principalId}`)
+})
+```
+
+### Advanced Query with Multiple Filters
+
+```typescript
+const results = await client.events.query({
+  filter: {
+    actions: ['patient.data.access', 'patient.data.modify'],
+    principalIds: ['dr-smith-123', 'nurse-jones-456'],
+    organizationId: 'hospital-456',
+    targetResourceTypes: ['Patient'],
+    dateRange: {
+      startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    }
+  },
+  pagination: { limit: 100 },
+  sort: { field: 'timestamp', direction: 'desc' }
+})
+```
+
+## Advanced Configuration
+
+### Production-Ready Setup
+
+For production environments, enable additional features:
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY
+  },
+  
+  // Enable automatic retries
+  retry: {
+    enabled: true,
+    maxAttempts: 3,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    backoffMultiplier: 2
+  },
+  
+  // Enable caching for better performance
+  cache: {
+    enabled: true,
+    defaultTtlMs: 60000, // 1 minute
+    storage: 'memory'
+  },
+  
+  // Enable detailed logging
+  logging: {
+    enabled: true,
+    level: 'info'
+  },
+  
+  // Set environment context
+  environment: 'production',
+  
+  // Add custom headers
+  customHeaders: {
+    'X-Application': 'MyHealthApp',
+    'X-Version': '1.2.3'
+  }
+})
+```
+
+### Health Monitoring
+
+Check system health before critical operations:
+
+```typescript
+// Basic health check
+const isHealthy = await client.health.check()
+if (!isHealthy) {
+  console.warn('⚠️  Audit system is not healthy')
+}
+
+// Detailed health check
+const healthDetails = await client.health.detailedCheck()
+console.log('System Status:', healthDetails.status)
+console.log('Components:', healthDetails.components)
+```
+
+## Error Handling
+
+### Robust Error Handling
+
+```typescript
+import { 
+  AuditClient, 
+  AuthenticationError, 
+  ValidationError, 
+  NetworkError 
+} from '@smedrec/audit-client'
+
+async function robustEventCreation(eventData: AuditEventInput) {
+  try {
+    const event = await client.events.create(eventData)
+    return { success: true, event }
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      console.error('Authentication failed:', error.message)
+      // Handle auth renewal
+    } else if (error instanceof ValidationError) {
+      console.error('Invalid event data:', error.details)
+      // Handle validation errors
+    } else if (error instanceof NetworkError) {
+      console.error('Network issue:', error.message)
+      // Handle retries or fallback
+    } else {
+      console.error('Unexpected error:', error)
+    }
+    return { success: false, error }
+  }
+}
+```
+
+## Next Steps
+
+Now that you have the basics down, explore more advanced features:
+
+- **[Configuration Guide](/audit-client/configuration/)** - Learn about all configuration options
+- **[Services Documentation](/audit-client/services/)** - Explore all available services
+- **[Plugin Architecture](/audit-client/plugins/)** - Extend functionality with plugins
+- **[Framework Integration](/audit-client/frameworks/)** - Integration guides for popular frameworks
+- **[Examples](/audit-client/examples/)** - Practical examples for common scenarios
+
+## Common Patterns
+
+### Middleware Integration
+
+Automatically log HTTP requests:
+
+```typescript
+import express from 'express'
+import { createAuditMiddleware } from '@smedrec/audit-client/middleware'
+
+const app = express()
+
+app.use(createAuditMiddleware(client, {
+  logRequests: true,
+  logResponses: true,
+  includeHeaders: false,
+  skipRoutes: ['/health', '/ping']
+}))
+```
+
+### Batch Processing
+
+For high-volume scenarios:
+
+```typescript
+const events = [
+  { action: 'user.login', principalId: 'user-1', /* ... */ },
+  { action: 'user.login', principalId: 'user-2', /* ... */ },
+  // ... more events
+]
+
+const result = await client.events.bulkCreate(events)
+console.log(`Created ${result.successful} events, ${result.failed} failed`)
+```
+
+### Real-time Monitoring
+
+Subscribe to live events:
+
+```typescript
+const subscription = await client.events.subscribe({
+  filter: { actions: ['security.breach', 'access.denied'] },
+  onEvent: (event) => {
+    console.log('🚨 Security event:', event)
+    // Send alert, trigger notification, etc.
+  },
+  onError: (error) => {
+    console.error('Subscription error:', error)
+  }
+})
+
+// Clean up when done
+subscription.unsubscribe()
+```

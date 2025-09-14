@@ -1,36 +1,89 @@
 ---
 title: Smart Logs
-description: Get started building your docs site with Starlight.
+description: Enterprise-grade audit logging system for healthcare applications with HIPAA/GDPR compliance, cryptographic integrity, and multi-platform support.
 template: splash
 hero:
-  tagline: It handles the generation, validation, and queuing of audit events with built-in security and compliance features.
+  tagline: Enterprise-grade audit logging system designed for healthcare applications. Ensures HIPAA/GDPR compliance with cryptographic integrity, tamper-proof logging, and guaranteed delivery.
   image:
     file: ../../assets/houston.webp
   actions:
-    - text: Read docs
-      link: /audit/get-started/
+    - text: Get Started
+      link: /audit-client/quick-start/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
+    - text: API Reference
+      link: /api/
       icon: external
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+## Key Features
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
+	<Card title="🔒 Security First" icon="shield">
+		Cryptographic hashing (SHA-256) and HMAC signatures ensure tamper-proof audit logs with built-in integrity verification.
 	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
+	<Card title="🏥 Healthcare Ready" icon="heart">
+		Specialized for FHIR resources, PHI data handling, and healthcare compliance requirements including HIPAA and GDPR.
 	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
+	<Card title="🚀 Reliable Delivery" icon="rocket">
+		Guaranteed event processing with dead letter queues, circuit breaker patterns, and exponential backoff retry mechanisms.
 	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
+	<Card title="📱 Multi-Platform" icon="laptop">
+		Web (PWA), Mobile (React Native/Expo), Desktop (Tauri), and API access with type-safe tRPC integration.
+	</Card>
+	<Card title="📊 Observable" icon="chart">
+		Comprehensive monitoring with metrics collection, distributed tracing, and real-time health checks.
+	</Card>
+	<Card title="⚡ High Performance" icon="lightning">
+		Optimized for high-throughput scenarios with BullMQ + Redis queuing and efficient PostgreSQL storage.
 	</Card>
 </CardGrid>
+
+## Quick Start
+
+Get up and running with Smart Logs in minutes:
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'YOUR_API_KEY'
+  }
+})
+
+// Log a user login event
+await client.events.create({
+  action: 'user.login',
+  principalId: 'user-123',
+  organizationId: 'org-456',
+  status: 'success',
+  targetResourceType: 'User',
+  sessionContext: {
+    ipAddress: '198.51.100.10',
+    userAgent: 'Mozilla/5.0...'
+  }
+})
+```
+
+## Architecture Overview
+
+Smart Logs follows a modern microservices architecture:
+
+- **Web/Native Apps**: React + TanStack Router, React Native + Expo
+- **API Server**: Hono + tRPC + Better Auth + Drizzle ORM
+- **Worker Service**: BullMQ + Redis for reliable background processing
+- **Database**: PostgreSQL with optimized partitioning strategies
+- **Security**: End-to-end cryptographic verification and compliance validation
+
+## Use Cases
+
+- **Patient Data Access Logging**: Track who accessed patient records when and why
+- **FHIR Resource Auditing**: Monitor changes to healthcare data standards
+- **Compliance Reporting**: Generate automated HIPAA and GDPR compliance reports
+- **Security Monitoring**: Detect suspicious activities and unauthorized access
+- **System Integration**: Audit API calls, data exchanges, and system interactions

@@ -1,0 +1,735 @@
+---
+title: Framework Integration
+description: Learn how to integrate the Smart Logs Audit Client with popular web frameworks including Express.js, Next.js, Fastify, and more.
+---
+
+# Framework Integration
+
+This guide provides comprehensive examples of integrating the `@smedrec/audit-client` with popular web frameworks. Each integration pattern is designed to be production-ready with proper error handling and resource management.
+
+## Express.js
+
+### Basic Setup
+
+Create a centralized client instance for your Express application:
+
+**`src/lib/audit-client.ts`**
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+export const auditClient = new AuditClient({
+  baseUrl: process.env.AUDIT_API_URL || 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY
+  },
+  
+  // Production optimizations
+  retry: {
+    enabled: true,
+    maxAttempts: 3
+  },
+  
+  cache: {
+    enabled: true,
+    defaultTtlMs: 300000 // 5 minutes
+  },
+  
+  logging: {
+    enabled: process.env.NODE_ENV !== 'production',
+    level: process.env.NODE_ENV === 'production' ? 'warn' : 'debug'
+  }
+})
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('Shutting down audit client...')
+  await auditClient.destroy()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('Shutting down audit client...')
+  await auditClient.destroy()
+  process.exit(0)
+})
+```
+
+### Request Auditing Middleware
+
+Create middleware to automatically audit all incoming requests:
+
+**`src/middleware/audit-middleware.ts`**
+
+```typescript
+import { Request, Response, NextFunction } from 'express'
+import { auditClient } from '../lib/audit-client'
+
+interface AuditedRequest extends Request {
+  user?: {
+    id: string
+    organizationId: string
+    role: string
+  }
+}
+
+export const auditMiddleware = (req: AuditedRequest, res: Response, next: NextFunction) => {
+  const startTime = Date.now()
+  
+  // Capture request information
+  const requestInfo = {
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    correlationId: req.get('X-Correlation-ID') || generateCorrelationId()
+  }
+
+  // Log request attempt
+  auditClient.events.create({
+    action: 'api.request.attempt',
+    principalId: req.user?.id || 'anonymous',
+    organizationId: req.user?.organizationId || 'unknown',
+    status: 'attempt',
+    sessionContext: {
+      ipAddress: requestInfo.ip,
+      userAgent: requestInfo.userAgent
+    },
+    details: {
+      method: requestInfo.method,
+      path: requestInfo.path,
+      correlationId: requestInfo.correlationId
+    }
+  }).catch(error => {
+    console.error('Failed to audit request attempt:', error)
+  })
+
+  // Capture response completion
+  res.on('finish', () => {
+    const duration = Date.now() - startTime
+    const status = res.statusCode >= 400 ? 'failure' : 'success'
+    
+    auditClient.events.create({
+      action: 'api.request.complete',
+      principalId: req.user?.id || 'anonymous',
+      organizationId: req.user?.organizationId || 'unknown',
+      status,
+      sessionContext: {
+        ipAddress: requestInfo.ip,
+        userAgent: requestInfo.userAgent
+      },
+      details: {
+        method: requestInfo.method,
+        path: requestInfo.path,
+        statusCode: res.statusCode,
+        duration,
+        correlationId: requestInfo.correlationId
+      }
+    }).catch(error => {
+      console.error('Failed to audit request completion:', error)
+    })
+  })
+
+  next()
+}
+
+function generateCorrelationId(): string {
+  return Math.random().toString(36).substring(2, 15)
+}
+```
+
+### Route-Specific Auditing
+
+Audit specific business actions in your route handlers:
+
+**`src/routes/users.ts`**
+
+```typescript
+import express from 'express'
+import { auditClient } from '../lib/audit-client'
+import { requireAuth } from '../middleware/auth'
+
+const router = express.Router()
+
+router.post('/users', requireAuth, async (req, res) => {
+  try {
+    // Create user logic
+    const newUser = await createUser(req.body)
+    
+    // Audit the user creation
+    await auditClient.events.create({
+      action: 'user.create',
+      principalId: req.user.id,
+      organizationId: req.user.organizationId,
+      status: 'success',
+      outcomeDescription: 'User successfully created',
+      targetResourceType: 'User',
+      targetResourceId: newUser.id,
+      details: {
+        userRole: newUser.role,
+        userEmail: newUser.email,
+        createdBy: req.user.id
+      }
+    }, {
+      generateHash: true,
+      generateSignature: true
+    })
+    
+    res.status(201).json(newUser)
+  } catch (error) {
+    // Audit the failure
+    await auditClient.events.create({
+      action: 'user.create',
+      principalId: req.user.id,
+      organizationId: req.user.organizationId,
+      status: 'failure',
+      outcomeDescription: `User creation failed: ${error.message}`,
+      targetResourceType: 'User',
+      details: {
+        error: error.message,
+        requestData: req.body
+      }
+    })
+    
+    res.status(500).json({ error: 'User creation failed' })
+  }
+})
+
+export default router
+```
+
+## Next.js
+
+### App Router Setup
+
+For Next.js App Router, create a singleton client instance:
+
+**`lib/audit-client.ts`**
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+// Singleton pattern to avoid connection issues in serverless
+declare global {
+  var auditClient: AuditClient | undefined
+}
+
+const client = globalThis.auditClient || new AuditClient({
+  baseUrl: process.env.AUDIT_API_URL!,
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY!
+  },
+  
+  // Serverless optimizations
+  retry: {
+    enabled: true,
+    maxAttempts: 2 // Faster failures in serverless
+  },
+  
+  cache: {
+    enabled: false // Avoid memory leaks in serverless
+  }
+})
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.auditClient = client
+}
+
+export const auditClient = client
+```
+
+### API Routes
+
+Audit API route actions:
+
+**`app/api/documents/route.ts`**
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { auditClient } from '@/lib/audit-client'
+import { auth } from '@/lib/auth'
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const data = await request.json()
+    
+    // Create document logic
+    const document = await createDocument(data)
+    
+    // Audit the creation
+    await auditClient.events.create({
+      action: 'document.create',
+      principalId: session.user.id,
+      organizationId: session.user.organizationId,
+      status: 'success',
+      targetResourceType: 'Document',
+      targetResourceId: document.id,
+      sessionContext: {
+        ipAddress: request.ip,
+        userAgent: request.headers.get('user-agent')
+      },
+      details: {
+        documentType: document.type,
+        fileName: document.fileName
+      }
+    })
+    
+    return NextResponse.json(document, { status: 201 })
+  } catch (error) {
+    console.error('Document creation failed:', error)
+    return NextResponse.json({ error: 'Creation failed' }, { status: 500 })
+  }
+}
+```
+
+### Server Actions
+
+Audit Server Actions in the App Router:
+
+**`app/actions/document-actions.ts`**
+
+```typescript
+'use server'
+
+import { auditClient } from '@/lib/audit-client'
+import { auth } from '@/lib/auth'
+import { revalidatePath } from 'next/cache'
+
+export async function deleteDocument(documentId: string) {
+  const session = await auth()
+  
+  if (!session) {
+    throw new Error('Unauthorized')
+  }
+
+  try {
+    // Delete document logic
+    await deleteDocumentById(documentId)
+    
+    // Audit the deletion
+    await auditClient.events.create({
+      action: 'document.delete',
+      principalId: session.user.id,
+      organizationId: session.user.organizationId,
+      status: 'success',
+      targetResourceType: 'Document',
+      targetResourceId: documentId,
+      outcomeDescription: 'Document successfully deleted'
+    })
+    
+    revalidatePath('/documents')
+    return { success: true }
+  } catch (error) {
+    // Audit the failure
+    await auditClient.events.create({
+      action: 'document.delete',
+      principalId: session.user.id,
+      organizationId: session.user.organizationId,
+      status: 'failure',
+      targetResourceType: 'Document',
+      targetResourceId: documentId,
+      outcomeDescription: `Document deletion failed: ${error.message}`
+    })
+    
+    throw error
+  }
+}
+```
+
+## Fastify
+
+### Plugin-Based Integration
+
+Create a Fastify plugin for the audit client:
+
+**`plugins/audit-client.ts`**
+
+```typescript
+import fp from 'fastify-plugin'
+import { AuditClient } from '@smedrec/audit-client'
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    auditClient: AuditClient
+  }
+}
+
+export default fp(async function (fastify, opts) {
+  const auditClient = new AuditClient({
+    baseUrl: process.env.AUDIT_API_URL!,
+    authentication: {
+      type: 'apiKey',
+      apiKey: process.env.AUDIT_API_KEY!
+    },
+    ...opts
+  })
+
+  fastify.decorate('auditClient', auditClient)
+  
+  fastify.addHook('onClose', async () => {
+    await auditClient.destroy()
+  })
+})
+```
+
+### Request Logging Hook
+
+Add request auditing with Fastify hooks:
+
+**`hooks/audit-hook.ts`**
+
+```typescript
+import { FastifyInstance } from 'fastify'
+
+export function registerAuditHooks(fastify: FastifyInstance) {
+  fastify.addHook('onRequest', async (request, reply) => {
+    request.auditContext = {
+      startTime: Date.now(),
+      correlationId: request.headers['x-correlation-id'] || generateId()
+    }
+  })
+
+  fastify.addHook('onResponse', async (request, reply) => {
+    const duration = Date.now() - request.auditContext.startTime
+    const status = reply.statusCode >= 400 ? 'failure' : 'success'
+    
+    fastify.auditClient.events.create({
+      action: 'api.request',
+      principalId: request.user?.id || 'anonymous',
+      organizationId: request.user?.organizationId || 'unknown',
+      status,
+      sessionContext: {
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent']
+      },
+      details: {
+        method: request.method,
+        url: request.url,
+        statusCode: reply.statusCode,
+        duration,
+        correlationId: request.auditContext.correlationId
+      }
+    }).catch(error => {
+      fastify.log.error('Failed to audit request:', error)
+    })
+  })
+}
+```
+
+## React (Frontend)
+
+### Client-Side Auditing
+
+Set up client-side auditing for user interactions:
+
+**`lib/audit-client.ts`**
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+export const auditClient = new AuditClient({
+  baseUrl: process.env.NEXT_PUBLIC_AUDIT_API_URL!,
+  authentication: {
+    type: 'session',
+    sessionToken: () => getSessionToken() // Dynamic token retrieval
+  },
+  
+  // Browser-specific optimizations
+  cache: {
+    enabled: true,
+    storage: 'localStorage',
+    defaultTtlMs: 600000 // 10 minutes
+  },
+  
+  batching: {
+    enabled: true,
+    maxBatchSize: 50,
+    flushIntervalMs: 10000 // 10 seconds
+  }
+})
+```
+
+### React Hook for Auditing
+
+Create a React hook for easy auditing:
+
+**`hooks/use-audit.ts`**
+
+```typescript
+import { useCallback } from 'react'
+import { auditClient } from '@/lib/audit-client'
+import { useUser } from '@/hooks/use-user'
+
+interface AuditEventData {
+  action: string
+  targetResourceType?: string
+  targetResourceId?: string
+  details?: Record<string, any>
+}
+
+export function useAudit() {
+  const { user } = useUser()
+  
+  const logEvent = useCallback(async (eventData: AuditEventData) => {
+    if (!user) return
+    
+    try {
+      await auditClient.events.create({
+        ...eventData,
+        principalId: user.id,
+        organizationId: user.organizationId,
+        status: 'success',
+        sessionContext: {
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
+      })
+    } catch (error) {
+      console.error('Failed to log audit event:', error)
+    }
+  }, [user])
+  
+  const logPageView = useCallback(async (pageName: string) => {
+    await logEvent({
+      action: 'page.view',
+      details: {
+        pageName,
+        url: window.location.href,
+        referrer: document.referrer
+      }
+    })
+  }, [logEvent])
+  
+  const logUserAction = useCallback(async (action: string, details?: Record<string, any>) => {
+    await logEvent({
+      action: `user.${action}`,
+      details
+    })
+  }, [logEvent])
+  
+  return {
+    logEvent,
+    logPageView,
+    logUserAction
+  }
+}
+```
+
+### Component Usage
+
+Use the audit hook in React components:
+
+**`components/UserProfile.tsx`**
+
+```tsx
+import { useState } from 'react'
+import { useAudit } from '@/hooks/use-audit'
+
+export function UserProfile() {
+  const [profile, setProfile] = useState(null)
+  const { logUserAction, logEvent } = useAudit()
+  
+  const handleProfileUpdate = async (data) => {
+    try {
+      const updatedProfile = await updateProfile(data)
+      setProfile(updatedProfile)
+      
+      // Audit the profile update
+      await logEvent({
+        action: 'user.profile.update',
+        targetResourceType: 'UserProfile',
+        targetResourceId: updatedProfile.id,
+        details: {
+          fieldsUpdated: Object.keys(data),
+          updateSize: Object.keys(data).length
+        }
+      })
+    } catch (error) {
+      console.error('Profile update failed:', error)
+    }
+  }
+  
+  const handleSensitiveDataAccess = async () => {
+    // Audit access to sensitive information
+    await logUserAction('sensitive_data.access', {
+      dataType: 'personal_information',
+      accessReason: 'profile_review'
+    })
+    
+    // Show sensitive data
+  }
+  
+  return (
+    <div>
+      {/* Profile component UI */}
+    </div>
+  )
+}
+```
+
+## NestJS
+
+### Module Setup
+
+Create an audit module for NestJS:
+
+**`audit/audit.module.ts`**
+
+```typescript
+import { Module, Global } from '@nestjs/common'
+import { ConfigModule, ConfigService } from '@nestjs/config'
+import { AuditService } from './audit.service'
+
+@Global()
+@Module({
+  imports: [ConfigModule],
+  providers: [AuditService],
+  exports: [AuditService]
+})
+export class AuditModule {}
+```
+
+**`audit/audit.service.ts`**
+
+```typescript
+import { Injectable, OnModuleDestroy } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { AuditClient } from '@smedrec/audit-client'
+
+@Injectable()
+export class AuditService implements OnModuleDestroy {
+  private client: AuditClient
+  
+  constructor(private configService: ConfigService) {
+    this.client = new AuditClient({
+      baseUrl: this.configService.get('AUDIT_API_URL'),
+      authentication: {
+        type: 'apiKey',
+        apiKey: this.configService.get('AUDIT_API_KEY')
+      }
+    })
+  }
+  
+  async onModuleDestroy() {
+    await this.client.destroy()
+  }
+  
+  async logEvent(eventData: any) {
+    return this.client.events.create(eventData)
+  }
+  
+  // Add other audit methods as needed
+}
+```
+
+### Interceptor for Automatic Auditing
+
+Create an interceptor for automatic request auditing:
+
+**`audit/audit.interceptor.ts`**
+
+```typescript
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler
+} from '@nestjs/common'
+import { Observable } from 'rxjs'
+import { tap } from 'rxjs/operators'
+import { AuditService } from './audit.service'
+
+@Injectable()
+export class AuditInterceptor implements NestInterceptor {
+  constructor(private auditService: AuditService) {}
+  
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const request = context.switchToHttp().getRequest()
+    const startTime = Date.now()
+    
+    return next.handle().pipe(
+      tap(() => {
+        const duration = Date.now() - startTime
+        
+        this.auditService.logEvent({
+          action: 'api.request',
+          principalId: request.user?.id || 'anonymous',
+          organizationId: request.user?.organizationId || 'unknown',
+          status: 'success',
+          sessionContext: {
+            ipAddress: request.ip,
+            userAgent: request.get('user-agent')
+          },
+          details: {
+            method: request.method,
+            path: request.path,
+            duration
+          }
+        }).catch(error => {
+          console.error('Failed to audit request:', error)
+        })
+      })
+    )
+  }
+}
+```
+
+## Best Practices
+
+### Error Handling
+
+Always handle audit failures gracefully:
+
+```typescript
+async function auditAction(eventData) {
+  try {
+    await auditClient.events.create(eventData)
+  } catch (error) {
+    // Log the error but don't break the main application flow
+    console.error('Audit logging failed:', error)
+    
+    // Optionally send to error tracking service
+    errorTracker.captureException(error, {
+      context: 'audit_failure',
+      eventData
+    })
+  }
+}
+```
+
+### Performance Optimization
+
+Use batching for high-volume applications:
+
+```typescript
+// Enable batching in configuration
+const auditClient = new AuditClient({
+  // ... other config
+  batching: {
+    enabled: true,
+    maxBatchSize: 100,
+    flushIntervalMs: 5000
+  }
+})
+```
+
+### Testing Integration
+
+Mock the audit client in tests:
+
+```typescript
+// __mocks__/@smedrec/audit-client.ts
+export const AuditClient = jest.fn().mockImplementation(() => ({
+  events: {
+    create: jest.fn().mockResolvedValue({ id: 'test-event-id' })
+  },
+  destroy: jest.fn().mockResolvedValue(undefined)
+}))
+```

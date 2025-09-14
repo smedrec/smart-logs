@@ -1,16 +1,46 @@
 ---
-title: Audit SDK
-description: Audit SDK provides a comprehensive, high-level interface for audit logging in healthcare applications..
+title: Audit SDK (Deprecated)
+description: This documentation is deprecated. Please use the new Audit Client Library instead.
 ---
 
-# Audit SDK (`@repo/audit-sdk`)
+# Audit SDK (Deprecated)
 
-The `@repo/audit-sdk` package provides a comprehensive, high-level interface for audit logging in healthcare applications. It builds on top of `@repo/audit` and `@repo/audit-db` to offer enhanced features, compliance validation, and developer-friendly APIs.
+:::caution[Deprecated Package]
+The `@repo/audit-sdk` package has been deprecated. Please use the new **[Audit Client Library (`@smedrec/audit-client`)](/audit-client/overview/)** instead.
 
-## Features
+The new client library provides:
+- Enhanced type safety and modern TypeScript support
+- Comprehensive plugin architecture
+- Built-in compliance features (HIPAA/GDPR)
+- Better performance and reliability
+- Improved developer experience
+:::
 
-- 🔒 **Security First**: Built-in cryptographic hashing and signatures
-- 🏥 **Healthcare Ready**: FHIR-specific audit events and PHI handling
+## Migration to Audit Client Library
+
+If you're currently using `@repo/audit-sdk`, please refer to the **[Migration Guide](/audit-client/migration/)** to upgrade to `@smedrec/audit-client`.
+
+### Quick Migration Example
+
+```typescript
+// Before (deprecated @repo/audit-sdk)
+import { AuditSDK } from '@repo/audit-sdk'
+
+const audit = new AuditSDK({ queueName: 'audit-queue' })
+
+// After (@smedrec/audit-client)
+import { AuditClient } from '@smedrec/audit-client'
+
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'your-api-key'
+  }
+})
+```
+
+For complete documentation, visit the **[Audit Client Library documentation](/audit-client/overview/)**.
 - 📋 **Compliance Built-in**: HIPAA and GDPR compliance validation
 - 🚀 **High Performance**: Batching, rate limiting, and guaranteed delivery
 - 🔧 **Easy Integration**: Express, WebSocket, and GraphQL middleware

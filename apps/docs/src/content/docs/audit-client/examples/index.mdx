@@ -1,0 +1,827 @@
+---
+title: Code Examples
+description: Practical code examples for common use cases with the Smart Logs Audit Client, from basic setup to advanced patterns.
+---
+
+# Code Examples
+
+This guide provides practical, production-ready code examples for common use cases of the `@smedrec/audit-client`. Each example includes error handling and best practices.
+
+## Client Initialization
+
+### Basic Setup
+
+Minimal configuration to get started:
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY
+  }
+})
+
+// Always clean up resources
+process.on('SIGINT', async () => {
+  await client.destroy()
+  process.exit(0)
+})
+```
+
+### Production Configuration
+
+Enterprise-ready setup with all features enabled:
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+const client = new AuditClient({
+  baseUrl: process.env.AUDIT_API_URL,
+  environment: 'production',
+  
+  authentication: {
+    type: 'bearer',
+    bearerToken: process.env.AUDIT_BEARER_TOKEN,
+    autoRefresh: true,
+    refreshEndpoint: '/auth/refresh'
+  },
+  
+  // Reliability features
+  retry: {
+    enabled: true,
+    maxAttempts: 5,
+    backoffMultiplier: 2,
+    jitter: true
+  },
+  
+  // Performance optimizations
+  cache: {
+    enabled: true,
+    defaultTtlMs: 300000, // 5 minutes
+    storage: 'memory'
+  },
+  
+  // Observability
+  logging: {
+    enabled: true,
+    level: 'info',
+    redactSensitive: true
+  },
+  
+  // Custom headers for identification
+  customHeaders: {
+    'X-Application': 'HealthCareApp',
+    'X-Version': process.env.APP_VERSION
+  }
+})
+```
+
+### Environment-Specific Configuration
+
+Different configurations for different environments:
+
+```typescript
+import { AuditClient } from '@smedrec/audit-client'
+
+function createAuditClient(environment: string) {
+  const baseConfig = {
+    baseUrl: process.env.AUDIT_API_URL,
+    authentication: {
+      type: 'apiKey' as const,
+      apiKey: process.env.AUDIT_API_KEY
+    }
+  }
+
+  switch (environment) {
+    case 'development':
+      return new AuditClient({
+        ...baseConfig,
+        logging: {
+          enabled: true,
+          level: 'debug',
+          logBodies: true
+        },
+        cache: { enabled: false },
+        retry: { enabled: false }
+      })
+      
+    case 'staging':
+      return new AuditClient({
+        ...baseConfig,
+        logging: { enabled: true, level: 'info' },
+        cache: { enabled: true },
+        retry: { enabled: true, maxAttempts: 2 }
+      })
+      
+    case 'production':
+      return new AuditClient({
+        ...baseConfig,
+        logging: { enabled: true, level: 'warn' },
+        cache: { enabled: true, defaultTtlMs: 600000 },
+        retry: { enabled: true, maxAttempts: 5 },
+        performance: { maxConnections: 20 }
+      })
+      
+    default:
+      throw new Error(`Unknown environment: ${environment}`)
+  }
+}
+
+const client = createAuditClient(process.env.NODE_ENV)
+```
+
+## Event Creation
+
+### Healthcare-Specific Events
+
+#### Patient Data Access
+
+```typescript
+async function logPatientDataAccess(
+  client: AuditClient,
+  doctorId: string,
+  patientId: string,
+  accessType: string
+) {
+  try {
+    const event = await client.events.create({
+      action: 'patient.data.access',
+      principalId: doctorId,
+      organizationId: 'hospital-main',
+      status: 'success',
+      outcomeDescription: `Doctor accessed patient ${accessType} data`,
+      
+      // HIPAA-specific fields
+      targetResourceType: 'Patient',
+      targetResourceId: patientId,
+      dataClassification: 'PHI',
+      
+      sessionContext: {
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+        sessionId: request.sessionID
+      },
+      
+      details: {
+        accessType, // 'medical_records', 'lab_results', 'imaging'
+        accessReason: 'treatment',
+        departmentId: 'cardiology',
+        facilityId: 'main-hospital'
+      }
+    }, {
+      // Enable security features for PHI
+      generateHash: true,
+      generateSignature: true,
+      durabilityGuarantees: true
+    })
+    
+    console.log(`Logged patient access: ${event.id}`)
+    return event
+  } catch (error) {
+    console.error('Failed to log patient access:', error)
+    throw error
+  }
+}
+```
+
+#### FHIR Resource Auditing
+
+```typescript
+async function logFhirResourceChange(
+  client: AuditClient,
+  userId: string,
+  resourceType: string,
+  resourceId: string,
+  operation: 'create' | 'read' | 'update' | 'delete'
+) {
+  const event = await client.events.create({
+    action: `fhir.${resourceType.toLowerCase()}.${operation}`,
+    principalId: userId,
+    organizationId: 'healthcare-org',
+    status: 'success',
+    
+    targetResourceType: `FHIR_${resourceType}`,
+    targetResourceId: resourceId,
+    dataClassification: 'PHI',
+    
+    outcomeDescription: `FHIR ${resourceType} ${operation} operation completed`,
+    
+    details: {
+      fhirVersion: '4.0.1',
+      resourceType,
+      operation,
+      endpoint: `/fhir/${resourceType}/${resourceId}`,
+      compliance: {
+        hipaa: true,
+        gdpr: true
+      }
+    }
+  }, {
+    generateHash: true,
+    generateSignature: true
+  })
+  
+  return event
+}
+```
+
+### Business Events
+
+#### User Authentication
+
+```typescript
+async function logUserLogin(
+  client: AuditClient,
+  userId: string,
+  loginResult: 'success' | 'failure',
+  ipAddress: string,
+  userAgent: string,
+  failureReason?: string
+) {
+  const event = await client.events.create({
+    action: 'user.login',
+    principalId: userId,
+    organizationId: 'main-org',
+    status: loginResult,
+    
+    outcomeDescription: loginResult === 'success' 
+      ? 'User successfully authenticated'
+      : `Login failed: ${failureReason}`,
+    
+    sessionContext: {
+      ipAddress,
+      userAgent,
+      timestamp: new Date().toISOString()
+    },
+    
+    details: {
+      authMethod: 'password',
+      mfaUsed: true,
+      deviceTrusted: false,
+      ...(failureReason && { failureReason }),
+      geolocation: await getGeolocation(ipAddress)
+    }
+  })
+  
+  return event
+}
+
+// Usage
+await logUserLogin(
+  client,
+  'user-123',
+  'success',
+  '192.168.1.100',
+  'Mozilla/5.0...'
+)
+```
+
+#### Document Management
+
+```typescript
+async function logDocumentAction(
+  client: AuditClient,
+  action: 'create' | 'read' | 'update' | 'delete' | 'share',
+  userId: string,
+  documentId: string,
+  documentMetadata: any
+) {
+  const classification = documentMetadata.sensitive ? 'CONFIDENTIAL' : 'INTERNAL'
+  
+  const event = await client.events.create({
+    action: `document.${action}`,
+    principalId: userId,
+    organizationId: documentMetadata.organizationId,
+    status: 'success',
+    
+    targetResourceType: 'Document',
+    targetResourceId: documentId,
+    dataClassification: classification,
+    
+    outcomeDescription: `User ${action}d document: ${documentMetadata.fileName}`,
+    
+    details: {
+      fileName: documentMetadata.fileName,
+      fileType: documentMetadata.fileType,
+      fileSize: documentMetadata.fileSize,
+      version: documentMetadata.version,
+      tags: documentMetadata.tags,
+      ...(action === 'share' && {
+        sharedWith: documentMetadata.sharedWith,
+        permissions: documentMetadata.permissions
+      })
+    }
+  }, {
+    generateHash: classification === 'CONFIDENTIAL',
+    generateSignature: classification === 'CONFIDENTIAL'
+  })
+  
+  return event
+}
+```
+
+### Bulk Operations
+
+#### Batch Event Creation
+
+```typescript
+async function createBulkEvents(client: AuditClient, events: any[]) {
+  try {
+    const result = await client.events.bulkCreate(events)
+    
+    console.log(`Bulk operation completed:`)
+    console.log(`- Successful: ${result.successful}`)
+    console.log(`- Failed: ${result.failed}`)
+    console.log(`- Total: ${result.total}`)
+    
+    // Handle partial failures
+    if (result.failed > 0) {
+      const failedEvents = result.results
+        .filter(r => !r.success)
+        .map(r => ({ event: r.event, error: r.error }))
+      
+      console.error('Failed events:', failedEvents)
+      
+      // Retry failed events individually
+      for (const failed of failedEvents) {
+        try {
+          await client.events.create(failed.event)
+          console.log(`Retry successful for event: ${failed.event.action}`)
+        } catch (retryError) {
+          console.error(`Retry failed for event: ${failed.event.action}`, retryError)
+        }
+      }
+    }
+    
+    return result
+  } catch (error) {
+    console.error('Bulk create failed entirely:', error)
+    throw error
+  }
+}
+
+// Usage with generated events
+const events = generateAuditEvents(100) // Generate 100 test events
+await createBulkEvents(client, events)
+```
+
+## Querying Events
+
+### Basic Queries
+
+#### Recent Events
+
+```typescript
+async function getRecentEvents(client: AuditClient, hours: number = 24) {
+  const startDate = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+  
+  const results = await client.events.query({
+    filter: {
+      dateRange: { startDate }
+    },
+    pagination: { limit: 100 },
+    sort: { field: 'timestamp', direction: 'desc' }
+  })
+  
+  console.log(`Found ${results.events.length} events in the last ${hours} hours`)
+  return results.events
+}
+```
+
+#### Security Events
+
+```typescript
+async function getSecurityEvents(client: AuditClient) {
+  const securityActions = [
+    'user.login.failed',
+    'user.password.reset',
+    'user.mfa.disabled',
+    'api.unauthorized',
+    'data.breach.detected'
+  ]
+  
+  const results = await client.events.query({
+    filter: {
+      actions: securityActions,
+      dateRange: {
+        startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    },
+    sort: { field: 'timestamp', direction: 'desc' }
+  })
+  
+  return results.events
+}
+```
+
+### Advanced Queries
+
+#### Compliance Reporting
+
+```typescript
+async function generateComplianceReport(
+  client: AuditClient,
+  startDate: string,
+  endDate: string
+) {
+  // Query for HIPAA-relevant events
+  const hipaaEvents = await client.events.query({
+    filter: {
+      dateRange: { startDate, endDate },
+      dataClassifications: ['PHI'],
+      actions: [
+        'patient.data.access',
+        'patient.data.modify',
+        'patient.data.export',
+        'fhir.patient.read',
+        'fhir.patient.update'
+      ]
+    },
+    pagination: { limit: 1000 },
+    sort: { field: 'timestamp', direction: 'desc' }
+  })
+  
+  // Analyze the events
+  const summary = {
+    totalEvents: hipaaEvents.events.length,
+    uniqueUsers: new Set(hipaaEvents.events.map(e => e.principalId)).size,
+    uniquePatients: new Set(
+      hipaaEvents.events
+        .filter(e => e.targetResourceType === 'Patient')
+        .map(e => e.targetResourceId)
+    ).size,
+    eventsByAction: hipaaEvents.events.reduce((acc, event) => {
+      acc[event.action] = (acc[event.action] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+  }
+  
+  return {
+    period: { startDate, endDate },
+    summary,
+    events: hipaaEvents.events
+  }
+}
+```
+
+#### User Activity Analysis
+
+```typescript
+async function analyzeUserActivity(
+  client: AuditClient,
+  userId: string,
+  days: number = 30
+) {
+  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  
+  const results = await client.events.query({
+    filter: {
+      principalIds: [userId],
+      dateRange: { startDate }
+    },
+    pagination: { limit: 500 }
+  })
+  
+  const events = results.events
+  
+  // Analyze activity patterns
+  const analysis = {
+    totalEvents: events.length,
+    uniqueActions: new Set(events.map(e => e.action)).size,
+    
+    // Activity by day
+    dailyActivity: events.reduce((acc, event) => {
+      const day = event.timestamp.split('T')[0]
+      acc[day] = (acc[day] || 0) + 1
+      return acc
+    }, {} as Record<string, number>),
+    
+    // Most common actions
+    topActions: Object.entries(
+      events.reduce((acc, event) => {
+        acc[event.action] = (acc[event.action] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+    )
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 10),
+    
+    // Resources accessed
+    resourcesAccessed: events
+      .filter(e => e.targetResourceId)
+      .map(e => ({ type: e.targetResourceType, id: e.targetResourceId }))
+  }
+  
+  return analysis
+}
+```
+
+## Error Handling Patterns
+
+### Robust Event Creation
+
+```typescript
+async function createEventWithRetry(
+  client: AuditClient,
+  eventData: any,
+  maxRetries: number = 3
+) {
+  let lastError: Error
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const event = await client.events.create(eventData)
+      return event
+    } catch (error) {
+      lastError = error
+      
+      if (error.code === 'VALIDATION_ERROR') {
+        // Don't retry validation errors
+        throw error
+      }
+      
+      if (error.code === 'AUTH_ERROR') {
+        // Try to refresh authentication
+        await client.refreshAuthentication()
+      }
+      
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000 // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, delay))
+        console.log(`Retrying event creation (attempt ${attempt + 1}/${maxRetries})`)
+      }
+    }
+  }
+  
+  throw lastError
+}
+```
+
+### Graceful Degradation
+
+```typescript
+async function auditWithFallback(
+  client: AuditClient,
+  eventData: any,
+  fallbackLogger?: (data: any) => void
+) {
+  try {
+    return await client.events.create(eventData)
+  } catch (error) {
+    console.error('Audit client failed, using fallback:', error)
+    
+    if (fallbackLogger) {
+      fallbackLogger({
+        timestamp: new Date().toISOString(),
+        source: 'audit-fallback',
+        ...eventData
+      })
+    }
+    
+    // Don't throw - allow application to continue
+    return null
+  }
+}
+
+// Usage with local file fallback
+await auditWithFallback(client, eventData, (data) => {
+  fs.appendFileSync('./audit-fallback.log', JSON.stringify(data) + '\n')
+})
+```
+
+## Real-time Features
+
+### Event Streaming
+
+```typescript
+async function streamEvents(client: AuditClient) {
+  try {
+    const stream = await client.events.stream({
+      filter: {
+        actions: ['security.alert', 'system.error'],
+        real_time: true
+      }
+    })
+    
+    stream.on('data', (event) => {
+      console.log('Real-time event received:', event)
+      
+      // Process critical events immediately
+      if (event.action === 'security.alert') {
+        handleSecurityAlert(event)
+      }
+    })
+    
+    stream.on('error', (error) => {
+      console.error('Stream error:', error)
+      // Implement reconnection logic
+    })
+    
+    stream.on('end', () => {
+      console.log('Stream ended')
+    })
+    
+    return stream
+  } catch (error) {
+    console.error('Failed to create stream:', error)
+    throw error
+  }
+}
+```
+
+### Event Subscriptions
+
+```typescript
+async function subscribeToEvents(client: AuditClient) {
+  const subscription = await client.events.subscribe({
+    filter: {
+      actions: ['patient.data.breach', 'system.critical.error'],
+      organizationId: 'my-org'
+    },
+    
+    onEvent: (event) => {
+      console.log('Subscription event:', event)
+      
+      // Send immediate notifications
+      if (event.action === 'patient.data.breach') {
+        sendEmergencyAlert(event)
+      }
+    },
+    
+    onError: (error) => {
+      console.error('Subscription error:', error)
+      // Implement reconnection logic
+    },
+    
+    onReconnect: () => {
+      console.log('Subscription reconnected')
+    }
+  })
+  
+  // Clean up subscription when done
+  process.on('SIGINT', () => {
+    subscription.unsubscribe()
+  })
+  
+  return subscription
+}
+```
+
+## Performance Optimization
+
+### Connection Pooling
+
+```typescript
+class AuditClientPool {
+  private clients: AuditClient[] = []
+  private currentIndex = 0
+  
+  constructor(poolSize: number = 5) {
+    for (let i = 0; i < poolSize; i++) {
+      this.clients.push(new AuditClient({
+        baseUrl: process.env.AUDIT_API_URL,
+        authentication: {
+          type: 'apiKey',
+          apiKey: process.env.AUDIT_API_KEY
+        },
+        performance: {
+          maxConnections: 2 // Limit per client
+        }
+      }))
+    }
+  }
+  
+  getClient(): AuditClient {
+    const client = this.clients[this.currentIndex]
+    this.currentIndex = (this.currentIndex + 1) % this.clients.length
+    return client
+  }
+  
+  async destroy() {
+    await Promise.all(this.clients.map(client => client.destroy()))
+  }
+}
+
+const pool = new AuditClientPool(5)
+
+// Usage
+async function createEvent(eventData: any) {
+  const client = pool.getClient()
+  return client.events.create(eventData)
+}
+```
+
+### Batching with Manual Control
+
+```typescript
+class AuditEventBatcher {
+  private batch: any[] = []
+  private batchTimeout: NodeJS.Timeout | null = null
+  
+  constructor(
+    private client: AuditClient,
+    private batchSize: number = 50,
+    private flushInterval: number = 5000
+  ) {}
+  
+  add(eventData: any) {
+    this.batch.push(eventData)
+    
+    if (this.batch.length >= this.batchSize) {
+      this.flush()
+    } else if (!this.batchTimeout) {
+      this.batchTimeout = setTimeout(() => this.flush(), this.flushInterval)
+    }
+  }
+  
+  private async flush() {
+    if (this.batch.length === 0) return
+    
+    const eventsToProcess = [...this.batch]
+    this.batch = []
+    
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout)
+      this.batchTimeout = null
+    }
+    
+    try {
+      await this.client.events.bulkCreate(eventsToProcess)
+      console.log(`Flushed ${eventsToProcess.length} events`)
+    } catch (error) {
+      console.error('Failed to flush batch:', error)
+      // Re-add failed events to retry queue
+      this.batch.unshift(...eventsToProcess)
+    }
+  }
+  
+  async destroy() {
+    await this.flush()
+  }
+}
+
+// Usage
+const batcher = new AuditEventBatcher(client, 100, 10000)
+
+// Add events to batch
+batcher.add({ action: 'user.login', principalId: 'user-1' })
+batcher.add({ action: 'user.logout', principalId: 'user-1' })
+
+// Clean up
+process.on('SIGINT', async () => {
+  await batcher.destroy()
+})
+```
+
+## Testing Utilities
+
+### Mock Client for Tests
+
+```typescript
+export class MockAuditClient {
+  public events = {
+    create: jest.fn().mockResolvedValue({ id: 'mock-event-id' }),
+    bulkCreate: jest.fn().mockResolvedValue({ 
+      successful: 5, 
+      failed: 0, 
+      total: 5 
+    }),
+    query: jest.fn().mockResolvedValue({ 
+      events: [], 
+      pagination: { total: 0 } 
+    })
+  }
+  
+  public destroy = jest.fn().mockResolvedValue(undefined)
+  
+  // Add other service mocks as needed
+  public compliance = {
+    generateHipaaReport: jest.fn().mockResolvedValue({ events: [] })
+  }
+}
+
+// Usage in tests
+describe('User Service', () => {
+  let mockAuditClient: MockAuditClient
+  
+  beforeEach(() => {
+    mockAuditClient = new MockAuditClient()
+  })
+  
+  it('should audit user creation', async () => {
+    const userService = new UserService(mockAuditClient as any)
+    
+    await userService.createUser({ name: 'John Doe' })
+    
+    expect(mockAuditClient.events.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'user.create',
+        status: 'success'
+      })
+    )
+  })
+})
+```

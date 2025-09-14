@@ -17,13 +17,16 @@ export default defineConfig({
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/joseantcordeiro/smart-logs' },
 			],
 			plugins: [
+				// TODO: Re-enable OpenAPI plugin when server is available
 				// Generate the OpenAPI documentation pages.
-				starlightOpenAPI([
-					{
-						base: 'api',
-						schema: 'http://localhost:3000/api/v1/openapi.json',
-					},
-				]),
+				// starlightOpenAPI([
+				// 	{
+				// 		base: 'api',
+				// 		schema: process.env.NODE_ENV === 'development' 
+				// 			? 'http://localhost:3000/api/v1/openapi.json'
+				// 			: 'https://api.smartlogs.com/api/v1/openapi.json',
+				// 	},
+				// ]),
 				// TODO: Re-enable TypeDoc plugin when compatibility is fixed
 				// Generate the documentation.
         // publicStarlightTypeDoc({
@@ -34,33 +37,52 @@ export default defineConfig({
 			],
 			sidebar: [
 				{
+					label: 'Getting Started',
+					items: [
+						{ label: 'Introduction', slug: 'index' },
+						{ label: 'Quick Start', slug: 'audit-client/quick-start' },
+					],
+				},
+				{
+					label: 'Audit Client Library',
+					items: [
+						{ label: 'Overview', slug: 'audit-client/overview' },
+						{ label: 'Quick Start', slug: 'audit-client/quick-start' },
+						{ label: 'Configuration', slug: 'audit-client/configuration' },
+						{ label: 'Plugin Architecture', slug: 'audit-client/plugins' },
+						{ label: 'Framework Integration', slug: 'audit-client/frameworks' },
+						{ label: 'Code Examples', slug: 'audit-client/examples' },
+					],
+				},
+				{
+					label: 'Core System',
+					items: [
+						{ label: 'Audit Core', slug: 'audit/audit' },
+						{ label: 'Database Layer', slug: 'audit/audit-db' },
+						{ label: 'Security & Compliance', slug: 'audit/security' },
+						{ label: 'Archival System', slug: 'audit/archival-system' },
+						{ label: 'Deprecated SDK', slug: 'audit/audit-sdk' },
+					],
+				},
+				{
 					label: 'Development',
 					items: [
-						// Each item here is one entry in the navigation menu.
 						{ label: 'Get Started', slug: 'audit/get-started' },
-						{ label: 'Audit SDK', slug: 'audit/audit' },
-						{ label: 'Audit DB', slug: 'audit/audit-db' },
-						{ label: 'API Reference', slug: 'audit/api-reference' },
 						{ label: 'Examples', slug: 'audit/examples' },
-						{ label: 'Security', slug: 'audit/security' },
-						{ label: 'Archival', slug: 'audit/archival-system' },
+						{ label: 'API Reference', slug: 'audit/api-reference' },
 					],
 				},
 				{
 					label: 'Reference',
 					autogenerate: { directory: 'reference' },
 				},
-				{
-					label: 'Audit Client',
-					autogenerate: { directory: 'audit-client' },
-				},
 				// Add the generated sidebar group to the sidebar.
-				...openAPISidebarGroups,
+				// ...openAPISidebarGroups,
 				// TODO: Re-enable when TypeDoc compatibility is fixed
 				// {
-        	// 	label: 'type docs',
-          // Add the generated public sidebar group to the sidebar.
-          // items: [publicTypeDocSidebarGroup],
+				//   label: 'type docs',
+				//   // Add the generated public sidebar group to the sidebar.
+				//   items: [publicTypeDocSidebarGroup],
 				// }
 			],
 		}),

@@ -17,7 +17,7 @@ The primary goals of this package are:
 - **Performance**: Efficient queuing with BullMQ and Redis for high-throughput scenarios
 - **Healthcare Focus**: Specialized support for FHIR resources and PHI data handling
 
-For a higher-level interface with additional features, consider using the [Audit SDK (`@repo/audit-sdk`)](./audit-sdk.md) which builds on this package.
+For a higher-level interface with additional features, consider using the [Audit Client Library (`@smedrec/audit-client`)](/audit-client/overview/) which provides a comprehensive SDK for interacting with the Smart Logs system.
 
 ## Installation
 

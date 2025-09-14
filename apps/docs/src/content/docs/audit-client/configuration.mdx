@@ -1,0 +1,550 @@
+---
+title: Configuration Guide
+description: Comprehensive guide to configuring the Smart Logs Audit Client for optimal performance, security, and reliability.
+---
+
+# Configuration Guide
+
+The `@smedrec/audit-client` provides extensive configuration options to customize behavior for your specific use case. This guide covers all available configuration options with practical examples.
+
+## Configuration Schema
+
+The main configuration interface:
+
+```typescript
+interface AuditClientConfig {
+  // Connection settings
+  baseUrl: string
+  apiVersion?: string
+  timeout?: number
+
+  // Authentication
+  authentication: AuthenticationConfig
+
+  // Feature configurations
+  retry?: RetryConfig
+  cache?: CacheConfig
+  batching?: BatchingConfig
+  performance?: PerformanceConfig
+  logging?: LoggingConfig
+  errorHandling?: ErrorHandlingConfig
+
+  // Environment and metadata
+  environment?: 'development' | 'staging' | 'production'
+  customHeaders?: Record<string, string>
+  interceptors?: InterceptorConfig
+}
+```
+
+## Core Configuration
+
+### Connection Settings
+
+```typescript
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  apiVersion: 'v1', // Optional, defaults to 'v1'
+  timeout: 30000, // 30 seconds, default is 10000ms
+  
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY
+  }
+})
+```
+
+### Environment Configuration
+
+Set the environment to enable environment-specific behaviors:
+
+```typescript
+const config = {
+  baseUrl: process.env.AUDIT_BASE_URL,
+  environment: process.env.NODE_ENV as 'development' | 'staging' | 'production',
+  
+  // Custom headers for identification
+  customHeaders: {
+    'X-Application': 'MyHealthApp',
+    'X-Version': '1.2.3',
+    'X-Environment': process.env.NODE_ENV
+  },
+  
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY
+  }
+}
+```
+
+## Authentication Configuration
+
+### API Key Authentication (Recommended)
+
+```typescript
+const config = {
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'sk_live_...',
+    autoRefresh: false // API keys don't need refresh
+  }
+}
+```
+
+### Bearer Token Authentication
+
+For OAuth 2.0 and JWT tokens:
+
+```typescript
+const config = {
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'bearer',
+    bearerToken: 'eyJhbGciOiJIUzI1NiIs...',
+    autoRefresh: true,
+    refreshEndpoint: '/auth/refresh'
+  }
+}
+```
+
+### Session Token Authentication
+
+For user-based sessions:
+
+```typescript
+const config = {
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'session',
+    sessionToken: 'sess_...',
+    autoRefresh: true,
+    refreshEndpoint: '/auth/refresh-session'
+  }
+}
+```
+
+### Custom Authentication
+
+For custom authentication schemes:
+
+```typescript
+const config = {
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'custom',
+    customHeaders: {
+      'X-Custom-Auth': 'custom-token-value',
+      'X-Signature': 'hmac-signature'
+    }
+  }
+}
+```
+
+## Retry Configuration
+
+Configure automatic retries for resilient operation:
+
+```typescript
+const config = {
+  // ... other config
+  retry: {
+    enabled: true,
+    maxAttempts: 3,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    backoffMultiplier: 2,
+    
+    // Specify which errors should trigger retries
+    retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+    retryableErrors: ['NETWORK_ERROR', 'TIMEOUT'],
+    
+    // Exponential backoff with jitter
+    jitter: true
+  }
+}
+```
+
+### Advanced Retry Strategies
+
+```typescript
+const config = {
+  retry: {
+    enabled: true,
+    maxAttempts: 5,
+    
+    // Custom retry conditions
+    shouldRetry: (error, attempt) => {
+      // Don't retry authentication errors
+      if (error.code === 'AUTH_ERROR') return false
+      
+      // Only retry the first 3 attempts for validation errors
+      if (error.code === 'VALIDATION_ERROR' && attempt > 3) return false
+      
+      return true
+    },
+    
+    // Custom delay calculation
+    calculateDelay: (attempt, error) => {
+      // Longer delays for rate limiting
+      if (error.status === 429) {
+        return Math.min(60000, 5000 * attempt) // Up to 1 minute
+      }
+      
+      // Standard exponential backoff
+      return Math.min(30000, 1000 * Math.pow(2, attempt))
+    }
+  }
+}
+```
+
+## Caching Configuration
+
+Enable caching to improve performance and reduce API calls:
+
+### Memory Caching
+
+```typescript
+const config = {
+  cache: {
+    enabled: true,
+    storage: 'memory',
+    defaultTtlMs: 300000, // 5 minutes
+    maxSize: 1000, // Maximum number of cached items
+    
+    // TTL per operation type
+    ttlByOperation: {
+      'events.query': 60000, // 1 minute for queries
+      'presets.list': 600000, // 10 minutes for presets
+      'health.check': 30000 // 30 seconds for health checks
+    }
+  }
+}
+```
+
+### localStorage Caching (Browser)
+
+```typescript
+const config = {
+  cache: {
+    enabled: true,
+    storage: 'localStorage',
+    defaultTtlMs: 600000, // 10 minutes
+    keyPrefix: 'audit-cache-',
+    
+    // Automatically clean expired entries
+    cleanupInterval: 300000 // 5 minutes
+  }
+}
+```
+
+### Custom Storage Backend
+
+```typescript
+const config = {
+  cache: {
+    enabled: true,
+    storage: 'custom',
+    storageAdapter: {
+      get: async (key: string) => {
+        // Custom get implementation
+        return await myCustomStorage.get(key)
+      },
+      set: async (key: string, value: any, ttl: number) => {
+        // Custom set implementation
+        await myCustomStorage.set(key, value, ttl)
+      },
+      delete: async (key: string) => {
+        await myCustomStorage.delete(key)
+      }
+    }
+  }
+}
+```
+
+## Batching Configuration
+
+Optimize performance with request batching:
+
+```typescript
+const config = {
+  batching: {
+    enabled: true,
+    maxBatchSize: 100,
+    flushIntervalMs: 5000, // Flush every 5 seconds
+    
+    // Batch different operations separately
+    groupBy: 'operation', // or 'none' to batch everything together
+    
+    // Enable for specific operations
+    enabledFor: ['events.create', 'metrics.report'],
+    
+    // Custom batch processing
+    processor: async (batch) => {
+      // Custom batch processing logic
+      return await processBatch(batch)
+    }
+  }
+}
+```
+
+## Performance Configuration
+
+Fine-tune performance settings:
+
+```typescript
+const config = {
+  performance: {
+    // Connection pooling
+    maxConnections: 10,
+    keepAlive: true,
+    keepAliveMsecs: 30000,
+    
+    // Request compression
+    compression: {
+      enabled: true,
+      threshold: 1024, // Compress responses > 1KB
+      algorithms: ['gzip', 'deflate']
+    },
+    
+    // Response streaming for large datasets
+    streaming: {
+      enabled: true,
+      highWaterMark: 64 * 1024 // 64KB chunks
+    }
+  }
+}
+```
+
+## Logging Configuration
+
+Configure detailed logging for debugging and monitoring:
+
+```typescript
+const config = {
+  logging: {
+    enabled: true,
+    level: 'info', // 'debug', 'info', 'warn', 'error'
+    
+    // What to log
+    logRequests: true,
+    logResponses: true,
+    logHeaders: false, // Security consideration
+    logBodies: false, // Performance consideration
+    
+    // Custom logger
+    logger: {
+      debug: (message, meta) => console.debug(message, meta),
+      info: (message, meta) => console.info(message, meta),
+      warn: (message, meta) => console.warn(message, meta),
+      error: (message, meta) => console.error(message, meta)
+    },
+    
+    // Redact sensitive information
+    redactSensitive: true,
+    redactFields: ['password', 'ssn', 'creditCard']
+  }
+}
+```
+
+## Error Handling Configuration
+
+Customize error handling behavior:
+
+```typescript
+const config = {
+  errorHandling: {
+    // Transform errors before throwing
+    errorTransformer: (error) => {
+      // Add context or transform error format
+      return {
+        ...error,
+        timestamp: new Date().toISOString(),
+        context: 'audit-client'
+      }
+    },
+    
+    // Global error handler
+    onError: (error, context) => {
+      // Log to external service, send alerts, etc.
+      console.error('Audit client error:', error, context)
+    },
+    
+    // Include stack traces in development
+    includeStackTrace: process.env.NODE_ENV === 'development'
+  }
+}
+```
+
+## Interceptor Configuration
+
+Add custom interceptors for requests and responses:
+
+```typescript
+const config = {
+  interceptors: {
+    request: [
+      // Add correlation IDs
+      (request) => {
+        request.headers['X-Correlation-ID'] = generateCorrelationId()
+        return request
+      },
+      
+      // Add timing information
+      (request) => {
+        request.metadata = { startTime: Date.now() }
+        return request
+      }
+    ],
+    
+    response: [
+      // Log timing information
+      (response, request) => {
+        const duration = Date.now() - request.metadata.startTime
+        console.log(`Request completed in ${duration}ms`)
+        return response
+      }
+    ]
+  }
+}
+```
+
+## Environment-Specific Configurations
+
+### Development Configuration
+
+```typescript
+const developmentConfig = {
+  baseUrl: 'http://localhost:3000',
+  environment: 'development',
+  
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'dev_key_...'
+  },
+  
+  logging: {
+    enabled: true,
+    level: 'debug',
+    logRequests: true,
+    logResponses: true,
+    logBodies: true
+  },
+  
+  retry: {
+    enabled: true,
+    maxAttempts: 2 // Fail fast in development
+  },
+  
+  cache: {
+    enabled: false // Disable caching for development
+  }
+}
+```
+
+### Production Configuration
+
+```typescript
+const productionConfig = {
+  baseUrl: 'https://api.smartlogs.com',
+  environment: 'production',
+  
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY
+  },
+  
+  retry: {
+    enabled: true,
+    maxAttempts: 5,
+    backoffMultiplier: 2,
+    jitter: true
+  },
+  
+  cache: {
+    enabled: true,
+    defaultTtlMs: 300000,
+    storage: 'memory'
+  },
+  
+  logging: {
+    enabled: true,
+    level: 'warn', // Only warnings and errors
+    logBodies: false,
+    redactSensitive: true
+  },
+  
+  performance: {
+    maxConnections: 20,
+    compression: { enabled: true }
+  }
+}
+```
+
+## Dynamic Configuration
+
+Update configuration at runtime:
+
+```typescript
+const client = new AuditClient(initialConfig)
+
+// Update authentication
+client.updateConfig({
+  authentication: {
+    type: 'bearer',
+    bearerToken: newToken
+  }
+})
+
+// Enable debug logging
+client.updateConfig({
+  logging: {
+    enabled: true,
+    level: 'debug'
+  }
+})
+
+// Get current configuration
+const currentConfig = client.getConfig()
+console.log('Current config:', currentConfig)
+```
+
+## Validation
+
+The client validates configuration on initialization:
+
+```typescript
+try {
+  const client = new AuditClient(config)
+} catch (error) {
+  if (error instanceof ConfigurationError) {
+    console.error('Invalid configuration:', error.details)
+    // Handle configuration errors
+  }
+}
+```
+
+## Best Practices
+
+### Security
+- Store API keys securely (environment variables, key management systems)
+- Use HTTPS for all communications
+- Enable sensitive data redaction in logs
+- Regularly rotate authentication tokens
+
+### Performance
+- Enable caching for read-heavy workloads
+- Use batching for high-volume event creation
+- Configure appropriate timeouts for your use case
+- Monitor performance metrics
+
+### Reliability
+- Enable retries with exponential backoff
+- Set reasonable timeout values
+- Implement circuit breaker patterns for critical paths
+- Monitor health checks
+
+### Monitoring
+- Enable appropriate logging levels
+- Use correlation IDs for distributed tracing
+- Monitor performance and error metrics
+- Set up alerts for critical failures
