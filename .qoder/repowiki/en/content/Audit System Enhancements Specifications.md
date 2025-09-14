@@ -20,7 +20,21 @@
 - [PERFORMANCE_OPTIMIZATION.md](file://packages/audit-db/PERFORMANCE_OPTIMIZATION.md)
 - [cli.ts](file://packages/audit/src/cli.ts)
 - [archival-cli.ts](file://packages/audit/src/archival/archival-cli.ts)
+- [client.ts](file://packages/audit-client/src/core/client.ts) - *Updated in recent commit*
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts) - *Updated in recent commit*
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts) - *Updated in recent commit*
+- [config.ts](file://packages/audit-client/src/core/config.ts) - *Updated in recent commit*
+- [README.md](file://packages/audit-client/src/infrastructure/plugins/README.md) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+- Updated architectural diagrams to reflect the enhanced plugin architecture
+- Added detailed class diagram for plugin system components
+- Expanded core components section with comprehensive plugin architecture overview
+- Enhanced integration points section with plugin configuration examples
+- Updated migration guidance to include plugin system considerations
+- Added new section on plugin architecture and extensibility
+- Updated monitoring and observability section to include plugin performance tracking
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,7 +44,8 @@
 5. [Operational Impact](#operational-impact)
 6. [Migration Guidance](#migration-guidance)
 7. [Monitoring and Observability](#monitoring-and-observability)
-8. [Conclusion](#conclusion)
+8. [Plugin Architecture](#plugin-architecture)
+9. [Conclusion](#conclusion)
 
 ## Introduction
 
@@ -303,6 +318,119 @@ style G fill:#00BCD4,stroke:#0097A7
 **Section sources**
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [dashboard.ts](file://packages/audit/src/observability/dashboard.ts)
+
+## Plugin Architecture
+
+The Audit Client Library features a comprehensive plugin architecture that enables extensibility through middleware, storage backends, and authentication methods. This modular design allows developers to customize and extend functionality without modifying the core library.
+
+```mermaid
+classDiagram
+class Plugin {
+<<interface>>
++name : string
++version : string
++description? : string
++dependencies? : string[]
++configSchema? : Record~string, any~
++initialize(config : any, context : PluginContext) : Promise~void~ | void
++destroy?() : Promise~void~ | void
++validateConfig?(config : any) : ValidationResult
+}
+class MiddlewarePlugin {
+<<interface>>
++type : 'middleware'
++processRequest?(request : MiddlewareRequest, next : MiddlewareNext) : Promise~MiddlewareRequest~
++processResponse?(response : MiddlewareResponse, next : MiddlewareNext) : Promise~MiddlewareResponse~
++handleError?(error : Error, context : MiddlewareErrorContext) : Promise~void~ | void
+}
+class StoragePlugin {
+<<interface>>
++type : 'storage'
++createStorage(config : any) : CacheStorage
+}
+class AuthPlugin {
+<<interface>>
++type : 'auth'
++getAuthHeaders(config : any, context : AuthContext) : Promise~Record~string, string~~
++refreshToken?(config : any, context : AuthContext) : Promise~string | null~
++validateAuthConfig?(config : any) : ValidationResult
++handleAuthError?(error : Error, config : any, context : AuthContext) : Promise~void~ | void
+}
+class PluginRegistry {
++plugins : Map~string, Plugin~
++middlewareChain : MiddlewarePlugin[]
++storagePlugins : Map~string, StoragePlugin~
++authPlugins : Map~string, AuthPlugin~
++register(plugin : Plugin, config : any) : Promise~void~
++unregister(name : string) : Promise~void~
++getPlugin~T~(name : string) : T | undefined
++getMiddlewareChain() : MiddlewarePlugin[]
++getStoragePlugin(name : string) : StoragePlugin | undefined
++getAuthPlugin(name : string) : AuthPlugin | undefined
++getStats() : PluginRegistryStats
+}
+class PluginManager {
++registry : PluginRegistry
++logger : Logger
++setClientConfig(config : AuditClientConfig) : void
++getRegistry() : PluginRegistry
++executeRequestMiddleware(request : MiddlewareRequest) : Promise~MiddlewareRequest~
++executeResponseMiddleware(response : MiddlewareResponse) : Promise~MiddlewareResponse~
++createStorage(pluginName : string, config : any) : PluginCacheStorage
++getAuthHeaders(pluginName : string, config : any, context : AuthContext) : Promise~Record~string, string~~
++refreshToken(pluginName : string, config : any, context : AuthContext) : Promise~string | null~
++cleanup() : Promise~void~
+}
+class AuditClient {
++configManager : ConfigManager
++config : AuditClientConfig
++state : ClientState
++logger : Logger | undefined
++authManager : AuthManager
++cacheManager : CacheManager
++retryManager : RetryManager
++batchManager : BatchManager
++errorHandler : ErrorHandler
++pluginManager : PluginManager
++_events : EventsService
++_compliance : ComplianceService
++_scheduledReports : ScheduledReportsService
++_presets : PresetsService
++_metrics : MetricsService
++_health : HealthService
++constructor(config : PartialAuditClientConfig)
++initializeInfrastructure() : void
++initializePlugins() : Promise~void~
++initializeServices() : void
++setupCleanupTasks() : void
++getConfig() : AuditClientConfig
++updateConfig(updates : Partial~AuditClientConfig~) : void
++addRequestInterceptor(interceptor : RequestInterceptor) : void
++addResponseInterceptor(interceptor : ResponseInterceptor) : void
++getStats() : ClientStats
++isReady() : boolean
++destroy() : Promise~void~
+}
+Plugin <|-- MiddlewarePlugin
+Plugin <|-- StoragePlugin
+Plugin <|-- AuthPlugin
+PluginManager --> PluginRegistry
+AuditClient --> PluginManager
+AuditClient --> PluginRegistry
+```
+
+**Diagram sources**
+- [client.ts](file://packages/audit-client/src/core/client.ts#L15-L825) - *Updated architecture*
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650) - *Core plugin interfaces*
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783) - *Built-in plugin implementations*
+- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530) - *Configuration management*
+
+**Section sources**
+- [client.ts](file://packages/audit-client/src/core/client.ts#L15-L825)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783)
+- [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [README.md](file://packages/audit-client/src/infrastructure/plugins/README.md#L1-L631)
 
 ## Conclusion
 

@@ -3,15 +3,23 @@
 <cite>
 **Referenced Files in This Document**   
 - [README.md](file://packages/audit-client/README.md)
-- [client.ts](file://packages/audit-client/src/core/client.ts)
-- [config.ts](file://packages/audit-client/src/core/config.ts)
-- [events.ts](file://packages/audit-client/src/services/events.ts)
-- [compliance.ts](file://packages/audit-client/src/services/compliance.ts)
-- [metrics.ts](file://packages/audit-client/src/services/metrics.ts)
+- [client.ts](file://packages/audit-client/src/core/client.ts) - *Updated in recent commit*
+- [config.ts](file://packages/audit-client/src/core/config.ts) - *Updated in recent commit*
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts) - *Added in recent commit*
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts) - *Added in recent commit*
 - [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts)
 - [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts)
 - [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated architecture overview to include new plugin system
+- Added comprehensive plugin architecture section with new diagrams
+- Enhanced configuration management section with plugin configuration details
+- Updated integration patterns to include plugin usage
+- Added new practical examples for plugin usage
+- Updated troubleshooting guide with plugin-specific issues
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -106,7 +114,7 @@ Metrics --> Config
 Metrics --> Base
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [client.ts](file://packages/audit-client/src/core/client.ts#L1-L100)
 - [config.ts](file://packages/audit-client/src/core/config.ts#L1-L50)
 
@@ -178,7 +186,7 @@ AuditClient --> ScheduledReportsService : "creates"
 AuditClient --> PluginManager : "uses"
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [client.ts](file://packages/audit-client/src/core/client.ts#L101-L200)
 
 **Section sources**
@@ -253,7 +261,7 @@ AuditClientConfig --> ErrorHandlingConfig
 AuditClientConfig --> PluginConfig
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [config.ts](file://packages/audit-client/src/core/config.ts#L1-L100)
 
 **Section sources**
@@ -344,7 +352,7 @@ QueryAuditEventsParams --> Pagination
 QueryAuditEventsParams --> Sort
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [events.ts](file://packages/audit-client/src/services/events.ts#L1-L100)
 
 **Section sources**
@@ -422,7 +430,7 @@ CustomReport --> Chart
 CustomReport --> ReportMetadata
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L1-L100)
 
 **Section sources**
@@ -492,7 +500,7 @@ MetricsService --> Alert
 MetricsService --> MetricsSubscription
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [metrics.ts](file://packages/audit-client/src/services/metrics.ts#L1-L100)
 
 **Section sources**
@@ -518,7 +526,7 @@ Initialize --> Complete([Configuration Complete])
 HandleError --> Complete
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [config.ts](file://packages/audit-client/src/core/config.ts#L101-L200)
 
 **Section sources**
@@ -548,6 +556,55 @@ Environment-specific defaults:
 **Section sources**
 - [config.ts](file://packages/audit-client/src/core/config.ts#L400-L500)
 
+### Plugin Configuration
+
+The plugin system allows for extensive customization through middleware, storage, and authentication plugins. The configuration supports both built-in and custom plugins.
+
+```mermaid
+classDiagram
+class PluginConfig {
++enabled : boolean
++autoLoad : boolean
++plugins : Plugin[]
++middleware : MiddlewareConfig
++storage : StorageConfig
++auth : AuthConfig
+}
+class MiddlewareConfig {
++enabled : boolean
++plugins : string[]
+}
+class StorageConfig {
++enabled : boolean
++defaultPlugin : string
++plugins : Record~string, any~
+}
+class AuthConfig {
++enabled : boolean
++defaultPlugin : string
++plugins : Record~string, any~
+}
+class Plugin {
++name : string
++type : 'middleware' | 'storage' | 'auth'
++enabled : boolean
++config : any
++priority : number
+}
+PluginConfig --> MiddlewareConfig
+PluginConfig --> StorageConfig
+PluginConfig --> AuthConfig
+PluginConfig --> Plugin
+```
+
+**Diagram sources**
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L100)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L100)
+
+**Section sources**
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
+
 ## Integration Patterns
 
 The Audit Client Library supports several integration patterns for different use cases and environments.
@@ -574,7 +631,7 @@ API-->>Client : Return response
 Client-->>App : Return result
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts#L1-L100)
 
 **Section sources**
@@ -602,7 +659,7 @@ Supported cache storage backends:
 - **sessionStorage**: Session-scoped browser storage
 - **Custom**: Custom storage implementation
 
-**Diagram sources **
+**Diagram sources**
 - [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts#L1-L100)
 
 **Section sources**
@@ -628,11 +685,46 @@ ShouldRetry --> |No| Fail([Request Failed])
 Wait --> CheckCircuit
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts#L1-L100)
 
 **Section sources**
 - [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts#L1-L522)
+
+### Plugin System Integration
+
+The plugin architecture allows for extensibility through middleware, storage, and authentication plugins.
+
+```mermaid
+sequenceDiagram
+participant App as "Application"
+participant Client as "AuditClient"
+participant PluginManager as "PluginManager"
+participant Registry as "PluginRegistry"
+participant Plugin as "MiddlewarePlugin"
+App->>Client : Create client with plugin config
+Client->>PluginManager : Initialize with config
+PluginManager->>Registry : Register plugins
+Registry->>Plugin : Initialize plugin
+App->>Client : Make API request
+Client->>PluginManager : Execute middleware chain
+PluginManager->>Plugin : Process request
+Plugin->>Plugin : Modify request
+Plugin-->>PluginManager : Return modified request
+PluginManager-->>Client : Return processed request
+Client->>API : Make request
+API-->>Client : Return response
+Client->>PluginManager : Execute response middleware
+PluginManager-->>App : Return result
+```
+
+**Diagram sources**
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L100)
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L100)
+
+**Section sources**
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783)
 
 ## Practical Examples
 
@@ -752,6 +844,58 @@ const exportResult = await client.compliance.exportGdprData({
 **Section sources**
 - [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L100-L200)
 
+### Plugin Usage
+
+```typescript
+// Configure built-in plugins
+const client = new AuditClient({
+  baseUrl: 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'your-api-key',
+  },
+  plugins: {
+    enabled: true,
+    autoLoad: true,
+    middleware: {
+      enabled: true,
+      plugins: ['request-logging', 'correlation-id'],
+    },
+    storage: {
+      enabled: true,
+      plugins: {
+        'redis-storage': {
+          host: 'localhost',
+          port: 6379,
+          password: 'your-password',
+        },
+      },
+    },
+    auth: {
+      enabled: true,
+      plugins: {
+        'jwt-auth': {
+          token: 'your-jwt-token',
+          refreshToken: 'your-refresh-token',
+          refreshEndpoint: '/auth/refresh',
+        },
+      },
+    },
+  },
+})
+
+// Manual plugin registration
+const loggingPlugin = BuiltInPluginFactory.createRequestLoggingPlugin({
+  logLevel: 'debug',
+  logBodies: true,
+})
+await client.plugins.getRegistry().register(loggingPlugin, {})
+```
+
+**Section sources**
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
+
 ## Troubleshooting Guide
 
 ### Common Issues and Solutions
@@ -763,9 +907,12 @@ const exportResult = await client.compliance.exportGdprData({
 | Network timeouts | Poor connectivity | Increase timeout settings |
 | Cache issues | Storage quota exceeded | Clear cache or switch to different storage backend |
 | Type errors | Version mismatch | Ensure compatible TypeScript and library versions |
+| Plugin not loading | Invalid plugin configuration | Validate plugin configuration using validateConfig method |
+| Plugin performance issues | Heavy middleware processing | Optimize plugin code or disable unnecessary plugins |
 
 **Section sources**
 - [README.md](file://packages/audit-client/README.md#L201-L250)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
 
 ### Error Handling
 
@@ -781,6 +928,8 @@ try {
     console.error('Authentication failed:', error.message)
   } else if (error instanceof RetryExhaustedError) {
     console.error('Request failed after retries:', error.attempts)
+  } else if (error instanceof PluginError) {
+    console.error('Plugin error:', error.message, 'Plugin:', error.pluginName)
   } else {
     console.error('Unexpected error:', error)
   }
@@ -789,6 +938,7 @@ try {
 
 **Section sources**
 - [client.ts](file://packages/audit-client/src/core/client.ts#L500-L600)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
 
 ### Debugging Tips
 
@@ -797,9 +947,12 @@ try {
 3. Check the health status with `healthCheck()` method
 4. Validate configuration with `ConfigManager.validateConfig()`
 5. Monitor cache statistics with `cacheManager.getStats()`
+6. Check plugin registry status with `client.plugins.getRegistry().getStats()`
+7. Use plugin performance tracker to identify slow plugins
 
 **Section sources**
 - [client.ts](file://packages/audit-client/src/core/client.ts#L600-L700)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
 
 ## Performance Considerations
 
@@ -821,6 +974,16 @@ The client implements proper cleanup to prevent memory leaks:
 - Proper disposal of WebSocket connections
 - Cache cleanup with LRU eviction
 - Interval cleanup for periodic tasks
+- Plugin cleanup during client destruction
+
+### Plugin Performance
+
+When using plugins, consider the following performance implications:
+
+- **Middleware overhead**: Each middleware plugin adds processing time to requests
+- **Storage latency**: External storage backends may introduce network latency
+- **Authentication complexity**: Custom auth plugins may add authentication overhead
+- **Plugin dependencies**: Plugin dependencies can create complex initialization chains
 
 ### Best Practices
 
@@ -829,6 +992,10 @@ The client implements proper cleanup to prevent memory leaks:
 3. Use bulk operations for multiple events
 4. Implement proper error handling and retry logic
 5. Monitor client statistics for performance issues
+6. Limit the number of active plugins to only those needed
+7. Use built-in plugins when possible for optimized performance
+8. Regularly clean up expired cache entries
 
 **Section sources**
 - [client.ts](file://packages/audit-client/src/core/client.ts#L700-L800)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)

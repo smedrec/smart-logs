@@ -11,6 +11,9 @@
 - [health.ts](file://packages\audit-client\src\services\health.ts) - *Updated in recent commit*
 - [presets.ts](file://packages\audit-client\src\services\presets.ts) - *Updated in recent commit*
 - [scheduled-reports.ts](file://packages\audit-client\src\services\scheduled-reports.ts) - *Updated in recent commit*
+- [configuration-examples.ts](file://packages\audit-client\src\examples\configuration-examples.ts) - *Updated in recent commit*
+- [client-usage.ts](file://packages\audit-client\src\examples\client-usage.ts) - *Updated in recent commit*
+- [FRAMEWORK_INTEGRATION.md](file://packages\audit-client\docs\FRAMEWORK_INTEGRATION.md) - *New documentation added*
 </cite>
 
 ## Update Summary
@@ -22,6 +25,8 @@
 - Added detailed integration mapping between client methods and API endpoints
 - Refreshed examples with current configuration and service usage patterns
 - Updated troubleshooting guide with new error handling and plugin-related issues
+- Added new section on framework integration patterns
+- Enhanced configuration examples with environment-specific and builder patterns
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -32,8 +37,9 @@
 6. [Usage Patterns](#usage-patterns)
 7. [Integration with Core Audit System](#integration-with-core-audit-system)
 8. [Examples](#examples)
-9. [Troubleshooting Guide](#troubleshooting-guide)
-10. [Conclusion](#conclusion)
+9. [Framework Integration](#framework-integration)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Conclusion](#conclusion)
 
 ## Introduction
 The Audit Client is a comprehensive TypeScript SDK designed for interacting with the Smart Logs Audit API. It provides a robust set of features including type safety, retry mechanisms, intelligent caching, authentication support, request batching, comprehensive error handling, performance optimization, observability, and a flexible plugin architecture. The client is structured into a modular architecture with distinct layers for core functionality, services, infrastructure, and utilities, enabling developers to efficiently manage audit events, compliance reporting, system metrics, health monitoring, and scheduled reports.
@@ -382,6 +388,7 @@ The client supports environment-specific configuration through the ConfigManager
 
 **Section sources**
 - [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
+- [configuration-examples.ts](file://packages\audit-client\src\examples\configuration-examples.ts#L54-L113)
 
 ## Usage Patterns
 The Audit Client follows several key usage patterns to ensure efficient and reliable interaction with the audit system.
@@ -622,6 +629,7 @@ const client = new AuditClient(config)
 
 **Section sources**
 - [README.md](file://packages\audit-client\README.md#L1-L213)
+- [configuration-examples.ts](file://packages\audit-client\src\examples\configuration-examples.ts#L0-L60)
 
 ### Events Service Example
 ```typescript
@@ -667,6 +675,65 @@ await client.metrics.acknowledgeAlert(alertId)
 
 **Section sources**
 - [README.md](file://packages\audit-client\README.md#L1-L213)
+
+## Framework Integration
+The Audit Client can be integrated with various web frameworks using different patterns to ensure optimal performance and reliability.
+
+### Express.js Integration
+For Express.js applications, create a centralized client instance and use middleware for automatic request auditing.
+
+```typescript
+// src/audit-client.ts
+import { AuditClient } from '@smedrec/audit-client'
+
+export const auditClient = new AuditClient({
+	baseUrl: process.env.AUDIT_API_URL || 'https://api.smartlogs.com',
+	authentication: {
+		type: 'apiKey',
+		apiKey: process.env.AUDIT_API_KEY,
+	},
+	logging: {
+		level: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
+	},
+})
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+	await auditClient.destroy()
+	process.exit(0)
+})
+```
+
+### Next.js Integration
+In Next.js applications, use a singleton pattern to avoid creating new connections on every request.
+
+```typescript
+// lib/audit-client.ts
+import { AuditClient } from '@smedrec/audit-client'
+
+declare global {
+	var auditClient: AuditClient | undefined
+}
+
+const client =
+	globalThis.auditClient ||
+	new AuditClient({
+		baseUrl: process.env.AUDIT_API_URL!,
+		authentication: {
+			type: 'apiKey',
+			apiKey: process.env.AUDIT_API_KEY!,
+		},
+	})
+
+if (process.env.NODE_ENV !== 'production') {
+	globalThis.auditClient = client
+}
+
+export const auditClient = client
+```
+
+**Section sources**
+- [FRAMEWORK_INTEGRATION.md](file://packages\audit-client\docs\FRAMEWORK_INTEGRATION.md#L0-L207)
 
 ## Troubleshooting Guide
 This section provides guidance for troubleshooting common issues with the Audit Client.

@@ -9,8 +9,18 @@
 - [apps/worker/package.json](file://apps/worker/package.json)
 - [apps/docs/package.json](file://apps/docs/package.json)
 - [apps/server/init-scripts/01-init-audit-db.sql](file://apps/server/init-scripts/01-init-audit-db.sql)
-- [packages/audit-sdk/examples/basic-usage.ts](file://packages/audit-sdk/examples/basic-usage.ts)
+- [packages/audit-client/docs/GETTING_STARTED.md](file://packages/audit-client/docs/GETTING_STARTED.md) - *Updated in recent commit*
+- [apps/docs/astro.config.mjs](file://apps/docs/astro.config.mjs) - *Sidebar restructured in recent commit*
+- [apps/docs/src/content/docs/audit/get-started.md](file://apps/docs/src/content/docs/audit/get-started.md) - *Quick start content updated*
 </cite>
+
+## Update Summary
+- Updated documentation structure to reflect new sidebar organization prioritizing "Getting Started" and "Audit Client Library"
+- Replaced references to deprecated `@repo/audit-sdk` with current `@repo/audit` and `@repo/audit-client` packages
+- Updated quick start guide to align with current implementation
+- Removed outdated Hello World example using deprecated SDK
+- Added new section for Audit Client Library usage
+- Updated table of contents and navigation structure
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -18,11 +28,13 @@
 3. [Running Applications](#running-applications)
 4. [Local Database Setup](#local-database-setup)
 5. [Environment Variables and Service Configuration](#environment-variables-and-service-configuration)
-6. [Hello World Example with Audit SDK](#hello-world-example-with-audit-sdk)
+6. [Quick Start with Audit Client Library](#quick-start-with-audit-client-library)
 7. [Common Setup Issues and Solutions](#common-setup-issues-and-solutions)
 
 ## Introduction
-This guide provides comprehensive instructions for setting up the SMEDREC Smart Logs development environment. You will learn how to install dependencies, run applications, configure the database, and use the audit SDK to emit test events. By following this guide, developers can have the full system running locally within 15 minutes.
+This guide provides comprehensive instructions for setting up the SMEDREC Smart Logs development environment. You will learn how to install dependencies, run applications, configure the database, and use the audit client library to emit test events. By following this guide, developers can have the full system running locally within 15 minutes.
+
+The audit system has been restructured with a new client library approach, deprecating the previous SDK in favor of a more modular and maintainable architecture.
 
 ## Development Environment Setup
 
@@ -212,17 +224,23 @@ Ensure the following services are running and properly connected:
 
 The server application automatically connects to these services using the environment variables.
 
-## Hello World Example with Audit SDK
+## Quick Start with Audit Client Library
 
-### SDK Initialization
-Create a simple script to test the Audit SDK:
+### Client Library Installation
+The audit system now uses a new client library architecture. Install the audit client package:
+
+```bash
+pnpm add '@repo/audit-client@workspace:*'
+```
+
+### Basic Usage
+Import and initialize the audit client:
 
 ```typescript
-// hello-world.ts
-import { AuditSDK } from '@repo/audit-sdk';
+import { AuditClient } from '@repo/audit-client';
 
-// Initialize the SDK with local configuration
-const auditSDK = new AuditSDK({
+// Initialize the audit client
+const auditClient = new AuditClient({
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
@@ -233,50 +251,73 @@ const auditSDK = new AuditSDK({
   },
 });
 
-async function helloWorld() {
+async function logAuditEvent() {
   try {
-    // Emit a test audit event
-    await auditSDK.log({
-      principalId: 'hello-world-user',
-      action: 'test.event.emitted',
+    // Log an audit event
+    await auditClient.events.log({
+      principalId: 'user-123',
+      action: 'document.accessed',
       status: 'success',
-      outcomeDescription: 'Hello World test event from getting started guide',
+      outcomeDescription: 'User accessed medical document',
+      targetResourceType: 'Document',
+      targetResourceId: 'doc-456',
     });
 
-    console.log('✅ Hello World audit event emitted successfully!');
+    console.log('✅ Audit event logged successfully!');
 
     // Check system health
-    const health = await auditSDK.getHealth();
+    const health = await auditClient.health.check();
     console.log('📊 Audit system health:', health);
   } catch (error) {
-    console.error('❌ Error emitting audit event:', error);
+    console.error('❌ Error logging audit event:', error);
   } finally {
-    await auditSDK.close();
+    await auditClient.disconnect();
   }
 }
 
-helloWorld();
+logAuditEvent();
 ```
 
-### Running the Example
-Execute the Hello World example:
+### Configuration Options
+The audit client supports various configuration options:
 
-```bash
-# From the root directory
-cd packages/audit-sdk
-npx tsx ../../examples/hello-world.ts
+```typescript
+const auditClient = new AuditClient({
+  // Redis configuration
+  redis: {
+    url: 'redis://localhost:6379',
+    maxRetries: 3,
+    retryInterval: 1000,
+  },
+  
+  // Database configuration
+  databaseUrl: 'postgresql://user:pass@localhost:5432/audit_db',
+  
+  // Default event properties
+  defaults: {
+    dataClassification: 'CONFIDENTIAL',
+    generateHash: true,
+    includeStackTrace: false,
+  },
+  
+  // Service-specific configurations
+  services: {
+    compliance: {
+      enabled: true,
+      retentionPeriod: '7y',
+    },
+    monitoring: {
+      enabled: true,
+      metricsInterval: 60000,
+    },
+  },
+});
 ```
-
-Expected output:
-```
-✅ Hello World audit event emitted successfully!
-📊 Audit system health: { redis: 'connected', database: 'connected', timestamp: '2024-01-15T10:00:00.000Z' }
-```
-
-This example demonstrates the basic usage pattern of the Audit SDK: initialize, log events, check health, and clean up connections.
 
 **Section sources**
-- [packages/audit-sdk/examples/basic-usage.ts](file://packages/audit-sdk/examples/basic-usage.ts)
+- [packages/audit-client/docs/GETTING_STARTED.md](file://packages/audit-client/docs/GETTING_STARTED.md)
+- [packages/audit-client/src/core/client.ts](file://packages/audit-client/src/core/client.ts)
+- [apps/docs/src/content/docs/audit/get-started.md](file://apps/docs/src/content/docs/audit/get-started.md)
 
 ## Common Setup Issues and Solutions
 
