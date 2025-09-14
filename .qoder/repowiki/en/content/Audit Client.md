@@ -684,20 +684,6 @@ const exportResult = await client.compliance.exportGdprData(params)
 **Section sources**
 - [README.md](file://packages\audit-client\README.md#L1-L213)
 
-### Metrics Service Example
-```typescript
-// Get system metrics
-const systemMetrics = await client.metrics.getSystemMetrics()
-const auditMetrics = await client.metrics.getAuditMetrics(params)
-
-// Manage alerts
-const alerts = await client.metrics.getAlerts()
-await client.metrics.acknowledgeAlert(alertId)
-```
-
-**Section sources**
-- [README.md](file://packages\audit-client\README.md#L1-L213)
-
 ## Framework Integration
 The Audit Client can be integrated with various web frameworks using different patterns to ensure optimal performance and reliability.
 

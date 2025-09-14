@@ -2,10 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [validator.ts](file://packages/audit/src/config/validator.ts)
-- [types.ts](file://packages/audit/src/config/types.ts)
-- [manager.ts](file://packages/audit/src/config/manager.ts)
+- [validator.ts](file://packages/audit/src/config/validator.ts) - *Updated in recent commit*
+- [types.ts](file://packages/audit/src/config/types.ts) - *Updated in recent commit*
+- [manager.ts](file://packages/audit/src/config/manager.ts) - *Updated in recent commit*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added in recent commit*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added new section for Plugin Configuration Validation
+- Added new section for GDPR Pseudonymization Configuration
+- Updated Compliance Settings Rules to include pseudonymization strategy validation
+- Added new custom validator functions for plugin and GDPR configurations
+- Updated section sources to reflect new and modified files
+- Enhanced troubleshooting section with new GDPR-related errors
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -19,7 +30,7 @@
 9. [Troubleshooting Common Validation Errors](#troubleshooting-common-validation-errors)
 
 ## Introduction
-The Configuration Validation system ensures the integrity and correctness of the audit system's configuration before initialization. This document details the validation pipeline, rules for each configuration section, error reporting mechanisms, and how validation failures prevent system startup. The system uses a custom validation framework with comprehensive rules for database URLs, retention periods, compliance settings, and integration credentials. While Zod is used elsewhere in the repository for API request validation, this configuration system implements its own schema-based validation approach.
+The Configuration Validation system ensures the integrity and correctness of the audit system's configuration before initialization. This document details the validation pipeline, rules for each configuration section, error reporting mechanisms, and how validation failures prevent system startup. The system uses a custom validation framework with comprehensive rules for database URLs, retention periods, compliance settings, integration credentials, plugin configurations, and GDPR pseudonymization settings. While Zod is used elsewhere in the repository for API request validation, this configuration system implements its own schema-based validation approach.
 
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts)
@@ -148,6 +159,11 @@ Compliance configuration validation ensures adherence to regulatory requirements
 - **required**: true
 - **type**: 'boolean'
 
+**:validationSchema['compliance.pseudonymizationStrategy']**
+- **required**: true
+- **type**: 'string'
+- **enum**: ['hash', 'token', 'encryption']
+
 **:validationSchema['compliance.reportingSchedule.enabled']**
 - **required**: true
 - **type**: 'boolean'
@@ -164,6 +180,7 @@ Compliance configuration validation ensures adherence to regulatory requirements
 
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts#L310-L340)
+- [types.ts](file://packages/audit/src/config/types.ts#L300-L350)
 
 ### Integration Credentials Rules
 Integration credentials validation ensures proper authentication and secure connections to external services.
@@ -198,6 +215,77 @@ Integration credentials validation ensures proper authentication and secure conn
 
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts#L100-L150)
+
+### Plugin Configuration Rules
+Plugin configuration validation ensures proper plugin setup and integration with the audit system.
+
+**:validationSchema['plugins.enabled']**
+- **required**: true
+- **type**: 'boolean'
+
+**:validationSchema['plugins.directory']**
+- **required**: true
+- **type**: 'string'
+- **custom**: Validates directory path exists and is accessible
+
+**:validationSchema['plugins.timeout']**
+- **required**: true
+- **type**: 'number'
+- **min**: 1000 (1 second)
+- **max**: 30000 (30 seconds)
+
+**:validationSchema['plugins.maxConcurrent']**
+- **required**: true
+- **type**: 'number'
+- **min**: 1
+- **max**: 50
+
+**:validationSchema['plugins.retryAttempts']**
+- **required**: true
+- **type**: 'number'
+- **min**: 0
+- **max**: 5
+
+**Section sources**
+- [validator.ts](file://packages/audit/src/config/validator.ts#L450-L480)
+- [types.ts](file://packages/audit/src/config/types.ts#L400-L450)
+
+### GDPR Pseudonymization Rules
+GDPR pseudonymization configuration validation ensures proper data privacy and compliance with GDPR requirements.
+
+**:validationSchema['compliance.pseudonymization.salt']**
+- **required**: true
+- **type**: 'string'
+- **min**: 32 characters
+
+**:validationSchema['compliance.pseudonymization.algorithm']**
+- **required**: true
+- **type**: 'string'
+- **enum**: ['SHA-256', 'SHA-512']
+
+**:validationSchema['compliance.pseudonymization.mappingStorage']**
+- **required**: true
+- **type**: 'string'
+- **enum**: ['database', 'encrypted-file']
+
+**:validationSchema['compliance.pseudonymization.mappingRetentionDays']**
+- **required**: true
+- **type**: 'number'
+- **min**: 1
+- **max**: 730 (2 years)
+
+**:validationSchema['compliance.pseudonymization.kms.enabled']**
+- **required**: true
+- **type**: 'boolean'
+
+**:validationSchema['compliance.pseudonymization.kms.keyId']**
+- **required**: true when kms.enabled is true
+- **type**: 'string'
+
+**Section sources**
+- [validator.ts](file://packages/audit/src/config/validator.ts#L500-L550)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L50-L100)
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L10-L50)
 
 ## Error Reporting and Startup Prevention
 
@@ -327,8 +415,47 @@ custom: (value) => {
 }
 ```
 
+**:validationSchema['plugins.directory']**
+```typescript
+custom: (value) => {
+	try {
+		const fs = require('fs')
+		if (!fs.existsSync(value)) {
+			return 'Plugin directory does not exist'
+		}
+		if (!fs.statSync(value).isDirectory()) {
+			return 'Plugin path must be a directory'
+		}
+		return true
+	} catch (error) {
+		return 'Error accessing plugin directory'
+	}
+}
+```
+
+**:validationSchema['compliance.pseudonymization.salt']**
+```typescript
+custom: (value) => {
+	if (typeof value !== 'string' || value.length < 32) {
+		return 'Pseudonymization salt must be at least 32 characters for cryptographic security'
+	}
+	return true
+}
+```
+
+**:validationSchema['compliance.pseudonymization.kms.keyId']**
+```typescript
+custom: (value, config) => {
+	if (config.compliance.pseudonymization.kms.enabled && (!value || value.trim() === '')) {
+		return 'KMS key ID is required when KMS encryption is enabled'
+	}
+	return true
+}
+```
+
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts#L130-L150)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L500-L550)
 
 ## Environment-Specific Rule Enforcement
 
@@ -372,6 +499,7 @@ The validation system applies different rules based on the environment configura
 - **retry.maxDelay ≥ retry.baseDelay**: Ensures retry delay progression is logical
 - **security.encryptionKey required when security.enableLogEncryption is true**: Prevents encryption without a key
 - **compliance.reportingSchedule.recipients not empty when reporting enabled**: Ensures reports have recipients
+- **compliance.pseudonymization.kms.keyId required when compliance.pseudonymization.kms.enabled is true**: Ensures KMS configuration is complete
 
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts#L555-L630)
@@ -416,6 +544,8 @@ The system masks sensitive information in logs and debugging output:
 - **Encryption keys**: Replaced with '***MASKED***'
 - **SMTP passwords**: Replaced with '***MASKED***'
 - **Webhook authorization headers**: Replaced with '***MASKED***'
+- **Pseudonymization salts**: Replaced with '***MASKED***'
+- **KMS credentials**: Replaced with '***MASKED***'
 
 The `sanitizeConfig()` method removes sensitive information from configuration objects before logging or debugging, while the `maskSensitiveUrl()` method specifically handles URL masking.
 
@@ -493,5 +623,26 @@ This approach ensures that only the relevant configuration changes are validated
 - **Solution**: Use redis:// for non-SSL or rediss:// for SSL connections
 - **Example**: `redis://localhost:6379` or `rediss://user:pass@redis.example.com:6379`
 
+**:Error: "Pseudonymization salt must be at least 32 characters for cryptographic security"**
+- **Cause**: Pseudonymization salt is too short
+- **Solution**: Provide a salt with at least 32 random characters
+- **Security Note**: Use a cryptographically secure random generator to create the salt
+
+**:Error: "KMS key ID is required when KMS encryption is enabled"**
+- **Cause**: KMS encryption is enabled but no key ID is provided
+- **Solution**: Specify a valid KMS key ID in the configuration
+- **Security Note**: Ensure the KMS service account has proper permissions to access the specified key
+
+**:Error: "Plugin directory does not exist"**
+- **Cause**: The specified plugin directory path does not exist
+- **Solution**: Create the directory or update the configuration to point to a valid path
+- **Example**: `plugins/directory: "./custom-plugins"` should point to an existing directory
+
+**:Error: "compliance.pseudonymization.strategy must be one of: hash, token, encryption"**
+- **Cause**: Invalid pseudonymization strategy specified
+- **Solution**: Use one of the supported strategies: 'hash', 'token', or 'encryption'
+- **Note**: 'hash' provides deterministic pseudonymization, 'token' provides random pseudonymization, and 'encryption' provides reversible pseudonymization
+
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts#L555-L630)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L500-L550)

@@ -3,25 +3,20 @@
 <cite>
 **Referenced Files in This Document**   
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
-- [types.ts](file://packages/audit/src/types.ts)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
-- [gdpr.tsx](file://apps/web/src/routes/dashboard/compliance/gdpr.tsx) - *Updated in recent commit*
-- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx) - *Updated in recent commit*
+- [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
-- [infisical-kms.ts](file://packages/infisical-kms/src/client.ts) - *KMS integration for pseudonymization*
+- [client.ts](file://packages/infisical-kms/src/client.ts) - *KMS integration for pseudonymization*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated GDPR compliance implementation with enhanced pseudonymization strategies and data retention policies
-- Added detailed information on compliance reporting workflows and template management
-- Enhanced security measures section with updated KMS integration details
-- Added new sections on compliance reporting and export workflows
-- Updated code examples and diagrams to reflect current implementation
-- Maintained existing structure while incorporating new compliance features
-- Added documentation for persistent pseudonym mapping storage and KMS encryption
+- Added comprehensive documentation for GDPR pseudonymization implementation including service architecture, strategies, and audit trails
+- Enhanced data minimization section with details on persistent pseudonym mapping storage and KMS encryption
+- Updated code examples to reflect current pseudonymization implementation with KMS integration
+- Added new section on pseudonymization strategies and their implementation
+- Updated sequence diagram to show KMS encryption in pseudonym mapping storage
+- Maintained existing structure while incorporating new pseudonymization features
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -48,31 +43,34 @@ sequenceDiagram
 participant User as "Data Subject"
 participant Admin as "Administrator"
 participant GDPRService as "GDPRComplianceService"
+participant KMS as "InfisicalKMS"
 participant DB as "Audit Database"
 Admin->>GDPRService : deleteUserDataWithAuditTrail(principalId)
 GDPRService->>DB : Query compliance-critical records
 DB-->>GDPRService : Return login, access, and GDPR action records
 GDPRService->>GDPRService : pseudonymizeUserData(principalId)
+GDPRService->>KMS : encrypt(originalId)
+KMS-->>GDPRService : Return encrypted originalId
+GDPRService->>DB : Store pseudonym mapping with encrypted originalId
 GDPRService->>DB : Update records with pseudonymized ID
 GDPRService->>DB : Delete non-compliance records
 GDPRService->>GDPRService : logGDPRActivity()
 GDPRService-->>Admin : Return deletion summary
-Note over GDPRService : Compliance records preserved<br/>via pseudonymization
+Note over GDPRService : Compliance records preserved<br/>via pseudonymization with<br/>KMS-encrypted mapping storage
 ```
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
 
 ### Data Minimization and Pseudonymization
-The system implements data minimization through pseudonymization strategies that replace personally identifiable information with artificial identifiers while maintaining referential integrity. The implementation now includes persistent storage of pseudonym mappings in an encrypted format using KMS integration.
+The system implements data minimization through pseudonymization strategies that replace personally identifiable information with artificial identifiers while maintaining referential integrity. The implementation includes persistent storage of pseudonym mappings in an encrypted format using KMS integration.
 
 ```mermaid
 classDiagram
 class GDPRComplianceService {
-+pseudonymMappings : Map<string, string>
 +pseudonymizeUserData(principalId, strategy)
-+getPseudonymMapping(originalId)
 +getOriginalId(pseudonymId)
++deleteUserDataWithAuditTrail()
 -generatePseudonymId(originalId, strategy)
 }
 class PseudonymizationMapping {
@@ -80,26 +78,66 @@ class PseudonymizationMapping {
 +pseudonymId : string
 +strategy : PseudonymizationStrategy
 +createdAt : string
-+context : string
 }
-class GDPRDataExportRequest {
-+principalId : string
-+organizationId : string
-+requestType : DataSubjectRightType
-+format : GDPRExportFormat
-+dateRange? : {start : string, end : string}
-+includeMetadata? : boolean
-+requestedBy : string
-+requestTimestamp : string
+class InfisicalKmsClient {
++encrypt(plaintext)
++decrypt(ciphertext)
++sign(data)
++verify(signature)
 }
-GDPRComplianceService --> PseudonymizationMapping : "creates"
-GDPRComplianceService --> GDPRDataExportRequest : "processes"
+class AuditDatabase {
++pseudonym_mapping table
++audit_log table
+}
+GDPRComplianceService --> InfisicalKmsClient : "uses for encryption"
+GDPRComplianceService --> AuditDatabase : "stores mappings"
+InfisicalKmsClient --> PseudonymizationMapping : "encrypts originalId"
+AuditDatabase --> PseudonymizationMapping : "contains"
 ```
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L643-L658)
 - [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [client.ts](file://packages/infisical-kms/src/client.ts)
+
+### Pseudonymization Strategies
+The system implements multiple pseudonymization strategies to accommodate different security and performance requirements.
+
+**Hash Strategy**: Uses SHA-256 hashing with salt to create deterministic pseudonyms. This strategy ensures the same original ID always produces the same pseudonym, enabling consistent referential integrity.
+
+```typescript
+private generatePseudonymId(originalId: string, strategy: PseudonymizationStrategy): string {
+  switch (strategy) {
+    case 'hash':
+      return `pseudo-${createHash('sha256')
+        .update(originalId + process.env.PSEUDONYM_SALT || 'default-salt')
+        .digest('hex')
+        .substring(0, 16)}`
+```
+
+**Token Strategy**: Generates random hexadecimal tokens for non-deterministic pseudonymization. This approach provides stronger privacy protection as it prevents reverse engineering through hash comparison.
+
+```typescript
+case 'token':
+  return `pseudo-${randomBytes(16).toString('hex')}`
+```
+
+**Encryption Strategy**: Uses KMS-managed encryption keys to encrypt original IDs. This strategy provides the highest security level and enables authorized reversal of pseudonymization when required for compliance investigations.
+
+```typescript
+case 'encryption':
+  const encryptedOriginalId = await this.kms.encrypt(principalId)
+  await this.db.insert(pseudonymMapping).values({
+    timestamp: new Date().toISOString(),
+    pseudonymId,
+    originalId: encryptedOriginalId.ciphertext,
+  })
+```
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L524-L572)
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L4-L25)
 
 ### Consent Tracking Implementation
 The system tracks consent through the `gdprContext` field in audit events, which captures legal basis, processing purpose, and data categories.
@@ -184,7 +222,7 @@ AuditLogEvent --> SessionContext : "contains"
 The system implements multiple security measures to protect data integrity and ensure secure access.
 
 ### Data Encryption and Integrity
-The system ensures data integrity through cryptographic hashing and provides options for data encryption in exports. The Infisical KMS integration uses RSASSA_PSS_SHA_256 as the default signing algorithm for enhanced security. Pseudonym mappings are now encrypted using KMS before storage.
+The system ensures data integrity through cryptographic hashing and provides options for data encryption in exports. The Infisical KMS integration uses RSASSA_PSS_SHA_256 as the default signing algorithm for enhanced security. Pseudonym mappings are encrypted using KMS before storage.
 
 ```mermaid
 flowchart TD
@@ -325,7 +363,7 @@ This section addresses common regulatory compliance challenges and their impleme
 ### Issue: Balancing Right to Erasure with Audit Requirements
 **Problem**: GDPR's right to erasure conflicts with regulatory requirements to maintain audit trails.
 
-**Solution**: The system implements pseudonymization of compliance-critical records while deleting non-essential personal data. Pseudonym mappings are now stored in a dedicated encrypted table with KMS integration.
+**Solution**: The system implements pseudonymization of compliance-critical records while deleting non-essential personal data. Pseudonym mappings are stored in a dedicated encrypted table with KMS integration.
 
 ```typescript
 async deleteUserDataWithAuditTrail(

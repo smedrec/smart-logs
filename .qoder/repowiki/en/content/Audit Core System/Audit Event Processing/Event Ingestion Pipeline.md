@@ -2,12 +2,24 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [types.ts](file://packages/audit/src/types.ts)
-- [validation.ts](file://packages/audit/src/validation.ts)
-- [audit.test.ts](file://packages/audit/src/__tests__/audit.test.ts)
+- [types.ts](file://packages/audit/src/types.ts) - *Updated in recent commit*
+- [validation.ts](file://packages/audit/src/validation.ts) - *Updated in recent commit*
+- [audit.test.ts](file://packages/audit/src/__tests__/audit.test.ts) - *Updated in recent commit*
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
 - [audit.md](file://apps/docs/src/content/docs/audit/audit.md)
+- [audit.ts](file://packages/audit/src/audit.ts) - *Updated in recent commit*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added in recent commit*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
 </cite>
+
+## Update Summary
+- Added comprehensive documentation for plugin architecture and middleware integration
+- Integrated GDPR pseudonymization and data export compliance features
+- Updated ingestion flow to include plugin hooks for authentication, storage, and processing extensions
+- Enhanced metadata enrichment process with GDPR-specific fields and pseudonymization capabilities
+- Added new sections on GDPR compliance workflows and data subject rights handling
+- Updated error handling to include GDPR-specific validation and compliance errors
+- Added best practices for GDPR-compliant event production and data handling
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -19,16 +31,19 @@
 7. [Validation Performance Considerations](#validation-performance-considerations)
 8. [Common Ingestion Issues and Solutions](#common-ingestion-issues-and-solutions)
 9. [Best Practices for Event Producers](#best-practices-for-event-producers)
-10. [Conclusion](#conclusion)
+10. [GDPR Compliance and Pseudonymization](#gdpr-compliance-and-pseudonymization)
+11. [Plugin Architecture](#plugin-architecture)
+12. [Conclusion](#conclusion)
 
 ## Introduction
 
 The Event Ingestion Pipeline is the core mechanism for capturing, validating, and processing audit events within the SMEDREC platform. It ensures that all system actions are securely logged with integrity, compliance, and reliability. This document details the complete lifecycle of an audit event from initial receipt through normalization, schema validation using Zod, metadata enrichment, and final queuing for downstream processing.
 
-The pipeline is designed to handle high-throughput scenarios while maintaining strict data integrity and security standards. It leverages cryptographic hashing, HMAC signatures, and comprehensive validation rules to ensure that only properly structured and authorized events are persisted.
+The pipeline is designed to handle high-throughput scenarios while maintaining strict data integrity and security standards. It leverages cryptographic hashing, HMAC signatures, and comprehensive validation rules to ensure that only properly structured and authorized events are persisted. Recent updates have integrated a comprehensive plugin architecture and enhanced GDPR compliance features including pseudonymization and data subject rights handling.
 
 **Section sources**
 - [audit.md](file://apps/docs/src/content/docs/audit/audit.md#L1-L100)
+- [audit.ts](file://packages/audit/src/audit.ts#L1-L50)
 
 ## Event Payload Structure
 
@@ -141,19 +156,24 @@ C --> D["Validation & Sanitization"]
 D --> E{"Validation Passed?"}
 E --> |Yes| F["Cryptographic Processing"]
 E --> |No| G["Structured Error Response"]
-F --> H["Queue Submission"]
-H --> I["BullMQ Redis Queue"]
-I --> J["Worker Processing"]
+F --> H["Plugin Processing"]
+H --> I["Queue Submission"]
+I --> J["BullMQ Redis Queue"]
+J --> K["Worker Processing"]
 style A fill:#f9f,stroke:#333
-style I fill:#bbf,stroke:#333
+style J fill:#bbf,stroke:#333
 ```
+
+The updated ingestion flow now includes a plugin processing stage that allows for middleware, storage, and authentication extensions. This plugin architecture enables extensibility for custom compliance requirements, additional security checks, and integration with external systems.
 
 **Diagram sources**
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md#L20-L100)
 - [validation.ts](file://packages/audit/src/validation.ts#L100-L200)
+- [audit.ts](file://packages/audit/src/audit.ts#L500-L600)
 
 **Section sources**
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md#L20-L100)
+- [audit.ts](file://packages/audit/src/audit.ts#L500-L600)
 
 ## Schema Validation with Zod
 
@@ -527,10 +547,156 @@ Comprehensive testing should include:
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md#L20-L200)
 - [audit.md](file://apps/docs/src/content/docs/audit/audit.md#L50-L100)
 
+## GDPR Compliance and Pseudonymization
+
+The Event Ingestion Pipeline now includes comprehensive GDPR compliance features to support data subject rights and privacy-by-design principles.
+
+### GDPR Data Subject Rights
+
+The system supports the following data subject rights:
+
+**:access**
+- Right to access personal data
+- Implemented through `exportUserData()` method
+
+**:rectification**
+- Right to correct inaccurate personal data
+- Implemented through pseudonymization and data update workflows
+
+**:erasure**
+- Right to be forgotten
+- Implemented through `deleteUserDataWithAuditTrail()` method
+
+**:portability**
+- Right to data portability
+- Implemented through multiple export formats (JSON, CSV, XML)
+
+**:restriction**
+- Right to restrict processing
+- Implemented through retention policy management
+
+### Pseudonymization Process
+
+The system implements pseudonymization to protect personal data while maintaining referential integrity:
+
+**:pseudonymizeUserData()**
+- Replaces identifiable information with pseudonyms
+- Maintains mapping for authorized access
+- Uses cryptographic hashing or tokenization
+- Preserves audit trail for compliance purposes
+
+**:generatePseudonymId()**
+- Supports multiple strategies: hash, token, encryption
+- Deterministic hashing for consistent pseudonym generation
+- Random tokenization for enhanced privacy
+
+### Data Export Process
+
+The GDPR data export process ensures compliance with Article 20:
+
+**:exportUserData()**
+- Supports JSON, CSV, and XML formats
+- Includes metadata about data categories and retention policies
+- Sanitizes sensitive system fields before export
+- Logs all export requests for audit trail
+
+**:formatExportData()**
+- Converts audit logs to requested format
+- Handles large datasets efficiently
+- Includes compliance metadata in export
+
+### Retention Policy Management
+
+The system automatically applies data retention policies:
+
+**:applyRetentionPolicies()**
+- Identifies records eligible for archival or deletion
+- Applies policies based on data classification
+- Maintains compliance audit trails
+- Supports both automatic and manual policy application
+
+**:isEligibleForArchival()**
+- Determines if data should be archived based on age
+- Considers both creation date and policy rules
+- Prevents premature archival of active data
+
+**:isEligibleForDeletion()**
+- Determines if data should be deleted based on retention rules
+- Ensures compliance with legal requirements
+- Preserves critical audit records
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L1-L100)
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L1-L100)
+
+## Plugin Architecture
+
+The Event Ingestion Pipeline now supports a comprehensive plugin architecture for extensibility.
+
+### Plugin Types
+
+**:middleware**
+- Authentication and authorization plugins
+- Rate limiting and security checks
+- Request transformation and enrichment
+
+**:storage**
+- Custom storage backends (S3, GCS, etc.)
+- Data archival and retention plugins
+- Backup and disaster recovery extensions
+
+**:auth**
+- Integration with external identity providers
+- Multi-factor authentication support
+- Role-based access control extensions
+
+### Plugin Integration Points
+
+**:preValidation**
+- Executed before schema validation
+- Can modify event structure
+- Can reject events based on custom rules
+
+**:postValidation**
+- Executed after successful validation
+- Can enrich validated events
+- Can trigger external workflows
+
+**:preQueue**
+- Final processing before queuing
+- Can apply cryptographic operations
+- Can implement custom routing
+
+**:postQueue**
+- Executed after successful queuing
+- Can trigger notifications
+- Can update external systems
+
+### Plugin Development
+
+Plugins are implemented as separate modules that integrate with the core pipeline:
+
+```typescript
+interface AuditPlugin {
+  name: string
+  version: string
+  initialize(config: any): Promise<void>
+  preValidation?(event: AuditLogEvent): Promise<AuditLogEvent | null>
+  postValidation?(event: AuditLogEvent): Promise<AuditLogEvent>
+  preQueue?(event: AuditLogEvent): Promise<AuditLogEvent>
+  postQueue?(event: AuditLogEvent, jobId: string): Promise<void>
+}
+```
+
+Plugins can be registered through configuration or dynamically at runtime, enabling flexible extension of the audit system's capabilities.
+
+**Section sources**
+- [audit.ts](file://packages/audit/src/audit.ts#L1000-L1200)
+
 ## Conclusion
 
 The Event Ingestion Pipeline provides a robust, secure, and efficient mechanism for capturing audit events in the SMEDREC platform. By enforcing strict schema validation, providing comprehensive error handling, and supporting cryptographic integrity verification, it ensures that audit logs are reliable and compliant with regulatory requirements.
 
-The pipeline's design balances thorough validation with performance considerations, making it suitable for high-throughput scenarios while maintaining data integrity. Client applications should implement proper validation and error handling to minimize ingestion failures and optimize system performance.
+Recent updates have enhanced the pipeline with a comprehensive plugin architecture and advanced GDPR compliance features including pseudonymization, data subject rights handling, and automated retention policy management. The pipeline's design balances thorough validation with performance considerations, making it suitable for high-throughput scenarios while maintaining data integrity.
 
-By following the best practices outlined in this document, developers can ensure smooth integration with the audit system and maintain the highest standards of security and compliance in their applications.
+Client applications should implement proper validation and error handling to minimize ingestion failures and optimize system performance. By following the best practices outlined in this document, developers can ensure smooth integration with the audit system and maintain the highest standards of security and compliance in their applications.

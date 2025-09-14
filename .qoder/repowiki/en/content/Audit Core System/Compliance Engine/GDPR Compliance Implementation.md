@@ -2,10 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated with pseudonym mapping and KMS integration*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated with enhanced compliance utilities*
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added pseudonym mapping table*
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
+- [infisical-kms](file://packages/infisical-kms) - *Added for secure pseudonym mapping storage*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated pseudonymization implementation to use secure database storage with KMS encryption
+- Added detailed documentation for pseudonym mapping lifecycle and re-identification controls
+- Enhanced audit trail integration with new compliance-critical actions
+- Updated code examples to reflect secure pseudonym mapping storage
+- Added information about Infisical KMS integration for pseudonym mapping protection
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -20,7 +30,7 @@
 ## Introduction
 The GDPR Compliance Implementation provides a comprehensive framework for handling data subject rights within the audit logging system. This implementation ensures compliance with key GDPR articles including the right to access (Article 15), right to erasure (Article 17), right to rectification (Article 16), and right to data portability (Article 20). The system is built around two core components: the GDPRComplianceService for handling compliance operations and GDPRUtils for providing utility functions for data protection.
 
-The implementation follows privacy-by-design principles, ensuring that personal data is properly identified, tagged, and processed while maintaining the integrity of audit trails. All compliance actions are themselves audited, creating a transparent and verifiable compliance process.
+The implementation follows privacy-by-design principles, ensuring that personal data is properly identified, tagged, and processed while maintaining the integrity of audit trails. All compliance actions are themselves audited, creating a transparent and verifiable compliance process. Recent updates have enhanced the pseudonymization system with secure database storage and KMS encryption for pseudonym mappings.
 
 ## Core Components
 
@@ -66,19 +76,35 @@ class Audit {
 +verifyEventSignature(event, signature) boolean
 +closeConnection() Promise~void~
 }
+class InfisicalKmsClient {
++encrypt(plaintext) Promise~EncryptResponse~
++decrypt(ciphertext) Promise~DecryptResponse~
++sign(data, algorithm) Promise~SignResponse~
++verify(data, signature, algorithm) Promise~VerifyResponse~
+}
+class pseudonym_mapping {
++id : serial
++timestamp : timestamp with time zone
++pseudonym_id : text
++original_id : text
+}
 GDPRComplianceService --> Audit : "uses for logging"
 GDPRComplianceService --> GDPRUtils : "uses for utilities"
+GDPRComplianceService --> InfisicalKmsClient : "uses for encryption"
+GDPRComplianceService --> pseudonym_mapping : "stores mappings"
 GDPRUtils --> "crypto" : "uses for hashing"
 ```
 
 **Diagram sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
-- [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [infisical-kms](file://packages/infisical-kms)
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
 
 ## Data Subject Rights Implementation
 
@@ -342,7 +368,42 @@ The system uses several irreversible transformation methods to ensure data canno
 2. **Random token generation**: Cryptographically secure random tokens provide strong privacy protection.
 3. **Data truncation**: Sensitive data is truncated when stored in certain contexts to minimize exposure.
 
-The pseudonymization mappings are stored in memory within the GDPRComplianceService, with methods to retrieve both the pseudonym for a given original ID and the original ID for a given pseudonym (for authorized compliance investigations).
+The pseudonymization mappings are now securely stored in the database with KMS encryption, replacing the previous in-memory storage approach. The `pseudonym_mapping` table stores the relationship between original IDs and pseudonym IDs with the following schema:
+
+```sql
+CREATE TABLE "pseudonym_mapping" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"timestamp" timestamp with time zone NOT NULL,
+	"pseudonym_id" text NOT NULL,
+	"original_id" text NOT NULL
+);
+```
+
+The `getOriginalId` method has been updated to retrieve and decrypt the original ID from the secure storage:
+
+```typescript
+async getOriginalId(pseudonymId: string): Promise<string | undefined> {
+    const mapping = await this.db
+        .select()
+        .from(pseudonymMapping)
+        .where(eq(pseudonymMapping.pseudonymId, pseudonymId))
+    if (mapping.length > 0) {
+        const encryptedOrigialId = mapping[0].originalId
+        try {
+            const decryptedOriginalId = await this.kms.decrypt(encryptedOrigialId)
+            return decryptedOriginalId.plaintext
+        } catch (error) {
+            console.error('Error decrypting pseudonym mapping:', error)
+            return undefined
+        }
+    }
+
+    console.error('No pseudonym mapping found for ID:', pseudonymId)
+    return undefined
+}
+```
+
+This implementation ensures that pseudonym mappings are protected with enterprise-grade encryption while still allowing authorized access for compliance investigations.
 
 ```mermaid
 flowchart TD
@@ -353,7 +414,8 @@ Strategy --> |Encryption| Encrypt[Apply encryption]
 Hash --> Format["Format as pseudo-{hash}"]
 Token --> Format
 Encrypt --> Format
-Format --> Store["Store mapping in memory"]
+Format --> EncryptKMS["Encrypt original ID with KMS"]
+EncryptKMS --> Store["Store mapping in database"]
 Store --> Return["Return pseudonym ID"]
 Return --> End([Pseudonymized ID])
 style Start fill:#f9f,stroke:#333
@@ -362,17 +424,20 @@ style Hash fill:#bbf,stroke:#333
 style Token fill:#bbf,stroke:#333
 style Encrypt fill:#bbf,stroke:#333
 style Format fill:#ffcc00,stroke:#333
+style EncryptKMS fill:#ff9900,stroke:#333
 style Store fill:#9f9,stroke:#333
 style Return fill:#9f9,stroke:#333
 ```
 
 **Diagram sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [infisical-kms](file://packages/infisical-kms)
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [infisical-kms](file://packages/infisical-kms)
 
 ## Data Minimization and Storage Limitation
 
@@ -640,6 +705,7 @@ When configuring GDPR rules, follow these best practices:
 2. **Configure pseudonymization salt**: Set a strong, secret salt value in the PSEUDONYM_SALT environment variable
 3. **Define compliance-critical actions**: Customize the list of actions that should be preserved during data deletion
 4. **Set up monitoring**: Implement alerts for GDPR compliance actions to detect potential abuse
+5. **Secure pseudonym mappings**: Ensure the Infisical KMS integration is properly configured with secure access controls
 
 ### Validating Compliance Workflows
 To validate compliance workflows:
@@ -648,10 +714,12 @@ To validate compliance workflows:
 2. **Test data deletion**: Verify that personal data is properly deleted while compliance records are preserved
 3. **Test pseudonymization**: Verify that pseudonymized data maintains referential integrity and cannot be easily reversed
 4. **Audit trail verification**: Verify that all compliance actions are properly recorded in the audit system
-5. **Performance testing**: Ensure that compliance operations perform well even with large datasets
+5. **Re-identification testing**: Verify that authorized re-identification works correctly through the `getOriginalId` method
+6. **Performance testing**: Ensure that compliance operations perform well even with large datasets
 
 Regular testing and validation are essential to maintain GDPR compliance and ensure that the system functions correctly when real data subject requests are received.
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+- [infisical-kms](file://packages/infisical-kms)

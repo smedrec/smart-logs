@@ -9,6 +9,8 @@
 - [event-categorization.ts](file://packages\audit\src\event\event-categorization.ts) - *Updated in recent commit*
 - [validation.ts](file://packages\audit\src\validation.ts) - *Updated in recent commit*
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts) - *Updated in recent commit*
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Added in recent commit*
+- [PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md) - *Added in recent commit*
 </cite>
 
 ## Update Summary
@@ -19,6 +21,8 @@
 - Expanded real-world usage example with multi-organizational alert isolation
 - Updated error handling section with new circuit breaker and dead letter queue metrics
 - Added best practices for compliance validation and event enrichment
+- Integrated plugin architecture documentation for middleware, storage, and authentication extensions
+- Added comprehensive GDPR pseudonymization implementation details
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -28,6 +32,8 @@
 5. [Real-World Usage Example](#real-world-usage-example)
 6. [Error Handling and Performance](#error-handling-and-performance)
 7. [Best Practices](#best-practices)
+8. [Plugin Architecture](#plugin-architecture)
+9. [GDPR Compliance and Pseudonymization](#gdpr-compliance-and-pseudonymization)
 
 ## Introduction
 The Audit Event Processing subsystem is responsible for capturing, validating, categorizing, and persisting audit events across the system. It ensures data integrity, supports compliance requirements, and enables monitoring and alerting. This document details the architecture, domain model, processing pipeline, and best practices for working with audit events.
@@ -495,3 +501,153 @@ The health score is calculated based on multiple factors:
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 - [validation.ts](file://packages\audit\src\validation.ts#L1-L866)
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L537)
+
+## Plugin Architecture
+The Audit Client Library includes a comprehensive plugin architecture that allows developers to extend functionality through custom middleware, storage backends, and authentication methods.
+
+### Core Concepts
+
+#### Plugin Interface
+All plugins must implement the base `Plugin` interface:
+
+```typescript
+interface Plugin {
+	readonly name: string
+	readonly version: string
+	readonly description?: string
+	readonly dependencies?: string[]
+	readonly configSchema?: Record<string, any>
+
+	initialize(config: any, context: PluginContext): Promise<void> | void
+	destroy?(): Promise<void> | void
+	validateConfig?(config: any): ValidationResult
+}
+```
+
+#### Plugin Types
+- **Middleware Plugins**: Process requests and responses
+- **Storage Plugins**: Custom cache storage backends
+- **Authentication Plugins**: Custom authentication methods
+
+### Built-in Plugins
+
+#### Middleware Plugins
+- **Request Logging Plugin**: Logs all HTTP requests and responses
+- **Correlation ID Plugin**: Adds correlation IDs for distributed tracing
+- **Rate Limiting Plugin**: Client-side rate limiting for API requests
+
+#### Storage Plugins
+- **Redis Storage Plugin**: Redis-based cache storage for distributed caching
+- **IndexedDB Storage Plugin**: Browser-based IndexedDB storage for client-side caching
+
+#### Authentication Plugins
+- **JWT Authentication Plugin**: JWT-based authentication with automatic token refresh
+- **OAuth2 Authentication Plugin**: OAuth2 client credentials flow authentication
+- **Custom Header Authentication Plugin**: Custom header-based authentication
+
+### Plugin Configuration
+Plugins can be configured through the client configuration:
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.example.com',
+	plugins: {
+		enabled: true,
+		middleware: {
+			enabled: true,
+			plugins: ['request-logging', 'correlation-id'],
+		},
+		storage: {
+			enabled: true,
+			defaultPlugin: 'redis-storage',
+			plugins: {
+				'redis-storage': {
+					host: 'localhost',
+					port: 6379,
+				},
+			},
+		},
+		auth: {
+			enabled: true,
+			defaultPlugin: 'jwt-auth',
+			plugins: {
+				'jwt-auth': {
+					token: 'your-token',
+				},
+			},
+		},
+	},
+})
+```
+
+**Section sources**   
+- [PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md#L1-L631)
+- [client.ts](file://packages\audit-client\src\core\client.ts#L31-L75)
+
+## GDPR Compliance and Pseudonymization
+The system provides comprehensive GDPR compliance features including data export, pseudonymization, and retention policy management.
+
+### GDPR Data Export
+The system supports exporting user audit data in portable formats (JSON, CSV, XML) to fulfill data subject rights requests:
+
+```typescript
+async exportUserData(request: GDPRDataExportRequest): Promise<GDPRDataExport> {
+	// Implementation details
+}
+```
+
+Supported export formats:
+- **JSON**: Standard JSON format with metadata
+- **CSV**: Comma-separated values format
+- **XML**: XML format with proper escaping
+
+### Pseudonymization Implementation
+The system implements GDPR Article 17 - Right to erasure with audit trail preservation through pseudonymization:
+
+```typescript
+async pseudonymizeUserData(
+	principalId: string,
+	strategy: PseudonymizationStrategy = 'hash',
+	requestedBy: string
+): Promise<{ pseudonymId: string; recordsAffected: number }> {
+	// Implementation details
+}
+```
+
+Pseudonymization strategies:
+- **Hash**: SHA-256 hashing with salt
+- **Token**: Random token generation
+- **Encryption**: Encrypted pseudonym ID
+
+### Data Retention Policies
+The system applies data retention policies with automatic archival and deletion:
+
+```typescript
+async applyRetentionPolicies(): Promise<ArchivalResult[]> {
+	// Implementation details
+}
+```
+
+Retention policy configuration includes:
+- **Retention days**: How long to retain data
+- **Archive after days**: When to move to archival storage
+- **Delete after days**: When to permanently delete data
+
+### Right to be Forgotten
+The system implements GDPR-compliant deletion with audit trail preservation:
+
+```typescript
+async deleteUserDataWithAuditTrail(
+	principalId: string,
+	requestedBy: string,
+	preserveComplianceAudits: boolean = true
+): Promise<{ recordsDeleted: number; complianceRecordsPreserved: number }> {
+	// Implementation details
+}
+```
+
+Compliance-critical audit records (login attempts, data exports, etc.) are preserved through pseudonymization rather than deletion.
+
+**Section sources**   
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L1-L698)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L783-L828)

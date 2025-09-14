@@ -14,6 +14,8 @@
 - [audit.md](file://apps/docs/src/content/docs/audit/audit.md)
 - [examples.md](file://apps/docs/src/content/docs/audit/examples.md)
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added in recent commit*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
 </cite>
 
 ## Update Summary
@@ -23,9 +25,13 @@
 - Enhanced the Audit Event Structure section to include the new algorithm field
 - Updated Usage Examples to demonstrate the new signature generation method
 - Modified the Cryptographic Security diagram to reflect the updated interface
+- Added new section on GDPR Compliance and Pseudonymization
+- Added new section on Plugin Architecture
+- Updated Core Components diagram to include plugin system
 
 **List of new sections added**
-- None
+- GDPR Compliance and Pseudonymization
+- Plugin Architecture
 
 **List of deprecated/removed sections**
 - None
@@ -33,6 +39,7 @@
 **Source tracking system updates and new source files**
 - Added annotations to updated files in referenced files list
 - Updated section sources to reflect changes in crypto.ts, audit.ts, and types.ts
+- Added new source files for GDPR compliance and plugin architecture
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -47,6 +54,8 @@
 10. [Integration Patterns](#integration-patterns)
 11. [Usage Examples](#usage-examples)
 12. [Performance and Scalability](#performance-and-scalability)
+13. [GDPR Compliance and Pseudonymization](#gdpr-compliance-and-pseudonymization)
+14. [Plugin Architecture](#plugin-architecture)
 
 ## Introduction
 
@@ -70,15 +79,23 @@ A --> C[Validation Service]
 A --> D[Crypto Service]
 A --> E[Reliable Processor]
 A --> F[Event Categorization]
-B --> G[File Storage]
-B --> H[S3 Storage]
-C --> I[Validation Rules]
-D --> J[SHA-256 Hashing]
-D --> K[HMAC-SHA256 Signatures]
-E --> L[BullMQ Queue]
-E --> M[Redis]
-E --> N[Circuit Breaker]
-E --> O[Dead Letter Queue]
+A --> G[Plugin System]
+A --> H[GDPR Compliance]
+B --> I[File Storage]
+B --> J[S3 Storage]
+C --> K[Validation Rules]
+D --> L[SHA-256 Hashing]
+D --> M[HMAC-SHA256 Signatures]
+E --> N[BullMQ Queue]
+E --> O[Redis]
+E --> P[Circuit Breaker]
+E --> Q[Dead Letter Queue]
+G --> R[Middleware Plugins]
+G --> S[Storage Plugins]
+G --> T[Auth Plugins]
+H --> U[Data Pseudonymization]
+H --> V[Retention Policies]
+H --> W[Data Export]
 ```
 
 **Diagram sources**
@@ -87,6 +104,7 @@ E --> O[Dead Letter Queue]
 - [validation.ts](file://packages/audit/src/validation.ts)
 - [crypto.ts](file://packages/audit/src/crypto.ts)
 - [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
+- [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 
 **Section sources**
 - [audit.ts](file://packages/audit/src/audit.ts)
@@ -601,3 +619,178 @@ The system's performance can be monitored through various metrics, including pro
 - [audit.ts](file://packages/audit/src/audit.ts)
 - [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
 - [config/types.ts](file://packages/audit/src/config/types.ts)
+
+## GDPR Compliance and Pseudonymization
+
+The Audit Core System includes comprehensive GDPR compliance features to support data subject rights and privacy-by-design principles. The `GDPRComplianceService` class implements these features, providing data export, pseudonymization, retention policies, and right to be forgotten functionality.
+
+```mermaid
+classDiagram
+class GDPRComplianceService {
+-db : PostgresJsDatabase
+-client : EnhancedAuditDatabaseClient
+-audit : Audit
+-kms : InfisicalKmsClient
++exportUserData(request : GDPRDataExportRequest) : Promise~GDPRDataExport~
++pseudonymizeUserData(principalId : string, strategy? : PseudonymizationStrategy, requestedBy : string) : Promise~{ pseudonymId : string; recordsAffected : number }~
++applyRetentionPolicies() : Promise~ArchivalResult[]~
++deleteUserDataWithAuditTrail(principalId : string, requestedBy : string, preserveComplianceAudits : boolean) : Promise~{ recordsDeleted : number; complianceRecordsPreserved : number }~
++getOriginalId(pseudonymId : string) : Promise~string | undefined~
++generateRequestId() : string
++generatePseudonymId(originalId : string, strategy : PseudonymizationStrategy) : string
++formatExportData(auditLogs : any[], format : GDPRExportFormat, includeMetadata? : boolean) : Promise~Buffer~
++generateCSVExport(auditLogs : any[]) : Buffer
++generateXMLExport(exportData : any) : Buffer
++objectToXML(obj : any, rootName : string) : string
++logGDPRActivity(event : AuditLogEvent) : Promise~void~
+}
+class GDPRDataExportRequest {
++principalId : string
++organizationId : string
++requestType : DataSubjectRightType
++format : GDPRExportFormat
++dateRange? : { start : string; end : string }
++includeMetadata? : boolean
++requestedBy : string
++requestTimestamp : string
+}
+class GDPRDataExport {
++requestId : string
++principalId : string
++organizationId : string
++exportTimestamp : string
++format : GDPRExportFormat
++recordCount : number
++dataSize : number
++data : Buffer
++metadata : { dateRange : { start : string; end : string }; categories : string[]; retentionPolicies : string[]; exportedBy : string }
+}
+class PseudonymizationMapping {
++originalId : string
++pseudonymId : string
++strategy : PseudonymizationStrategy
++createdAt : string
++context : string
+}
+class RetentionPolicy {
++policyName : string
++dataClassification : DataClassification
++retentionDays : number
++archiveAfterDays? : number
++deleteAfterDays? : number
++isActive : boolean
+}
+class ArchivalResult {
++recordsArchived : number
++recordsDeleted : number
++archivedAt : string
++policy : string
++summary : { byClassification : Record~string, number~; byAction : Record~string, number~; dateRange : { start : string; end : string } }
+}
+GDPRComplianceService --> GDPRDataExportRequest
+GDPRComplianceService --> GDPRDataExport
+GDPRComplianceService --> PseudonymizationMapping
+GDPRComplianceService --> RetentionPolicy
+GDPRComplianceService --> ArchivalResult
+```
+
+**Diagram sources**
+- [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+- [gdpr/gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+
+Key GDPR compliance features include:
+
+- **Data Export**: Implements GDPR Article 20 (Right to data portability) with support for JSON, CSV, and XML formats
+- **Pseudonymization**: Implements GDPR Article 17 (Right to erasure) with referential integrity preservation using hash, token, or encryption strategies
+- **Retention Policies**: Automated application of data retention policies with archival and deletion based on classification and age
+- **Right to be Forgotten**: Deletion of user data while preserving compliance-critical audit trails through pseudonymization
+- **Reverse Mapping**: Authorized access to original identifiers for compliance investigations
+
+The system uses Infisical KMS for secure storage of pseudonymization mappings, ensuring that original identifiers are encrypted and only accessible through proper authorization. The `pseudonymizeUserData` method replaces all instances of a principal ID with a deterministic pseudonym, maintaining referential integrity across audit records while protecting personal data.
+
+**Section sources**
+- [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+- [gdpr/gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+- [config/types.ts](file://packages/audit/src/config/types.ts)
+
+## Plugin Architecture
+
+The Audit Core System supports a flexible plugin architecture that allows for extensibility through middleware, storage, and authentication plugins. This architecture enables customization of the audit system behavior without modifying the core implementation.
+
+```mermaid
+classDiagram
+class Audit {
+-config : AuditConfig
+-connection : RedisType
+-queueName : string
+-bullmq_queue : Queue~AuditLogEvent~
+-isSharedConnection : boolean
+-cryptoService : CryptoService
+-logger : Logger
+-presetsService : DatabasePresetHandler
++log(eventDetails : Omit~AuditLogEvent, 'timestamp'~) : Promise~void~
++logWithEnhancements(eventDetails : Omit~AuditLogEvent, 'timestamp'~) : Promise~void~
++logFHIR(details : { principalId : string; action : string; resourceType : string; resourceId : string; status : 'attempt' | 'success' | 'failure'; outcomeDescription? : string; organizationId? : string; sessionContext? : any; fhirContext? : { version? : string; interaction? : string; compartment? : string } }) : Promise~void~
++logAuth(details : { principalId? : string; organizationId? : string; action : 'login' | 'logout' | 'password_change' | 'mfa_enable' | 'mfa_disable' | 'account' | 'session' | 'permission'; status : 'attempt' | 'success' | 'failure'; sessionContext? : any; reason? : string }) : Promise~void~
++logSystem(details : { action : string; status : 'attempt' | 'success' | 'failure'; component? : string; outcomeDescription? : string; systemContext? : any }) : Promise~void~
++logData(details : { principalId : string; organizationId? : string; action : 'create' | 'read' | 'update' | 'delete' | 'export' | 'import' | 'pseudonymize'; resourceType : string; resourceId : string; status : 'attempt' | 'success' | 'failure'; dataClassification? : 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'; changes? : any; outcomeDescription? : string; exportResult? : any; metadata? : any }) : Promise~void~
+}
+class Plugin {
++name : string
++version : string
++description : string
++initialize(audit : Audit) : void
++shutdown() : void
+}
+class MiddlewarePlugin {
+<<interface>>
++beforeLog(event : AuditLogEvent) : Promise~AuditLogEvent~
++afterLog(event : AuditLogEvent, result : any) : Promise~void~
+}
+class StoragePlugin {
+<<interface>>
++store(event : AuditLogEvent) : Promise~void~
++retrieve(query : any) : Promise~AuditLogEvent[]~
+}
+class AuthPlugin {
+<<interface>>
++authenticate(event : AuditLogEvent) : Promise~boolean~
++authorize(event : AuditLogEvent, action : string) : Promise~boolean~
+}
+class CustomEnrichmentPlugin {
++beforeLog(event : AuditLogEvent) : Promise~AuditLogEvent~
+}
+class CompliancePlugin {
++beforeLog(event : AuditLogEvent) : Promise~AuditLogEvent~
+}
+Audit --> Plugin : uses
+Plugin --> MiddlewarePlugin : implements
+Plugin --> StoragePlugin : implements
+Plugin --> AuthPlugin : implements
+CustomEnrichmentPlugin --> MiddlewarePlugin : implements
+CompliancePlugin --> MiddlewarePlugin : implements
+```
+
+**Diagram sources**
+- [audit.ts](file://packages/audit/src/audit.ts)
+- [config/types.ts](file://packages/audit/src/config/types.ts)
+
+The plugin system supports three main plugin types:
+
+- **Middleware Plugins**: Intercept audit events before and after logging to modify event data or trigger additional actions
+- **Storage Plugins**: Provide alternative storage backends for audit events beyond the default Redis and database storage
+- **Authentication Plugins**: Implement custom authentication and authorization logic for audit operations
+
+The system includes several built-in plugin implementations:
+
+- **Custom Enrichment Plugin**: Adds organization-specific metadata to audit events based on configuration
+- **Compliance Plugin**: Enforces additional compliance rules based on regulatory requirements
+- **Anomaly Detection Plugin**: Analyzes event patterns to detect suspicious activity
+- **External Notification Plugin**: Sends audit events to external monitoring systems
+
+Plugins are configured through the `AuditConfig` object and can be dynamically loaded at runtime. The plugin system follows the Open/Closed Principle, allowing new functionality to be added without modifying existing code.
+
+**Section sources**
+- [audit.ts](file://packages/audit/src/audit.ts)
+- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [config/manager.ts](file://packages/audit/src/config/manager.ts)

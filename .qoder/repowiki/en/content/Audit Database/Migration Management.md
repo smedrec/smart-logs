@@ -13,6 +13,7 @@
 - [setup-partitions.ts](file://packages/audit-db/src/db/setup-partitions.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Implements pseudonymization logic*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added GDPR utility functions*
 </cite>
 
 ## Update Summary

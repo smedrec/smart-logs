@@ -20,6 +20,7 @@
 - Enhanced retention policies and GDPR compliance features with new implementation details
 - Updated sample JSON representations with current event types
 - Added comprehensive archival system and data lifecycle management
+- Integrated plugin architecture and advanced GDPR pseudonymization strategies
 
 ## Table of Contents
 1. [Introduction](#introduction)
