@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from 'crypto'
 import { and, eq, gte, isNotNull, lte, sql } from 'drizzle-orm'
 
-import { auditLog, auditRetentionPolicy } from '@repo/audit-db'
+import { auditLog, auditRetentionPolicy, pseudonymMapping } from '@repo/audit-db'
 import * as auditSchema from '@repo/audit-db/dist/db/schema.js'
+import { InfisicalKmsClient } from '@repo/infisical-kms'
 
 import { Audit } from '../audit.js'
 
@@ -117,12 +118,12 @@ export interface ArchivalResult {
  * Requirements: 4.1, 4.2, 4.3, 4.4
  */
 export class GDPRComplianceService {
-	private pseudonymMappings = new Map<string, string>()
 	private db: PostgresJsDatabase<typeof auditSchema>
 
 	constructor(
 		private client: EnhancedAuditDatabaseClient,
-		private audit: Audit
+		private audit: Audit,
+		private kms: InfisicalKmsClient
 	) {
 		this.db = this.client.getDatabase()
 	}
@@ -233,7 +234,14 @@ export class GDPRComplianceService {
 		const pseudonymId = this.generatePseudonymId(principalId, strategy)
 
 		// Store mapping for referential integrity
-		this.pseudonymMappings.set(principalId, pseudonymId)
+		//this.pseudonymMappings.set(principalId, pseudonymId)
+		// TODO: process possible errors
+		const encryptedOriginalId = await this.kms.encrypt(principalId)
+		await this.db.insert(pseudonymMapping).values({
+			timestamp: new Date().toISOString(),
+			pseudonymId,
+			originalId: encryptedOriginalId.ciphertext,
+		})
 
 		// Update audit logs with pseudonymized ID
 		const updateResult = await this.db
@@ -502,21 +510,24 @@ export class GDPRComplianceService {
 	}
 
 	/**
-	 * Get pseudonym mapping for referential integrity
-	 */
-	getPseudonymMapping(originalId: string): string | undefined {
-		return this.pseudonymMappings.get(originalId)
-	}
-
-	/**
 	 * Reverse pseudonym mapping (for authorized compliance investigations)
 	 */
-	getOriginalId(pseudonymId: string): string | undefined {
-		for (const [original, pseudonym] of this.pseudonymMappings.entries()) {
-			if (pseudonym === pseudonymId) {
-				return original
+	async getOriginalId(pseudonymId: string): Promise<string | undefined> {
+		const mapping = await this.db
+			.select()
+			.from(pseudonymMapping)
+			.where(eq(pseudonymMapping.pseudonymId, pseudonymId))
+		if (mapping.length > 0) {
+			const encryptedOrigialId = mapping[0].originalId
+			try {
+				const decryptedOriginalId = await this.kms.decrypt(encryptedOrigialId)
+				return decryptedOriginalId.plaintext
+			} catch (error) {
+				console.error('Error decrypting pseudonym mapping:', error)
+				return undefined
 			}
 		}
+
 		return undefined
 	}
 

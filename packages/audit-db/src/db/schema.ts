@@ -641,6 +641,23 @@ export const configChangeEvent = pgTable(
 	}
 )
 
+export const pseudonymMapping = pgTable(
+	'pseudonym_mapping',
+	{
+		id: serial('id').primaryKey(),
+		timestamp: timestamp('timestamp', { withTimezone: true, mode: 'string' }).notNull(),
+		pseudonymId: text('pseudonym_id').notNull(),
+		originalId: text('original_id').notNull(),
+	},
+	(table) => {
+		return [
+			index('pseudonym_mapping_timestamp_idx').on(table.timestamp),
+			index('pseudonym_mapping_pseudonym_id_idx').on(table.pseudonymId),
+			index('pseudonym_mapping_original_id_idx').on(table.originalId),
+		]
+	}
+)
+
 // Add foreign key reference from scheduled_reports to report_templates
 // Note: This creates a soft reference since templateId is nullable
 
