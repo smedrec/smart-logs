@@ -528,6 +528,7 @@ export class GDPRComplianceService {
 			}
 		}
 
+		console.error('No pseudonym mapping found for ID:', pseudonymId)
 		return undefined
 	}
 
