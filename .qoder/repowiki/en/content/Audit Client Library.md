@@ -11,7 +11,21 @@
 - [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts)
 - [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts)
 - [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts)
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts)
+- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md)
+- [FRAMEWORK_INTEGRATION.md](file://packages/audit-client/docs/FRAMEWORK_INTEGRATION.md)
+- [plugin-usage.ts](file://packages/audit-client/src/examples/plugin-usage.ts)
 </cite>
+
+## Update Summary
+- Added comprehensive documentation for the plugin architecture system
+- Added framework integration examples for Express.js and Next.js
+- Updated architecture overview to include plugin system
+- Enhanced practical examples with plugin usage
+- Added new sections for plugin development and framework integration
+- Updated configuration management section to include plugin configuration
+- Added troubleshooting guidance for plugin-related issues
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -20,10 +34,12 @@
 4. [API Interfaces](#api-interfaces)
 5. [Configuration Management](#configuration-management)
 6. [Integration Patterns](#integration-patterns)
-7. [Practical Examples](#practical-examples)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Performance Considerations](#performance-considerations)
-10. [Conclusion](#conclusion)
+7. [Plugin Architecture](#plugin-architecture)
+8. [Framework Integration](#framework-integration)
+9. [Practical Examples](#practical-examples)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Performance Considerations](#performance-considerations)
+12. [Conclusion](#conclusion)
 
 ## Introduction
 
@@ -199,8 +215,11 @@ The library supports environment-specific configuration through the createDefaul
 
 Configuration can be updated at runtime using the updateConfig method, which reinitializes the relevant infrastructure components with the new configuration. This allows for dynamic configuration changes without requiring client recreation. The configuration system also supports loading configuration from environment variables, making it easy to configure the client in different deployment environments.
 
+The plugin system configuration is now a key part of the configuration management, allowing for flexible extension of client functionality through middleware, storage, and authentication plugins.
+
 **Section sources**
 - [config.ts](file://packages/audit-client/src/core/config.ts#L1-L530)
+- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md#L1-L630)
 
 ## Integration Patterns
 
@@ -242,6 +261,219 @@ The plugin architecture is a key integration pattern that allows developers to e
 - [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
 - [README.md](file://packages/audit-client/README.md#L1-L212)
 
+## Plugin Architecture
+
+The Audit Client Library includes a comprehensive plugin architecture that allows developers to extend functionality through custom middleware, storage backends, and authentication methods.
+
+### Core Concepts
+
+All plugins must implement the base `Plugin` interface which defines required properties and methods. The system supports three main plugin types:
+
+- **Middleware Plugins**: Process requests and responses
+- **Storage Plugins**: Custom cache storage backends
+- **Authentication Plugins**: Custom authentication methods
+
+The PluginManager orchestrates plugin operations and provides a PluginRegistry for managing all registered plugins.
+
+### Built-in Plugins
+
+The library includes several built-in plugins for common use cases:
+
+#### Middleware Plugins
+- **Request Logging Plugin**: Logs all HTTP requests and responses with configurable detail levels
+- **Correlation ID Plugin**: Adds correlation IDs to requests for distributed tracing
+- **Rate Limiting Plugin**: Client-side rate limiting for API requests
+
+#### Storage Plugins
+- **Redis Storage Plugin**: Redis-based cache storage for distributed caching
+- **IndexedDB Storage Plugin**: Browser-based IndexedDB storage for client-side caching
+
+#### Authentication Plugins
+- **JWT Authentication Plugin**: JWT-based authentication with automatic token refresh
+- **OAuth2 Authentication Plugin**: OAuth2 client credentials flow authentication
+- **Custom Header Authentication Plugin**: Custom header-based authentication
+
+### Plugin Configuration
+
+Plugins can be configured through the client configuration object. The configuration supports both automatic loading of built-in plugins and manual registration of custom plugins.
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.example.com',
+	authentication: {
+		type: 'custom',
+	},
+	plugins: {
+		enabled: true,
+		autoLoad: true,
+		middleware: {
+			enabled: true,
+			plugins: ['request-logging', 'correlation-id'],
+		},
+		storage: {
+			enabled: true,
+			defaultPlugin: 'redis-storage',
+			plugins: {
+				'redis-storage': {
+					host: 'localhost',
+					port: 6379,
+				},
+			},
+		},
+		auth: {
+			enabled: true,
+			defaultPlugin: 'jwt-auth',
+			plugins: {
+				'jwt-auth': {
+					token: 'your-token',
+				},
+			},
+		},
+	},
+})
+```
+
+### Creating Custom Plugins
+
+Developers can create custom plugins by implementing the appropriate plugin interface. The system provides type definitions and base classes to facilitate plugin development.
+
+**Section sources**
+- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md#L1-L630)
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L1-L650)
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L1-L783)
+- [plugin-usage.ts](file://packages/audit-client/src/examples/plugin-usage.ts#L1-L551)
+
+## Framework Integration
+
+The Audit Client Library can be integrated with popular web frameworks following specific patterns for each framework.
+
+### Express.js Integration
+
+For Express.js applications, create a centralized client instance and make it available to routes and middleware.
+
+```typescript
+// src/audit-client.ts
+import { AuditClient } from '@smedrec/audit-client'
+
+export const auditClient = new AuditClient({
+	baseUrl: process.env.AUDIT_API_URL || 'https://api.smartlogs.com',
+	authentication: {
+		type: 'apiKey',
+		apiKey: process.env.AUDIT_API_KEY,
+	},
+	logging: {
+		level: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
+	},
+})
+
+// Gracefully shut down the client on app exit
+process.on('SIGINT', async () => {
+	await auditClient.destroy()
+	process.exit(0)
+})
+```
+
+Create middleware to automatically log requests:
+
+```typescript
+// src/middleware/audit-logger.ts
+import { auditClient } from '../audit-client'
+
+export function auditRequest(req, res, next) {
+	const { method, path, ip, user } = req
+
+	// Fire-and-forget the audit event
+	auditClient.events
+		.create({
+			action: 'api.request',
+			principalId: user ? user.id : 'anonymous',
+			organizationId: user ? user.organizationId : 'unknown',
+			status: 'attempt',
+			sessionContext: {
+				ipAddress: ip,
+				userAgent: req.get('User-Agent'),
+			},
+			details: {
+				method,
+				path,
+				params: req.params,
+				query: req.query,
+			},
+		})
+		.catch((error) => {
+			console.error('Failed to log audit request:', error)
+		})
+
+	next()
+}
+```
+
+### Next.js Integration
+
+In Next.js applications, create a singleton client instance to avoid creating new connections on every request.
+
+```typescript
+// lib/audit-client.ts
+import { AuditClient } from '@smedrec/audit-client'
+
+// Use a global variable to preserve the client across hot reloads in development
+declare global {
+	var auditClient: AuditClient | undefined
+}
+
+const client =
+	globalThis.auditClient ||
+	new AuditClient({
+		baseUrl: process.env.AUDIT_API_URL!,
+		authentication: {
+			type: 'apiKey',
+			apiKey: process.env.AUDIT_API_KEY!,
+		},
+	})
+
+if (process.env.NODE_ENV !== 'production') {
+	globalThis.auditClient = client
+}
+
+export const auditClient = client
+```
+
+Use the client in API routes:
+
+```typescript
+// pages/api/documents/create.ts
+import { auditClient } from '@/lib/audit-client'
+import { getSession } from 'next-auth/react'
+
+export default async function handler(req, res) {
+	const session = await getSession({ req })
+
+	if (!session) {
+		return res.status(401).end()
+	}
+
+	// ... logic to create a document ...
+	const newDocument = await createDocument(req.body)
+
+	await auditClient.events.create(
+		{
+			action: 'document.create',
+			principalId: session.user.id,
+			organizationId: session.user.organizationId,
+			status: 'success',
+			targetResourceId: newDocument.id,
+		},
+		{ generateHash: true, generateSignature: true }
+	)
+
+	res.status(201).json(newDocument)
+}
+```
+
+**Section sources**
+- [FRAMEWORK_INTEGRATION.md](file://packages/audit-client/docs/FRAMEWORK_INTEGRATION.md#L1-L207)
+- [plugin-usage.ts](file://packages/audit-client/src/examples/plugin-usage.ts#L1-L551)
+
 ## Practical Examples
 
 The Audit Client Library includes numerous practical examples that demonstrate common use cases and best practices. These examples are designed to help developers quickly get started with the library and understand how to use its various features effectively.
@@ -252,19 +484,19 @@ For basic usage, developers can create an audit event with minimal configuration
 import { AuditClient } from '@smedrec/audit-client'
 
 const client = new AuditClient({
-    baseUrl: 'https://api.smartlogs.com',
-    authentication: {
-        type: 'apiKey',
-        apiKey: 'your-api-key',
-    },
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'apiKey',
+		apiKey: 'your-api-key',
+	},
 })
 
 // Create an audit event
 const event = await client.events.create({
-    action: 'user.login',
-    principalId: 'user-123',
-    organizationId: 'org-456',
-    status: 'success',
+	action: 'user.login',
+	principalId: 'user-123',
+	organizationId: 'org-456',
+	status: 'success',
 })
 ```
 
@@ -274,29 +506,29 @@ For more advanced scenarios, developers can configure the client with comprehens
 import { AuditClient } from '@smedrec/audit-client'
 
 const config = {
-    baseUrl: 'https://api.smartlogs.com',
-    authentication: {
-        type: 'apiKey',
-        apiKey: 'your-api-key',
-        autoRefresh: true,
-    },
-    retry: {
-        enabled: true,
-        maxAttempts: 3,
-        initialDelayMs: 100,
-        maxDelayMs: 5000,
-        backoffMultiplier: 2,
-    },
-    cache: {
-        enabled: true,
-        defaultTtlMs: 300000, // 5 minutes
-        storage: 'memory',
-    },
-    logging: {
-        enabled: true,
-        level: 'info',
-        maskSensitiveData: true,
-    },
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'apiKey',
+		apiKey: 'your-api-key',
+		autoRefresh: true,
+	},
+	retry: {
+		enabled: true,
+		maxAttempts: 3,
+		initialDelayMs: 100,
+		maxDelayMs: 5000,
+		backoffMultiplier: 2,
+	},
+	cache: {
+		enabled: true,
+		defaultTtlMs: 300000, // 5 minutes
+		storage: 'memory',
+	},
+	logging: {
+		enabled: true,
+		level: 'info',
+		maskSensitiveData: true,
+	},
 }
 
 const client = new AuditClient(config)
@@ -307,19 +539,19 @@ The library also provides examples for generating compliance reports:
 ```typescript
 // Generate HIPAA compliance report
 const hipaaReport = await client.compliance.generateHipaaReport({
-    dateRange: {
-        startDate: '2024-01-01',
-        endDate: '2024-01-31',
-    },
-    organizationIds: ['org-456'],
+	dateRange: {
+		startDate: '2024-01-01',
+		endDate: '2024-01-31',
+	},
+	organizationIds: ['org-456'],
 })
 
 // Generate GDPR data export
 const exportResult = await client.compliance.exportGdprData({
-    dataSubjectId: 'user-123',
-    organizationId: 'org-456',
-    includePersonalData: true,
-    format: 'json',
+	dataSubjectId: 'user-123',
+	organizationId: 'org-456',
+	includePersonalData: true,
+	format: 'json',
 })
 ```
 
@@ -331,22 +563,53 @@ const systemMetrics = await client.metrics.getSystemMetrics()
 
 // Get audit metrics
 const auditMetrics = await client.metrics.getAuditMetrics({
-    timeRange: {
-        startDate: '2024-01-01',
-        endDate: '2024-01-31',
-    },
+	timeRange: {
+		startDate: '2024-01-01',
+		endDate: '2024-01-31',
+	},
 })
 
 // Get active alerts
 const alerts = await client.metrics.getAlerts({
-    status: ['active'],
-    severity: ['high', 'critical'],
+	status: ['active'],
+	severity: ['high', 'critical'],
+})
+```
+
+Plugin usage examples:
+
+```typescript
+// Using built-in plugins
+const client = new AuditClient({
+	baseUrl: 'https://api.example.com',
+	authentication: {
+		type: 'apiKey',
+		apiKey: 'your-api-key',
+	},
+	plugins: {
+		enabled: true,
+		autoLoad: true,
+		middleware: {
+			enabled: true,
+			plugins: ['request-logging', 'correlation-id'],
+		},
+		storage: {
+			enabled: true,
+			plugins: {
+				'redis-storage': {
+					host: 'localhost',
+					port: 6379,
+				},
+			},
+		},
+	},
 })
 ```
 
 **Section sources**
 - [README.md](file://packages/audit-client/README.md#L1-L212)
 - [examples](file://packages/audit-client/src/examples)
+- [plugin-usage.ts](file://packages/audit-client/src/examples/plugin-usage.ts#L1-L551)
 
 ## Troubleshooting Guide
 
@@ -362,13 +625,13 @@ If the client is not behaving as expected, enable debug logging to get detailed 
 
 ```typescript
 const client = new AuditClient({
-    // ... other config
-    logging: {
-        enabled: true,
-        level: 'debug',
-        includeRequestBody: true,
-        includeResponseBody: true,
-    },
+	// ... other config
+	logging: {
+		enabled: true,
+		level: 'debug',
+		includeRequestBody: true,
+		includeResponseBody: true,
+	},
 })
 ```
 
@@ -376,11 +639,18 @@ This will provide detailed logs of all HTTP requests and responses, which can he
 
 For issues with real-time features such as event subscriptions or metrics streaming, ensure that the client environment supports WebSockets or Server-Sent Events. Some environments may have restrictions on these technologies that could affect functionality.
 
+For plugin-related issues:
+- Check that plugins are properly registered in the configuration
+- Verify plugin configuration matches the expected schema
+- Ensure plugin dependencies are met
+- Check that the plugin manager is properly initialized
+
 **Section sources**
 - [README.md](file://packages/audit-client/README.md#L1-L212)
 - [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
 - [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts#L1-L439)
 - [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts#L1-L522)
+- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md#L1-L630)
 
 ## Performance Considerations
 
@@ -394,16 +664,25 @@ For large datasets, the library provides streaming capabilities that allow proce
 
 The client's type safety and validation features also contribute to performance by catching errors early in the development process, reducing the likelihood of runtime errors that could impact performance.
 
+Plugin performance should also be considered:
+- Minimize middleware processing overhead
+- Cache expensive plugin operations when possible
+- Use async operations to avoid blocking the main thread
+- Monitor plugin execution time to identify bottlenecks
+
 **Section sources**
 - [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts#L1-L781)
 - [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts#L1-L522)
 - [client.ts](file://packages/audit-client/src/core/client.ts#L1-L825)
+- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md#L1-L630)
 
 ## Conclusion
 
 The Audit Client Library provides a comprehensive, robust solution for integrating with the Smart Logs Audit API. Its modular architecture, rich feature set, and developer-friendly design make it an excellent choice for applications requiring audit event management, compliance reporting, and system monitoring.
 
 The library's emphasis on type safety, validation, and error handling ensures reliable operation in production environments. Its support for advanced features such as retry mechanisms, intelligent caching, and real-time streaming makes it suitable for demanding enterprise applications.
+
+The recently added plugin architecture extends the library's capabilities, allowing developers to customize and extend functionality through middleware, storage, and authentication plugins. Framework integration examples provide clear guidance for implementing the client in popular web frameworks.
 
 By following the patterns and best practices outlined in this documentation, developers can effectively leverage the Audit Client Library to build secure, compliant, and high-performance applications. The library's comprehensive documentation, examples, and troubleshooting guidance provide the resources needed to successfully integrate and maintain audit functionality in any application.
 
@@ -417,3 +696,5 @@ By following the patterns and best practices outlined in this documentation, dev
 - [auth.ts](file://packages/audit-client/src/infrastructure/auth.ts#L1-L439)
 - [cache.ts](file://packages/audit-client/src/infrastructure/cache.ts#L1-L781)
 - [retry.ts](file://packages/audit-client/src/infrastructure/retry.ts#L1-L522)
+- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md#L1-L630)
+- [FRAMEWORK_INTEGRATION.md](file://packages/audit-client/docs/FRAMEWORK_INTEGRATION.md#L1-L207)

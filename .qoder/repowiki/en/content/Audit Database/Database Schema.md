@@ -11,7 +11,19 @@
 - [0003_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0003_snapshot.json)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
 - [audit.test.ts](file://packages/audit/src/__tests__/audit.test.ts)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added new section for pseudonym_mapping table to document GDPR pseudonymization feature
+- Updated Data Model Diagram to include new pseudonym_mapping table and its relationships
+- Added sample data entry for pseudonym_mapping table
+- Updated Data Validation and Business Logic section to include GDPR pseudonymization details
+- Enhanced source tracking with new and updated files related to GDPR pseudonymization
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -77,12 +89,14 @@ The audit database schema consists of several key components that work together 
 - **audit_presets**: Stores predefined logging configurations for consistent event patterns
 - **alerts**: Manages alerting based on audit event patterns and anomalies
 - **scheduled_reports**: Handles configuration for automated compliance reporting
+- **pseudonym_mapping**: New table for GDPR pseudonymization mapping (added in recent update)
 
 The schema implements partitioning on the audit_log table by timestamp to optimize query performance and storage management. This allows efficient querying of recent data while maintaining historical records.
 
 **Section sources**
 - [schema.test.ts](file://packages/audit-db/src/__tests__/schema.test.ts)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 
 ## Architecture Overview
 
@@ -101,11 +115,13 @@ F --> I["alerts"]
 G --> J["scheduled_reports"]
 K["audit_retention_policy"] --> D
 L["audit_presets"] --> B
+D --> M["pseudonym_mapping"]
 ```
 
 **Diagram sources**
 - [schema.test.ts](file://packages/audit-db/src/__tests__/schema.test.ts)
 - [migration-utils.ts](file://packages/audit-db/src/migration-utils.ts)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 
 ## Detailed Component Analysis
 
@@ -163,6 +179,25 @@ class audit_integrity_log {
 **Diagram sources**
 - [0004_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0004_snapshot.json)
 - [schema.test.ts](file://packages/audit-db/src/__tests__/schema.test.ts)
+
+### Pseudonym Mapping Analysis
+
+The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilities by maintaining a secure mapping between original identifiers and pseudonymized identifiers.
+
+```mermaid
+classDiagram
+class pseudonym_mapping {
++id : serial
++timestamp : timestamp with time zone
++pseudonym_id : text
++original_id : text
+}
+```
+
+**Diagram sources**
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 
 ## Data Model Diagram
 
@@ -264,16 +299,25 @@ timestamp with time zone updated_at
 varchar(255) created_by
 varchar(255) updated_by
 }
+pseudonym_mapping {
+serial id PK
+timestamp with time zone timestamp
+text pseudonym_id
+text original_id
+}
 audit_log ||--o{ audit_integrity_log : "1 to many"
 audit_log }|--|| audit_retention_policy : "retention_policy → policy_name"
 audit_log }|--|| audit_presets : "preset references"
 alerts }|--|| audit_log : "references events"
 scheduled_reports }|--|| audit_presets : "uses templates"
+audit_log }|--|| pseudonym_mapping : "GDPR pseudonymization"
 ```
 
 **Diagram sources**
 - [0004_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0004_snapshot.json)
 - [0003_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0003_snapshot.json)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
 
 ## Entity Relationship Details
 
@@ -496,6 +540,30 @@ The scheduled_reports table handles configuration for automated compliance repor
 - [0004_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0004_snapshot.json)
 - [resolvers.test.ts](file://apps/server/src/lib/graphql/__tests__/resolvers.test.ts)
 
+### pseudonym_mapping Table
+
+The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilities by securely maintaining the mapping between original identifiers and their pseudonymized counterparts. This enables data subject rights fulfillment while preserving referential integrity in audit logs.
+
+**Field Definitions:**
+- **id**: Serial primary key, auto-incrementing identifier
+- **timestamp**: Timestamp when the pseudonymization mapping was created
+- **pseudonym_id**: The pseudonymized identifier used in place of the original ID
+- **original_id**: The encrypted original identifier, stored securely for authorized reversal
+
+**Constraints:**
+- Primary Key: id
+- Not Null Constraints: timestamp, pseudonym_id, original_id
+
+**Indexes:**
+- pseudonym_mapping_timestamp_idx: B-tree index on timestamp for temporal analysis of pseudonymization activities
+- pseudonym_mapping_pseudonym_id_idx: B-tree index on pseudonym_id for efficient lookup of pseudonymized IDs
+- pseudonym_mapping_original_id_idx: B-tree index on original_id for efficient lookup of original IDs
+
+**Section sources**
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
+
 ## Sample Data Entries
 
 ### audit_log Sample Entries
@@ -655,10 +723,23 @@ The scheduled_reports table handles configuration for automated compliance repor
 }
 ```
 
+### pseudonym_mapping Sample Entry
+
+```json
+{
+  "id": 101,
+  "timestamp": "2024-01-16T08:30:00.000Z",
+  "pseudonym_id": "pseudo-a1b2c3d4e5f67890",
+  "original_id": "encrypted:user-123:salt123"
+}
+```
+
 **Section sources**
 - [migration-utils.ts](file://packages/audit-db/src/migration-utils.ts)
 - [basic-usage.ts](file://packages/audit-sdk/examples/basic-usage.ts)
 - [examples.ts](file://packages/audit-sdk/src/__tests__/examples.ts)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 
 ## Constraints and Indexes
 
@@ -672,6 +753,7 @@ The audit database schema implements comprehensive constraints and indexes to en
 - audit_presets.id: Primary key with auto-increment
 - alerts.id: Primary key with auto-increment
 - scheduled_reports.id: Primary key with auto-increment
+- pseudonym_mapping.id: Primary key with auto-increment
 
 ### Foreign Keys
 - audit_integrity_log.audit_log_id references audit_log.id: Ensures integrity records only reference existing audit events
@@ -726,9 +808,15 @@ The schema includes numerous indexes to optimize common query patterns:
 - scheduled_reports_created_by_idx: B-tree index on created_by for accountability
 - scheduled_reports_org_enabled_idx: Composite index on organization_id and enabled for common queries
 
+**pseudonym_mapping Indexes:**
+- pseudonym_mapping_timestamp_idx: B-tree index on timestamp for temporal analysis of pseudonymization activities
+- pseudonym_mapping_pseudonym_id_idx: B-tree index on pseudonym_id for efficient lookup of pseudonymized IDs
+- pseudonym_mapping_original_id_idx: B-tree index on original_id for efficient lookup of original IDs
+
 **Section sources**
 - [0004_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0004_snapshot.json)
 - [0003_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0003_snapshot.json)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 
 ## Data Validation and Business Logic
 
@@ -768,6 +856,15 @@ The audit_log table uses range partitioning by timestamp to optimize performance
 - Older partitions can be moved to cost-effective storage
 - Query performance is maintained for recent data while historical data remains accessible
 
+### GDPR Pseudonymization
+The system implements GDPR-compliant pseudonymization through the pseudonym_mapping table:
+- Original identifiers are replaced with pseudonymized IDs in audit logs
+- A secure mapping is maintained between original and pseudonymized IDs
+- Original IDs are encrypted before storage in the mapping table
+- Pseudonymization supports multiple strategies: deterministic hashing, random tokens, and encryption
+- Authorized personnel can reverse the mapping for compliance investigations
+- The system maintains referential integrity while protecting data subject privacy
+
 ### Compliance Features
 The schema includes several features specifically designed for regulatory compliance:
 - **Data Classification**: Explicit tagging of data sensitivity
@@ -776,6 +873,7 @@ The schema includes several features specifically designed for regulatory compli
 - **Audit Presets**: Standardized event formats for consistent logging
 - **Correlation IDs**: End-to-end tracing of related operations
 - **Immutable Records**: Once written, audit records cannot be modified
+- **GDPR Pseudonymization**: Secure handling of personal data for data subject rights fulfillment
 
 These features collectively ensure that the audit system meets requirements for healthcare compliance standards including HIPAA, GDPR, and other data protection regulations.
 
@@ -783,3 +881,6 @@ These features collectively ensure that the audit system meets requirements for 
 - [migration-utils.ts](file://packages/audit-db/src/migration-utils.ts)
 - [basic-usage.ts](file://packages/audit-sdk/examples/basic-usage.ts)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
+- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*

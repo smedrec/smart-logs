@@ -9,6 +9,8 @@
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
 - [gdpr.tsx](file://apps/web/src/routes/dashboard/compliance/gdpr.tsx) - *Updated in recent commit*
 - [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx) - *Updated in recent commit*
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [infisical-kms.ts](file://packages/infisical-kms/src/client.ts) - *KMS integration for pseudonymization*
 </cite>
 
 ## Update Summary
@@ -19,6 +21,7 @@
 - Added new sections on compliance reporting and export workflows
 - Updated code examples and diagrams to reflect current implementation
 - Maintained existing structure while incorporating new compliance features
+- Added documentation for persistent pseudonym mapping storage and KMS encryption
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -61,7 +64,7 @@ Note over GDPRService : Compliance records preserved<br/>via pseudonymization
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
 
 ### Data Minimization and Pseudonymization
-The system implements data minimization through pseudonymization strategies that replace personally identifiable information with artificial identifiers while maintaining referential integrity.
+The system implements data minimization through pseudonymization strategies that replace personally identifiable information with artificial identifiers while maintaining referential integrity. The implementation now includes persistent storage of pseudonym mappings in an encrypted format using KMS integration.
 
 ```mermaid
 classDiagram
@@ -95,6 +98,8 @@ GDPRComplianceService --> GDPRDataExportRequest : "processes"
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
+- [schema.ts](file://packages/audit-db/src/db/schema.ts#L643-L658)
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
 
 ### Consent Tracking Implementation
 The system tracks consent through the `gdprContext` field in audit events, which captures legal basis, processing purpose, and data categories.
@@ -179,7 +184,7 @@ AuditLogEvent --> SessionContext : "contains"
 The system implements multiple security measures to protect data integrity and ensure secure access.
 
 ### Data Encryption and Integrity
-The system ensures data integrity through cryptographic hashing and provides options for data encryption in exports. The Infisical KMS integration uses RSASSA_PSS_SHA_256 as the default signing algorithm for enhanced security.
+The system ensures data integrity through cryptographic hashing and provides options for data encryption in exports. The Infisical KMS integration uses RSASSA_PSS_SHA_256 as the default signing algorithm for enhanced security. Pseudonym mappings are now encrypted using KMS before storage.
 
 ```mermaid
 flowchart TD
@@ -320,7 +325,7 @@ This section addresses common regulatory compliance challenges and their impleme
 ### Issue: Balancing Right to Erasure with Audit Requirements
 **Problem**: GDPR's right to erasure conflicts with regulatory requirements to maintain audit trails.
 
-**Solution**: The system implements pseudonymization of compliance-critical records while deleting non-essential personal data.
+**Solution**: The system implements pseudonymization of compliance-critical records while deleting non-essential personal data. Pseudonym mappings are now stored in a dedicated encrypted table with KMS integration.
 
 ```typescript
 async deleteUserDataWithAuditTrail(
@@ -355,6 +360,8 @@ async deleteUserDataWithAuditTrail(
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
+- [schema.ts](file://packages/audit-db/src/db/schema.ts#L643-L658)
+- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
 
 ### Issue: Ensuring Data Minimization in Audit Logs
 **Problem**: Collecting excessive data in audit logs violates GDPR's data minimization principle.

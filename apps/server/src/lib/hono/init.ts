@@ -241,6 +241,14 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			audit: auditDbInstance.getDrizzleInstance(),
 		}
 
+		if (!kms)
+			kms = new InfisicalKmsClient({
+				baseUrl: config.security.kms.baseUrl,
+				encryptionKey: config.security.kms.encryptionKey,
+				signingKey: config.security.kms.signingKey,
+				accessToken: config.security.kms.accessToken,
+			})
+
 		if (!databaseAlertHandler) databaseAlertHandler = new DatabaseAlertHandler(auditDbInstance)
 		if (!monitoringService) {
 			if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
@@ -332,7 +340,8 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			)
 		}
 		if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(db.audit)
-		if (!gdprComplianceService) gdprComplianceService = new GDPRComplianceService(client, audit)
+		if (!gdprComplianceService)
+			gdprComplianceService = new GDPRComplianceService(client, audit, kms)
 
 		const compliance = {
 			report: reportingService,
@@ -341,14 +350,6 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			preset: presetDatabaseHandler,
 			gdpr: gdprComplianceService,
 		}
-
-		if (!kms)
-			kms = new InfisicalKmsClient({
-				baseUrl: config.security.kms.baseUrl,
-				encryptionKey: config.security.kms.encryptionKey,
-				signingKey: config.security.kms.signingKey,
-				accessToken: config.security.kms.accessToken,
-			})
 
 		//const cache = initCache(c);
 		//const cache = null

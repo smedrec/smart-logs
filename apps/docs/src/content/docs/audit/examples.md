@@ -1,284 +1,728 @@
 ---
-title: Examples
-description: Practical examples of using the SMEDREC Audit System in various scenarios.
+title: Comprehensive Examples
+description: Practical examples and implementation patterns for the SMEDREC Audit System across various scenarios and use cases.
+sidebar_position: 4
 ---
 
-# Examples
+# Comprehensive Examples
 
-Practical examples of using the SMEDREC Audit System in various scenarios.
+Practical examples and implementation patterns for the SMEDREC Audit System across various scenarios and use cases.
 
-## Basic Usage Examples
+## 🚀 Quick Start Examples
 
-### Simple User Action Logging
-
-```typescript
-import { Audit } from '@repo/audit'
-
-const auditService = new Audit('user-activity-queue')
-
-// Log user login
-await auditService.log({
-	principalId: 'user-123',
-	action: 'auth.login.success',
-	status: 'success',
-	outcomeDescription: 'User successfully logged in',
-	sessionContext: {
-		sessionId: 'sess-abc123',
-		ipAddress: '192.168.1.100',
-		userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-	},
-})
-
-// Log user logout
-await auditService.log({
-	principalId: 'user-123',
-	action: 'auth.logout',
-	status: 'success',
-	outcomeDescription: 'User logged out successfully',
-})
-```
-
-### FHIR Resource Access Logging
+### Basic Client Initialization
 
 ```typescript
-// Patient record access
-await auditService.log({
-	principalId: 'practitioner-456',
-	organizationId: 'org-hospital-1',
-	action: 'fhir.patient.read',
-	targetResourceType: 'Patient',
-	targetResourceId: 'patient-789',
-	status: 'success',
-	outcomeDescription: 'Practitioner accessed patient record for treatment',
-	dataClassification: 'PHI',
-	sessionContext: {
-		sessionId: 'sess-def456',
-		ipAddress: '10.0.1.50',
-		userAgent: 'FHIR-Client/1.0',
-	},
-	// Additional FHIR-specific context
-	fhirContext: {
-		resourceVersion: '1',
-		compartment: 'Patient/patient-789',
-		interaction: 'read',
-	},
-})
+import { AuditDb, EnhancedAuditDb } from '@repo/audit-db'
+import { auditLog } from '@repo/audit-db/schema'
 
-// Failed access attempt
-await auditService.log({
-	principalId: 'practitioner-999',
-	action: 'fhir.patient.read',
-	targetResourceType: 'Patient',
-	targetResourceId: 'patient-789',
-	status: 'failure',
-	outcomeDescription: 'Access denied - insufficient permissions',
-	dataClassification: 'PHI',
-	errorDetails: {
-		errorCode: 'INSUFFICIENT_PERMISSIONS',
-		cerbosDecision: 'DENY',
-		requiredRole: 'attending_physician',
-	},
+// Basic client for simple applications
+const basicClient = new AuditDb()
+const db = basicClient.getDrizzleInstance()
+
+// Verify connection
+const isConnected = await basicClient.checkAuditDbConnection()
+if (!isConnected) {
+  throw new Error('Database connection failed')
+}
+
+// Enhanced client for production
+const enhancedClient = new EnhancedAuditDb({
+  connection: {
+    connectionString: process.env.AUDIT_DB_URL!,
+    ssl: process.env.NODE_ENV === 'production'
+  },
+  connectionPool: {
+    minConnections: 5,
+    maxConnections: 20,
+    idleTimeout: 30000
+  },
+  queryCache: {
+    enabled: true,
+    maxSizeMB: 100,
+    defaultTTL: 300
+  },
+  monitoring: {
+    enabled: true,
+    slowQueryThreshold: 1000,
+    autoOptimization: true
+  }
 })
 ```
 
-## Advanced Usage Examples
-
-### High-Security Audit Events
+### Simple Healthcare Audit Event
 
 ```typescript
-// Critical system changes with full security
-await auditService.logWithGuaranteedDelivery(
-	{
-		principalId: 'admin-001',
-		action: 'system.configuration.change',
-		targetResourceType: 'SystemConfig',
-		targetResourceId: 'security-policy',
-		status: 'success',
-		outcomeDescription: 'Updated system security policy',
-		dataClassification: 'CONFIDENTIAL',
-		changes: {
-			oldValue: { maxLoginAttempts: 3 },
-			newValue: { maxLoginAttempts: 5 },
-		},
-	},
-	{
-		priority: 1, // Highest priority
-		durabilityGuarantees: true,
-		generateHash: true,
-		generateSignature: true,
-		correlationId: 'config-change-2024-001',
-	}
-)
+// Log patient record access
+await db.insert(auditLog).values({
+  timestamp: new Date().toISOString(),
+  action: 'patient.record.access',
+  status: 'success',
+  principalId: 'doctor-123',
+  principalType: 'healthcare_provider',
+  resourceId: 'patient-456',
+  resourceType: 'patient_record',
+  sourceIp: '10.0.1.50',
+  userAgent: 'EMR-System/2.1',
+  metadata: {
+    department: 'cardiology',
+    accessReason: 'routine_checkup',
+    patientConsent: true,
+    dataElements: ['demographics', 'vitals', 'medications']
+  }
+})
 ```
 
-### Batch Operations Logging
+## 🏥 Healthcare-Specific Examples
+
+### HIPAA-Compliant Patient Data Access
 
 ```typescript
-// Log multiple related events with correlation
-const correlationId = `batch-${Date.now()}`
+import { AuditDb } from '@repo/audit-db'
+import { auditLog } from '@repo/audit-db/schema'
+import { eq, desc, and, gte } from 'drizzle-orm'
 
-const patients = ['patient-001', 'patient-002', 'patient-003']
-
-for (const patientId of patients) {
-	await auditService.log({
-		principalId: 'system-batch-processor',
-		action: 'data.anonymize',
-		targetResourceType: 'Patient',
-		targetResourceId: patientId,
-		status: 'success',
-		outcomeDescription: 'Patient data anonymized for research dataset',
-		dataClassification: 'PHI',
-		correlationId,
-		batchInfo: {
-			batchId: correlationId,
-			totalItems: patients.length,
-			currentItem: patients.indexOf(patientId) + 1,
-		},
-	})
+class HIPAAAuditLogger {
+  private db: ReturnType<AuditDb['getDrizzleInstance']>
+  
+  constructor() {
+    const auditDb = new AuditDb()
+    this.db = auditDb.getDrizzleInstance()
+  }
+  
+  // Log patient record access with HIPAA compliance
+  async logPatientAccess({
+    doctorId,
+    patientId,
+    department,
+    accessReason,
+    dataElements
+  }: {
+    doctorId: string
+    patientId: string
+    department: string
+    accessReason: string
+    dataElements: string[]
+  }) {
+    return await this.db.insert(auditLog).values({
+      timestamp: new Date().toISOString(),
+      action: 'hipaa.patient_data.access',
+      status: 'success',
+      principalId: doctorId,
+      principalType: 'healthcare_provider',
+      resourceId: patientId,
+      resourceType: 'patient_record',
+      sourceIp: this.getClientIP(),
+      metadata: {
+        department,
+        accessReason,
+        dataElements,
+        minimumNecessary: true,
+        patientConsent: await this.verifyPatientConsent(patientId),
+        hipaaCompliant: true,
+        retentionPeriod: 2555 // 7 years
+      }
+    }).returning()
+  }
+  
+  // Log prescription creation
+  async logPrescriptionCreation({
+    doctorId,
+    patientId,
+    medication,
+    dosage,
+    frequency,
+    duration
+  }: {
+    doctorId: string
+    patientId: string
+    medication: string
+    dosage: string
+    frequency: string
+    duration: string
+  }) {
+    return await this.db.insert(auditLog).values({
+      timestamp: new Date().toISOString(),
+      action: 'prescription.create',
+      status: 'success',
+      principalId: doctorId,
+      principalType: 'healthcare_provider',
+      resourceId: `prescription-${Date.now()}`,
+      resourceType: 'prescription',
+      metadata: {
+        patientId,
+        medication,
+        dosage,
+        frequency,
+        duration,
+        prescribedAt: new Date().toISOString(),
+        dea_number: await this.getDEANumber(doctorId),
+        controlledSubstance: await this.isControlledSubstance(medication)
+      }
+    }).returning()
+  }
+  
+  // Log lab result access
+  async logLabResultAccess({
+    userId,
+    userType,
+    patientId,
+    labResultId,
+    testType
+  }: {
+    userId: string
+    userType: 'physician' | 'nurse' | 'lab_tech' | 'patient'
+    patientId: string
+    labResultId: string
+    testType: string
+  }) {
+    return await this.db.insert(auditLog).values({
+      timestamp: new Date().toISOString(),
+      action: 'lab_result.access',
+      status: 'success',
+      principalId: userId,
+      principalType: userType,
+      resourceId: labResultId,
+      resourceType: 'lab_result',
+      metadata: {
+        patientId,
+        testType,
+        accessedBy: userType,
+        criticality: await this.getLabCriticality(labResultId),
+        dataClassification: 'PHI'
+      }
+    }).returning()
+  }
+  
+  // Query patient audit trail for compliance reporting
+  async getPatientAuditTrail(patientId: string, startDate?: Date, endDate?: Date) {
+    let conditions = eq(auditLog.resourceId, patientId)
+    
+    if (startDate && endDate) {
+      conditions = and(
+        conditions,
+        gte(auditLog.timestamp, startDate.toISOString()),
+        gte(auditLog.timestamp, endDate.toISOString())
+      )
+    }
+    
+    return await this.db
+      .select({
+        timestamp: auditLog.timestamp,
+        action: auditLog.action,
+        principalId: auditLog.principalId,
+        principalType: auditLog.principalType,
+        status: auditLog.status,
+        sourceIp: auditLog.sourceIp,
+        metadata: auditLog.metadata
+      })
+      .from(auditLog)
+      .where(conditions)
+      .orderBy(desc(auditLog.timestamp))
+  }
+  
+  private async verifyPatientConsent(patientId: string): Promise<boolean> {
+    // Implementation to verify patient consent
+    return true
+  }
+  
+  private async getDEANumber(doctorId: string): Promise<string> {
+    // Implementation to get doctor's DEA number
+    return 'DEA123456'
+  }
+  
+  private async isControlledSubstance(medication: string): Promise<boolean> {
+    // Implementation to check if medication is controlled
+    return false
+  }
+  
+  private async getLabCriticality(labResultId: string): Promise<string> {
+    // Implementation to get lab result criticality
+    return 'normal'
+  }
+  
+  private getClientIP(): string {
+    // Implementation to get client IP
+    return '10.0.1.50'
+  }
 }
 ```
 
-### Error Handling and Retry Logic
+### GDPR Compliance Examples
 
 ```typescript
-import { Audit } from '@repo/audit'
-
-class AuditService {
-	private audit: Audit
-
-	constructor() {
-		this.audit = new Audit('application-audit-queue')
-	}
-
-	async logWithRetry(eventDetails: any, maxRetries = 3): Promise<void> {
-		let lastError: Error | null = null
-
-		for (let attempt = 1; attempt <= maxRetries; attempt++) {
-			try {
-				await this.audit.log(eventDetails, {
-					generateHash: true,
-					correlationId: `retry-${attempt}-${Date.now()}`,
-				})
-				return // Success
-			} catch (error) {
-				lastError = error as Error
-				console.warn(`Audit logging attempt ${attempt} failed:`, error)
-
-				if (attempt < maxRetries) {
-					// Exponential backoff
-					const delay = Math.pow(2, attempt) * 1000
-					await new Promise((resolve) => setTimeout(resolve, delay))
-				}
-			}
-		}
-
-		// All retries failed - log to fallback system
-		console.error('All audit logging attempts failed:', lastError)
-		await this.logToFallbackSystem(eventDetails, lastError)
-	}
-
-	private async logToFallbackSystem(eventDetails: any, error: Error): Promise<void> {
-		// Implement fallback logging (file system, alternative queue, etc.)
-		console.error(
-			'FALLBACK AUDIT LOG:',
-			JSON.stringify({
-				...eventDetails,
-				timestamp: new Date().toISOString(),
-				fallbackReason: error.message,
-			})
-		)
-	}
+class GDPRAuditLogger {
+  private db: ReturnType<AuditDb['getDrizzleInstance']>
+  
+  constructor() {
+    const auditDb = new AuditDb()
+    this.db = auditDb.getDrizzleInstance()
+  }
+  
+  // Log data subject access request
+  async logDataSubjectAccessRequest({
+    dataSubjectId,
+    requestType,
+    dataElements,
+    legalBasis
+  }: {
+    dataSubjectId: string
+    requestType: 'access' | 'rectification' | 'erasure' | 'portability'
+    dataElements: string[]
+    legalBasis: string
+  }) {
+    return await this.db.insert(auditLog).values({
+      timestamp: new Date().toISOString(),
+      action: `gdpr.data_subject.${requestType}`,
+      status: 'success',
+      principalId: dataSubjectId,
+      principalType: 'data_subject',
+      resourceType: 'personal_data',
+      metadata: {
+        requestType,
+        dataElements,
+        legalBasis,
+        processingLawfulness: true,
+        dataMinimization: true,
+        purposeLimitation: true,
+        accuracyEnsured: true,
+        storageLimitation: true,
+        integrityConfidentiality: true,
+        accountability: true,
+        gdprCompliant: true
+      }
+    }).returning()
+  }
+  
+  // Log consent management
+  async logConsentChange({
+    dataSubjectId,
+    consentType,
+    granted,
+    purpose,
+    dataCategories
+  }: {
+    dataSubjectId: string
+    consentType: 'marketing' | 'analytics' | 'processing' | 'sharing'
+    granted: boolean
+    purpose: string
+    dataCategories: string[]
+  }) {
+    return await this.db.insert(auditLog).values({
+      timestamp: new Date().toISOString(),
+      action: 'gdpr.consent.change',
+      status: 'success',
+      principalId: dataSubjectId,
+      principalType: 'data_subject',
+      resourceType: 'consent_record',
+      metadata: {
+        consentType,
+        granted,
+        purpose,
+        dataCategories,
+        consentMethod: 'explicit',
+        withdrawable: true,
+        granular: true,
+        consentDate: new Date().toISOString()
+      }
+    }).returning()
+  }
+  
+  // Log data processing activity
+  async logDataProcessing({
+    processorId,
+    dataSubjectId,
+    processingPurpose,
+    dataCategories,
+    legalBasis
+  }: {
+    processorId: string
+    dataSubjectId: string
+    processingPurpose: string
+    dataCategories: string[]
+    legalBasis: string
+  }) {
+    return await this.db.insert(auditLog).values({
+      timestamp: new Date().toISOString(),
+      action: 'gdpr.data.processing',
+      status: 'success',
+      principalId: processorId,
+      principalType: 'data_processor',
+      resourceId: dataSubjectId,
+      resourceType: 'personal_data',
+      metadata: {
+        processingPurpose,
+        dataCategories,
+        legalBasis,
+        retentionPeriod: this.calculateRetentionPeriod(processingPurpose),
+        dataMinimizationApplied: true,
+        pseudonymized: true
+      }
+    }).returning()
+  }
+  
+  private calculateRetentionPeriod(purpose: string): number {
+    // Implementation based on GDPR requirements
+    const retentionPolicies: Record<string, number> = {
+      'contract_fulfillment': 365 * 6, // 6 years
+      'legal_obligation': 365 * 7, // 7 years
+      'legitimate_interest': 365 * 3, // 3 years
+      'consent': 365 * 2 // 2 years
+    }
+    return retentionPolicies[purpose] || 365 * 2
+  }
 }
 ```
 
-## Database Operations Examples
+## 📊 Enhanced Database Operations
 
-### Querying Audit Logs
+### Performance-Optimized Queries
 
 ```typescript
-import { and, desc, eq, gte, lte } from 'drizzle-orm'
+import { EnhancedAuditDb } from '@repo/audit-db'
+import { eq, gte, lte, and, or, desc, asc, count, sql } from 'drizzle-orm'
 
+class PerformanceOptimizedQueries {
+  private client: EnhancedAuditDb
+  
+  constructor() {
+    this.client = new EnhancedAuditDb({
+      connection: {
+        connectionString: process.env.AUDIT_DB_URL!,
+        ssl: true
+      },
+      connectionPool: {
+        minConnections: 10,
+        maxConnections: 50,
+        idleTimeout: 60000
+      },
+      queryCache: {
+        enabled: true,
+        maxSizeMB: 500,
+        defaultTTL: 900
+      },
+      monitoring: {
+        enabled: true,
+        slowQueryThreshold: 500,
+        autoOptimization: true
+      }
+    })
+  }
+  
+  // Cached query for frequently accessed user events
+  async getUserEventsOptimized(userId: string, limit: number = 10) {
+    return await this.client.query(
+      `SELECT * FROM audit_log 
+       WHERE principal_id = $1 
+       ORDER BY timestamp DESC 
+       LIMIT $2`,
+      [userId, limit],
+      {
+        cacheKey: `user_events_${userId}_${limit}`,
+        ttl: 300 // 5 minutes
+      }
+    )
+  }
+  
+  // Batch query for dashboard analytics
+  async getDashboardMetrics() {
+    const results = await this.client.queryBatch([
+      {
+        sql: 'SELECT COUNT(*) as total FROM audit_log WHERE timestamp >= $1',
+        params: [new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()],
+        options: { cacheKey: 'daily_count', ttl: 300 }
+      },
+      {
+        sql: 'SELECT COUNT(*) as failures FROM audit_log WHERE status = $1 AND timestamp >= $2',
+        params: ['failure', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()],
+        options: { cacheKey: 'daily_failures', ttl: 300 }
+      },
+      {
+        sql: 'SELECT COUNT(DISTINCT principal_id) as unique_users FROM audit_log WHERE timestamp >= $1',
+        params: [new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()],
+        options: { cacheKey: 'daily_users', ttl: 300 }
+      }
+    ])
+    
+    return {
+      totalEvents: results[0].data?.[0]?.total || 0,
+      failedEvents: results[1].data?.[0]?.failures || 0,
+      uniqueUsers: results[2].data?.[0]?.unique_users || 0
+    }
+  }
+  
+  // Transaction with performance monitoring
+  async createAuditEventWithMetrics(eventData: any) {
+    return await this.client.transaction(async (tx) => {
+      const startTime = Date.now()
+      
+      // Create the main audit event
+      const event = await tx.query(
+        `INSERT INTO audit_log (timestamp, action, status, principal_id, resource_type, metadata) 
+         VALUES ($1, $2, $3, $4, $5, $6) 
+         RETURNING *`,
+        [
+          eventData.timestamp,
+          eventData.action,
+          eventData.status,
+          eventData.principalId,
+          eventData.resourceType,
+          eventData.metadata
+        ]
+      )
+      
+      const executionTime = Date.now() - startTime
+      
+      // Log performance metrics if slow
+      if (executionTime > 100) {
+        await tx.query(
+          `INSERT INTO audit_log (timestamp, action, status, principal_id, metadata) 
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            new Date().toISOString(),
+            'performance.slow_query',
+            'warning',
+            'system',
+            {
+              originalAction: eventData.action,
+              executionTime,
+              threshold: 100
+            }
+          ]
+        )
+      }
+      
+      return event[0]
+    })
+  }
+  
+  // Complex aggregation with caching
+  async getComplianceReport(startDate: Date, endDate: Date) {
+    const cacheKey = `compliance_report_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}`
+    
+    return await this.client.query(
+      `SELECT 
+         action,
+         COUNT(*) as event_count,
+         COUNT(DISTINCT principal_id) as unique_users,
+         COUNT(*) FILTER (WHERE status = 'success') as successful_events,
+         COUNT(*) FILTER (WHERE status = 'failure') as failed_events,
+         ROUND(AVG(EXTRACT(EPOCH FROM (updated_at - timestamp)) * 1000), 2) as avg_processing_time
+       FROM audit_log 
+       WHERE timestamp BETWEEN $1 AND $2
+         AND action LIKE 'patient.%'
+       GROUP BY action
+       ORDER BY event_count DESC`,
+      [startDate.toISOString(), endDate.toISOString()],
+      {
+        cacheKey,
+        ttl: 3600 // 1 hour for compliance reports
+      }
+    )
+  }
+  
+  // Get performance metrics
+  async getSystemPerformanceMetrics() {
+    const metrics = await this.client.getPerformanceMetrics()
+    const health = await this.client.getHealthStatus()
+    
+    return {
+      cache: {
+        hitRate: metrics.cache.hitRate,
+        memoryUsage: metrics.cache.memoryUsage
+      },
+      database: {
+        activeConnections: metrics.connectionPool.activeConnections,
+        averageQueryTime: metrics.queries.averageExecutionTime
+      },
+      health: {
+        overall: health.overall,
+        components: health.components
+      }
+    }
+  }
+}
+```
+
+### Transaction Management Examples
+
+```typescript
 import { AuditDb } from '@repo/audit-db'
 import { auditLog } from '@repo/audit-db/schema'
 
-const auditDb = new AuditDb()
-const db = auditDb.getDrizzleInstance()
-
-// Get recent events for a user
-const userEvents = await db
-	.select()
-	.from(auditLog)
-	.where(eq(auditLog.principalId, 'user-123'))
-	.orderBy(desc(auditLog.timestamp))
-	.limit(50)
-
-// Get failed login attempts in the last 24 hours
-const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
-const failedLogins = await db
-	.select()
-	.from(auditLog)
-	.where(
-		and(eq(auditLog.action, 'auth.login.failure'), gte(auditLog.timestamp, yesterday.toISOString()))
-	)
-	.orderBy(desc(auditLog.timestamp))
-
-// Get PHI access events for compliance reporting
-const phiAccess = await db
-	.select({
-		timestamp: auditLog.timestamp,
-		principalId: auditLog.principalId,
-		action: auditLog.action,
-		targetResourceId: auditLog.targetResourceId,
-		outcomeDescription: auditLog.outcomeDescription,
-	})
-	.from(auditLog)
-	.where(
-		and(
-			eq(auditLog.dataClassification, 'PHI'),
-			gte(auditLog.timestamp, '2024-01-01T00:00:00Z'),
-			lte(auditLog.timestamp, '2024-12-31T23:59:59Z')
-		)
-	)
-	.orderBy(desc(auditLog.timestamp))
-```
-
-### Compliance Reporting
-
-```typescript
-// Generate HIPAA compliance report
-async function generateHIPAAReport(startDate: Date, endDate: Date) {
-	const db = new AuditDb().getDrizzleInstance()
-
-	const report = await db
-		.select({
-			date: auditLog.timestamp,
-			user: auditLog.principalId,
-			action: auditLog.action,
-			resource: auditLog.targetResourceType,
-			resourceId: auditLog.targetResourceId,
-			outcome: auditLog.status,
-			description: auditLog.outcomeDescription,
-			ipAddress: auditLog.details,
-		})
-		.from(auditLog)
-		.where(
-			and(
-				eq(auditLog.dataClassification, 'PHI'),
-				gte(auditLog.timestamp, startDate.toISOString()),
-				lte(auditLog.timestamp, endDate.toISOString())
-			)
-		)
-		.orderBy(desc(auditLog.timestamp))
-
-	return {
-		reportGenerated: new Date().toISOString(),
-		period: { start: startDate.toISOString(), end: endDate.toISOString() },
-		totalEvents: report.length,
-		events: report.map((event) => ({
-			...event,
-			ipAddress: event.ipAddress?.sessionContext?.ipAddress || 'unknown',
-		})),
-	}
+class TransactionManager {
+  private db: ReturnType<AuditDb['getDrizzleInstance']>
+  
+  constructor() {
+    const auditDb = new AuditDb()
+    this.db = auditDb.getDrizzleInstance()
+  }
+  
+  // Patient treatment session with multiple related events
+  async logTreatmentSession({
+    doctorId,
+    patientId,
+    treatmentType,
+    medications,
+    procedures
+  }: {
+    doctorId: string
+    patientId: string
+    treatmentType: string
+    medications: Array<{name: string, dosage: string}>
+    procedures: Array<{name: string, duration: number}>
+  }) {
+    return await this.db.transaction(async (tx) => {
+      const sessionId = `session-${Date.now()}`
+      const timestamp = new Date().toISOString()
+      
+      // Log session start
+      const sessionStart = await tx
+        .insert(auditLog)
+        .values({
+          timestamp,
+          action: 'treatment.session.start',
+          status: 'success',
+          principalId: doctorId,
+          principalType: 'healthcare_provider',
+          resourceId: sessionId,
+          resourceType: 'treatment_session',
+          metadata: {
+            patientId,
+            treatmentType,
+            sessionId
+          }
+        })
+        .returning()
+      
+      // Log medications prescribed
+      const medicationEvents = []
+      for (const med of medications) {
+        const medEvent = await tx
+          .insert(auditLog)
+          .values({
+            timestamp: new Date().toISOString(),
+            action: 'medication.prescribe',
+            status: 'success',
+            principalId: doctorId,
+            principalType: 'healthcare_provider',
+            resourceId: `med-${Date.now()}-${Math.random()}`,
+            resourceType: 'prescription',
+            metadata: {
+              patientId,
+              sessionId,
+              medication: med.name,
+              dosage: med.dosage,
+              relatedTo: sessionStart[0].id
+            }
+          })
+          .returning()
+        medicationEvents.push(medEvent[0])
+      }
+      
+      // Log procedures performed
+      const procedureEvents = []
+      for (const proc of procedures) {
+        const procEvent = await tx
+          .insert(auditLog)
+          .values({
+            timestamp: new Date().toISOString(),
+            action: 'procedure.perform',
+            status: 'success',
+            principalId: doctorId,
+            principalType: 'healthcare_provider',
+            resourceId: `proc-${Date.now()}-${Math.random()}`,
+            resourceType: 'medical_procedure',
+            metadata: {
+              patientId,
+              sessionId,
+              procedure: proc.name,
+              duration: proc.duration,
+              relatedTo: sessionStart[0].id
+            }
+          })
+          .returning()
+        procedureEvents.push(procEvent[0])
+      }
+      
+      // Log session completion
+      const sessionEnd = await tx
+        .insert(auditLog)
+        .values({
+          timestamp: new Date().toISOString(),
+          action: 'treatment.session.complete',
+          status: 'success',
+          principalId: doctorId,
+          principalType: 'healthcare_provider',
+          resourceId: sessionId,
+          resourceType: 'treatment_session',
+          metadata: {
+            patientId,
+            sessionId,
+            medicationCount: medications.length,
+            procedureCount: procedures.length,
+            relatedEvents: [
+              sessionStart[0].id,
+              ...medicationEvents.map(e => e.id),
+              ...procedureEvents.map(e => e.id)
+            ]
+          }
+        })
+        .returning()
+      
+      return {
+        sessionStart: sessionStart[0],
+        medications: medicationEvents,
+        procedures: procedureEvents,
+        sessionEnd: sessionEnd[0]
+      }
+    })
+  }
+  
+  // Error handling with rollback
+  async safeAuditOperation(operations: Array<() => Promise<any>>) {
+    try {
+      return await this.db.transaction(async (tx) => {
+        const results = []
+        
+        for (const operation of operations) {
+          const result = await operation()
+          results.push(result)
+        }
+        
+        // Log successful batch operation
+        await tx.insert(auditLog).values({
+          timestamp: new Date().toISOString(),
+          action: 'audit.batch.success',
+          status: 'success',
+          principalId: 'system',
+          principalType: 'system',
+          metadata: {
+            operationCount: operations.length,
+            completedAt: new Date().toISOString()
+          }
+        })
+        
+        return results
+      })
+    } catch (error) {
+      // Log the failure outside the transaction
+      await this.db.insert(auditLog).values({
+        timestamp: new Date().toISOString(),
+        action: 'audit.batch.failure',
+        status: 'failure',
+        principalId: 'system',
+        principalType: 'system',
+        metadata: {
+          operationCount: operations.length,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          failedAt: new Date().toISOString()
+        }
+      })
+      
+      throw error
+    }
+  }
 }
 ```
 
@@ -512,4 +956,120 @@ describe('Audit Database Integration', () => {
 })
 ```
 
-These examples demonstrate the flexibility and power of the SMEDREC Audit System across different use cases, from simple logging to complex compliance scenarios.
+## 🔗 Advanced Integration Examples
+
+### Express.js Middleware
+
+```typescript
+import { AuditDb } from '@repo/audit-db'
+import { auditLog } from '@repo/audit-db/schema'
+
+const auditDb = new AuditDb()
+const db = auditDb.getDrizzleInstance()
+
+export function auditMiddleware() {
+  return async (req: any, res: any, next: any) => {
+    const startTime = Date.now()
+    
+    res.on('finish', async () => {
+      const processingTime = Date.now() - startTime
+      
+      await db.insert(auditLog).values({
+        timestamp: new Date().toISOString(),
+        action: `api.${req.method.toLowerCase()}.${req.path}`,
+        status: res.statusCode < 400 ? 'success' : 'failure',
+        principalId: req.user?.id || 'anonymous',
+        principalType: req.user?.type || 'anonymous',
+        sourceIp: req.ip,
+        userAgent: req.get('User-Agent'),
+        metadata: {
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          processingTime
+        }
+      })
+    })
+    
+    next()
+  }
+}
+```
+
+### React Audit Hook
+
+```typescript
+import { useCallback } from 'react'
+
+export function useAudit() {
+  const logEvent = useCallback(async (event: any) => {
+    await fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...event,
+        timestamp: new Date().toISOString(),
+        sessionContext: {
+          userAgent: navigator.userAgent,
+          url: window.location.href
+        }
+      })
+    })
+  }, [])
+  
+  return { logEvent }
+}
+```
+
+## 🧪 Testing Examples
+
+### Basic Test Suite
+
+```typescript
+import { describe, it, expect } from 'vitest'
+import { AuditDb } from '@repo/audit-db'
+import { auditLog } from '@repo/audit-db/schema'
+
+describe('Audit Database', () => {
+  it('should create and retrieve audit events', async () => {
+    const auditDb = new AuditDb(process.env.TEST_AUDIT_DB_URL)
+    const db = auditDb.getDrizzleInstance()
+    
+    const testEvent = {
+      timestamp: new Date().toISOString(),
+      action: 'test.action',
+      status: 'success',
+      principalId: 'test-user',
+      principalType: 'user'
+    }
+    
+    const [created] = await db.insert(auditLog).values(testEvent).returning()
+    expect(created.action).toBe(testEvent.action)
+    
+    // Cleanup
+    await db.delete(auditLog).where(eq(auditLog.id, created.id))
+  })
+})
+```
+
+## 📊 Best Practices Summary
+
+### Performance Optimization
+- Use `EnhancedAuditDb` for production workloads
+- Enable query caching for frequently accessed data
+- Implement connection pooling with appropriate sizes
+- Use batch operations for multiple related events
+
+### Security & Compliance
+- Always specify data classification levels (PHI, PII, etc.)
+- Include source IP addresses and user agents
+- Implement proper access controls for audit data
+- Use cryptographic integrity verification for critical events
+
+### Monitoring & Alerting
+- Monitor database performance metrics
+- Set up alerts for failed audit events
+- Track cache hit rates and query performance
+- Implement health checks for system components
+
+These examples provide a solid foundation for implementing comprehensive audit logging in healthcare applications with HIPAA and GDPR compliance.

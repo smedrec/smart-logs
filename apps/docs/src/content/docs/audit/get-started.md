@@ -1,9 +1,11 @@
 ---
-title: Getting Started with the Audit System
-description: The SMEDREC Audit System provides comprehensive audit logging capabilities for healthcare applications, ensuring compliance with HIPAA, GDPR, and other regulatory requirements.
+title: Quick Start Guide
+description: Quick overview and getting started with the SMEDREC Audit System.
 ---
 
-# Getting Started with the Audit System
+# Quick Start Guide
+
+> **📖 For comprehensive setup instructions, visit our [Getting Started Guide](./getting-started.md)**
 
 The SMEDREC Audit System provides comprehensive audit logging capabilities for healthcare applications, ensuring compliance with HIPAA, GDPR, and other regulatory requirements.
 
@@ -14,105 +16,72 @@ The audit system consists of two main packages:
 - **[@repo/audit](./audit.md)** - Core audit logging SDK for generating and sending audit events
 - **[@repo/audit-db](./audit-db.md)** - Database layer for storing and querying audit logs
 
-## Quick Start
-
-### 1. Installation
-
-Add the audit packages to your application:
+## Quick Installation
 
 ```bash
-# For basic audit logging
-pnpm add '@repo/audit@workspace:*'
+# Install audit database package
+npm install @repo/audit-db
 
-# For database operations
-pnpm add '@repo/audit-db@workspace:*'
+# Install peer dependencies
+npm install drizzle-orm postgres redis
 ```
 
-### 2. Basic Usage
+## Basic Usage
 
 ```typescript
-import { Audit } from '@repo/audit'
+import { AuditDb } from '@repo/audit-db'
 
-// Initialize the audit service
-const auditService = new Audit('user-activity-queue')
+// Initialize the audit database client
+const auditDb = new AuditDb()
 
-// Log a simple audit event
-await auditService.log({
-	principalId: 'user-123',
-	action: 'fhir.patient.read',
-	targetResourceType: 'Patient',
-	targetResourceId: 'patient-456',
-	status: 'success',
-	outcomeDescription: 'Successfully retrieved patient record',
+// Check connection
+const isConnected = await auditDb.checkAuditDbConnection()
+
+// Log a HIPAA-compliant audit event
+await auditDb.logAuditEvent({
+  timestamp: new Date().toISOString(),
+  action: 'fhir.patient.access',
+  status: 'success',
+  principalId: 'physician-123',
+  principalType: 'healthcare_provider',
+  resourceId: 'patient-456',
+  resourceType: 'Patient',
+  sourceIp: '192.168.1.100',
+  metadata: {
+    accessReason: 'patient-care',
+    dataElements: ['demographics', 'allergies'],
+    hipaaCompliant: true
+  }
 })
 ```
 
-### 3. Environment Setup
-
-Configure your environment variables:
+## Environment Setup
 
 ```env
-# Redis connection for audit queue
-REDIS_URL="redis://localhost:6379"
-
-# Optional: Separate Redis for audit system
-AUDIT_REDIS_URL="redis://audit-redis:6379"
-
-# Database connection for audit storage
+# Required
 AUDIT_DB_URL="postgresql://user:pass@localhost:5432/audit_db"
+AUDIT_REDIS_URL="redis://localhost:6379"
+
+# Recommended for production
+AUDIT_CRYPTO_SECRET="your-256-bit-secret-key"
+AUDIT_ENABLE_ENCRYPTION=true
 ```
 
 ## Key Features
 
-### 🔒 Security & Compliance
-
-- Cryptographic integrity verification with SHA-256 hashing
-- HMAC signatures for tamper detection
-- GDPR compliance with data classification and retention policies
-- Automatic data sanitization to prevent injection attacks
-
-### 🚀 Reliability
-
-- Guaranteed delivery with reliable event processor
-- Circuit breaker pattern for fault tolerance
-- Dead letter queue for failed events
-- Automatic retry mechanisms with exponential backoff
-
-### 📊 Monitoring & Observability
-
-- Real-time health checks and metrics
-- Performance monitoring with latency tracking
-- Queue depth monitoring
-- Comprehensive error handling and logging
-
-### 🏥 Healthcare-Specific
-
-- FHIR resource audit events
-- Practitioner license verification tracking
-- Patient data access logging
-- HIPAA-compliant audit trails
-
-## Architecture
-
-```mermaid
-graph TB
-    A[Application] --> B[Audit SDK]
-    B --> C[Redis Queue]
-    C --> D[Audit Worker]
-    D --> E[PostgreSQL Database]
-
-    B --> F[Validation & Sanitization]
-    B --> G[Cryptographic Security]
-    B --> H[Reliable Processor]
-
-    D --> I[GDPR Compliance]
-    D --> J[Monitoring & Alerts]
-```
+- **🏥 Healthcare-Focused**: Built for HIPAA, GDPR, and healthcare compliance
+- **🔒 Enterprise Security**: Encryption, integrity verification, and anomaly detection
+- **⚡ High Performance**: Redis caching and database partitioning
+- **🛠️ Developer-Friendly**: TypeScript-first with comprehensive documentation
 
 ## Next Steps
 
-- [Learn about the Audit SDK](./audit.md)
-- [Explore database operations](./audit-db.md)
-- [View API reference](./api-reference.md)
-- [Check out examples](./examples.md)
-- [Security best practices](./security.md)
+📖 **[Complete Getting Started Guide](./getting-started.md)** - Comprehensive setup and healthcare examples
+
+📚 **[API Reference](./api-reference.md)** - Complete API documentation
+
+💡 **[Examples](./examples.md)** - Healthcare implementation patterns
+
+🔒 **[Security Guide](./security.md)** - Security best practices and compliance
+
+🚀 **[Performance Optimization](./performance-optimization.md)** - Production optimization techniques

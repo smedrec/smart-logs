@@ -14,19 +14,22 @@
 - [configuration-examples.ts](file://packages\audit-client\src\examples\configuration-examples.ts) - *Updated in recent commit*
 - [client-usage.ts](file://packages\audit-client\src\examples\client-usage.ts) - *Updated in recent commit*
 - [FRAMEWORK_INTEGRATION.md](file://packages\audit-client\docs\FRAMEWORK_INTEGRATION.md) - *New documentation added*
+- [PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md) - *New documentation added*
+- [built-in.ts](file://packages\audit-client\src\infrastructure\plugins\built-in.ts) - *New plugin implementations*
+- [plugins.ts](file://packages\audit-client\src\infrastructure\plugins.ts) - *New plugin system*
+- [plugin-usage.ts](file://packages\audit-client\src\examples\plugin-usage.ts) - *New plugin examples*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated architecture overview to reflect modular design with enhanced plugin system
-- Added comprehensive configuration options with Zod validation schema details
-- Enhanced API interfaces with complete type definitions and method signatures
-- Updated usage patterns with sequence diagrams for client initialization and service usage
-- Added detailed integration mapping between client methods and API endpoints
-- Refreshed examples with current configuration and service usage patterns
-- Updated troubleshooting guide with new error handling and plugin-related issues
-- Added new section on framework integration patterns
-- Enhanced configuration examples with environment-specific and builder patterns
+- Added comprehensive plugin architecture section with interface definitions and implementation details
+- Enhanced framework integration section with Express.js and Next.js examples
+- Updated architecture overview to include plugin system components
+- Added detailed configuration examples for plugin system
+- Expanded examples section with plugin usage patterns
+- Added new troubleshooting guidance for plugin-related issues
+- Updated API interfaces to reflect plugin-enabled functionality
+- Enhanced configuration options with plugin-specific settings
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -38,8 +41,9 @@
 7. [Integration with Core Audit System](#integration-with-core-audit-system)
 8. [Examples](#examples)
 9. [Framework Integration](#framework-integration)
-10. [Troubleshooting Guide](#troubleshooting-guide)
-11. [Conclusion](#conclusion)
+10. [Plugin Architecture](#plugin-architecture)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Conclusion](#conclusion)
 
 ## Introduction
 The Audit Client is a comprehensive TypeScript SDK designed for interacting with the Smart Logs Audit API. It provides a robust set of features including type safety, retry mechanisms, intelligent caching, authentication support, request batching, comprehensive error handling, performance optimization, observability, and a flexible plugin architecture. The client is structured into a modular architecture with distinct layers for core functionality, services, infrastructure, and utilities, enabling developers to efficiently manage audit events, compliance reporting, system metrics, health monitoring, and scheduled reports.
@@ -48,7 +52,7 @@ The Audit Client is a comprehensive TypeScript SDK designed for interacting with
 - [README.md](file://packages\audit-client\README.md#L1-L213)
 
 ## Architecture Overview
-The Audit Client follows a modular architecture with four main layers: Core, Service, Infrastructure, and Utils. The Core layer contains the main client class and configuration management. The Service layer provides domain-specific functionality through specialized services. The Infrastructure layer handles cross-cutting concerns like authentication, caching, and retry logic. The Utils layer contains helper functions and validation utilities.
+The Audit Client follows a modular architecture with four main layers: Core, Service, Infrastructure, and Utils. The Core layer contains the main client class and configuration management. The Service layer provides domain-specific functionality through specialized services. The Infrastructure layer handles cross-cutting concerns like authentication, caching, and retry logic. The Utils layer contains helper functions and validation utilities. The architecture has been enhanced with a comprehensive plugin system that allows for extensibility through middleware, storage, and authentication plugins.
 
 ```mermaid
 graph TB
@@ -73,6 +77,13 @@ Batch[BatchManager]
 Error[ErrorHandler]
 Plugin[PluginManager]
 Logger[DefaultLogger]
+end
+subgraph "Plugin System"
+PluginRegistry[PluginRegistry]
+MiddlewarePlugin[MiddlewarePlugin]
+StoragePlugin[StoragePlugin]
+AuthPlugin[AuthPlugin]
+BuiltInPlugins[Built-in Plugins]
 end
 subgraph "Utils Layer"
 Validation[Validation]
@@ -103,18 +114,29 @@ Metrics --> BaseResource
 Health --> BaseResource
 Presets --> BaseResource
 ScheduledReports --> BaseResource
+Plugin --> PluginRegistry
+Plugin --> MiddlewarePlugin
+Plugin --> StoragePlugin
+Plugin --> AuthPlugin
+Plugin --> BuiltInPlugins
+PluginRegistry --> MiddlewarePlugin
+PluginRegistry --> StoragePlugin
+PluginRegistry --> AuthPlugin
+Client --> Plugin
 ```
 
 **Diagram sources**
 - [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
 - [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
+- [plugins.ts](file://packages\audit-client\src\infrastructure\plugins.ts#L1-L649)
 
 ## Core Components
-The Audit Client consists of several core components that work together to provide a comprehensive audit management solution. The main entry point is the AuditClient class, which orchestrates all services and manages configuration. The ConfigManager handles configuration validation and normalization using Zod schemas. The BaseResource class provides common functionality for all services, including request handling and error management. The client also includes specialized services for events, compliance, metrics, health, presets, and scheduled reports, each providing domain-specific functionality.
+The Audit Client consists of several core components that work together to provide a comprehensive audit management solution. The main entry point is the AuditClient class, which orchestrates all services and manages configuration. The ConfigManager handles configuration validation and normalization using Zod schemas. The BaseResource class provides common functionality for all services, including request handling and error management. The client also includes specialized services for events, compliance, metrics, health, presets, and scheduled reports, each providing domain-specific functionality. The plugin system has been enhanced with a PluginManager, PluginRegistry, and various plugin types to enable extensibility.
 
 **Section sources**
 - [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
 - [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
+- [plugins.ts](file://packages\audit-client\src\infrastructure\plugins.ts#L1-L649)
 
 ## API Interfaces
 The Audit Client provides a comprehensive set of API interfaces through its various services. These interfaces enable developers to interact with the audit system in a type-safe and efficient manner.
@@ -276,7 +298,7 @@ class ScheduledReportsService {
 - [scheduled-reports.ts](file://packages\audit-client\src\services\scheduled-reports.ts#L1-L797)
 
 ## Configuration Options
-The Audit Client supports comprehensive configuration options through the AuditClientConfig interface. Configuration can be provided during client initialization and updated at runtime. The configuration includes settings for connection, authentication, retry logic, caching, batching, performance optimization, logging, error handling, and plugins.
+The Audit Client supports comprehensive configuration options through the AuditClientConfig interface. Configuration can be provided during client initialization and updated at runtime. The configuration includes settings for connection, authentication, retry logic, caching, batching, performance optimization, logging, error handling, and plugins. The configuration schema has been enhanced to include plugin-specific settings for middleware, storage, and authentication plugins.
 
 ### Configuration Schema
 The configuration is validated using Zod schemas to ensure type safety and correctness. The main configuration schema includes the following components:
@@ -384,7 +406,7 @@ AuditClientConfig --> PluginConfig
 - [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
 ### Environment-Specific Configuration
-The client supports environment-specific configuration through the ConfigManager class. Default configurations are provided for development, staging, and production environments, with appropriate settings for logging, error handling, and performance optimization.
+The client supports environment-specific configuration through the ConfigManager class. Default configurations are provided for development, staging, and production environments, with appropriate settings for logging, error handling, and performance optimization. The plugin system can be configured differently for each environment, with more verbose logging and debugging features enabled in development.
 
 **Section sources**
 - [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
@@ -735,6 +757,98 @@ export const auditClient = client
 **Section sources**
 - [FRAMEWORK_INTEGRATION.md](file://packages\audit-client\docs\FRAMEWORK_INTEGRATION.md#L0-L207)
 
+## Plugin Architecture
+The Audit Client includes a comprehensive plugin architecture that allows developers to extend functionality through custom middleware, storage backends, and authentication methods.
+
+### Core Concepts
+The plugin system provides:
+- **Middleware Plugins**: Process requests and responses
+- **Storage Plugins**: Custom cache storage backends
+- **Authentication Plugins**: Custom authentication methods
+- **Plugin Registry**: Centralized plugin management
+- **Plugin Manager**: Orchestrates plugin operations
+- **Built-in Plugins**: Ready-to-use common functionality
+
+### Plugin Interface
+All plugins must implement the base `Plugin` interface:
+
+```typescript
+interface Plugin {
+	readonly name: string
+	readonly version: string
+	readonly description?: string
+	readonly dependencies?: string[]
+	readonly configSchema?: Record<string, any>
+
+	initialize(config: any, context: PluginContext): Promise<void> | void
+	destroy?(): Promise<void> | void
+	validateConfig?(config: any): ValidationResult
+}
+```
+
+### Plugin Types
+#### Middleware Plugin
+Processes HTTP requests and responses:
+
+```typescript
+interface MiddlewarePlugin extends Plugin {
+	readonly type: 'middleware'
+
+	processRequest?(request: MiddlewareRequest, next: MiddlewareNext): Promise<MiddlewareRequest>
+	processResponse?(response: MiddlewareResponse, next: MiddlewareNext): Promise<MiddlewareResponse>
+	handleError?(error: Error, context: MiddlewareErrorContext): Promise<void> | void
+}
+```
+
+#### Storage Plugin
+Creates custom cache storage backends:
+
+```typescript
+interface StoragePlugin extends Plugin {
+	readonly type: 'storage'
+
+	createStorage(config: any): CacheStorage
+}
+```
+
+#### Authentication Plugin
+Provides custom authentication methods:
+
+```typescript
+interface AuthPlugin extends Plugin {
+	readonly type: 'auth'
+
+	getAuthHeaders(config: any, context: AuthContext): Promise<Record<string, string>>
+	refreshToken?(config: any, context: AuthContext): Promise<string | null>
+	validateAuthConfig?(config: any): ValidationResult
+	handleAuthError?(error: Error, config: any, context: AuthContext): Promise<void> | void
+}
+```
+
+### Built-in Plugins
+#### Middleware Plugins
+- **Request Logging Plugin**: Logs all HTTP requests and responses
+- **Correlation ID Plugin**: Adds correlation IDs for distributed tracing
+- **Rate Limiting Plugin**: Client-side rate limiting for API requests
+
+#### Storage Plugins
+- **Redis Storage Plugin**: Redis-based cache storage for distributed caching
+- **IndexedDB Storage Plugin**: Browser-based IndexedDB storage for client-side caching
+
+#### Authentication Plugins
+- **JWT Authentication Plugin**: JWT-based authentication with automatic token refresh
+- **OAuth2 Authentication Plugin**: OAuth2 client credentials flow authentication
+- **Custom Header Authentication Plugin**: Custom header-based authentication
+
+### Creating Custom Plugins
+Developers can create custom plugins by implementing the appropriate plugin interface. The plugin system supports dependency resolution, configuration validation, and lifecycle management.
+
+**Section sources**
+- [PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md#L0-L630)
+- [built-in.ts](file://packages\audit-client\src\infrastructure\plugins\built-in.ts#L0-L782)
+- [plugins.ts](file://packages\audit-client\src\infrastructure\plugins.ts#L0-L649)
+- [plugin-usage.ts](file://packages\audit-client\src\examples\plugin-usage.ts#L0-L550)
+
 ## Troubleshooting Guide
 This section provides guidance for troubleshooting common issues with the Audit Client.
 
@@ -813,5 +927,21 @@ Enable request compression and streaming. Use pagination for large result sets. 
 - [client.ts](file://packages\audit-client\src\core\client.ts#L1-L825)
 - [config.ts](file://packages\audit-client\src\core\config.ts#L1-L530)
 
+### Plugin-Related Issues
+Plugin issues may occur when plugins are not properly configured or initialized.
+
+**Common Issues:**
+- Plugin not loading
+- Configuration validation errors
+- Dependency conflicts
+- Performance degradation from middleware plugins
+
+**Solution:**
+Check plugin registration and dependencies. Validate plugin configuration against the schema. Use performance tracking to identify slow plugins. Ensure proper cleanup in plugin destroy methods.
+
+**Section sources**
+- [plugins.ts](file://packages\audit-client\src\infrastructure\plugins.ts#L1-L649)
+- [built-in.ts](file://packages\audit-client\src\infrastructure\plugins\built-in.ts#L1-L782)
+
 ## Conclusion
-The Audit Client provides a comprehensive and robust solution for interacting with the Smart Logs Audit API. Its modular architecture, type safety, and extensive feature set make it an ideal choice for applications requiring audit functionality. The client's support for configuration, retry logic, caching, and observability ensures reliable and efficient operation in various environments. With its comprehensive API interfaces and clear usage patterns, the Audit Client simplifies the integration of audit capabilities into applications while maintaining high performance and reliability.
+The Audit Client provides a comprehensive and robust solution for interacting with the Smart Logs Audit API. Its modular architecture, type safety, and extensive feature set make it an ideal choice for applications requiring audit functionality. The client's support for configuration, retry logic, caching, and observability ensures reliable and efficient operation in various environments. With its comprehensive API interfaces and clear usage patterns, the Audit Client simplifies the integration of audit capabilities into applications while maintaining high performance and reliability. The recently enhanced plugin architecture allows for extensibility and customization, making the client adaptable to various use cases and environments.

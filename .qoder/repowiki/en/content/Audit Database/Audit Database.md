@@ -2,24 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
-- [performance-monitoring.ts](file://packages/audit-db/src/db/performance-monitoring.ts)
-- [query-cache.ts](file://packages/audit-db/src/cache/query-cache.ts)
-- [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
-- [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts) - *Updated in recent commit*
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts) - *Updated in recent commit*
+- [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Updated in recent commit*
+- [pseudonym_mapping](file://packages\audit-db\drizzle\migrations\0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Updated in recent commit*
+- [README.md](file://packages\audit-db\README.md) - *Updated in recent commit*
+- [future-enhancements.md](file://packages\audit-db\docs\future-enhancements.md) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
-- Updated database integration examples to use EnhancedAuditDb client instead of direct database connections
-- Added documentation for DatabaseAlertHandler class and its integration with EnhancedAuditDb
-- Updated connection handling documentation to reflect the use of enhanced client
-- Added new section on alert persistence with database integration
-- Updated architecture overview to include alert handling components
-- Added new diagram for alert handling architecture
+- Added new section on GDPR pseudonymization with persistent encrypted pseudonym mapping
+- Updated data model documentation to include the new pseudonym_mapping table
+- Added details on GDPR compliance features and data subject rights implementation
+- Updated architecture overview to include pseudonymization components
+- Added new diagram for GDPR pseudonymization architecture
+- Updated section sources to reflect new and modified files
+- Updated README and future enhancements roadmap documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -32,7 +29,8 @@
 8. [Migration and Version Management](#migration-and-version-management)
 9. [Architecture Overview](#architecture-overview)
 10. [Alert Persistence with Database Integration](#alert-persistence-with-database-integration)
-11. [Conclusion](#conclusion)
+11. [GDPR Pseudonymization and Compliance](#gdpr-pseudonymization-and-compliance)
+12. [Conclusion](#conclusion)
 
 ## Introduction
 
@@ -43,7 +41,7 @@ This documentation provides a detailed overview of the Audit Database's data mod
 The database schema supports a wide range of audit-related entities including audit events, alerts, compliance records, and metadata tables. It implements a multi-tenant architecture with organizational isolation, ensuring data privacy and security across different tenants.
 
 **Section sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
 
 ## Data Model
 
@@ -247,16 +245,22 @@ varchar environment
 varchar previous_version
 varchar new_version
 }
+pseudonym_mapping {
+integer id PK
+timestamp timestamp
+text pseudonym_id
+text original_id
+}
 audit_log ||--o{ audit_integrity_log : "1:N"
 scheduled_reports ||--o{ report_executions : "1:N"
 report_templates ||--o{ scheduled_reports : "1:N"
 ```
 
 **Diagram sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
 
 **Section sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
 
 ### Core Entities
 
@@ -324,6 +328,15 @@ Stores persistent alert records with multi-organizational support.
 - **resolutionNotes**: text - Notes about resolution
 - **createdAt**: timestamp - Creation timestamp
 - **updatedAt**: timestamp - Last update timestamp
+
+#### pseudonym_mapping
+Stores encrypted pseudonym-to-original ID mappings for GDPR compliance.
+
+**Fields:**
+- **id**: serial - Primary key
+- **timestamp**: timestamp with time zone - Creation timestamp
+- **pseudonymId**: text - Pseudonymized identifier
+- **originalId**: text - Encrypted original identifier
 
 ## Partitioning Strategy
 
@@ -755,7 +768,9 @@ drizzle/migrations/
 ├── 0001_aberrant_natasha_romanoff.sql
 ├── 0002_tearful_blonde_phantom.sql
 ├── 0003_easy_prowler.sql
-└── 0004_mixed_roughhouse.sql
+├── 0004_mixed_roughhouse.sql
+├── 0005_marvelous_christian_walker.sql
+└── 0006_silly_tyger_tiger.sql
 ```
 
 Each migration file contains the SQL statements needed to upgrade the database schema, along with a corresponding rollback section.
@@ -994,6 +1009,145 @@ The DatabaseAlertHandler supports several key usage patterns:
 5. **Alert statistics**: Get summary statistics about active alerts
 6. **Alert cleanup**: Automatically remove old resolved alerts based on retention policy
 
+## GDPR Pseudonymization and Compliance
+
+The Audit Database now supports GDPR-compliant pseudonymization through the GDPRComplianceService class, which integrates with the EnhancedAuditDatabaseClient to manage pseudonymized data while maintaining referential integrity.
+
+### GDPR Pseudonymization Architecture
+
+```mermaid
+graph TD
+US[User System] --> GCS[GDPRComplianceService]
+GCS --> EADB[EnhancedAuditDatabaseClient]
+EADB --> DB[(PostgreSQL)]
+EADB --> RC[Redis Cache]
+GCS --> KMS[InfisicalKMS]
+KMS --> EADB
+subgraph "GDPR Compliance"
+GCS
+KMS
+end
+subgraph "Data Storage"
+DB
+RC
+end
+style GCS fill:#f96,stroke:#333
+style KMS fill:#f96,stroke:#333
+style DB fill:#bbf,stroke:#333
+style RC fill:#bbf,stroke:#333
+```
+
+**Diagram sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [pseudonym_mapping](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+- [pseudonymMapping](file://packages/audit-db/src/db/schema.ts)
+
+### GDPRComplianceService Class
+
+The GDPRComplianceService class implements GDPR requirements for data subject rights and privacy-by-design principles:
+
+```typescript
+class GDPRComplianceService {
+  private db: PostgresJsDatabase<typeof auditSchema>
+
+  constructor(
+    private client: EnhancedAuditDatabaseClient,
+    private audit: Audit,
+    private kms: InfisicalKmsClient
+  ) {
+    this.db = this.client.getDatabase()
+  }
+  
+  async exportUserData(request: GDPRDataExportRequest): Promise<GDPRDataExport>
+  async pseudonymizeUserData(principalId: string, strategy: PseudonymizationStrategy, requestedBy: string): Promise<{ pseudonymId: string; recordsAffected: number }>
+  async applyRetentionPolicies(): Promise<ArchivalResult[]>
+  async deleteUserDataWithAuditTrail(principalId: string, requestedBy: string, preserveComplianceAudits: boolean): Promise<{ recordsDeleted: number; complianceRecordsPreserved: number }>
+  async getOriginalId(pseudonymId: string): Promise<string | undefined>
+}
+```
+
+### Key Features
+
+- **Persistent pseudonym mapping**: Stores encrypted pseudonym-to-original ID mappings in the pseudonym_mapping table
+- **Multiple pseudonymization strategies**: Supports hash, token, and encryption strategies
+- **Referential integrity**: Maintains relationships between pseudonymized records
+- **Authorized reverse lookup**: Allows authorized users to retrieve original IDs for compliance investigations
+- **Comprehensive audit trail**: Logs all GDPR-related activities for compliance verification
+- **Data subject rights**: Implements access, rectification, erasure, portability, and restriction rights
+
+### Pseudonym Mapping Data Model
+
+The pseudonym_mapping table stores the following fields:
+
+- **id**: serial - Primary key
+- **timestamp**: timestamp with time zone - Creation timestamp
+- **pseudonymId**: text - Pseudonymized identifier
+- **originalId**: text - Encrypted original identifier
+
+### Pseudonymization Strategies
+
+The system supports three pseudonymization strategies:
+
+1. **Hash-based**: Uses SHA-256 hashing with salt for deterministic pseudonymization
+2. **Token-based**: Generates random tokens for non-deterministic pseudonymization
+3. **Encryption-based**: Uses KMS encryption for reversible pseudonymization
+
+### Integration Example
+
+```typescript
+// Initialize GDPR compliance service
+const gdprService = new GDPRComplianceService(
+  enhancedAuditDbClient,
+  auditService,
+  kmsClient
+)
+
+// Pseudonymize user data
+const result = await gdprService.pseudonymizeUserData(
+  'user-123',
+  'hash',
+  'admin-user'
+)
+
+console.log('Pseudonym ID:', result.pseudonymId)
+console.log('Records affected:', result.recordsAffected)
+
+// Retrieve original ID (authorized use only)
+const originalId = await gdprService.getOriginalId(result.pseudonymId)
+console.log('Original ID:', originalId)
+
+// Export user data for GDPR compliance
+const exportRequest = {
+  principalId: 'user-123',
+  organizationId: 'org-456',
+  requestType: 'access',
+  format: 'json',
+  requestedBy: 'admin-user',
+  requestTimestamp: new Date().toISOString()
+}
+
+const exportResult = await gdprService.exportUserData(exportRequest)
+console.log('Export completed:', exportResult.recordCount, 'records')
+```
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+
+### Usage Patterns
+
+The GDPRComplianceService supports several key usage patterns:
+
+1. **User data export**: Export audit data in portable formats (JSON, CSV, XML) for data subject access requests
+2. **Data pseudonymization**: Replace original identifiers with pseudonyms while maintaining referential integrity
+3. **Right to erasure**: Delete user data while preserving compliance-critical audit trails
+4. **Retention policy enforcement**: Automatically archive and delete data based on retention policies
+5. **Authorized investigation**: Retrieve original identifiers for compliance investigations with proper authorization
+6. **Compliance reporting**: Generate reports for regulatory audits and compliance verification
+
 ## Conclusion
 
 The Audit Database is a comprehensive, high-performance system designed to meet the demanding requirements of modern audit and compliance scenarios. By implementing advanced database techniques such as time-based partitioning, Redis caching, and comprehensive performance monitoring, the system delivers excellent performance even with large volumes of audit data.
@@ -1006,5 +1160,6 @@ Key strengths of the system include:
 - **Maintainability**: Automated maintenance tasks and comprehensive monitoring reduce operational overhead.
 - **Extensibility**: The modular architecture and Drizzle ORM integration make it easy to evolve the schema as requirements change.
 - **Alert Persistence**: The new DatabaseAlertHandler provides reliable, persistent storage of alerts with multi-organizational support and comprehensive querying capabilities.
+- **GDPR Compliance**: The GDPRComplianceService and pseudonym_mapping table provide robust support for data subject rights and privacy-by-design principles.
 
 The system is well-positioned to serve as the foundation for audit and compliance capabilities across various domains, with particular strength in healthcare applications requiring HIPAA compliance. By following the documented patterns and best practices, organizations can ensure their audit data is secure, reliable, and available when needed.

@@ -3,15 +3,17 @@
 <cite>
 **Referenced Files in This Document**   
 - [package.json](file://package.json)
-- [apps/server/package.json](file://apps/server/package.json)
-- [apps/web/package.json](file://apps/web/package.json)
-- [apps/native/package.json](file://apps/native/package.json)
-- [apps/worker/package.json](file://apps/worker/package.json)
-- [apps/docs/package.json](file://apps/docs/package.json)
-- [apps/server/init-scripts/01-init-audit-db.sql](file://apps/server/init-scripts/01-init-audit-db.sql)
-- [packages/audit-client/docs/GETTING_STARTED.md](file://packages/audit-client/docs/GETTING_STARTED.md) - *Updated in recent commit*
-- [apps/docs/astro.config.mjs](file://apps/docs/astro.config.mjs) - *Sidebar restructured in recent commit*
-- [apps/docs/src/content/docs/audit/get-started.md](file://apps/docs/src/content/docs/audit/get-started.md) - *Quick start content updated*
+- [apps/server/package.json](file://apps\server\package.json)
+- [apps/web/package.json](file://apps\web\package.json)
+- [apps/native/package.json](file://apps\native\package.json)
+- [apps/worker/package.json](file://apps\worker\package.json)
+- [apps/docs/package.json](file://apps\docs\package.json)
+- [apps/server/init-scripts/01-init-audit-db.sql](file://apps\server\init-scripts\01-init-audit-db.sql)
+- [packages/audit-client/docs/GETTING_STARTED.md](file://packages\audit-client\docs\GETTING_STARTED.md) - *Updated in recent commit*
+- [apps/docs/astro.config.mjs](file://apps\docs\astro.config.mjs) - *Sidebar restructured in recent commit*
+- [apps/docs/src/content/docs/audit/get-started.md](file://apps\docs\src\content\docs\audit\get-started.md) - *Quick start content updated*
+- [packages/audit-client/docs/PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md) - *Added plugin architecture documentation*
+- [packages/audit-client/docs/FRAMEWORK_INTEGRATION.md](file://packages\audit-client\docs\FRAMEWORK_INTEGRATION.md) - *Added framework integration examples*
 </cite>
 
 ## Update Summary
@@ -19,8 +21,9 @@
 - Replaced references to deprecated `@repo/audit-sdk` with current `@repo/audit` and `@repo/audit-client` packages
 - Updated quick start guide to align with current implementation
 - Removed outdated Hello World example using deprecated SDK
-- Added new section for Audit Client Library usage
+- Added new sections for Audit Client Library usage, Plugin Architecture, and Framework Integration
 - Updated table of contents and navigation structure
+- Enhanced examples with plugin system and framework integration patterns
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,12 +32,14 @@
 4. [Local Database Setup](#local-database-setup)
 5. [Environment Variables and Service Configuration](#environment-variables-and-service-configuration)
 6. [Quick Start with Audit Client Library](#quick-start-with-audit-client-library)
-7. [Common Setup Issues and Solutions](#common-setup-issues-and-solutions)
+7. [Plugin Architecture System](#plugin-architecture-system)
+8. [Framework Integration Examples](#framework-integration-examples)
+9. [Common Setup Issues and Solutions](#common-setup-issues-and-solutions)
 
 ## Introduction
 This guide provides comprehensive instructions for setting up the SMEDREC Smart Logs development environment. You will learn how to install dependencies, run applications, configure the database, and use the audit client library to emit test events. By following this guide, developers can have the full system running locally within 15 minutes.
 
-The audit system has been restructured with a new client library approach, deprecating the previous SDK in favor of a more modular and maintainable architecture.
+The audit system has been restructured with a new client library approach, deprecating the previous SDK in favor of a more modular and maintainable architecture with extensible plugin capabilities.
 
 ## Development Environment Setup
 
@@ -138,11 +143,11 @@ pnpm dev
 The documentation will be available at `http://localhost:4321`.
 
 **Section sources**
-- [apps/server/package.json](file://apps/server/package.json)
-- [apps/web/package.json](file://apps/web/package.json)
-- [apps/native/package.json](file://apps/native/package.json)
-- [apps/worker/package.json](file://apps/worker/package.json)
-- [apps/docs/package.json](file://apps/docs/package.json)
+- [apps/server/package.json](file://apps\server\package.json)
+- [apps/web/package.json](file://apps\web\package.json)
+- [apps/native/package.json](file://apps\native\package.json)
+- [apps/worker/package.json](file://apps\worker\package.json)
+- [apps/docs/package.json](file://apps\docs\package.json)
 
 ## Local Database Setup
 
@@ -195,7 +200,7 @@ pnpm db:stop      # Stop the database container
 ```
 
 **Section sources**
-- [apps/server/init-scripts/01-init-audit-db.sql](file://apps/server/init-scripts/01-init-audit-db.sql)
+- [apps/server/init-scripts/01-init-audit-db.sql](file://apps\server\init-scripts\01-init-audit-db.sql)
 
 ## Environment Variables and Service Configuration
 
@@ -241,37 +246,56 @@ import { AuditClient } from '@repo/audit-client';
 
 // Initialize the audit client
 const auditClient = new AuditClient({
-  redis: {
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  baseUrl: process.env.AUDIT_API_URL || 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY || 'your-api-key-here',
   },
-  databaseUrl: process.env.AUDIT_DB_URL || 'postgresql://audit:password@localhost:5432/audit_db',
-  defaults: {
-    dataClassification: 'INTERNAL',
-    generateHash: true,
+  logging: {
+    level: 'info',
+    includeRequestBody: false,
+    includeResponseBody: false,
   },
 });
 
 async function logAuditEvent() {
   try {
     // Log an audit event
-    await auditClient.events.log({
+    const event = await auditClient.events.create({
+      action: 'user.login',
       principalId: 'user-123',
-      action: 'document.accessed',
+      organizationId: 'org-456',
       status: 'success',
-      outcomeDescription: 'User accessed medical document',
-      targetResourceType: 'Document',
-      targetResourceId: 'doc-456',
+      outcomeDescription: 'User successfully logged in via password.',
+      targetResourceType: 'User',
+      targetResourceId: 'user-123',
+      sessionContext: {
+        ipAddress: '198.51.100.10',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      },
+      details: {
+        mfa_used: true,
+      },
     });
 
-    console.log('✅ Audit event logged successfully!');
+    console.log('✅ Audit event created successfully:', event.id);
 
-    // Check system health
-    const health = await auditClient.health.check();
-    console.log('📊 Audit system health:', health);
+    // Query events
+    const results = await auditClient.events.query({
+      filter: {
+        actions: ['user.login'],
+        statuses: ['success'],
+      },
+      pagination: {
+        limit: 10,
+      },
+    });
+
+    console.log(`Found ${results.events.length} login events.`);
   } catch (error) {
-    console.error('❌ Error logging audit event:', error);
+    console.error('❌ Error creating audit event:', error);
   } finally {
-    await auditClient.disconnect();
+    await auditClient.destroy();
   }
 }
 
@@ -283,41 +307,234 @@ The audit client supports various configuration options:
 
 ```typescript
 const auditClient = new AuditClient({
-  // Redis configuration
-  redis: {
-    url: 'redis://localhost:6379',
-    maxRetries: 3,
-    retryInterval: 1000,
+  // API endpoint
+  baseUrl: 'https://api.smartlogs.com',
+  
+  // Authentication configuration
+  authentication: {
+    type: 'apiKey',
+    apiKey: 'your-api-key-here',
   },
   
-  // Database configuration
-  databaseUrl: 'postgresql://user:pass@localhost:5432/audit_db',
-  
-  // Default event properties
-  defaults: {
-    dataClassification: 'CONFIDENTIAL',
-    generateHash: true,
-    includeStackTrace: false,
+  // Retry configuration
+  retry: {
+    enabled: true,
+    maxAttempts: 3,
+    backoffMultiplier: 2,
+    maxDelayMs: 10000,
   },
   
-  // Service-specific configurations
-  services: {
-    compliance: {
-      enabled: true,
-      retentionPeriod: '7y',
-    },
-    monitoring: {
-      enabled: true,
-      metricsInterval: 60000,
-    },
+  // Cache configuration
+  cache: {
+    enabled: true,
+    defaultTtlMs: 60000,
+    maxItems: 1000,
+  },
+  
+  // Logging configuration
+  logging: {
+    enabled: true,
+    level: 'info',
+    maskSensitiveData: true,
+    sensitiveFields: ['password', 'token', 'secret'],
   },
 });
 ```
 
 **Section sources**
-- [packages/audit-client/docs/GETTING_STARTED.md](file://packages/audit-client/docs/GETTING_STARTED.md)
-- [packages/audit-client/src/core/client.ts](file://packages/audit-client/src/core/client.ts)
-- [apps/docs/src/content/docs/audit/get-started.md](file://apps/docs/src/content/docs/audit/get-started.md)
+- [packages/audit-client/docs/GETTING_STARTED.md](file://packages\audit-client\docs\GETTING_STARTED.md)
+- [packages/audit-client/src/core/client.ts](file://packages\audit-client\src\core\client.ts)
+- [apps/docs/src/content/docs/audit/get-started.md](file://apps\docs\src\content\docs\audit\get-started.md)
+
+## Plugin Architecture System
+
+The Audit Client Library includes a comprehensive plugin architecture that allows developers to extend functionality through custom middleware, storage backends, and authentication methods.
+
+### Core Plugin Types
+- **Middleware Plugins**: Process requests and responses
+- **Storage Plugins**: Custom cache storage backends
+- **Authentication Plugins**: Custom authentication methods
+
+### Built-in Plugins
+#### Request Logging Plugin
+```typescript
+const client = new AuditClient({
+  plugins: {
+    middleware: {
+      enabled: true,
+      plugins: ['request-logging'],
+    },
+  },
+  logging: {
+    level: 'info',
+  },
+});
+```
+
+#### Correlation ID Plugin
+```typescript
+const client = new AuditClient({
+  plugins: {
+    middleware: {
+      enabled: true,
+      plugins: ['correlation-id'],
+    },
+  },
+});
+```
+
+#### Redis Storage Plugin
+```typescript
+const client = new AuditClient({
+  plugins: {
+    storage: {
+      enabled: true,
+      plugins: {
+        'redis-storage': {
+          host: 'localhost',
+          port: 6379,
+          password: 'redis-password',
+        },
+      },
+    },
+  },
+});
+```
+
+### Custom Plugin Example
+```typescript
+import type { MiddlewarePlugin, MiddlewareRequest, MiddlewareNext } from '@repo/audit-client';
+
+class CustomTimingPlugin implements MiddlewarePlugin {
+  readonly name = 'custom-timing';
+  readonly version = '1.0.0';
+  readonly type = 'middleware' as const;
+
+  async processRequest(
+    request: MiddlewareRequest,
+    next: MiddlewareNext
+  ): Promise<MiddlewareRequest> {
+    request.headers['X-Request-Start-Time'] = Date.now().toString();
+    return next(request);
+  }
+}
+
+// Register the plugin
+await auditClient.plugins.getRegistry().register(new CustomTimingPlugin());
+```
+
+**Section sources**
+- [packages/audit-client/docs/PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md)
+- [packages/audit-client/src/infrastructure/plugins/README.md](file://packages\audit-client\src\infrastructure\plugins\README.md)
+- [packages/audit-client/src/core/client.ts](file://packages\audit-client\src\core\client.ts)
+
+## Framework Integration Examples
+
+### Express.js Integration
+**`src/audit-client.ts`**
+```typescript
+import { AuditClient } from '@repo/audit-client';
+
+export const auditClient = new AuditClient({
+  baseUrl: process.env.AUDIT_API_URL || 'https://api.smartlogs.com',
+  authentication: {
+    type: 'apiKey',
+    apiKey: process.env.AUDIT_API_KEY,
+  },
+});
+
+// Gracefully shut down the client on app exit
+process.on('SIGINT', async () => {
+  await auditClient.destroy();
+  process.exit(0);
+});
+```
+
+**`src/middleware/audit-logger.ts`**
+```typescript
+import { auditClient } from '../audit-client';
+
+export function auditRequest(req, res, next) {
+  const { method, path, ip, user } = req;
+
+  auditClient.events
+    .create({
+      action: 'api.request',
+      principalId: user ? user.id : 'anonymous',
+      organizationId: user ? user.organizationId : 'unknown',
+      status: 'attempt',
+      sessionContext: {
+        ipAddress: ip,
+        userAgent: req.get('User-Agent'),
+      },
+      details: {
+        method,
+        path,
+        params: req.params,
+        query: req.query,
+      },
+    })
+    .catch((error) => {
+      console.error('Failed to log audit request:', error);
+    });
+
+  next();
+}
+```
+
+### Next.js Integration
+**`lib/audit-client.ts`**
+```typescript
+import { AuditClient } from '@repo/audit-client';
+
+declare global {
+  var auditClient: AuditClient | undefined;
+}
+
+const client =
+  globalThis.auditClient ||
+  new AuditClient({
+    baseUrl: process.env.AUDIT_API_URL!,
+    authentication: {
+      type: 'apiKey',
+      apiKey: process.env.AUDIT_API_KEY!,
+    },
+  });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.auditClient = client;
+}
+
+export const auditClient = client;
+```
+
+**`app/actions.ts`**
+```typescript
+'use server'
+
+import { auditClient } from '@/lib/audit-client';
+
+export async function deleteDocument(documentId: string) {
+  const session = await auth();
+
+  if (!session) {
+    throw new Error('Unauthorized');
+  }
+
+  await auditClient.events.create({
+    action: 'document.delete',
+    principalId: session.user.id,
+    organizationId: session.user.organizationId,
+    status: 'success',
+    targetResourceId: documentId,
+  });
+}
+```
+
+**Section sources**
+- [packages/audit-client/docs/FRAMEWORK_INTEGRATION.md](file://packages\audit-client\docs\FRAMEWORK_INTEGRATION.md)
+- [packages/audit-client/src/examples/client-usage.ts](file://packages\audit-client\src\examples\client-usage.ts)
+- [packages/audit-client/src/core/client.ts](file://packages\audit-client\src\core\client.ts)
 
 ## Common Setup Issues and Solutions
 

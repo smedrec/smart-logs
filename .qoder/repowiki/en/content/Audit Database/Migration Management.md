@@ -7,11 +7,22 @@
 - [0002_tearful_blonde_phantom.sql](file://packages/audit-db/drizzle/migrations/0002_tearful_blonde_phantom.sql)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql)
 - [0004_mixed_roughhouse.sql](file://packages/audit-db/drizzle/migrations/0004_mixed_roughhouse.sql)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added pseudonym mapping table for GDPR compliance*
 - [convert-to-partitioned.sql](file://packages/audit-db/src/db/migrations/convert-to-partitioned.sql)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
 - [setup-partitions.ts](file://packages/audit-db/src/db/setup-partitions.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Implements pseudonymization logic*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added new section on GDPR pseudonymization migration
+- Updated migration workflow section to include GDPR-related changes
+- Added new diagram showing pseudonymization data flow
+- Updated structure of migration files section to include the new pseudonym_mapping table
+- Enhanced best practices section with GDPR compliance considerations
+- Added new sources for GDPR-related files and updated migration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -22,7 +33,8 @@
 6. [Rollback Procedures and Failure Recovery](#rollback-procedures-and-failure-recovery)
 7. [Best Practices for Writing Migrations](#best-practices-for-writing-migrations)
 8. [Complex Migration Examples](#complex-migration-examples)
-9. [Validation and Monitoring](#validation-and-monitoring)
+9. [GDPR Pseudonymization Migration](#gdpr-pseudonymization-migration)
+10. [Validation and Monitoring](#validation-and-monitoring)
 
 ## Introduction
 This document provides comprehensive documentation for the database migration system using Drizzle ORM in the audit-db package. It details the migration workflow, versioning strategy, rollback procedures, and execution process. The system supports atomic schema changes, data transformations, and advanced features like table partitioning for large audit datasets. The migration framework ensures schema consistency across environments while enabling safe, reversible changes with minimal downtime.
@@ -72,6 +84,7 @@ Subsequent migrations apply incremental changes. For example:
 - `0002_tearful_blonde_phantom.sql` adds `integrity_report` to `report_executions` and `export` to `scheduled_reports`
 - `0003_easy_prowler.sql` adds acknowledgment fields to `alerts`
 - `0004_mixed_roughhouse.sql` drops a foreign key constraint from `audit_integrity_log`
+- `0006_silly_tyger_tiger.sql` adds the `pseudonym_mapping` table for GDPR compliance
 
 Each migration file follows a consistent pattern:
 1. DDL statements for schema changes
@@ -87,6 +100,7 @@ audit_log ||--o{ audit_integrity_log : "has integrity verification"
 scheduled_reports ||--o{ report_executions : "has executions"
 alerts ||--o{ audit_log : "references events"
 error_log ||--o{ error_aggregation : "contributes to aggregation"
+pseudonym_mapping ||--o{ audit_log : "maps pseudonymized IDs"
 ```
 
 **Diagram sources**
@@ -99,6 +113,7 @@ error_log ||--o{ error_aggregation : "contributes to aggregation"
 - [0002_tearful_blonde_phantom.sql](file://packages/audit-db/drizzle/migrations/0002_tearful_blonde_phantom.sql#L1-L2)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql#L1-L5)
 - [0004_mixed_roughhouse.sql](file://packages/audit-db/drizzle/migrations/0004_mixed_roughhouse.sql#L1)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
 
 ## Migration Execution Process
 
@@ -273,9 +288,17 @@ Test migrations thoroughly:
 ### Documentation
 Include clear comments in migration files explaining the purpose and impact of changes.
 
+### GDPR Compliance
+When implementing GDPR-related migrations:
+- Ensure pseudonymization mappings are encrypted
+- Maintain referential integrity for audit trails
+- Implement proper access controls for reverse mapping
+- Document data protection impact assessments
+
 **Section sources**
 - [0001_aberrant_natasha_romanoff.sql](file://packages/audit-db/drizzle/migrations/0001_aberrant_natasha_romanoff.sql#L1)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql#L1-L5)
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
 
 ## Complex Migration Examples
 
@@ -367,6 +390,47 @@ A --> G
 - [convert-to-partitioned.sql](file://packages/audit-db/src/db/migrations/convert-to-partitioned.sql#L1-L66)
 - [setup-partitions.ts](file://packages/audit-db/src/db/setup-partitions.ts#L1-L50)
 
+## GDPR Pseudonymization Migration
+
+The system implements GDPR-compliant pseudonymization through a dedicated migration and supporting infrastructure. The `0006_silly_tyger_tiger.sql` migration introduces the `pseudonym_mapping` table to maintain referential integrity while protecting personal data.
+
+### Migration Details
+The `pseudonym_mapping` table structure:
+- `id`: Serial primary key
+- `timestamp`: Timestamp of mapping creation
+- `pseudonym_id`: Text field storing the pseudonymized identifier
+- `original_id`: Text field storing the encrypted original identifier
+
+The migration creates three indexes for efficient lookups:
+- `pseudonym_mapping_timestamp_idx` on timestamp
+- `pseudonym_mapping_pseudonym_id_idx` on pseudonym_id
+- `pseudonym_mapping_original_id_idx` on original_id
+
+### Data Flow
+```mermaid
+flowchart LR
+A["Original User ID"] --> B["GDPR Compliance Service"]
+B --> C["Generate Pseudonym"]
+C --> D["Encrypt Original ID"]
+D --> E["Store in pseudonym_mapping"]
+E --> F["Update audit_log with pseudonym"]
+F --> G["Maintain Audit Trail"]
+G --> H["Preserve Referential Integrity"]
+B --> I["Support Multiple Strategies"]
+I --> J["Hash-based Pseudonymization"]
+I --> K["Token-based Pseudonymization"]
+I --> L["Encryption-based Pseudonymization"]
+```
+
+**Diagram sources**
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L234-L275)
+
+**Section sources**
+- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L234-L275)
+- [gdpr-utils.test.ts](file://packages/audit/src/__tests__/gdpr-utils.test.ts#L0-L37)
+
 ## Validation and Monitoring
 
 The system includes several validation and monitoring mechanisms to ensure migration integrity:
@@ -404,15 +468,15 @@ async analyzePartitionPerformance(): Promise<{
 }
 ```
 
-### Execution Monitoring
-The partition maintenance scheduler logs key metrics:
+### GDPR Compliance Monitoring
+The system monitors pseudonymization operations:
 ```typescript
-console.log('Partition statistics:', {
-    totalPartitions: stats.totalPartitions,
-    totalSizeGB: (stats.totalSize / (1024 * 1024 * 1024)).toFixed(2),
-    totalRecords: stats.totalRecords,
-    recommendations: stats.recommendations,
-})
+async logGDPRActivity(event: AuditLogEvent): Promise<void> {
+    await this.audit.log(event, {
+        generateHash: true,
+        generateSignature: true,
+    })
+}
 ```
 
 These monitoring capabilities help ensure that migrations maintain optimal database performance and that partitioning strategies remain effective as data volumes grow.
@@ -420,3 +484,4 @@ These monitoring capabilities help ensure that migrations maintain optimal datab
 **Section sources**
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L20-L662)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts#L1-L497)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L234-L275)
