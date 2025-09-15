@@ -224,12 +224,12 @@ export class RedisEnhancedMetricsCollector implements EnhancedMetricsCollector {
 				heapTotal: memUsage.heapTotal,
 			},
 			disk: {
-				used: 0, // Would need additional library for disk metrics
+				used: 0, // TODO: Would need additional library for disk metrics
 				total: 0,
 				free: 0,
 			},
 			network: {
-				bytesIn: 0, // Would need additional library for network metrics
+				bytesIn: 0, // TODO: Would need additional library for network metrics
 				bytesOut: 0,
 				packetsIn: 0,
 				packetsOut: 0,

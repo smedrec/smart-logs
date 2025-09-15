@@ -261,7 +261,7 @@ export class AuditTracer implements Tracer {
 	 * Export span to Jaeger (placeholder implementation)
 	 */
 	private exportToJaeger(span: Span): void {
-		// In a real implementation, this would send to Jaeger
+		// TODO: In a real implementation, this would send to Jaeger
 		console.log('📊 Jaeger Export:', {
 			traceID: span.traceId,
 			spanID: span.spanId,
@@ -290,7 +290,7 @@ export class AuditTracer implements Tracer {
 	 * Export span to Zipkin (placeholder implementation)
 	 */
 	private exportToZipkin(span: Span): void {
-		// In a real implementation, this would send to Zipkin
+		// TODO: In a real implementation, this would send to Zipkin
 		console.log('📈 Zipkin Export:', {
 			traceId: span.traceId,
 			id: span.spanId,
@@ -311,7 +311,7 @@ export class AuditTracer implements Tracer {
 	 * Export span to OTLP (placeholder implementation)
 	 */
 	private exportToOTLP(span: Span): void {
-		// In a real implementation, this would send to OTLP endpoint
+		// TODO: In a real implementation, this would send to OTLP endpoint
 		console.log('🚀 OTLP Export:', {
 			resourceSpans: [
 				{
