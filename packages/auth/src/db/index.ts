@@ -26,4 +26,4 @@ export const initDrizzle = (dbUrl?: string, maxConnections: number = MAX_CONNECT
 	return { db, client }
 }
 
-export type DrizzleDb = ReturnType<typeof initDrizzle>['db']
+export type AuthDrizzleDb = ReturnType<typeof initDrizzle>['db']

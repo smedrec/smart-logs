@@ -1,7 +1,7 @@
 export { db, initDrizzle } from './db/index.js'
 export * from './db/schema/index.js'
 export type { Session } from './auth.js'
-export type { DrizzleCli } from './db/index.js'
+export type { AuthDrizzleDb } from './db/index.js'
 export type { Permission, Role } from './permissions.js'
 export { Auth } from './auth.js'
 export { AuthorizationService, createAuthorizationService } from './permissions.js'

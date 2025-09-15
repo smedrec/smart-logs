@@ -12,11 +12,11 @@ import { getRedisConnection } from './redis.js'
 import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Audit, AuditConfig } from '@repo/audit'
 import type { MailerSendOptions } from '@repo/mailer'
-import type { DrizzleDb } from './db/index.js'
+import type { AuthDrizzleDb } from './db/index.js'
 
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
-	private db: DrizzleDb
+	private db: AuthDrizzleDb
 	private redis: RedisInstanceType
 	private audit: Audit | undefined = undefined
 	/**
