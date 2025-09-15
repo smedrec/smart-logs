@@ -7,8 +7,8 @@
 	"main": "dist/index.js",
 	"scripts": {
 		"build": "tsc --build",
+		"check-types": "tsc --noEmit",
 		"check:lint": "eslint . --ext .ts",
-		"check:types": "tsc --noEmit",
 		"clean": "rm -rf dist node_modules .turbo",
 		"dev": "tsx watch src/index.ts",
 		"start": "node dist/index.js",
@@ -17,15 +17,15 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@hono/node-server": "1.16.0",
+		"@hono/node-server": "1.19.2",
 		"@repo/audit": "workspace:*",
 		"@repo/audit-db": "workspace:*",
 		"@repo/redis-client": "workspace:*",
-		"bullmq": "5.56.4",
-		"dotenv": "17.2.0",
-		"hono": "4.8.4",
+		"bullmq": "5.58.5",
+		"dotenv": "17.2.2",
+		"hono": "4.9.7",
 		"ioredis": "5.7.0",
-		"pino": "9.7.0",
+		"pino": "9.9.5",
 		"postgres": "3.4.7",
 		"workers-tagged-logger": "0.13.1"
 	},

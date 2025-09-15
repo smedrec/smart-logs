@@ -21,7 +21,7 @@
 	},
 	"dependencies": {
 		"@repo/redis-client": "workspace:*",
-		"bullmq": "5.56.4",
+		"bullmq": "5.58.5",
 		"ioredis": "5.7.0"
 	},
 	"devDependencies": {

@@ -15,17 +15,22 @@
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Implements pseudonymization logic*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added GDPR utility functions*
-- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added organization role management with Redis caching*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added organization role management with Redis caching*
+- [organization.ts](file://packages/auth/docs/tutorials/organization-management.md) - *Organization management implementation*
+- [member-management.ts](file://packages/auth/docs/tutorials/organization-management.md) - *Member management implementation*
+- [permissions.ts](file://packages/auth/src/permissions.ts) - *Authorization service with Redis caching*
+- [active-organization.ts](file://packages/auth/docs/tutorials/organization-management.md) - *Active organization management*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on organization role management migration
-- Updated migration workflow section to include role-based access control changes
-- Added new diagram showing organization role data flow
-- Updated structure of migration files section to include the new organization_role table
-- Enhanced best practices section with role management considerations
-- Added new sources for role management-related files and updated migration
+- Added new section on organization role management migration with comprehensive implementation details
+- Updated migration workflow section to include role-based access control changes and Redis caching integration
+- Added new diagram showing organization role data flow with Redis cache interaction
+- Enhanced best practices section with role management considerations and permission hierarchy
+- Updated structure of migration files section to include the new organization_role table and its constraints
+- Added detailed implementation examples for organization creation, member management, and role assignment
+- Integrated Redis caching strategy for permission lookups and user role management
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -90,6 +95,7 @@ Subsequent migrations apply incremental changes. For example:
 - `0004_mixed_roughhouse.sql` drops a foreign key constraint from `audit_integrity_log`
 - `0005_marvelous_christian_walker.sql` adds `run_id` field to `report_executions` and `scheduled_reports`
 - `0006_silly_tyger_tiger.sql` adds the `pseudonym_mapping` table for GDPR compliance
+- `0005_fluffy_donald_blake.sql` adds the `organization_role` table for role-based access control with Redis caching
 
 Each migration file follows a consistent pattern:
 1. DDL statements for schema changes
@@ -112,7 +118,7 @@ organization_role ||--o{ organization : "defines permissions per organization"
 **Diagram sources**
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L20-L662)
 - [0000_burly_namor.sql](file://packages/audit-db/drizzle/migrations/0000_burly_namor.sql#L1-L320)
-- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
 
 **Section sources**
 - [0000_burly_namor.sql](file://packages/audit-db/drizzle/migrations/0000_burly_namor.sql#L1-L320)
@@ -122,6 +128,7 @@ organization_role ||--o{ organization : "defines permissions per organization"
 - [0004_mixed_roughhouse.sql](file://packages/audit-db/drizzle/migrations/0004_mixed_roughhouse.sql#L1)
 - [0005_marvelous_christian_walker.sql](file://packages/audit-db/drizzle/migrations/0005_marvelous_christian_walker.sql#L1-L2)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
 
 ## Migration Execution Process
 
@@ -305,16 +312,19 @@ When implementing GDPR-related migrations:
 
 ### Role Management
 When implementing role-based access control migrations:
-- Define clear permission hierarchies
-- Implement proper foreign key constraints
-- Use composite primary keys for role assignments
+- Define clear permission hierarchies (owner > admin > member)
+- Implement proper foreign key constraints with cascade deletion
+- Use composite primary keys for role assignments (organization_id, name)
 - Create appropriate indexes for role-based queries
+- Integrate Redis caching for permission lookups to improve performance
+- Implement role inheritance and permission caching strategies
 
 **Section sources**
 - [0001_aberrant_natasha_romanoff.sql](file://packages/audit-db/drizzle/migrations/0001_aberrant_natasha_romanoff.sql#L1)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql#L1-L5)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
-- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [permissions.ts](file://packages/auth/src/permissions.ts#L1-L53)
 
 ## Complex Migration Examples
 
@@ -463,7 +473,78 @@ The migration creates two indexes for efficient lookups:
 - `organization_role_organization_id_idx` on organization_id
 - `organization_role_name_idx` on name
 
-The table uses a composite primary key on organization_id and name, ensuring unique role names per organization.
+The table uses a composite primary key on organization_id and name, ensuring unique role names per organization. It also includes a foreign key constraint with cascade deletion to maintain referential integrity.
+
+### Implementation Details
+The role management system is implemented with the following components:
+
+**Organization Creation**
+```typescript
+export async function createOrganization(
+  session: Session,
+  input: CreateOrganizationInput
+): Promise<typeof organization.$inferSelect> {
+  const organizationId = crypto.randomUUID()
+  const userId = session.user.id
+  
+  return await db.transaction(async (tx) => {
+    // Create organization
+    const [newOrg] = await tx.insert(organization).values({
+      id: organizationId,
+      name: input.name,
+      slug: input.slug || generateSlug(input.name),
+      retentionDays: input.retentionDays || 90,
+      createdAt: new Date()
+    }).returning()
+
+    // Add creator as organization owner
+    await tx.insert(member).values({
+      id: crypto.randomUUID(),
+      organizationId: newOrg.id,
+      userId: userId,
+      role: 'owner',
+      createdAt: new Date()
+    })
+
+    return newOrg
+  })
+}
+```
+
+**Role Management with Redis Caching**
+```typescript
+export class AuthorizationService {
+  private readonly roleCachePrefix = 'authz:roles:'
+  private readonly permissionCachePrefix = 'authz:permissions:'
+  
+  constructor(private db: PostgresJsDatabase, private redis: RedisInstanceType) {
+    this.initializeRoles()
+  }
+
+  async hasPermission(
+    session: Session,
+    resource: string,
+    action: string
+  ): Promise<boolean> {
+    // Check cache first
+    const cacheKey = `${this.permissionCachePrefix}${session.session.userId}:${resource}:${action}`
+    const exists = await this.redis.exists(cacheKey)
+    
+    if (exists) {
+      const data = await this.redis.get(cacheKey)
+      return data === 'true'
+    }
+
+    // Calculate permission and cache result
+    let hasPermission = await this.calculatePermission(session, resource, action)
+    
+    // Cache for 5 minutes
+    await this.redis.setex(cacheKey, 300, hasPermission ? 'true' : 'false')
+    
+    return hasPermission
+  }
+}
+```
 
 ### Data Flow
 ```mermaid
@@ -482,13 +563,16 @@ K --> L["Cache Refresh"]
 ```
 
 **Diagram sources**
-- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
-- [authz.ts](file://packages/auth/src/db/schema/authz.ts#L80-L118)
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [permissions.ts](file://packages/auth/src/permissions.ts#L1-L53)
+- [organization.ts](file://packages/auth/docs/tutorials/organization-management.md#L43-L110)
 
 **Section sources**
-- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
-- [authz.ts](file://packages/auth/src/db/schema/authz.ts#L80-L118)
-- [organization_role.test.ts](file://packages/auth/src/__tests__/organization_role.test.ts#L0-L45)
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [permissions.ts](file://packages/auth/src/permissions.ts#L1-L53)
+- [organization.ts](file://packages/auth/docs/tutorials/organization-management.md#L43-L110)
+- [member-management.ts](file://packages/auth/docs/tutorials/organization-management.md#L242-L626)
+- [active-organization.ts](file://packages/auth/docs/tutorials/organization-management.md#L837-L935)
 
 ## Validation and Monitoring
 
@@ -538,9 +622,33 @@ async logGDPRActivity(event: AuditLogEvent): Promise<void> {
 }
 ```
 
+### Role Management Monitoring
+The authorization service includes monitoring for permission cache performance:
+```typescript
+async getRoleFromDatabase(fullKey: string): Promise<Role | null> {
+    // Monitor database queries for role lookups
+    const startTime = Date.now()
+    const result = await this.db.query.organizationRole.findFirst({
+        where: and(
+            eq(organizationRole.organizationId, organizationId),
+            eq(organizationRole.name, name)
+        )
+    })
+    const duration = Date.now() - startTime
+    
+    // Log slow queries
+    if (duration > 100) {
+        console.warn('Slow role lookup:', { fullKey, duration })
+    }
+    
+    return result
+}
+```
+
 These monitoring capabilities help ensure that migrations maintain optimal database performance and that partitioning strategies remain effective as data volumes grow.
 
 **Section sources**
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L20-L662)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts#L1-L497)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L234-L275)
+- [permissions.ts](file://packages/auth/src/permissions.ts#L116-L165)
