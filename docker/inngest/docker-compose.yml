@@ -1,0 +1,19 @@
+services:
+  inngest:
+    image: inngest/inngest
+    command: 'inngest start -u http://192.168.1.114:3000/api/inngest'
+    container_name: inngest
+    restart: always
+    ports:
+      - '8288:8288'
+      - '8289:8289'
+    environment:
+      - INNGEST_EVENT_KEY=${INNGEST_EVENT_KEY}
+      - INNGEST_SIGNING_KEY=${INNGEST_SIGNING_KEY}
+      - INNGEST_POSTGRES_URI=${INNGEST_POSTGRES_URI}
+      - INNGEST_REDIS_URI=${INNGEST_REDIS_URI}
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default

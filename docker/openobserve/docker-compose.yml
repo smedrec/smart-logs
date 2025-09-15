@@ -1,0 +1,22 @@
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    restart: always
+    ports:
+      - "5080:5080"
+    environment:
+      - ZO_DATA_DIR=/data
+      - ZO_ROOT_USER_EMAIL=${OPENOBSERVE_ROOT_USER_EMAIL}
+      - ZO_ROOT_USER_PASSWORD=${OPENOBSERVE_ROOT_USER_PASSWORD}
+    volumes:
+      - openobserve_data:/data
+
+#networks:
+#  default:
+#    external: true
+#    name: nginx-proxy-manager_default
+
+volumes:
+  openobserve_data:
+    driver: local

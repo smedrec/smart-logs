@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: pgvector
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '25432:5432'
+    volumes:
+      - pgvector:/var/lib/postgresql/data
+    command: postgres -c shared_preload_libraries='pg_stat_statements' -c wal_level=logical
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${AUDIT_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  electric:
+    image: docker.io/electricsql/electric:latest
+    container_name: electric
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${AUDIT_DB}?sslmode=disable
+      # Not suitable for production. Only use insecure mode in development or if you've otherwise secured the Electric API.
+      # See https://electric-sql.com/docs/guides/security
+      ELECTRIC_INSECURE: true
+    #ports:
+    #  - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
+
+volumes:
+  pgvector:
+    driver: local

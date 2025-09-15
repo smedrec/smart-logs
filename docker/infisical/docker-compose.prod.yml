@@ -1,0 +1,14 @@
+services:
+  backend:
+    container_name: infisical-backend
+    restart: always
+    image: infisical/infisical:latest-postgres
+    pull_policy: always
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
