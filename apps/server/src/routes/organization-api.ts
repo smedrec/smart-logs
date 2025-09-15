@@ -5,11 +5,10 @@
  * - Hello World
  *
  */
-import { Session } from 'inspector/promises'
 import { ApiError } from '@/lib/errors/http.js'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
-import { emailProvider, organization } from '@repo/auth'
+import { emailProvider } from '@repo/auth'
 
 import { openApiErrorResponses } from '../lib/errors/openapi_responses.js'
 

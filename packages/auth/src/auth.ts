@@ -12,10 +12,11 @@ import { getRedisConnection } from './redis.js'
 import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Audit, AuditConfig } from '@repo/audit'
 import type { MailerSendOptions } from '@repo/mailer'
+import type { DrizzleDb } from './db/index.js'
 
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
-	private db: ReturnType<typeof initDrizzle>['db']
+	private db: DrizzleDb
 	private redis: RedisInstanceType
 	private audit: Audit | undefined = undefined
 	/**
@@ -25,25 +26,12 @@ class Auth {
 	 * @throws Error if the config not provided and cannot be found in environment variables.
 	 */
 	constructor(config: AuditConfig, inngest: Inngest, audit?: Audit) {
-		/**const effectiveConfig = config || getEnvConfig()
-
-		if (!effectiveConfig) {
-			throw new Error('Auth: Better auth environment variables not found.')
-		}*/
-
 		const redis = getRedisConnection(config.server.auth.redisUrl)
 		this.redis = redis
 
 		// Using environment variable AUTH_DB_URL
 		const { db } = initDrizzle(config.server.auth.dbUrl, config.server.auth.poolSize)
 		this.db = db
-
-		// TODO - see who to fix the async question
-		//if (await authDbService.checkAuthDbConnection()) {
-		console.info('🟢 Connected to Postgres for Better Auth service.')
-		//} else {
-		//	console.error('🔴 Postgres connection error for Better Auth service')
-		//}
 
 		if (audit) {
 			this.audit = audit
@@ -153,7 +141,7 @@ class Auth {
 									action: 'login' as const,
 									status: 'success' as 'success' | 'attempt' | 'failure',
 									sessionContext: {
-										sessionId: session.id,
+										sessionId: session.id || sessionId,
 										ipAddress:
 											session.ipAddress && session.ipAddress.length > 0
 												? session.ipAddress
@@ -273,11 +261,10 @@ class Auth {
 					rateLimit: {
 						enabled: true,
 						timeWindow: 1000 * 60 * 60 * 24, // 1 day
-						maxRequests: 10, // 10 requests per day
+						maxRequests: 10000, // 10000 requests per day
 					},
 					enableMetadata: true,
 				}),
-				//await AuditSDKPlugin(),
 				openAPI(),
 			],
 		})
