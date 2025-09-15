@@ -47,6 +47,7 @@ The audit worker has been completely redesigned with enterprise-grade features:
 #### Old vs New Configuration
 
 **❌ Old Way (Environment Variables):**
+
 ```bash
 DATABASE_URL="postgresql://..."
 REDIS_URL="redis://..."
@@ -55,8 +56,9 @@ LOG_LEVEL="info"
 ```
 
 **✅ New Way (ConfigurationManager):**
+
 ```bash
-CONFIG_PATH="s3://your-bucket/config/worker-config.json"
+CONFIG_PATH="default/audit-development.json"
 LOG_LEVEL="info"  # Optional override
 ```
 
@@ -76,86 +78,86 @@ Create a comprehensive configuration file in JSON format:
 
 ```json
 {
-  "redis": {
-    "host": "localhost",
-    "port": 6379,
-    "password": null,
-    "db": 0,
-    "family": 4,
-    "maxRetriesPerRequest": 3,
-    "retryDelayOnFailover": 100,
-    "lazyConnect": true,
-    "keepAlive": 30000
-  },
-  "enhancedClient": {
-    "connectionString": "postgresql://audit_user:secure_password@localhost:5432/audit_db",
-    "maxConnections": 20,
-    "idleTimeoutMillis": 30000,
-    "connectionTimeoutMillis": 2000,
-    "monitoring": {
-      "enabled": false,
-      "queryLogging": false,
-      "slowQueryThreshold": 1000
-    },
-    "partitioning": {
-      "enabled": false,
-      "partitionBy": "month",
-      "retentionMonths": 12
-    }
-  },
-  "security": {
-    "encryptionKey": "a-very-secure-256-bit-encryption-key-goes-here-32-chars",
-    "algorithm": "aes-256-gcm",
-    "keyRotation": {
-      "enabled": false,
-      "rotationIntervalDays": 90
-    }
-  },
-  "monitoring": {
-    "enabled": true,
-    "alertThresholds": {
-      "errorRate": 0.05,
-      "queueDepth": 1000,
-      "processingLatency": 5000,
-      "memoryUsage": 0.8,
-      "cpuUsage": 0.8
-    },
-    "metricsRetentionDays": 7,
-    "alertCooldownMinutes": 15
-  },
-  "reliableProcessor": {
-    "queueName": "audit-events",
-    "concurrency": 5,
-    "maxStalledCount": 1,
-    "maxRetriesPerRequest": 3,
-    "retryConfig": {
-      "maxRetries": 3,
-      "baseDelay": 1000,
-      "maxDelay": 30000,
-      "backoffStrategy": "exponential"
-    },
-    "circuitBreakerConfig": {
-      "failureThreshold": 5,
-      "recoveryTimeout": 60000,
-      "monitoringPeriod": 10000,
-      "minimumThroughput": 10
-    },
-    "deadLetterConfig": {
-      "queueName": "audit-events-failed",
-      "alertThreshold": 10,
-      "retentionDays": 30
-    }
-  },
-  "worker": {
-    "port": 3001,
-    "host": "0.0.0.0",
-    "gracefulShutdownTimeoutMs": 30000
-  },
-  "logging": {
-    "level": "info",
-    "format": "json",
-    "destination": "stdout"
-  }
+	"redis": {
+		"host": "localhost",
+		"port": 6379,
+		"password": null,
+		"db": 0,
+		"family": 4,
+		"maxRetriesPerRequest": 3,
+		"retryDelayOnFailover": 100,
+		"lazyConnect": true,
+		"keepAlive": 30000
+	},
+	"enhancedClient": {
+		"connectionString": "postgresql://audit_user:secure_password@localhost:5432/audit_db",
+		"maxConnections": 20,
+		"idleTimeoutMillis": 30000,
+		"connectionTimeoutMillis": 2000,
+		"monitoring": {
+			"enabled": false,
+			"queryLogging": false,
+			"slowQueryThreshold": 1000
+		},
+		"partitioning": {
+			"enabled": false,
+			"partitionBy": "month",
+			"retentionMonths": 12
+		}
+	},
+	"security": {
+		"encryptionKey": "a-very-secure-256-bit-encryption-key-goes-here-32-chars",
+		"algorithm": "aes-256-gcm",
+		"keyRotation": {
+			"enabled": false,
+			"rotationIntervalDays": 90
+		}
+	},
+	"monitoring": {
+		"enabled": true,
+		"alertThresholds": {
+			"errorRate": 0.05,
+			"queueDepth": 1000,
+			"processingLatency": 5000,
+			"memoryUsage": 0.8,
+			"cpuUsage": 0.8
+		},
+		"metricsRetentionDays": 7,
+		"alertCooldownMinutes": 15
+	},
+	"reliableProcessor": {
+		"queueName": "audit-events",
+		"concurrency": 5,
+		"maxStalledCount": 1,
+		"maxRetriesPerRequest": 3,
+		"retryConfig": {
+			"maxRetries": 3,
+			"baseDelay": 1000,
+			"maxDelay": 30000,
+			"backoffStrategy": "exponential"
+		},
+		"circuitBreakerConfig": {
+			"failureThreshold": 5,
+			"recoveryTimeout": 60000,
+			"monitoringPeriod": 10000,
+			"minimumThroughput": 10
+		},
+		"deadLetterConfig": {
+			"queueName": "audit-events-failed",
+			"alertThreshold": 10,
+			"retentionDays": 30
+		}
+	},
+	"worker": {
+		"port": 3001,
+		"host": "0.0.0.0",
+		"gracefulShutdownTimeoutMs": 30000
+	},
+	"logging": {
+		"level": "info",
+		"format": "json",
+		"destination": "stdout"
+	}
 }
 ```
 
@@ -193,7 +195,7 @@ Set the minimal required environment variables:
 
 ```bash
 # Primary configuration
-export CONFIG_PATH="s3://your-config-bucket/worker/config.json"
+export CONFIG_PATH="default/audit-development.json"
 
 # Optional: Override logging level
 export LOG_LEVEL="info"
@@ -213,24 +215,20 @@ Create a simple validation script to test your configuration:
 import { ConfigurationManager } from '@repo/audit'
 
 async function validateConfig() {
-  try {
-    const configManager = new ConfigurationManager(
-      process.env.CONFIG_PATH!,
-      's3'
-    )
-    
-    await configManager.initialize()
-    const config = configManager.getConfig()
-    
-    console.log('✅ Configuration loaded successfully')
-    console.log('Redis host:', config.redis.host)
-    console.log('Database configured:', !!config.enhancedClient.connectionString)
-    console.log('Worker port:', config.worker.port)
-    
-  } catch (error) {
-    console.error('❌ Configuration validation failed:', error)
-    process.exit(1)
-  }
+	try {
+		const configManager = new ConfigurationManager(process.env.CONFIG_PATH!, 's3')
+
+		await configManager.initialize()
+		const config = configManager.getConfig()
+
+		console.log('✅ Configuration loaded successfully')
+		console.log('Redis host:', config.redis.host)
+		console.log('Database configured:', !!config.enhancedClient.connectionString)
+		console.log('Worker port:', config.worker.port)
+	} catch (error) {
+		console.error('❌ Configuration validation failed:', error)
+		process.exit(1)
+	}
 }
 
 validateConfig()
@@ -273,14 +271,14 @@ services:
       POSTGRES_USER: audit_user
       POSTGRES_PASSWORD: dev_password
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - '6379:6379'
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -320,47 +318,47 @@ Create a development-specific configuration file:
 
 ```json
 {
-  "redis": {
-    "host": "localhost",
-    "port": 6379,
-    "password": null,
-    "db": 0
-  },
-  "enhancedClient": {
-    "connectionString": "postgresql://audit_user:dev_password@localhost:5432/audit_db_dev",
-    "maxConnections": 10,
-    "monitoring": {
-      "enabled": true,
-      "queryLogging": true
-    }
-  },
-  "security": {
-    "encryptionKey": "dev-key-32-characters-long-test",
-    "algorithm": "aes-256-gcm"
-  },
-  "monitoring": {
-    "enabled": true,
-    "alertThresholds": {
-      "errorRate": 0.1,
-      "queueDepth": 100,
-      "processingLatency": 10000
-    }
-  },
-  "reliableProcessor": {
-    "queueName": "audit-events-dev",
-    "concurrency": 2,
-    "circuitBreakerConfig": {
-      "failureThreshold": 10,
-      "recoveryTimeout": 30000
-    }
-  },
-  "worker": {
-    "port": 3001
-  },
-  "logging": {
-    "level": "debug",
-    "format": "pretty"
-  }
+	"redis": {
+		"host": "localhost",
+		"port": 6379,
+		"password": null,
+		"db": 0
+	},
+	"enhancedClient": {
+		"connectionString": "postgresql://audit_user:dev_password@localhost:5432/audit_db_dev",
+		"maxConnections": 10,
+		"monitoring": {
+			"enabled": true,
+			"queryLogging": true
+		}
+	},
+	"security": {
+		"encryptionKey": "dev-key-32-characters-long-test",
+		"algorithm": "aes-256-gcm"
+	},
+	"monitoring": {
+		"enabled": true,
+		"alertThresholds": {
+			"errorRate": 0.1,
+			"queueDepth": 100,
+			"processingLatency": 10000
+		}
+	},
+	"reliableProcessor": {
+		"queueName": "audit-events-dev",
+		"concurrency": 2,
+		"circuitBreakerConfig": {
+			"failureThreshold": 10,
+			"recoveryTimeout": 30000
+		}
+	},
+	"worker": {
+		"port": 3001
+	},
+	"logging": {
+		"level": "debug",
+		"format": "pretty"
+	}
 }
 ```
 
@@ -408,78 +406,78 @@ Create a production-optimized configuration:
 
 ```json
 {
-  "redis": {
-    "host": "redis-cluster.production.com",
-    "port": 6379,
-    "password": "${REDIS_PASSWORD}",
-    "db": 0,
-    "tls": {
-      "rejectUnauthorized": true
-    },
-    "maxRetriesPerRequest": 3,
-    "connectTimeout": 10000
-  },
-  "enhancedClient": {
-    "connectionString": "postgresql://audit_user:${DB_PASSWORD}@db-cluster.production.com:5432/audit_db",
-    "maxConnections": 50,
-    "ssl": {
-      "rejectUnauthorized": true,
-      "ca": "${DB_SSL_CA}",
-      "cert": "${DB_SSL_CERT}",
-      "key": "${DB_SSL_KEY}"
-    },
-    "monitoring": {
-      "enabled": true,
-      "queryLogging": false,
-      "slowQueryThreshold": 1000
-    },
-    "partitioning": {
-      "enabled": true,
-      "partitionBy": "month",
-      "retentionMonths": 24
-    }
-  },
-  "security": {
-    "encryptionKey": "${ENCRYPTION_KEY}",
-    "algorithm": "aes-256-gcm",
-    "keyRotation": {
-      "enabled": true,
-      "rotationIntervalDays": 90
-    }
-  },
-  "monitoring": {
-    "enabled": true,
-    "alertThresholds": {
-      "errorRate": 0.01,
-      "queueDepth": 5000,
-      "processingLatency": 2000,
-      "memoryUsage": 0.85,
-      "cpuUsage": 0.80
-    },
-    "metricsRetentionDays": 30
-  },
-  "reliableProcessor": {
-    "queueName": "audit-events",
-    "concurrency": 20,
-    "circuitBreakerConfig": {
-      "failureThreshold": 3,
-      "recoveryTimeout": 120000
-    },
-    "deadLetterConfig": {
-      "queueName": "audit-events-failed",
-      "alertThreshold": 5,
-      "retentionDays": 90
-    }
-  },
-  "worker": {
-    "port": 3001,
-    "host": "0.0.0.0",
-    "gracefulShutdownTimeoutMs": 60000
-  },
-  "logging": {
-    "level": "warn",
-    "format": "json"
-  }
+	"redis": {
+		"host": "redis-cluster.production.com",
+		"port": 6379,
+		"password": "${REDIS_PASSWORD}",
+		"db": 0,
+		"tls": {
+			"rejectUnauthorized": true
+		},
+		"maxRetriesPerRequest": 3,
+		"connectTimeout": 10000
+	},
+	"enhancedClient": {
+		"connectionString": "postgresql://audit_user:${DB_PASSWORD}@db-cluster.production.com:5432/audit_db",
+		"maxConnections": 50,
+		"ssl": {
+			"rejectUnauthorized": true,
+			"ca": "${DB_SSL_CA}",
+			"cert": "${DB_SSL_CERT}",
+			"key": "${DB_SSL_KEY}"
+		},
+		"monitoring": {
+			"enabled": true,
+			"queryLogging": false,
+			"slowQueryThreshold": 1000
+		},
+		"partitioning": {
+			"enabled": true,
+			"partitionBy": "month",
+			"retentionMonths": 24
+		}
+	},
+	"security": {
+		"encryptionKey": "${ENCRYPTION_KEY}",
+		"algorithm": "aes-256-gcm",
+		"keyRotation": {
+			"enabled": true,
+			"rotationIntervalDays": 90
+		}
+	},
+	"monitoring": {
+		"enabled": true,
+		"alertThresholds": {
+			"errorRate": 0.01,
+			"queueDepth": 5000,
+			"processingLatency": 2000,
+			"memoryUsage": 0.85,
+			"cpuUsage": 0.8
+		},
+		"metricsRetentionDays": 30
+	},
+	"reliableProcessor": {
+		"queueName": "audit-events",
+		"concurrency": 20,
+		"circuitBreakerConfig": {
+			"failureThreshold": 3,
+			"recoveryTimeout": 120000
+		},
+		"deadLetterConfig": {
+			"queueName": "audit-events-failed",
+			"alertThreshold": 5,
+			"retentionDays": 90
+		}
+	},
+	"worker": {
+		"port": 3001,
+		"host": "0.0.0.0",
+		"gracefulShutdownTimeoutMs": 60000
+	},
+	"logging": {
+		"level": "warn",
+		"format": "json"
+	}
 }
 ```
 
@@ -540,42 +538,42 @@ spec:
         app: audit-worker
     spec:
       containers:
-      - name: worker
-        image: your-registry/audit-worker:latest
-        env:
-        - name: CONFIG_PATH
-          value: "s3://prod-config-bucket/worker/config.json"
-        - name: NODE_ENV
-          value: "production"
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: worker-secrets
-              key: redis-password
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: worker-secrets
-              key: db-password
-        - name: ENCRYPTION_KEY
-          valueFrom:
-            secretKeyRef:
-              name: worker-secrets
-              key: encryption-key
-        ports:
-        - containerPort: 3001
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 3001
-          initialDelaySeconds: 60
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 3001
-          initialDelaySeconds: 30
-          periodSeconds: 10
+        - name: worker
+          image: your-registry/audit-worker:latest
+          env:
+            - name: CONFIG_PATH
+              value: 's3://prod-config-bucket/worker/config.json'
+            - name: NODE_ENV
+              value: 'production'
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: worker-secrets
+                  key: redis-password
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: worker-secrets
+                  key: db-password
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: worker-secrets
+                  key: encryption-key
+          ports:
+            - containerPort: 3001
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 10
 ```
 
 ### Step 3: Production Build
@@ -629,30 +627,30 @@ Expected health check response:
 
 ```json
 {
-  "status": "OK",
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "uptime": 3600,
-  "components": {
-    "database": {
-      "status": "OK",
-      "message": "Database connection healthy",
-      "responseTime": 12,
-      "lastCheck": "2024-01-15T10:30:00.000Z"
-    },
-    "redis": {
-      "status": "OK",
-      "message": "Redis connection ready",
-      "responseTime": 5,
-      "lastCheck": "2024-01-15T10:30:00.000Z"
-    },
-    "queue": {
-      "status": "OK",
-      "message": "Queue processing normally",
-      "queueDepth": 45,
-      "processedCount": 15420,
-      "lastCheck": "2024-01-15T10:30:00.000Z"
-    }
-  }
+	"status": "OK",
+	"timestamp": "2024-01-15T10:30:00.000Z",
+	"uptime": 3600,
+	"components": {
+		"database": {
+			"status": "OK",
+			"message": "Database connection healthy",
+			"responseTime": 12,
+			"lastCheck": "2024-01-15T10:30:00.000Z"
+		},
+		"redis": {
+			"status": "OK",
+			"message": "Redis connection ready",
+			"responseTime": 5,
+			"lastCheck": "2024-01-15T10:30:00.000Z"
+		},
+		"queue": {
+			"status": "OK",
+			"message": "Queue processing normally",
+			"queueDepth": 45,
+			"processedCount": 15420,
+			"lastCheck": "2024-01-15T10:30:00.000Z"
+		}
+	}
 }
 ```
 
@@ -856,16 +854,16 @@ For processing large volumes of events:
 
 ```json
 {
-  "reliableProcessor": {
-    "concurrency": 50,
-    "batchSize": 100
-  },
-  "enhancedClient": {
-    "maxConnections": 100,
-    "partitioning": {
-      "enabled": true
-    }
-  }
+	"reliableProcessor": {
+		"concurrency": 50,
+		"batchSize": 100
+	},
+	"enhancedClient": {
+		"maxConnections": 100,
+		"partitioning": {
+			"enabled": true
+		}
+	}
 }
 ```
 
@@ -873,13 +871,13 @@ For processing large volumes of events:
 
 ```json
 {
-  "monitoring": {
-    "metricsRetentionDays": 1
-  },
-  "reliableProcessor": {
-    "maxStalledCount": 1,
-    "maxRetriesPerRequest": 2
-  }
+	"monitoring": {
+		"metricsRetentionDays": 1
+	},
+	"reliableProcessor": {
+		"maxStalledCount": 1,
+		"maxRetriesPerRequest": 2
+	}
 }
 ```
 

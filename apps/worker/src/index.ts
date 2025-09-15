@@ -1,9 +1,7 @@
 import 'dotenv/config'
 
 import { serve } from '@hono/node-server'
-import { sql } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { pino } from 'pino'
 
 import {
 	AuditBottleneckAnalyzer,
@@ -38,6 +36,7 @@ import {
 	errorAggregation,
 	errorLog,
 } from '@repo/audit-db'
+import { ConsoleLogger } from '@repo/logs'
 import {
 	closeSharedRedisConnection,
 	getRedisConnectionStatus,
@@ -50,7 +49,15 @@ import type { AuditLogEvent, ReliableProcessorConfig } from '@repo/audit'
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
 
-const logger = pino({ name: 'audit-worker', level: LOG_LEVEL })
+const logger = new ConsoleLogger({
+	environment: 'development',
+	application: 'worker',
+	module: 'SmartLogs',
+	version: '0.1.0',
+	defaultFields: {
+		environment: 'development',
+	},
+})
 
 // Configuration manager
 let configManager: ConfigurationManager | undefined = undefined
@@ -103,7 +110,8 @@ app.get('/healthz', async (c) => {
 			return c.json(healthStatus)
 		}
 	} catch (error) {
-		logger.error('Health check failed with error:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Health check failed with error: ${errorMessage}`, { error: errorMessage })
 		c.status(503)
 		return c.json({
 			status: 'CRITICAL',
@@ -134,11 +142,12 @@ app.get('/metrics', async (c) => {
 			monitoring: auditMetrics,
 		})
 	} catch (error) {
-		logger.error('Failed to collect metrics:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to collect metrics: ${errorMessage}`, { error: errorMessage })
 		c.status(500)
 		return c.json({
 			error: 'Failed to collect metrics',
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: errorMessage,
 		})
 	}
 })
@@ -168,11 +177,12 @@ app.get('/health/:component', async (c) => {
 		c.status(statusCode)
 		return c.json(componentHealth)
 	} catch (error) {
-		logger.error('Failed to check component health:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to check component health: ${errorMessage}`, { error: errorMessage })
 		c.status(500)
 		return c.json({
 			error: 'Failed to check component health',
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: errorMessage,
 		})
 	}
 })
@@ -188,11 +198,12 @@ app.get('/observability/dashboard', async (c) => {
 		const dashboardData = await dashboard.getDashboardData()
 		return c.json(dashboardData)
 	} catch (error) {
-		logger.error('Failed to get dashboard data:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to get dashboard data: ${errorMessage}`, { error: errorMessage })
 		c.status(500)
 		return c.json({
 			error: 'Failed to get dashboard data',
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: errorMessage,
 		})
 	}
 })
@@ -214,11 +225,12 @@ app.get('/observability/metrics/enhanced', async (c) => {
 
 		return c.json(JSON.parse(metrics))
 	} catch (error) {
-		logger.error('Failed to export enhanced metrics:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to export enhanced metrics: ${errorMessage}`, { error: errorMessage })
 		c.status(500)
 		return c.json({
 			error: 'Failed to export enhanced metrics',
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: errorMessage,
 		})
 	}
 })
@@ -233,11 +245,12 @@ app.get('/observability/bottlenecks', async (c) => {
 		const bottlenecks = (await dashboard?.getBottleneckAnalysis()) || []
 		return c.json(bottlenecks)
 	} catch (error) {
-		logger.error('Failed to get bottleneck analysis:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to get bottleneck analysis: ${errorMessage}`, { error: errorMessage })
 		c.status(500)
 		return c.json({
 			error: 'Failed to get bottleneck analysis',
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: errorMessage,
 		})
 	}
 })
@@ -258,11 +271,12 @@ app.get('/observability/traces', async (c) => {
 		const activeSpans = tracer.getActiveSpans()
 		return c.json(activeSpans)
 	} catch (error) {
-		logger.error('Failed to get trace data:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to get trace data: ${errorMessage}`, { error: errorMessage })
 		c.status(500)
 		return c.json({
 			error: 'Failed to get trace data',
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: errorMessage,
 		})
 	}
 })
@@ -277,11 +291,12 @@ app.get('/observability/profiling', async (c) => {
 		const profilingResults = bottleneckAnalyzer.getProfilingResults()
 		return c.json(profilingResults)
 	} catch (error) {
-		logger.error('Failed to get profiling results:', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to get profiling results: ${errorMessage}`, { error: errorMessage })
 		c.status(500)
 		return c.json({
 			error: 'Failed to get profiling results',
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: errorMessage,
 		})
 	}
 })
@@ -304,7 +319,7 @@ async function main() {
 				error instanceof Error
 					? error.message
 					: 'Unknown error during configuration manager initialization'
-			logger.error('🔴 Configuration manager initialization failed:', message)
+			logger.error(`🔴 Configuration manager initialization failed: ${message}`, { error: message })
 			throw new Error(message)
 		}
 	}
@@ -319,7 +334,10 @@ async function main() {
 		}
 	} catch (error) {
 		// TODO: Optionally, implement retry logic here or ensure process exits.
-		logger.error('🔴 Halting worker start due to redis connection failure.', error)
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+		logger.error('🔴 Halting worker start due to redis connection failure.', {
+			error: errorMessage,
+		})
 		throw error
 	}
 
@@ -330,7 +348,8 @@ async function main() {
 	// We can add listeners here too, but it might be redundant if the shared client's logging is sufficient.
 	// For example, if specific actions for this worker are needed on 'error':
 	connection.on('error', (err) => {
-		logger.error('🔴 Redis connection error impacting BullMQ worker:', err)
+		const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+		logger.error('🔴 Redis connection error impacting BullMQ worker:', { error: errorMessage })
 		// Consider if process should exit or if client's reconnection logic is sufficient.
 	})
 
@@ -626,7 +645,8 @@ async function main() {
 		try {
 			await reliableProcessor.start()
 		} catch (error) {
-			logger.error('Failed to start reliable processor:', error)
+			const errorMessage = error instanceof Error ? error.message : error
+			logger.error(`Failed to start reliable processor: ${errorMessage}`, { error: errorMessage })
 			throw error
 		}
 	}
@@ -686,7 +706,10 @@ async function main() {
 
 // Start the application
 main().catch(async (error) => {
-	logger.error('💥 Unhandled error in main application scope:', error.message)
+	const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+	logger.error(`💥 Unhandled error in main application scope: ${errorMessage}`, {
+		error: errorMessage,
+	})
 	await auditDbService?.end()
 	// Ensure Redis connection is closed on fatal error
 	void closeSharedRedisConnection().finally(() => process.exit(1))

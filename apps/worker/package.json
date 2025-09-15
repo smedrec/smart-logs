@@ -20,12 +20,12 @@
 		"@hono/node-server": "1.19.2",
 		"@repo/audit": "workspace:*",
 		"@repo/audit-db": "workspace:*",
+		"@repo/logs": "workspace:*",
 		"@repo/redis-client": "workspace:*",
 		"bullmq": "5.58.5",
 		"dotenv": "17.2.2",
 		"hono": "4.9.7",
 		"ioredis": "5.7.0",
-		"pino": "9.9.5",
 		"postgres": "3.4.7",
 		"workers-tagged-logger": "0.13.1"
 	},
