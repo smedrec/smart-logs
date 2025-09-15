@@ -295,7 +295,7 @@ async function main() {
 	// 0. Initialize configuration manager
 	if (!configManager) {
 		logger.info('🔗 Initializing configuration manager...')
-		configManager = new ConfigurationManager('default/audit-development.json', 's3')
+		configManager = new ConfigurationManager(process.env.CONFIG_PATH!, 's3')
 		try {
 			await configManager.initialize()
 		} catch (error) {

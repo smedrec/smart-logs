@@ -1,134 +1,272 @@
-# Audit Worker (`audit-worker`)
+# Smart Logs Audit Worker
 
-This application is a Node.js-based BullMQ worker responsible for processing audit log events from a Redis queue and storing them in a PostgreSQL database using Drizzle ORM.
+A high-performance, enterprise-grade audit log processing worker built with Node.js, BullMQ, and advanced monitoring capabilities. This worker consumes audit events from Redis queues and provides comprehensive audit trail processing, compliance reporting, and real-time monitoring.
 
-It consumes messages produced by services using the `@repo/audit` package.
+## 🏗️ Architecture Overview
 
-## Prerequisites
+The Audit Worker is a sophisticated event processing system designed for enterprise audit logging requirements:
 
-- Node.js (version as specified in the root `package.json` or `.nvmrc`)
-- pnpm (version as specified in the root `package.json`)
-- Docker (for running local PostgreSQL and Redis instances, optional if you have them running elsewhere)
-- A running PostgreSQL server.
-- A running Redis server.
+### Core Components
 
-## Setup
+- **Reliable Event Processor**: Built on BullMQ with circuit breaker pattern and retry mechanisms
+- **Configuration Manager**: S3-based dynamic configuration management (no more env variables!)
+- **Enhanced Database Layer**: Drizzle ORM with PostgreSQL, partitioning, and monitoring
+- **Redis Integration**: High-performance caching, metrics, and queue management
+- **Observability Stack**: Comprehensive tracing, metrics collection, and bottleneck analysis
+- **Health Check System**: Multi-component health monitoring with alerting
+- **Monitoring Dashboard**: Real-time monitoring and alerting system
 
-1.  **Install Dependencies:**
-    From the monorepo root:
+### Key Features
 
-    ```sh
-    pnpm install
-    ```
+- ✅ **Dynamic Configuration**: S3-based configuration management with hot reloading
+- ✅ **Circuit Breaker Pattern**: Automatic failure detection and recovery
+- ✅ **Advanced Retry Logic**: Exponential backoff with dead letter queue
+- ✅ **Real-time Monitoring**: Performance metrics, bottleneck analysis, and alerting
+- ✅ **Distributed Tracing**: Complete request tracing with span correlation
+- ✅ **Health Checks**: Comprehensive system health monitoring
+- ✅ **Compliance APIs**: HIPAA, GDPR, and general compliance reporting
+- ✅ **Data Integrity**: Cryptographic verification and audit trails
+- ✅ **High Performance**: Optimized for high-throughput event processing
 
-2.  **Environment Variables:**
-    Copy the example environment file and customize it with your local settings:
+## 🚀 Quick Start
 
-    ```sh
-    cp apps/audit/.env.example apps/audit/.env
-    ```
+### Prerequisites
 
-    Edit `apps/audit/.env` with your actual `DATABASE_URL` and `REDIS_URL`. Required variables:
-    - `DATABASE_URL`: Connection string for PostgreSQL (e.g., `postgresql://user:password@localhost:5432/auditdb`)
-    - `REDIS_URL`: Connection string for Redis (e.g., `redis://localhost:6379`)
-    - `AUDIT_QUEUE_NAME`: Name of the BullMQ queue to process (defaults to `audit`)
-    - `LOG_LEVEL`: Logging level (e.g., `info`, `debug`, defaults to `info`)
-    - `WORKER_CONCURRENCY`: Number of concurrent jobs the worker can process (defaults to 5)
+- **Node.js 18+**
+- **PostgreSQL 14+**
+- **Redis 6+**
+- **pnpm** package manager
+- **S3-compatible storage** for configuration
+- **TypeScript** knowledge
 
-3.  **Database Migrations:**
-    Before running the application for the first time, or after any schema changes, you need to apply database migrations. Ensure your `DATABASE_URL` in `.env` is correctly pointing to your development database.
+### Configuration Setup
 
-    ```sh
-    # From the monorepo root
-    pnpm -F audit-worker db:migrate
+**⚠️ Important**: The worker now uses the ConfigurationManager service for configuration instead of environment variables.
 
-    # Or from the apps/audit directory
-    # cd apps/audit
-    # pnpm db:migrate
-    ```
+1. **Prepare your configuration file** (JSON format):
 
-    To generate new migrations after schema changes (`apps/audit/src/db/schema.ts`):
-
-    ```sh
-    # From the monorepo root
-    pnpm -F audit-worker db:generate
-
-    # Or from the apps/audit directory
-    # cd apps/audit
-    # pnpm db:generate
-    ```
-
-## Development
-
-### Run in Development Mode
-
-This command starts the TypeScript compiler in watch mode and uses `nodemon` to restart the worker when changes are detected.
-
-```sh
-# From the monorepo root
-pnpm -F audit-worker dev
-
-# Or from the apps/audit directory
-# cd apps/audit
-# pnpm dev
+```json
+{
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "password": null,
+    "db": 0
+  },
+  "enhancedClient": {
+    "connectionString": "postgresql://user:pass@localhost:5432/audit_db",
+    "maxConnections": 20,
+    "monitoring": {
+      "enabled": false
+    },
+    "partitioning": {
+      "enabled": false
+    }
+  },
+  "security": {
+    "encryptionKey": "your-256-bit-encryption-key-here",
+    "algorithm": "aes-256-gcm"
+  },
+  "monitoring": {
+    "alertThresholds": {
+      "errorRate": 0.05,
+      "queueDepth": 1000,
+      "processingLatency": 5000
+    }
+  },
+  "reliableProcessor": {
+    "queueName": "audit-events",
+    "concurrency": 5,
+    "circuitBreakerConfig": {
+      "failureThreshold": 5,
+      "recoveryTimeout": 60000
+    },
+    "deadLetterConfig": {
+      "queueName": "audit-events-failed",
+      "alertThreshold": 10
+    }
+  },
+  "worker": {
+    "port": 3001
+  }
+}
 ```
 
-### Build for Production
+2. **Upload configuration to S3**:
+   - Upload your config file to S3
+   - Note the S3 path (e.g., `s3://your-bucket/config/worker-config.json`)
 
-This command compiles the TypeScript code to JavaScript in the `apps/audit/dist` directory.
+3. **Set environment variables**:
 
-```sh
-# From the monorepo root
-pnpm -F audit-worker build
+```bash
+# Configuration source
+CONFIG_PATH="s3://your-bucket/config/worker-config.json"
 
-# Or from the apps/audit directory
-# cd apps/audit
-# pnpm build
+# Optional: Logging level
+LOG_LEVEL="info"
 ```
 
-### Run in Production Mode
+### Installation & Setup
 
-After building, you can run the worker using:
+1. **Install dependencies**:
+   ```bash
+   # From monorepo root
+   pnpm install
+   ```
 
-```sh
-# From the monorepo root
-pnpm -F audit-worker start
+2. **Build the worker**:
+   ```bash
+   # From monorepo root
+   pnpm -F worker build
+   
+   # Or from worker directory
+   cd apps/worker
+   pnpm build
+   ```
 
-# Or from the apps/audit directory
-# cd apps/audit
-# pnpm start
+3. **Start the worker**:
+   ```bash
+   # Development mode (with hot reload)
+   pnpm -F worker dev
+   
+   # Production mode
+   pnpm -F worker start
+   ```
+
+## 🎯 Core Functionality
+
+### Audit Event Processing
+
+The worker processes audit events with the following workflow:
+
+1. **Event Ingestion**: Consumes events from Redis queue
+2. **Validation**: Validates event structure and required fields
+3. **Hash Verification**: Verifies cryptographic integrity (if hash provided)
+4. **Storage**: Persists events to PostgreSQL with optimized schema
+5. **Monitoring**: Tracks performance metrics and patterns
+6. **Alerting**: Generates alerts for suspicious patterns or system issues
+
+### Event Schema
+
+```typescript
+interface AuditLogEvent {
+  timestamp: string                    // ISO 8601 timestamp
+  principalId: string                  // User/service identifier
+  organizationId?: string              // Tenant identifier
+  action: string                       // Action performed
+  targetResourceType?: string          // Resource type (e.g., "Patient")
+  targetResourceId?: string           // Resource identifier
+  status: 'success' | 'failure'      // Operation outcome
+  outcomeDescription?: string         // Human-readable outcome
+  hash?: string                       // Cryptographic hash
+  hashAlgorithm?: string             // Hash algorithm used
+  eventVersion?: string              // Event schema version
+  correlationId?: string             // Request correlation ID
+  dataClassification?: string        // Data sensitivity level
+  retentionPolicy?: string           // Retention requirements
+  sessionContext?: {                 // Session information
+    sessionId?: string
+    ipAddress?: string
+    userAgent?: string
+  }
+  // Additional fields stored in 'details' JSONB column
+  [key: string]: any
+}
 ```
 
-Ensure environment variables are set in your production environment.
+## 🔧 Configuration Management
 
-## Testing
+### ConfigurationManager Features
 
-Run unit tests using Vitest:
+- **S3 Integration**: Store configurations in S3 buckets
+- **Hot Reloading**: Dynamic configuration updates without restart
+- **Validation**: Schema validation for configuration integrity
+- **Fallback**: Local file fallback if S3 is unavailable
+- **Caching**: Intelligent caching with TTL
 
-```sh
-# From the monorepo root
-pnpm -F audit-worker test
+### Configuration Structure
 
-# Or from the apps/audit directory
-# cd apps/audit
-# pnpm test
+```typescript
+interface WorkerConfig {
+  redis: RedisConfig
+  enhancedClient: DatabaseConfig
+  security: SecurityConfig
+  monitoring: MonitoringConfig
+  reliableProcessor: ProcessorConfig
+  worker: {
+    port: number
+  }
+}
 ```
 
-Integration tests (if developed) might require separate setup for Redis/Postgres and specific test scripts.
+## 📊 Monitoring & Observability
 
-## How it Works
+### Health Check Endpoints
 
-1.  **Queue Interaction:** The worker connects to Redis using the provided `REDIS_URL` and listens to the queue specified by `AUDIT_QUEUE_NAME`.
-2.  **Job Processing:** When a new job (an `AuditLogEvent`) arrives, the worker:
-    - Parses the event data.
-    - Maps the event fields to the `audit_log` table schema.
-    - Any properties not explicitly mapped are stored in a `details` JSONB column.
-    - Inserts the record into the PostgreSQL database using Drizzle ORM.
-3.  **Logging:** The worker uses `workers-tagged-logger` for logging its operations. Log level is configurable via `LOG_LEVEL`.
-4.  **Error Handling:** If processing a job fails, BullMQ's retry mechanism will take effect based on its default configuration. Failed jobs are retained for a configurable period.
+```bash
+# Overall system health
+GET /healthz
 
-## AGENTS.md Check
+# Component-specific health
+GET /health/database
+GET /health/redis
+GET /health/queue
+GET /health/circuit-breaker
 
-There are no specific `AGENTS.md` instructions in `apps/audit` or its parent directories that directly apply to the worker's core logic beyond general repository guidelines. The `.cursor/rules/worker-development.mdc` was for Cloudflare Workers and is less relevant now, but principles of clear configuration and testing still apply.
-The `packages/audit/AGENTS.md` (if it existed) would be relevant for how events are _produced_, which this worker _consumes_.
-This worker adheres to the general structure of a Node.js application within the monorepo.
+# System metrics
+GET /metrics
+```
+
+### Observability Endpoints
+
+```bash
+# Monitoring dashboard data
+GET /observability/dashboard
+
+# Enhanced metrics (JSON or Prometheus format)
+GET /observability/metrics/enhanced?format=prometheus
+
+# Bottleneck analysis
+GET /observability/bottlenecks
+
+# Distributed traces
+GET /observability/traces?traceId=12345
+
+# Performance profiling
+GET /observability/profiling
+```
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+# Run all tests
+pnpm test
+
+# Run with coverage
+pnpm test:ci
+
+# Watch mode
+pnpm test:watch
+```
+
+### Integration Tests
+```bash
+# Test compliance API
+pnpm test src/__tests__/compliance-api.test.ts
+
+# Test monitoring integration
+pnpm test src/__tests__/monitoring-integration.test.ts
+```
+
+## 📚 Documentation
+
+- **[Getting Started Guide](docs/getting-started.md)** - Complete setup walkthrough
+- **[Configuration Guide](docs/tutorials/configuration.md)** - Advanced configuration options
+- **[Monitoring Setup](docs/tutorials/monitoring.md)** - Observability configuration
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+- **[FAQ](docs/faq.md)** - Frequently asked questions
+
+---
+
+**Note**: This is an enterprise-grade application designed for technical personnel with experience in distributed systems, audit logging, and compliance requirements.
