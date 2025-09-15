@@ -15,15 +15,17 @@
 - [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section for pseudonym_mapping table to document GDPR pseudonymization feature
-- Updated Data Model Diagram to include new pseudonym_mapping table and its relationships
-- Added sample data entry for pseudonym_mapping table
-- Updated Data Validation and Business Logic section to include GDPR pseudonymization details
-- Enhanced source tracking with new and updated files related to GDPR pseudonymization
+- Added new section for organization_role table to document role-based access control features
+- Updated Data Model Diagram to include new organization_role table and its relationships
+- Added sample data entry for organization_role table
+- Updated Data Validation and Business Logic section to include role management and permission system details
+- Enhanced source tracking with new and updated files related to organization role management
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -52,6 +54,7 @@ The audit database functionality is organized within the monorepo structure with
 - **apps/docs**: Contains documentation including schema references
 - **apps/server**: Implements API endpoints that interact with the audit system
 - **packages/audit**: Contains core audit service logic and processing
+- **packages/auth**: Manages authentication and authorization including role-based access control
 
 The audit database package uses Drizzle ORM for schema definition and migration management, with JSON snapshots used to track schema evolution across versions.
 
@@ -90,6 +93,7 @@ The audit database schema consists of several key components that work together 
 - **alerts**: Manages alerting based on audit event patterns and anomalies
 - **scheduled_reports**: Handles configuration for automated compliance reporting
 - **pseudonym_mapping**: New table for GDPR pseudonymization mapping (added in recent update)
+- **organization_role**: New table for role-based access control with permissions (added in recent update)
 
 The schema implements partitioning on the audit_log table by timestamp to optimize query performance and storage management. This allows efficient querying of recent data while maintaining historical records.
 
@@ -97,6 +101,7 @@ The schema implements partitioning on the audit_log table by timestamp to optimi
 - [schema.test.ts](file://packages/audit-db/src/__tests__/schema.test.ts)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 
 ## Architecture Overview
 
@@ -116,12 +121,14 @@ G --> J["scheduled_reports"]
 K["audit_retention_policy"] --> D
 L["audit_presets"] --> B
 D --> M["pseudonym_mapping"]
+N["organization_role"] --> D
 ```
 
 **Diagram sources**
 - [schema.test.ts](file://packages/audit-db/src/__tests__/schema.test.ts)
 - [migration-utils.ts](file://packages/audit-db/src/migration-utils.ts)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 
 ## Detailed Component Analysis
 
@@ -198,6 +205,26 @@ class pseudonym_mapping {
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+
+### Organization Role Analysis
+
+The organization_role table provides role-based access control by defining roles with specific permissions within organizations.
+
+```mermaid
+classDiagram
+class organization_role {
++organization_id : varchar(50)
++name : varchar(50)
++description : text
++permissions : jsonb
++inherits : jsonb
+}
+```
+
+**Diagram sources**
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql)
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts)
 
 ## Data Model Diagram
 
@@ -305,12 +332,20 @@ timestamp with time zone timestamp
 text pseudonym_id
 text original_id
 }
+organization_role {
+varchar(50) organization_id PK
+varchar(50) name PK
+text description
+jsonb permissions
+jsonb inherits
+}
 audit_log ||--o{ audit_integrity_log : "1 to many"
 audit_log }|--|| audit_retention_policy : "retention_policy → policy_name"
 audit_log }|--|| audit_presets : "preset references"
 alerts }|--|| audit_log : "references events"
 scheduled_reports }|--|| audit_presets : "uses templates"
 audit_log }|--|| pseudonym_mapping : "GDPR pseudonymization"
+audit_log }|--|| organization_role : "organization role management"
 ```
 
 **Diagram sources**
@@ -318,6 +353,7 @@ audit_log }|--|| pseudonym_mapping : "GDPR pseudonymization"
 - [0003_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0003_snapshot.json)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 
 ## Entity Relationship Details
 
@@ -564,6 +600,31 @@ The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilitie
 - [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 
+### organization_role Table
+
+The organization_role table provides role-based access control by defining roles with specific permissions within organizations. Each role is scoped to an organization and contains a set of permissions that define what actions users with that role can perform.
+
+**Field Definitions:**
+- **organization_id**: Organization identifier, part of composite primary key and foreign key to organization table
+- **name**: Role name, part of composite primary key (e.g., "admin", "member", "viewer")
+- **description**: Human-readable description of the role's purpose and responsibilities
+- **permissions**: JSONB array containing permission objects with resource and action fields
+- **inherits**: JSONB array of role names that this role inherits permissions from
+
+**Constraints:**
+- Primary Key: organization_id and name (composite primary key)
+- Foreign Key: organization_id references organization.id with cascade delete
+- Not Null Constraints: organization_id, name, permissions
+
+**Indexes:**
+- organization_role_organization_id_idx: B-tree index on organization_id for organization-based queries
+- organization_role_name_idx: B-tree index on name for role-based queries
+
+**Section sources**
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
+- [permissions.ts](file://packages/auth/src/permissions.ts) - *Contains permission definitions and role logic*
+
 ## Sample Data Entries
 
 ### audit_log Sample Entries
@@ -734,12 +795,51 @@ The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilitie
 }
 ```
 
+### organization_role Sample Entry
+
+```json
+{
+  "organization_id": "org-medical-001",
+  "name": "org:admin",
+  "description": "Organization administrator with full access to audit system",
+  "permissions": [
+    {
+      "resource": "audit.events",
+      "action": "read"
+    },
+    {
+      "resource": "audit.events",
+      "action": "create"
+    },
+    {
+      "resource": "audit.events",
+      "action": "update"
+    },
+    {
+      "resource": "audit.events",
+      "action": "delete"
+    },
+    {
+      "resource": "audit.reports",
+      "action": "read"
+    },
+    {
+      "resource": "audit.reports",
+      "action": "create"
+    }
+  ],
+  "inherits": []
+}
+```
+
 **Section sources**
 - [migration-utils.ts](file://packages/audit-db/src/migration-utils.ts)
 - [basic-usage.ts](file://packages/audit-sdk/examples/basic-usage.ts)
 - [examples.ts](file://packages/audit-sdk/src/__tests__/examples.ts)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
 
 ## Constraints and Indexes
 
@@ -754,14 +854,17 @@ The audit database schema implements comprehensive constraints and indexes to en
 - alerts.id: Primary key with auto-increment
 - scheduled_reports.id: Primary key with auto-increment
 - pseudonym_mapping.id: Primary key with auto-increment
+- organization_role: Composite primary key on organization_id and name
 
 ### Foreign Keys
 - audit_integrity_log.audit_log_id references audit_log.id: Ensures integrity records only reference existing audit events
+- organization_role.organization_id references organization.id: Ensures roles are associated with valid organizations
 - Other relationships are maintained through logical references rather than foreign keys to maintain performance in high-volume logging scenarios
 
 ### Unique Constraints
 - audit_retention_policy.policy_name: Ensures policy names are unique
 - audit_presets.name: Ensures preset names are unique
+- organization_role: Composite primary key ensures unique role names within each organization
 
 ### Check Constraints
 - Various fields have domain-specific constraints enforced at the application level through validation rules in the audit SDK
@@ -813,10 +916,15 @@ The schema includes numerous indexes to optimize common query patterns:
 - pseudonym_mapping_pseudonym_id_idx: B-tree index on pseudonym_id for efficient lookup of pseudonymized IDs
 - pseudonym_mapping_original_id_idx: B-tree index on original_id for efficient lookup of original IDs
 
+**organization_role Indexes:**
+- organization_role_organization_id_idx: B-tree index on organization_id for organization-based queries
+- organization_role_name_idx: B-tree index on name for role-based queries
+
 **Section sources**
 - [0004_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0004_snapshot.json)
 - [0003_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0003_snapshot.json)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 
 ## Data Validation and Business Logic
 
@@ -865,6 +973,16 @@ The system implements GDPR-compliant pseudonymization through the pseudonym_mapp
 - Authorized personnel can reverse the mapping for compliance investigations
 - The system maintains referential integrity while protecting data subject privacy
 
+### Role-Based Access Control
+The system implements role-based access control through the organization_role table:
+- Roles are defined at the organization level with specific permissions
+- Each role contains a JSONB array of permissions specifying allowed resources and actions
+- Roles can inherit permissions from other roles through the inherits field
+- Permissions follow a hierarchical structure where more specific permissions override inherited ones
+- The system caches role permissions in Redis for performance optimization
+- Role changes are automatically synchronized between database and cache
+- Permission checks are performed with a 5-minute cache retention period to balance security and performance
+
 ### Compliance Features
 The schema includes several features specifically designed for regulatory compliance:
 - **Data Classification**: Explicit tagging of data sensitivity
@@ -874,6 +992,7 @@ The schema includes several features specifically designed for regulatory compli
 - **Correlation IDs**: End-to-end tracing of related operations
 - **Immutable Records**: Once written, audit records cannot be modified
 - **GDPR Pseudonymization**: Secure handling of personal data for data subject rights fulfillment
+- **Role-Based Access Control**: Granular permission system for audit data access
 
 These features collectively ensure that the audit system meets requirements for healthcare compliance standards including HIPAA, GDPR, and other data protection regulations.
 
@@ -884,3 +1003,6 @@ These features collectively ensure that the audit system meets requirements for 
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
+- [permissions.ts](file://packages/auth/src/permissions.ts) - *Contains permission definitions and role logic*

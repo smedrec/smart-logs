@@ -2,24 +2,35 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [data-export.ts](file://packages/audit/src/report/data-export.ts)
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
-- [compliance.ts](file://apps/server/src/routers/compliance.ts)
+- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts) - *Updated in recent commit f47a2b0*
+- [data-export.ts](file://packages/audit/src/report/data-export.ts) - *Updated in recent commit f47a2b0*
+- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts) - *Modified for GDPR compliance*
+- [compliance.ts](file://apps/server/src/routers/compliance.ts) - *Updated TRPC integration*
+- [compliance.ts](file://packages/audit-client/src/services/compliance.ts) - *Added GDPR export functionality*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated GDPR compliance reporting section with new data subject access request (DSAR) capabilities
+- Enhanced data export service documentation to reflect GDPR-specific export workflows
+- Added new section on GDPR data export functionality and pseudonymization
+- Updated API endpoints and integration examples for GDPR compliance
+- Added new code examples for GDPR data export and report generation
+- Updated source references to reflect recent code changes
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Architecture Overview](#architecture-overview)
 3. [Compliance Reporting Service](#compliance-reporting-service)
 4. [Data Export Service](#data-export-service)
-5. [API Endpoints and Integration](#api-endpoints-and-integration)
-6. [Report Generation Examples](#report-generation-examples)
-7. [Performance Optimization and Best Practices](#performance-optimization-and-best-practices)
-8. [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
+5. [GDPR Data Export and Pseudonymization](#gdpr-data-export-and-pseudonymization)
+6. [API Endpoints and Integration](#api-endpoints-and-integration)
+7. [Report Generation Examples](#report-generation-examples)
+8. [Performance Optimization and Best Practices](#performance-optimization-and-best-practices)
+9. [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
 
 ## Introduction
-The Compliance Reporting and Export system provides a robust framework for generating regulatory-compliant audit reports and exporting audit data in multiple formats. This document details the architecture, functionality, and integration points of the compliance reporting and data export modules, focusing on GDPR and HIPAA compliance use cases. The system enables organizations to meet regulatory requirements through automated report generation, integrity verification, and secure data export capabilities.
+The Compliance Reporting and Export system provides a robust framework for generating regulatory-compliant audit reports and exporting audit data in multiple formats. This document details the architecture, functionality, and integration points of the compliance reporting and data export modules, focusing on GDPR and HIPAA compliance use cases. The system enables organizations to meet regulatory requirements through automated report generation, integrity verification, and secure data export capabilities, with recent enhancements specifically addressing GDPR data subject rights and export requirements.
 
 ## Architecture Overview
 The compliance reporting system follows a layered architecture with clear separation between data access, business logic, and presentation layers. The core components are organized as follows:
@@ -210,8 +221,9 @@ ComplianceReport <|-- GDPRComplianceReport
 ComplianceReport <|-- IntegrityVerificationReport
 ```
 
-**Diagram sources**
+**Section sources**
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L100-L300)
+- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L500-L600)
 
 ## Data Export Service
 
@@ -373,6 +385,76 @@ private generateHTMLReport(report: ComplianceReport, config: ExportConfig): stri
 }
 ```
 
+## GDPR Data Export and Pseudonymization
+
+The system now includes specialized functionality for GDPR data subject access requests (DSAR) and data export requirements, allowing organizations to fulfill data subject rights efficiently.
+
+### GDPR Data Export API
+The GDPR data export service provides dedicated endpoints for exporting personal data in response to DSAR requests:
+
+```typescript
+/**
+ * Export data for GDPR requests
+ * Requirement 5.2: WHEN generating GDPR reports THEN the client SHALL support data export and pseudonymization requests
+ */
+async exportGdprData(params: GdprExportParams): Promise<GdprExportResult> {
+	// Validate input using centralized validation
+	const validationResult = validateGdprExportParams(params)
+	if (!validationResult.success) {
+		throw new ValidationError('Invalid GDPR export parameters', {
+			...(validationResult.zodError && { originalError: validationResult.zodError }),
+		})
+	}
+
+	const response = await this.request<GdprExportResult>('/compliance/export/gdpr', {
+		method: 'POST',
+		body: validationResult.data,
+	})
+
+	// Validate response structure
+	assertType(response, isObject, 'Invalid GDPR export response from server')
+	assertDefined(response.exportId, 'GDPR export response missing export ID')
+	assertDefined(response.downloadUrl, 'GDPR export response missing download URL')
+
+	return response
+}
+```
+
+### Pseudonymization Support
+The export service supports pseudonymization of personal data to protect data subject privacy:
+
+```typescript
+export interface GdprExportParams {
+	subjectId: string
+	dataCategories?: DataClassification[]
+	includeAuditTrail?: boolean
+	pseudonymize?: boolean
+	format?: ReportFormat
+	dateRange?: {
+		startDate: string
+		endDate: string
+	}
+}
+
+export interface GdprExportResult {
+	exportId: string
+	subjectId: string
+	pseudonymized: boolean
+	dataCategories: DataClassification[]
+	exportedAt: string
+	downloadUrl: string
+	expiration: string
+	size: number
+	recordCount: number
+}
+```
+
+When pseudonymization is requested, the system replaces direct identifiers with pseudonyms while maintaining data relationships for analysis purposes.
+
+**Section sources**
+- [compliance.ts](file://packages/audit-client/src/services/compliance.ts#L498-L554)
+- [data-export.ts](file://packages/audit/src/report/data-export.ts)
+
 ## API Endpoints and Integration
 
 The compliance reporting system exposes both REST and TRPC endpoints for frontend integration.
@@ -389,6 +471,7 @@ Integrity[POST /reports/integrity]
 end
 subgraph "Export"
 Export[POST /export/report]
+GDPRExport[POST /export/gdpr]
 end
 subgraph "Scheduled Reports"
 Create[POST /scheduled-reports]
@@ -399,6 +482,7 @@ HIPAA --> ComplianceService
 GDPR --> ComplianceService
 Integrity --> ComplianceService
 Export --> ExportService
+GDPRExport --> ExportService
 Create --> ScheduledService
 List --> ScheduledService
 Get --> ScheduledService
@@ -462,6 +546,40 @@ This generates a report that includes:
 - Data subject rights requests (access, rectification, erasure, etc.)
 - Legal basis for each processing activity
 - Cross-border data transfer information
+
+### GDPR Data Export with Pseudonymization
+To export GDPR data with pseudonymization for a data subject access request:
+
+```json
+POST /export/gdpr
+{
+	"subjectId": "user-123",
+	"dataCategories": ["PHI", "CONFIDENTIAL"],
+	"includeAuditTrail": true,
+	"pseudonymize": true,
+	"format": "json",
+	"dateRange": {
+		"startDate": "2023-01-01T00:00:00Z",
+		"endDate": "2023-12-31T23:59:59Z"
+	}
+}
+```
+
+The response includes a secure download URL for the exported data:
+
+```json
+{
+	"exportId": "gdpr-export-456",
+	"subjectId": "user-123",
+	"pseudonymized": true,
+	"dataCategories": ["PHI", "CONFIDENTIAL"],
+	"exportedAt": "2024-01-15T10:30:00Z",
+	"downloadUrl": "https://api.example.com/download/gdpr-export-456?token=abc123",
+	"expiration": "2024-01-16T10:30:00Z",
+	"size": 1048576,
+	"recordCount": 1500
+}
+```
 
 ### HIPAA Compliance Summary
 To generate a HIPAA compliance summary, use:

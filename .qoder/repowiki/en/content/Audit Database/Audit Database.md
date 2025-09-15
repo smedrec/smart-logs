@@ -7,16 +7,17 @@
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Updated in recent commit*
 - [README.md](file://packages\audit-db\README.md) - *Updated in recent commit*
 - [future-enhancements.md](file://packages\audit-db\docs\future-enhancements.md) - *Updated in recent commit*
+- [organization_role](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [authz.ts](file://packages\auth\src\db\schema\authz.ts) - *Added in recent commit*
 </cite>
 
 ## Update Summary
-- Added new section on GDPR pseudonymization with persistent encrypted pseudonym mapping
-- Updated data model documentation to include the new pseudonym_mapping table
-- Added details on GDPR compliance features and data subject rights implementation
-- Updated architecture overview to include pseudonymization components
-- Added new diagram for GDPR pseudonymization architecture
+- Added new section on organization role management with database integration and Redis caching
+- Updated data model documentation to include the new organization_role table
+- Added details on role-based access control implementation and permission management
+- Updated architecture overview to include role management components
+- Added new diagram for organization role management architecture
 - Updated section sources to reflect new and modified files
-- Updated README and future enhancements roadmap documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,7 +31,8 @@
 9. [Architecture Overview](#architecture-overview)
 10. [Alert Persistence with Database Integration](#alert-persistence-with-database-integration)
 11. [GDPR Pseudonymization and Compliance](#gdpr-pseudonymization-and-compliance)
-12. [Conclusion](#conclusion)
+12. [Organization Role Management](#organization-role-management)
+13. [Conclusion](#conclusion)
 
 ## Introduction
 
@@ -251,6 +253,13 @@ timestamp timestamp
 text pseudonym_id
 text original_id
 }
+organization_role {
+varchar organization_id PK
+varchar name PK
+text description
+jsonb permissions
+jsonb inherits
+}
 audit_log ||--o{ audit_integrity_log : "1:N"
 scheduled_reports ||--o{ report_executions : "1:N"
 report_templates ||--o{ scheduled_reports : "1:N"
@@ -258,9 +267,11 @@ report_templates ||--o{ scheduled_reports : "1:N"
 
 **Diagram sources**
 - [schema.ts](file://packages\audit-db\src\db\schema.ts)
+- [authz.ts](file://packages\auth\src\db\schema\authz.ts)
 
 **Section sources**
 - [schema.ts](file://packages\audit-db\src\db\schema.ts)
+- [authz.ts](file://packages\auth\src\db\schema\authz.ts)
 
 ### Core Entities
 
@@ -337,6 +348,16 @@ Stores encrypted pseudonym-to-original ID mappings for GDPR compliance.
 - **timestamp**: timestamp with time zone - Creation timestamp
 - **pseudonymId**: text - Pseudonymized identifier
 - **originalId**: text - Encrypted original identifier
+
+#### organization_role
+Stores role definitions and permissions for organizational access control.
+
+**Fields:**
+- **organizationId**: varchar(50) - Organization identifier (composite primary key)
+- **name**: varchar(50) - Role name (composite primary key)
+- **description**: text - Role description
+- **permissions**: jsonb - Array of permission objects with resource and action
+- **inherits**: jsonb - Array of role names that this role inherits from
 
 ## Partitioning Strategy
 
@@ -1148,6 +1169,137 @@ The GDPRComplianceService supports several key usage patterns:
 5. **Authorized investigation**: Retrieve original identifiers for compliance investigations with proper authorization
 6. **Compliance reporting**: Generate reports for regulatory audits and compliance verification
 
+## Organization Role Management
+
+The Audit Database now supports organization-level role management through the AuthorizationService class, which integrates with the EnhancedAuditDatabaseClient to manage role-based access control with Redis caching and PostgreSQL persistence.
+
+### Organization Role Management Architecture
+
+```mermaid
+graph TD
+US[User System] --> AS[AuthorizationService]
+AS --> EADB[EnhancedAuditDatabaseClient]
+EADB --> DB[(PostgreSQL)]
+EADB --> RC[Redis Cache]
+AS --> RC
+US --> RC
+subgraph "Role Management"
+AS
+EADB
+end
+subgraph "Data Storage"
+DB
+RC
+end
+style AS fill:#f96,stroke:#333
+style EADB fill:#f96,stroke:#333
+style DB fill:#bbf,stroke:#333
+style RC fill:#bbf,stroke:#333
+```
+
+**Diagram sources**
+- [authz.ts](file://packages/auth/src/permissions.ts)
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [organization_role](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql)
+
+**Section sources**
+- [authz.ts](file://packages/auth/src/permissions.ts)
+- [organization_role](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql)
+
+### AuthorizationService Class
+
+The AuthorizationService class implements role-based access control for organizational permissions:
+
+```typescript
+class AuthorizationService {
+  private readonly roleCachePrefix = 'authz:roles:'
+  private readonly permissionCachePrefix = 'authz:permissions:'
+  private readonly retentionPeriod = 5 * 60 // 5 minutes
+
+  constructor(
+    private db: PostgresJsDatabase<typeof authSchema>,
+    private redis: RedisInstanceType
+  ) {
+    this.initializeRoles()
+  }
+  
+  async hasPermission(session: Session, resource: string, action: string, context?: Record<string, any>): Promise<boolean>
+  async getUserPermissions(session: Session): Promise<Permission[]>
+  async getRole(roleName: string): Promise<Role | undefined>
+  async getAllRoles(): Promise<Role[]>
+  private async initializeRoles(): Promise<void>
+  private async getRolePermissions(role: Role): Promise<Permission[]>
+  private async checkRolePermissions(role: Role, resource: string, action: string, context?: Record<string, any>): Promise<boolean>
+  private async checkResourceSpecificPermissions(session: Session, resource: string, action: string, context?: Record<string, any>): Promise<boolean>
+  private async addRoleToDatabase(role: Role): Promise<void>
+  private async removeRoleFromDatabase(roleName: string): Promise<void>
+}
+```
+
+### Key Features
+
+- **Organization-specific roles**: Stores roles with organization_id and name as composite primary key
+- **Permission inheritance**: Supports role inheritance through the inherits field
+- **Redis caching**: Caches roles and permissions for improved performance
+- **PostgreSQL persistence**: Stores role definitions in the organization_role table
+- **Composite primary key**: Uses organization_id and name as composite primary key for uniqueness
+- **Foreign key constraint**: Enforces referential integrity with the organization table
+- **Index optimization**: Includes indexes on organization_id and name for query performance
+
+### Organization Role Data Model
+
+The organization_role table stores the following fields:
+
+- **organizationId**: varchar(50) - Organization identifier (composite primary key)
+- **name**: varchar(50) - Role name (composite primary key)
+- **description**: text - Role description
+- **permissions**: jsonb - Array of permission objects with resource and action
+- **inherits**: jsonb - Array of role names that this role inherits from
+
+### Role Management Usage
+
+The AuthorizationService supports several key usage patterns:
+
+1. **Permission checking**: Verify if a user has permission to perform an action on a resource
+2. **Role retrieval**: Get role definitions from cache or database
+3. **Permission caching**: Cache permission results for 5 minutes to reduce database load
+4. **Role inheritance**: Support hierarchical role structures through inheritance
+5. **Resource-specific permissions**: Handle ownership and organization-level access rules
+6. **System integration**: Integrate with GraphQL resolvers and other services for access control
+
+### Integration Example
+
+```typescript
+// Initialize authorization service
+const authorizationService = createAuthorizationService(db, redis)
+
+// Check if user has permission
+const hasPermission = await authorizationService.hasPermission(
+  session,
+  'audit.events',
+  'read',
+  { organizationId: 'org-123' }
+)
+
+if (!hasPermission) {
+  throw new Error('Access denied')
+}
+
+// Get user permissions
+const permissions = await authorizationService.getUserPermissions(session)
+console.log('User permissions:', permissions)
+
+// Get specific role
+const role = await authorizationService.getRole('org-123:admin')
+if (role) {
+  console.log('Role permissions:', role.permissions)
+}
+```
+
+**Section sources**
+- [authz.ts](file://packages/auth/src/permissions.ts)
+- [organization_role](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql)
+
 ## Conclusion
 
 The Audit Database is a comprehensive, high-performance system designed to meet the demanding requirements of modern audit and compliance scenarios. By implementing advanced database techniques such as time-based partitioning, Redis caching, and comprehensive performance monitoring, the system delivers excellent performance even with large volumes of audit data.
@@ -1161,5 +1313,6 @@ Key strengths of the system include:
 - **Extensibility**: The modular architecture and Drizzle ORM integration make it easy to evolve the schema as requirements change.
 - **Alert Persistence**: The new DatabaseAlertHandler provides reliable, persistent storage of alerts with multi-organizational support and comprehensive querying capabilities.
 - **GDPR Compliance**: The GDPRComplianceService and pseudonym_mapping table provide robust support for data subject rights and privacy-by-design principles.
+- **Organization Role Management**: The AuthorizationService and organization_role table provide fine-grained access control with Redis caching and PostgreSQL persistence.
 
 The system is well-positioned to serve as the foundation for audit and compliance capabilities across various domains, with particular strength in healthcare applications requiring HIPAA compliance. By following the documented patterns and best practices, organizations can ensure their audit data is secure, reliable, and available when needed.

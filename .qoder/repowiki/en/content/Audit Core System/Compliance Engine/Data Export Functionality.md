@@ -2,12 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [data-export.ts](file://packages/audit/src/report/data-export.ts)
-- [data-export.test.ts](file://packages/audit/src/__tests__/data-export.test.ts)
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts)
+- [data-export.ts](file://packages/audit/src/report/data-export.ts) - *Updated with GDPR compliance integration*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added GDPR data export functionality*
+- [data-export.test.ts](file://packages/audit/src/__tests__/data-export.test.ts) - *Updated with GDPR export test cases*
+- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts) - *Updated with GDPR report types*
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated with encryption for GDPR exports*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Enhanced data export functionality to support GDPR data portability requirements
+- Added detailed documentation for GDPR-specific export implementation
+- Updated test cases to include GDPR export validation
+- Integrated GDPR compliance service with data export functionality
+- Added information about pseudonymization and encryption for GDPR exports
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -416,6 +424,35 @@ The data export functionality is designed with security and regulatory complianc
 ### GDPR Compliance
 The system supports GDPR data portability requirements by providing exports in structured, commonly used formats (JSON, CSV, XML) that can be easily processed by other systems. The export includes all personal data processing activities, data subject rights requests, and legal basis information required by GDPR.
 
+The GDPR compliance service has been enhanced to support data export requests through the `exportUserData` method, which handles GDPR data portability requests. This method supports multiple export formats and includes proper pseudonymization and encryption when required.
+
+```mermaid
+sequenceDiagram
+participant User as Data Subject
+participant Admin as Administrator
+participant API as Server API
+participant GDPR as GDPRComplianceService
+participant Export as DataExportService
+participant Audit as Audit System
+User->>Admin : Request data export
+Admin->>API : Initiate GDPR export request
+API->>API : Validate permissions and request parameters
+API->>GDPR : Call exportUserData(request)
+GDPR->>GDPR : Validate request and build query conditions
+GDPR->>Audit : Query audit logs for user
+Audit-->>GDPR : Return audit logs
+GDPR->>Export : Format data according to requested format
+Export-->>GDPR : Return formatted data
+GDPR->>Audit : Log GDPR activity
+Audit-->>GDPR : Confirmation
+GDPR-->>API : Return export result
+API-->>Admin : Deliver export file
+Admin-->>User : Provide exported data
+```
+
+**Diagram sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L61-L150)
+
 ### Data Protection
 Exported data is protected through multiple layers of security:
 - **Encryption**: Data can be encrypted using AES-256-GCM before export
@@ -436,3 +473,4 @@ These security measures ensure that the data export functionality meets the high
 - [data-export.ts](file://packages/audit/src/report/data-export.ts#L0-L580)
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L0-L951)
 - [crypto.ts](file://packages/audit/src/crypto.ts#L0-L219)
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L0-L697)

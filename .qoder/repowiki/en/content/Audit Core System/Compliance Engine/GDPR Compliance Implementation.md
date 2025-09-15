@@ -5,7 +5,6 @@
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated with pseudonym mapping and KMS integration*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated with enhanced compliance utilities*
 - [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added pseudonym mapping table*
-- [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
 - [infisical-kms](file://packages/infisical-kms) - *Added for secure pseudonym mapping storage*
 </cite>
 
@@ -138,6 +137,19 @@ async exportUserData(request: GDPRDataExportRequest): Promise<GDPRDataExport> {
         { cacheKey }
     )
 
+    // Collect metadata
+    const categories = new Set<string>()
+    const retentionPolicies = new Set<string>()
+    let earliestDate = new Date().toISOString()
+    let latestDate = new Date(0).toISOString()
+
+    for (const log of auditLogs) {
+        if (log.action) categories.add(log.action)
+        if (log.retentionPolicy) retentionPolicies.add(log.retentionPolicy)
+        if (log.timestamp < earliestDate) earliestDate = log.timestamp
+        if (log.timestamp > latestDate) latestDate = log.timestamp
+    }
+
     // Format data according to requested format
     const exportData = await this.formatExportData(
         auditLogs,
@@ -149,6 +161,7 @@ async exportUserData(request: GDPRDataExportRequest): Promise<GDPRDataExport> {
     await this.logGDPRActivity({
         timestamp: new Date().toISOString(),
         principalId: request.requestedBy,
+        organizationId: request.organizationId,
         action: 'gdpr.data.export',
         status: 'success',
         targetResourceType: 'AuditLog',

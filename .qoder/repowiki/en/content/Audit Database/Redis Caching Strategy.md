@@ -4,13 +4,22 @@
 **Referenced Files in This Document**   
 - [cache-factory.ts](file://packages/audit-db/src/cache/cache-factory.ts)
 - [query-cache.ts](file://packages/audit-db/src/cache/query-cache.ts)
-- [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts)
+- [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts) - *Updated in recent commit for organization role caching*
 - [cached-query-executor.ts](file://packages/audit-db/src/cache/cached-query-executor.ts)
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [examples/redis-cache-usage.ts](file://packages/audit-db/src/examples/redis-cache-usage.ts)
 - [README.md](file://packages/audit-db/README.md)
 - [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md)
+- [index.ts](file://packages/auth/src/db/index.ts) - *Added Redis caching for organization roles*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect new Redis caching implementation for organization roles
+- Added details about hybrid L1/L2 caching strategy in production environments
+- Enhanced performance considerations with new metrics from RedisQueryCache implementation
+- Updated architecture overview to include local cache (L1) and Redis (L2) relationship
+- Added new section on RedisQueryCache configuration options and compression features
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -24,7 +33,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides a comprehensive overview of the Redis-based query caching system implemented in the audit-db package. The caching strategy is designed to optimize performance for audit data retrieval operations by reducing database load through intelligent caching of frequently accessed query results. The system features a pluggable architecture with factory patterns, TTL management, and cache invalidation policies tailored for audit data workloads.
+This document provides a comprehensive overview of the Redis-based query caching system implemented in the audit-db package. The caching strategy is designed to optimize performance for audit data retrieval operations by reducing database load through intelligent caching of frequently accessed query results. The system features a pluggable architecture with factory patterns, TTL management, and cache invalidation policies tailored for audit data workloads. Recent updates include Redis caching for organization roles to improve authorization performance.
 
 ## Project Structure
 The Redis caching implementation is located within the `packages/audit-db/src/cache` directory. This modular structure separates caching concerns from database operations while maintaining tight integration with the enhanced database client.
@@ -54,7 +63,7 @@ end
 - [cache-factory.ts](file://packages/audit-db/src/cache/cache-factory.ts)
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 
-**Section sources**
+**Section sources**   
 - [cache-factory.ts](file://packages/audit-db/src/cache/cache-factory.ts)
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 
@@ -63,10 +72,10 @@ The caching system consists of four primary components that work together to pro
 
 - **CacheFactory**: Creates and configures cache instances based on environment settings
 - **QueryCache**: Abstract interface defining cache operations
-- **RedisQueryCache**: Concrete implementation using Redis as the backend
+- **RedisQueryCache**: Concrete implementation using Redis as the backend with optional local L1 cache
 - **CachedQueryExecutor**: Mediator that orchestrates cached query execution
 
-These components follow the Strategy and Factory design patterns, allowing for flexible configuration and potential replacement of the caching backend.
+These components follow the Strategy and Factory design patterns, allowing for flexible configuration and potential replacement of the caching backend. The RedisQueryCache now supports hybrid caching with local memory as L1 cache and Redis as L2 cache, particularly beneficial for organization role queries.
 
 **Section sources**
 - [cache-factory.ts](file://packages/audit-db/src/cache/cache-factory.ts)
@@ -75,7 +84,7 @@ These components follow the Strategy and Factory design patterns, allowing for f
 - [cached-query-executor.ts](file://packages/audit-db/src/cache/cached-query-executor.ts)
 
 ## Architecture Overview
-The caching architecture implements a decorator pattern around database queries, intercepting requests and serving cached results when available. This approach minimizes changes to existing code while providing significant performance benefits.
+The caching architecture implements a decorator pattern around database queries, intercepting requests and serving cached results when available. This approach minimizes changes to existing code while providing significant performance benefits. The system now supports a hybrid L1/L2 caching strategy where frequently accessed data like organization roles are cached in local memory (L1) and distributed Redis (L2).
 
 ```mermaid
 sequenceDiagram
@@ -106,7 +115,7 @@ CQE-->>Client : Query Results
 ## Detailed Component Analysis
 
 ### CacheFactory Analysis
-The CacheFactory provides a centralized mechanism for creating cache instances with consistent configuration. It reads environment variables to determine the cache implementation and connection settings.
+The CacheFactory provides a centralized mechanism for creating cache instances with consistent configuration. It reads environment variables to determine the cache implementation and connection settings. The factory now supports three cache types: local, redis, and hybrid, with the hybrid configuration being recommended for production use to optimize organization role queries.
 
 ```mermaid
 classDiagram
@@ -146,7 +155,7 @@ QueryCache <|-- RedisQueryCache : "implements"
 - [query-cache.ts](file://packages/audit-db/src/cache/query-cache.ts#L1-L30)
 
 ### Query Execution Flow
-The cached query execution process follows a well-defined flow that prioritizes cache hits while ensuring data consistency through proper TTL management and fallback mechanisms.
+The cached query execution process follows a well-defined flow that prioritizes cache hits while ensuring data consistency through proper TTL management and fallback mechanisms. For organization role queries, the system first checks the local L1 cache before querying Redis L2 cache, significantly reducing latency for authorization operations.
 
 ```mermaid
 flowchart TD
@@ -209,8 +218,10 @@ The Redis caching strategy delivers significant performance benefits for audit d
 
 The system implements several performance optimization techniques:
 
+- **Hybrid Caching**: Local L1 cache for frequently accessed data like organization roles, with Redis L2 cache for distribution
 - **Key Generation**: Deterministic key generation using query text and parameter hashing
 - **TTL Management**: Configurable time-to-live values with default of 5 minutes for audit data
+- **Compression**: Large values are compressed to reduce memory footprint
 - **Fallback Behavior**: Graceful degradation when Redis is unavailable
 - **Connection Pooling**: Reuses Redis connections to minimize overhead
 
@@ -249,4 +260,4 @@ Common issues and their solutions when working with the Redis caching system:
 - [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md)
 
 ## Conclusion
-The Redis-based query caching system provides a robust solution for improving performance of audit data retrieval operations. By implementing a clean separation of concerns through the CacheFactory, QueryCache, and CachedQueryExecutor components, the system offers both high performance and maintainability. The architecture supports easy configuration, monitoring, and troubleshooting, making it a reliable component of the overall audit data infrastructure. For optimal results, monitor cache hit ratios and adjust TTL values based on access patterns and data volatility requirements.
+The Redis-based query caching system provides a robust solution for improving performance of audit data retrieval operations. By implementing a clean separation of concerns through the CacheFactory, QueryCache, and CachedQueryExecutor components, the system offers both high performance and maintainability. The architecture supports easy configuration, monitoring, and troubleshooting, making it a reliable component of the overall audit data infrastructure. Recent enhancements include Redis caching for organization roles and hybrid L1/L2 caching strategies. For optimal results, monitor cache hit ratios and adjust TTL values based on access patterns and data volatility requirements.

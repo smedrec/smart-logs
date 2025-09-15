@@ -2,11 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md)
-- [plugin-usage.ts](file://packages/audit-client/src/examples/plugin-usage.ts)
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts)
-- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts)
+- [PLUGIN_ARCHITECTURE.md](file://packages/audit-client/docs/PLUGIN_ARCHITECTURE.md) - *Updated in recent commit*
+- [plugin-usage.ts](file://packages/audit-client/src/examples/plugin-usage.ts) - *Updated in recent commit*
+- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts) - *Updated in recent commit*
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts) - *Updated in recent commit*
+- [utils.ts](file://packages/audit-client/src/infrastructure/plugins/utils.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect formalized plugin architecture with GDPR compliance considerations
+- Enhanced examples with complete implementation details from source files
+- Added new sections for plugin utilities and performance tracking
+- Updated diagrams to accurately represent current code structure
+- Improved configuration examples with real-world usage patterns
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -293,6 +302,25 @@ OAuth2AuthPlugin-->>Client : Return Authorization header
 **Diagram sources**
 - [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L650-L750)
 
+#### Custom Header Authentication Plugin
+Supports custom header-based authentication with dynamic header value functions.
+
+```mermaid
+classDiagram
+class CustomHeaderAuthPlugin {
++readonly name : 'custom-header-auth'
++getAuthHeaders(config : CustomHeaderAuthConfig, context : AuthContext) : Promise<Record<string, string>>
++validateAuthConfig?(config : CustomHeaderAuthConfig) : ValidationResult
+}
+class CustomHeaderAuthConfig {
++headers : Record<string, string | (context : AuthContext) => Promise<string> | string>
+}
+CustomHeaderAuthPlugin --> AuthPlugin : "implements"
+```
+
+**Diagram sources**
+- [built-in.ts](file://packages/audit-client/src/infrastructure/plugins/built-in.ts#L750-L850)
+
 ## Creating Custom Plugins
 
 ### Custom Middleware Plugin
@@ -527,7 +555,7 @@ class PluginPerformanceMetrics {
 ```
 
 **Diagram sources**
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins.ts#L620-L650)
+- [utils.ts](file://packages/audit-client/src/infrastructure/plugins/utils.ts#L434-L488)
 
 ### Dependency Resolution
 The system handles plugin dependencies with cycle detection and proper loading order.
@@ -546,7 +574,7 @@ H --> I[Load in dependency order]
 ```
 
 **Diagram sources**
-- [plugins.ts](file://packages/audit-client/src/infrastructure/plugins/utils.ts#L288-L340)
+- [utils.ts](file://packages/audit-client/src/infrastructure/plugins/utils.ts#L288-L340)
 
 ## Best Practices
 

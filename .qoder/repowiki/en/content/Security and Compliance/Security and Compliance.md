@@ -2,11 +2,11 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
-- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
-- [client.ts](file://packages/infisical-kms/src/client.ts) - *KMS integration for pseudonymization*
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Updated in recent commit*
+- [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts) - *Updated in recent commit*
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
+- [pseudonym_mapping.sql](file://packages\audit-db\drizzle\migrations\0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [client.ts](file://packages\infisical-kms\src\client.ts) - *KMS integration for pseudonymization*
 </cite>
 
 ## Update Summary
@@ -60,7 +60,7 @@ Note over GDPRService : Compliance records preserved<br/>via pseudonymization wi
 ```
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L380-L470)
 
 ### Data Minimization and Pseudonymization
 The system implements data minimization through pseudonymization strategies that replace personally identifiable information with artificial identifiers while maintaining referential integrity. The implementation includes persistent storage of pseudonym mappings in an encrypted format using KMS integration.
@@ -96,10 +96,10 @@ AuditDatabase --> PseudonymizationMapping : "contains"
 ```
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L643-L658)
-- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
-- [client.ts](file://packages/infisical-kms/src/client.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L100-L150)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L643-L658)
+- [pseudonym_mapping.sql](file://packages\audit-db\drizzle\migrations\0006_silly_tyger_tiger.sql)
+- [client.ts](file://packages\infisical-kms\src\client.ts)
 
 ### Pseudonymization Strategies
 The system implements multiple pseudonymization strategies to accommodate different security and performance requirements.
@@ -136,8 +136,8 @@ case 'encryption':
 ```
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L524-L572)
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L4-L25)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L524-L572)
+- [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts#L4-L25)
 
 ### Consent Tracking Implementation
 The system tracks consent through the `gdprContext` field in audit events, which captures legal basis, processing purpose, and data categories.
@@ -157,7 +157,7 @@ ThrowError --> End
 ```
 
 **Section sources**
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts#L100-L130)
+- [compliance.ts](file://packages\audit-sdk\src\compliance.ts#L100-L130)
 
 ## HIPAA Compliance Features
 
@@ -183,7 +183,7 @@ Note over Validator : All PHI events require<br/>principalId, action, targetReso
 ```
 
 **Section sources**
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts#L40-L80)
+- [compliance.ts](file://packages\audit-sdk\src\compliance.ts#L40-L80)
 
 ### PHI Data Classification
 The system identifies PHI resources through a predefined list of healthcare resource types and enforces appropriate data classification.
@@ -214,8 +214,8 @@ AuditLogEvent --> SessionContext : "contains"
 ```
 
 **Section sources**
-- [types.ts](file://packages/audit/src/types.ts#L10-L50)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L20-L30)
+- [types.ts](file://packages\audit\src\types.ts#L10-L50)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L20-L30)
 
 ## Security Measures
 
@@ -238,9 +238,9 @@ I --> J["Generate Integrity Report"]
 ```
 
 **Section sources**
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L300-L400)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L50-L70)
-- [client.ts](file://packages/infisical-kms/src/client.ts#L100-L120)
+- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts#L300-L400)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L50-L70)
+- [client.ts](file://packages\infisical-kms\src\client.ts#L100-L120)
 
 ### Secure Authentication and Access Controls
 The system implements secure authentication through audit logging of all authentication events and role-based access controls.
@@ -275,7 +275,7 @@ AuditLogEvent --> SessionContext : "sessionContext"
 ```
 
 **Section sources**
-- [types.ts](file://packages/audit/src/types.ts#L150-L180)
+- [types.ts](file://packages\audit\src\types.ts#L150-L180)
 
 ## Compliance Reporting and Data Export
 
@@ -302,8 +302,8 @@ Note over ReportService : Reports can be scheduled<br/>daily, weekly, monthly,<b
 ```
 
 **Section sources**
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L200-L300)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L500-L550)
+- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts#L200-L300)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L500-L550)
 
 ### Data Export Implementation
 The GDPR data export feature provides data subject access requests in multiple formats with metadata preservation.
@@ -321,7 +321,7 @@ Note over D: Supports JSON, CSV, and XML<br/>formats with optional metadata
 ```
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L180-L250)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L180-L250)
 
 ## Relationships Between Compliance Modules
 
@@ -351,10 +351,10 @@ style P fill:#bbf,stroke:#333
 ```
 
 **Section sources**
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts)
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [compliance.ts](file://packages\audit-sdk\src\compliance.ts)
+- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
 
 ## Common Compliance Issues and Solutions
 
@@ -397,9 +397,9 @@ async deleteUserDataWithAuditTrail(
 ```
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L643-L658)
-- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L380-L470)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L643-L658)
+- [pseudonym_mapping.sql](file://packages\audit-db\drizzle\migrations\0006_silly_tyger_tiger.sql)
 
 ### Issue: Ensuring Data Minimization in Audit Logs
 **Problem**: Collecting excessive data in audit logs violates GDPR's data minimization principle.
@@ -431,7 +431,7 @@ function validateGDPR(event: Partial<AuditLogEvent>, gdprConfig?: ComplianceConf
 ```
 
 **Section sources**
-- [compliance.ts](file://packages/audit-sdk/src/compliance.ts#L100-L130)
+- [compliance.ts](file://packages\audit-sdk\src\compliance.ts#L100-L130)
 
 ## Best Practices for Production Compliance
 
@@ -462,7 +462,7 @@ H --> I[Prevent Future Issues]
 ```
 
 **Section sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L400-L450)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L400-L450)
 
 ### Data Retention Management
 Implement proper data retention policies to comply with regulatory requirements.
@@ -490,4 +490,4 @@ async applyRetentionPolicies(): Promise<ArchivalResult[]> {
 ```
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L280-L320)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L280-L320)

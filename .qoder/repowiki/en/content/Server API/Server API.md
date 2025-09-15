@@ -14,7 +14,18 @@
 - [openapi_responses.ts](file://apps/server/src/lib/errors/openapi_responses.ts)
 - [http.ts](file://apps/server/src/lib/errors/http.ts)
 - [alerts.ts](file://apps/server/src/routers/alerts.ts) - *Updated in recent commit*
+- [organization-api.ts](file://apps/server/src/routes/organization-api.ts) - *Added organization role management*
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added organization_role table*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added new section on Organization Role Management API
+- Updated Authentication and Access Control section with new role management capabilities
+- Added new database schema details for organization_role table
+- Enhanced Access Control Rules diagram to include role creation
+- Updated Section sources and Referenced Files to include new files
+- Added details about organization role creation endpoint and database integration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -28,7 +39,8 @@
 9. [Health Check API](#health-check-api)
 10. [Metrics API](#metrics-api)
 11. [Observability API](#observability-api)
-12. [Request and Response Examples](#request-and-response-examples)
+12. [Organization Role Management API](#organization-role-management-api)
+13. [Request and Response Examples](#request-and-response-examples)
 
 ## Introduction
 The SMEDREC Audit System REST API provides comprehensive access to healthcare audit functionality through a well-structured RESTful interface. The API supports audit event management, compliance reporting, system monitoring, and observability features. Built on Hono with OpenAPI documentation, the API follows modern REST principles with robust security, rate limiting, and error handling.
@@ -39,6 +51,7 @@ The API is organized into logical modules accessible under different path prefix
 - `/metrics`: System and audit metrics
 - `/observability`: Comprehensive system monitoring
 - `/health`: Health check endpoints
+- `/organization`: Organization management including role management
 
 All endpoints are versioned and documented via Swagger UI at `/docs`, with machine-readable OpenAPI specification available at `/openapi.json`.
 
@@ -114,14 +127,18 @@ E --> H[/metrics/system/*, /observability/*/]
 H --> I[requireRole admin]
 E --> J[/audit/*, /compliance/*/]
 J --> K[requireOrganizationAccess]
-C --> |Authorized| L[Process Request]
-C --> |Unauthorized| M[403 Forbidden]
-L --> N[Return Response]
+E --> L[/organization/*]
+L --> M[requireAuthOrApiKey]
+L --> N[requireOrganizationAccess]
+C --> |Authorized| O[Process Request]
+C --> |Unauthorized| P[403 Forbidden]
+O --> Q[Return Response]
 ```
 
 **Diagram sources**
 - [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L1-L765)
 - [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L241-L288)
+- [organization-api.ts](file://apps/server/src/routes/organization-api.ts#L1-L222)
 
 ### Role-Based Access Control
 The `requireRole` middleware enforces role-based permissions. Currently, admin access is required for system metrics and observability endpoints.
@@ -562,6 +579,60 @@ Returns detailed information about performance bottlenecks including:
 **Section sources**
 - [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L0-L199)
 
+## Organization Role Management API
+The Organization Role Management API provides endpoints for creating and managing organization-specific roles with associated permissions.
+
+### Base Path
+`/api/v1/organization`
+
+### Create Organization Role
+Creates a new role within the organization with specified permissions and inheritance.
+
+**Endpoint**: `POST /role`  
+**Authentication**: Required  
+**Permissions**: Organization admin access
+
+**Request Body**:
+```json
+{
+  "name": "auditor",
+  "description": "Audit event viewer with verification capabilities",
+  "permissions": [
+    {
+      "resource": "audit.events",
+      "action": "read"
+    },
+    {
+      "resource": "audit.events",
+      "action": "verify"
+    }
+  ],
+  "inherits": ["viewer"]
+}
+```
+
+**Response**: `201 Created` with the created role details.
+
+### Database Schema
+The organization roles are stored in the `organization_role` table with the following schema:
+
+```sql
+CREATE TABLE "organization_role" (
+	"organization_id" varchar(50) NOT NULL,
+	"name" varchar(50) NOT NULL,
+	"description" text,
+	"permissions" jsonb NOT NULL,
+	"inherits" jsonb,
+	CONSTRAINT "organization_role_organization_id_name_pk" PRIMARY KEY("organization_id","name")
+);
+```
+
+The table includes a composite primary key of organization_id and name, with a foreign key constraint to the organization table and indexes on both organization_id and name for efficient querying.
+
+**Section sources**
+- [organization-api.ts](file://apps/server/src/routes/organization-api.ts#L1-L222)
+- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+
 ## Request and Response Examples
 This section provides practical examples of API usage.
 
@@ -591,6 +662,29 @@ curl -X POST https://api.smedrec.com/api/v1/audit/events \
 curl -X GET "https://api.smedrec.com/api/v1/audit/events?actions=user.login,record.access&statuses=success&startDate=2024-01-01T00:00:00Z&limit=25" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
   -H "Accept-Version: 1.0.0"
+```
+
+### Create Organization Role
+```bash
+curl -X POST https://api.smedrec.com/api/v1/organization/role \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Accept-Version: 1.0.0" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "compliance-officer",
+    "description": "User with compliance reporting permissions",
+    "permissions": [
+      {
+        "resource": "compliance.reports",
+        "action": "generate"
+      },
+      {
+        "resource": "audit.events",
+        "action": "read"
+      }
+    ],
+    "inherits": ["auditor"]
+  }'
 ```
 
 ### Health Check Response
@@ -649,3 +743,4 @@ curl -X GET "https://api.smedrec.com/api/v1/audit/events?actions=user.login,reco
 - [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L1-L329)
 - [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L0-L199)
 - [health-api.ts](file://apps/server/src/routes/health-api.ts#L0-L199)
+- [organization-api.ts](file://apps/server/src/routes/organization-api.ts#L1-L222)
