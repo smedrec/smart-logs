@@ -21,6 +21,7 @@ export interface Permission {
  */
 export interface Role {
 	name: string
+	description?: string
 	permissions: Permission[]
 	inherits?: string[]
 }
@@ -459,7 +460,7 @@ export class AuthorizationService {
 			await this.redis.set(fullKey, JSON.stringify(role))
 			await this.addRoleToDatabase(role)
 		} catch (error) {
-			console.error('Failed to get role', {
+			console.error('Failed to add role', {
 				roleName,
 				error: error instanceof Error ? error.message : 'Unknown error',
 			})
@@ -568,12 +569,23 @@ export class AuthorizationService {
 		const organizationId = role.name.split(':')[0]
 		const name = role.name.split(':')[1]
 
-		await this.db.insert(organizationRole).values({
-			organizationId,
-			name,
-			permissions: role.permissions,
-			inherits: role.inherits,
-		})
+		await this.db
+			.insert(organizationRole)
+			.values({
+				organizationId,
+				name,
+				description: role.description,
+				permissions: role.permissions,
+				inherits: role.inherits,
+			})
+			.onConflictDoUpdate({
+				target: [organizationRole.organizationId, organizationRole.name],
+				set: {
+					description: role.description,
+					permissions: role.permissions,
+					inherits: role.inherits,
+				},
+			})
 	}
 
 	/**
