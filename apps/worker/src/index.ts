@@ -13,6 +13,7 @@ import {
 	CircuitBreakerHealthCheck,
 	ConfigurationManager,
 	ConsoleAlertHandler,
+	CryptoService,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
 	DatabaseHealthCheck,
@@ -32,7 +33,6 @@ import {
 	trace,
 } from '@repo/audit'
 import {
-	AuditDbWithConfig,
 	auditLog as auditLogTableSchema,
 	EnhancedAuditDb,
 	errorAggregation,
@@ -60,6 +60,8 @@ let connection: Redis | undefined = undefined
 
 // Using configuration manager
 let auditDbService: EnhancedAuditDb | undefined = undefined
+
+let cryptoService: CryptoService | undefined = undefined
 
 // Reliable event processor instance
 let reliableProcessor: ReliableEventProcessor<AuditLogEvent> | undefined = undefined
@@ -334,6 +336,8 @@ async function main() {
 
 	// 2. Initialize database connection
 	if (!auditDbService) {
+		config.enhancedClient.monitoring.enabled = false
+		config.enhancedClient.partitioning.enabled = false
 		auditDbService = new EnhancedAuditDb(connection, config.enhancedClient)
 	}
 
@@ -348,6 +352,10 @@ async function main() {
 	}
 
 	const db = auditDbService.getDrizzleInstance()
+
+	if (!cryptoService) {
+		cryptoService = new CryptoService(config.security)
+	}
 
 	// 4. Initialize error handling services
 	if (!databaseErrorLogger) {
@@ -432,7 +440,13 @@ async function main() {
 			if (eventData.hash) {
 				const hashingTimer = new PerformanceTimer()
 				span.log('info', 'Processing event hash')
-				// Hash verification would happen here
+				if (cryptoService?.verifyHash(eventData, eventData.hash)) {
+					span.log('info', 'Event hash verification passed')
+				} else {
+					span.log('error', 'Event hash verification failed')
+					// TODO: Implement error handling for hash verification failures
+					//throw new Error('Event hash verification failed')
+				}
 				hashingTime = hashingTimer.stop()
 				span.log('info', 'Hash processing completed', { hashingTime })
 			}
@@ -463,6 +477,7 @@ async function main() {
 				...additionalDetails // Captures all other properties including practitioner-specific fields
 			} = eventData
 
+			const latency = eventData.processingLatency || 0
 			// This will throw an error if database operation fails, which will be caught by the retry mechanism
 			await db.insert(auditLogTableSchema).values({
 				timestamp, // This comes from the event, should be an ISO string
@@ -480,7 +495,7 @@ async function main() {
 				correlationId,
 				dataClassification,
 				retentionPolicy,
-				processingLatency: processingLatency || Math.floor(performanceTimer.getCurrentDuration()),
+				processingLatency: Math.floor(latency + performanceTimer.getCurrentDuration()),
 				archivedAt,
 				details: Object.keys(additionalDetails).length > 0 ? additionalDetails : null,
 			})
