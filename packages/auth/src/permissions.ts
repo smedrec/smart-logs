@@ -1,3 +1,7 @@
+import { and, eq } from 'drizzle-orm'
+
+import { organizationRole } from './db/schema/index.js'
+
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Session } from './auth.js'
@@ -28,12 +32,11 @@ export class AuthorizationService {
 	private readonly roleCachePrefix = 'authz:roles:'
 	private readonly permissionCachePrefix = 'authz:permissions:'
 	private readonly retentionPeriod = 5 * 60 // 5 minutes
-	private db: PostgresJsDatabase<typeof authSchema>
-	private redis: RedisInstanceType
 
-	constructor(db: PostgresJsDatabase<typeof authSchema>, redis: RedisInstanceType) {
-		this.db = db
-		this.redis = redis
+	constructor(
+		private db: PostgresJsDatabase<typeof authSchema>,
+		private redis: RedisInstanceType
+	) {
 		this.initializeRoles()
 	}
 
@@ -63,7 +66,7 @@ export class AuthorizationService {
 			},
 		]
 
-		// Organization-level roles
+		// Default Organization-level roles
 		const organizationRoles: Role[] = [
 			{
 				name: 'org:member',
@@ -161,7 +164,12 @@ export class AuthorizationService {
 
 				// Check organization-level permissions if not already granted
 				if (!hasPermission && session.session.activeOrganizationRole) {
-					const orgRole = await this.getRole(`org:${session.session.activeOrganizationRole}`)
+					let orgRole
+					orgRole = await this.getRole(
+						`${session.session.activeOrganizationId}:${session.session.activeOrganizationRole}`
+					)
+					if (!orgRole)
+						orgRole = await this.getRole(`org:${session.session.activeOrganizationRole}`)
 					if (orgRole && (await this.checkRolePermissions(orgRole, resource, action, context))) {
 						hasPermission = true
 					}
@@ -330,7 +338,11 @@ export class AuthorizationService {
 
 		// Get organization role permissions
 		if (session.session.activeOrganizationRole) {
-			const orgRole = await this.getRole(`org:${session.session.activeOrganizationRole}`)
+			let orgRole: Role | undefined
+			orgRole = await this.getRole(
+				`${session.session.activeOrganizationId}:${session.session.activeOrganizationRole}`
+			)
+			if (!orgRole) orgRole = await this.getRole(`org:${session.session.activeOrganizationRole}`)
 			if (orgRole) {
 				const rolePermission = await this.getRolePermissions(orgRole)
 				permissions.push(...rolePermission)
@@ -445,6 +457,7 @@ export class AuthorizationService {
 				? roleName
 				: `${this.roleCachePrefix}${roleName}`
 			await this.redis.set(fullKey, JSON.stringify(role))
+			await this.addRoleToDatabase(role)
 		} catch (error) {
 			console.error('Failed to get role', {
 				roleName,
@@ -462,6 +475,7 @@ export class AuthorizationService {
 				? roleName
 				: `${this.roleCachePrefix}${roleName}`
 			await this.redis.del(fullKey)
+			await this.removeRoleFromDatabase(roleName)
 		} catch (error) {
 			console.error('Failed to delete role', {
 				roleName,
@@ -474,11 +488,17 @@ export class AuthorizationService {
 	 * Get role definition
 	 */
 	async getRole(roleName: string): Promise<Role | undefined> {
+		let data
 		try {
 			const fullKey = roleName.startsWith(this.roleCachePrefix)
 				? roleName
 				: `${this.roleCachePrefix}${roleName}`
-			const data = await this.redis.get(fullKey)
+			data = await this.redis.get(fullKey)
+			if (data === null) {
+				data = await this.getRoleFromDatabase(fullKey)
+				return data || undefined
+			}
+
 			return data ? JSON.parse(data) : undefined
 		} catch (error) {
 			console.error('Failed to get role', {
@@ -487,6 +507,73 @@ export class AuthorizationService {
 			})
 			return undefined
 		}
+	}
+
+	/**
+	 * Get a role from the database.
+	 * @param fullKey The full key of the role.
+	 * @returns The role.
+	 */
+	private async getRoleFromDatabase(fullKey: string): Promise<Role | null> {
+		fullKey = fullKey.replace(this.roleCachePrefix, '')
+		const organizationId = fullKey.substring(0, fullKey.indexOf(':'))
+		const name = fullKey.substring(fullKey.indexOf(':') + 1)
+
+		const result = await this.db.query.organizationRole.findFirst({
+			where: and(
+				eq(organizationRole.organizationId, organizationId),
+				eq(organizationRole.name, name)
+			),
+			columns: { name: true, permissions: true, inherits: true },
+		})
+		if (!result) return null
+
+		const role = {
+			name: result.name,
+			permissions:
+				typeof result.permissions === 'string'
+					? JSON.parse(result.permissions)
+					: result.permissions,
+			inherits:
+				(typeof result.inherits === 'string' ? JSON.parse(result.inherits) : result.inherits) ||
+				undefined,
+		}
+
+		await this.redis.set(fullKey, JSON.stringify(role))
+		return role
+	}
+
+	/**
+	 * Remove role from database
+	 */
+	private async removeRoleFromDatabase(roleName: string): Promise<void> {
+		roleName = roleName.replace(this.roleCachePrefix, '')
+		const organizationId = roleName.substring(0, roleName.indexOf(':'))
+		const name = roleName.substring(roleName.indexOf(':') + 1)
+
+		await this.db
+			.delete(organizationRole)
+			.where(
+				and(
+					eq(organizationRole.organizationId, organizationId),
+					eq(organizationRole.name, roleName)
+				)
+			)
+	}
+
+	/**
+	 * Add role to database
+	 */
+	private async addRoleToDatabase(role: Role): Promise<void> {
+		const organizationId = role.name.split(':')[0]
+		const name = role.name.split(':')[1]
+
+		await this.db.insert(organizationRole).values({
+			organizationId,
+			name,
+			permissions: role.permissions,
+			inherits: role.inherits,
+		})
 	}
 
 	/**

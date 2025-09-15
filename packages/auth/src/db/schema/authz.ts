@@ -12,6 +12,7 @@ import {
 	varchar,
 } from 'drizzle-orm/pg-core'
 
+import { Permission } from '../../permissions'
 import { organization, user } from './auth'
 import { DeliveryConfig, ExportConfig } from './types'
 
@@ -97,3 +98,21 @@ export const emailProvider = pgTable('email_provider', {
 	fromName: varchar('from_name', { length: 50 }),
 	fromEmail: varchar('from_email', { length: 50 }),
 })
+
+export const organizationRole = pgTable(
+	'organization_role',
+	{
+		organizationId: varchar('organization_id', { length: 50 })
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		name: varchar('name', { length: 50 }).notNull(),
+		description: text('description'),
+		permissions: jsonb('permissions').$type<Permission[]>().notNull(),
+		inherits: jsonb('inherits').$type<string[]>(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.organizationId, table.name] }),
+		index('organization_role_organization_id_idx').on(table.organizationId),
+		index('organization_role_name_idx').on(table.name),
+	]
+)

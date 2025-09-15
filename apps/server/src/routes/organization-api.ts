@@ -5,6 +5,7 @@
  * - Hello World
  *
  */
+import { Session } from 'inspector/promises'
 import { ApiError } from '@/lib/errors/http.js'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
@@ -37,6 +38,19 @@ const EmailProviderResponseSchema = z.object({
 	fromEmail: z.string().optional(),
 })
 
+const RoleSchema = z.object({
+	name: z.string().min(1),
+	description: z.string().optional(),
+	permissions: z.array(
+		z.object({
+			resource: z.string(),
+			action: z.string(),
+			conditions: z.record(z.string(), z.any()).optional(),
+		})
+	),
+	inherits: z.array(z.string()).optional(),
+})
+
 // Route definitions
 const organizationEmailProviderRoute = createRoute({
 	method: 'post',
@@ -59,6 +73,34 @@ const organizationEmailProviderRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: EmailProviderResponseSchema,
+				},
+			},
+		},
+		...openApiErrorResponses,
+	},
+})
+
+const organizationRoleCreateRoute = createRoute({
+	method: 'post',
+	path: '/role',
+	tags: ['Organization Role Management'],
+	summary: 'Create Organization Role',
+	description: 'Creates a new organization role.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: RoleSchema,
+				},
+			},
+		},
+	},
+	responses: {
+		201: {
+			description: 'Role created successfully',
+			content: {
+				'application/json': {
+					schema: RoleSchema,
 				},
 			},
 		},
@@ -156,6 +198,25 @@ export function createOrganizationAPI(): OpenAPIHono<any> {
 				message: `Failed to create/update email provider: ${message}`,
 			})
 		}
+	})
+
+	app.openapi(organizationRoleCreateRoute, async (c) => {
+		const { authorization, logger } = c.get('services')
+		const session = c.get('session')
+		const role = c.req.valid('json')
+
+		role.name = `${session?.session.activeOrganizationId}:${role.name}`
+		try {
+			await authorization.addRole(role)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message: `Failed to create role: ${message}`,
+			})
+		}
+
+		return c.json(role, 201)
 	})
 
 	return app
