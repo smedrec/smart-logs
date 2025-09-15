@@ -7,6 +7,7 @@
 - [0002_tearful_blonde_phantom.sql](file://packages/audit-db/drizzle/migrations/0002_tearful_blonde_phantom.sql)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql)
 - [0004_mixed_roughhouse.sql](file://packages/audit-db/drizzle/migrations/0004_mixed_roughhouse.sql)
+- [0005_marvelous_christian_walker.sql](file://packages/audit-db/drizzle/migrations/0005_marvelous_christian_walker.sql) - *Added run_id field for report executions*
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added pseudonym mapping table for GDPR compliance*
 - [convert-to-partitioned.sql](file://packages/audit-db/src/db/migrations/convert-to-partitioned.sql)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
@@ -14,16 +15,17 @@
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Implements pseudonymization logic*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added GDPR utility functions*
+- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added organization role management with Redis caching*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on GDPR pseudonymization migration
-- Updated migration workflow section to include GDPR-related changes
-- Added new diagram showing pseudonymization data flow
-- Updated structure of migration files section to include the new pseudonym_mapping table
-- Enhanced best practices section with GDPR compliance considerations
-- Added new sources for GDPR-related files and updated migration
+- Added new section on organization role management migration
+- Updated migration workflow section to include role-based access control changes
+- Added new diagram showing organization role data flow
+- Updated structure of migration files section to include the new organization_role table
+- Enhanced best practices section with role management considerations
+- Added new sources for role management-related files and updated migration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,7 +37,8 @@
 7. [Best Practices for Writing Migrations](#best-practices-for-writing-migrations)
 8. [Complex Migration Examples](#complex-migration-examples)
 9. [GDPR Pseudonymization Migration](#gdpr-pseudonymization-migration)
-10. [Validation and Monitoring](#validation-and-monitoring)
+10. [Organization Role Management Migration](#organization-role-management-migration)
+11. [Validation and Monitoring](#validation-and-monitoring)
 
 ## Introduction
 This document provides comprehensive documentation for the database migration system using Drizzle ORM in the audit-db package. It details the migration workflow, versioning strategy, rollback procedures, and execution process. The system supports atomic schema changes, data transformations, and advanced features like table partitioning for large audit datasets. The migration framework ensures schema consistency across environments while enabling safe, reversible changes with minimal downtime.
@@ -85,6 +88,7 @@ Subsequent migrations apply incremental changes. For example:
 - `0002_tearful_blonde_phantom.sql` adds `integrity_report` to `report_executions` and `export` to `scheduled_reports`
 - `0003_easy_prowler.sql` adds acknowledgment fields to `alerts`
 - `0004_mixed_roughhouse.sql` drops a foreign key constraint from `audit_integrity_log`
+- `0005_marvelous_christian_walker.sql` adds `run_id` field to `report_executions` and `scheduled_reports`
 - `0006_silly_tyger_tiger.sql` adds the `pseudonym_mapping` table for GDPR compliance
 
 Each migration file follows a consistent pattern:
@@ -102,11 +106,13 @@ scheduled_reports ||--o{ report_executions : "has executions"
 alerts ||--o{ audit_log : "references events"
 error_log ||--o{ error_aggregation : "contributes to aggregation"
 pseudonym_mapping ||--o{ audit_log : "maps pseudonymized IDs"
+organization_role ||--o{ organization : "defines permissions per organization"
 ```
 
 **Diagram sources**
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L20-L662)
 - [0000_burly_namor.sql](file://packages/audit-db/drizzle/migrations/0000_burly_namor.sql#L1-L320)
+- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
 
 **Section sources**
 - [0000_burly_namor.sql](file://packages/audit-db/drizzle/migrations/0000_burly_namor.sql#L1-L320)
@@ -114,6 +120,7 @@ pseudonym_mapping ||--o{ audit_log : "maps pseudonymized IDs"
 - [0002_tearful_blonde_phantom.sql](file://packages/audit-db/drizzle/migrations/0002_tearful_blonde_phantom.sql#L1-L2)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql#L1-L5)
 - [0004_mixed_roughhouse.sql](file://packages/audit-db/drizzle/migrations/0004_mixed_roughhouse.sql#L1)
+- [0005_marvelous_christian_walker.sql](file://packages/audit-db/drizzle/migrations/0005_marvelous_christian_walker.sql#L1-L2)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
 
 ## Migration Execution Process
@@ -296,10 +303,18 @@ When implementing GDPR-related migrations:
 - Implement proper access controls for reverse mapping
 - Document data protection impact assessments
 
+### Role Management
+When implementing role-based access control migrations:
+- Define clear permission hierarchies
+- Implement proper foreign key constraints
+- Use composite primary keys for role assignments
+- Create appropriate indexes for role-based queries
+
 **Section sources**
 - [0001_aberrant_natasha_romanoff.sql](file://packages/audit-db/drizzle/migrations/0001_aberrant_natasha_romanoff.sql#L1)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql#L1-L5)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
 
 ## Complex Migration Examples
 
@@ -431,6 +446,49 @@ I --> L["Encryption-based Pseudonymization"]
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L234-L275)
 - [gdpr-utils.test.ts](file://packages/audit/src/__tests__/gdpr-utils.test.ts#L0-L37)
+
+## Organization Role Management Migration
+
+The system implements organization role management through a dedicated migration and supporting infrastructure. The `0005_fluffy_donald_blake.sql` migration introduces the `organization_role` table to manage role-based access control with Redis caching.
+
+### Migration Details
+The `organization_role` table structure:
+- `organization_id`: Varchar(50) foreign key to organization table
+- `name`: Varchar(50) role name
+- `description`: Text field for role description
+- `permissions`: Jsonb field storing permission array
+- `inherits`: Jsonb field storing inherited roles
+
+The migration creates two indexes for efficient lookups:
+- `organization_role_organization_id_idx` on organization_id
+- `organization_role_name_idx` on name
+
+The table uses a composite primary key on organization_id and name, ensuring unique role names per organization.
+
+### Data Flow
+```mermaid
+flowchart LR
+A["User Request"] --> B["Authentication Service"]
+B --> C["Role Management Service"]
+C --> D["Check organization_role Table"]
+D --> E["Redis Cache"]
+E --> F["Return Permissions"]
+F --> G["Authorize Request"]
+G --> H["Execute Operation"]
+C --> I["Update Role Permissions"]
+I --> J["Database Persistence"]
+J --> K["Redis Cache Invalidation"]
+K --> L["Cache Refresh"]
+```
+
+**Diagram sources**
+- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts#L80-L118)
+
+**Section sources**
+- [organization_role.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts#L80-L118)
+- [organization_role.test.ts](file://packages/auth/src/__tests__/organization_role.test.ts#L0-L45)
 
 ## Validation and Monitoring
 

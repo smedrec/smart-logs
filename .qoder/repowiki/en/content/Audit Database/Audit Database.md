@@ -8,7 +8,7 @@
 - [README.md](file://packages\audit-db\README.md) - *Updated in recent commit*
 - [future-enhancements.md](file://packages\audit-db\docs\future-enhancements.md) - *Updated in recent commit*
 - [organization_role](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql) - *Added in recent commit*
-- [authz.ts](file://packages\auth\src\db\schema\authz.ts) - *Added in recent commit*
+- [authz.ts](file://packages\auth\src\permissions.ts) - *Added in recent commit*
 </cite>
 
 ## Update Summary
@@ -267,11 +267,11 @@ report_templates ||--o{ scheduled_reports : "1:N"
 
 **Diagram sources**
 - [schema.ts](file://packages\audit-db\src\db\schema.ts)
-- [authz.ts](file://packages\auth\src\db\schema\authz.ts)
+- [authz.ts](file://packages\auth\src\permissions.ts)
 
 **Section sources**
 - [schema.ts](file://packages\audit-db\src\db\schema.ts)
-- [authz.ts](file://packages\auth\src\db\schema\authz.ts)
+- [authz.ts](file://packages\auth\src\permissions.ts)
 
 ### Core Entities
 
@@ -379,10 +379,10 @@ Optimize --> End([Partitioning Complete])
 ```
 
 **Diagram sources**
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
+- [partitioning.ts](file://packages\audit-db\src\db\partitioning.ts)
 
 **Section sources**
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
+- [partitioning.ts](file://packages\audit-db\src\db\partitioning.ts)
 
 ### Key Features
 
@@ -482,12 +482,12 @@ end note
 ```
 
 **Diagram sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
+- [partitioning.ts](file://packages\audit-db\src\db\partitioning.ts)
 
 **Section sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
+- [partitioning.ts](file://packages\audit-db\src\db\partitioning.ts)
 
 The `dropExpiredPartitions` method in the `DatabasePartitionManager` class automatically removes partitions that are older than the retention period. This process runs on a scheduled basis through the `PartitionMaintenanceScheduler`.
 
@@ -520,12 +520,12 @@ style DB fill:#bbf,stroke:#333
 ```
 
 **Diagram sources**
-- [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts)
-- [query-cache.ts](file://packages/audit-db/src/cache/query-cache.ts)
+- [redis-query-cache.ts](file://packages\audit-db\src\cache\redis-query-cache.ts)
+- [query-cache.ts](file://packages\audit-db\src\cache\query-cache.ts)
 
 **Section sources**
-- [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts)
-- [query-cache.ts](file://packages/audit-db/src/cache/query-cache.ts)
+- [redis-query-cache.ts](file://packages\audit-db\src\cache\redis-query-cache.ts)
+- [query-cache.ts](file://packages\audit-db\src\cache\query-cache.ts)
 
 ### Implementation Details
 
@@ -625,12 +625,12 @@ Auto --> DB
 ```
 
 **Diagram sources**
-- [performance-monitoring.ts](file://packages/audit-db/src/db/performance-monitoring.ts)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [performance-monitoring.ts](file://packages\audit-db\src\db\performance-monitoring.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 **Section sources**
-- [performance-monitoring.ts](file://packages/audit-db/src/db/performance-monitoring.ts)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [performance-monitoring.ts](file://packages\audit-db\src\db\performance-monitoring.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 ### Key Monitoring Components
 
@@ -677,7 +677,7 @@ CheckSuggestions --> |No| End([Optimization Complete])
 ```
 
 **Diagram sources**
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 The system generates performance reports every 5 minutes and takes automatic actions when certain thresholds are exceeded, such as clearing the cache when the hit ratio is very low or running maintenance operations when there are many slow queries.
 
@@ -707,10 +707,10 @@ Audit --> Integrity[Data Integrity Verification]
 ```
 
 **Diagram sources**
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 **Section sources**
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 ### Security Features
 
@@ -768,7 +768,7 @@ Verify --> Monitor["Monitor post-migration performance"]
 ```
 
 **Section sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
 
 ### Drizzle ORM Implementation
 
@@ -854,11 +854,11 @@ style Archive fill:#6f9,stroke:#333
 
 **Diagram sources**
 - [project_structure](file://)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 **Section sources**
 - [project_structure](file://)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 ### Data Access Patterns
 
@@ -911,12 +911,12 @@ style RC fill:#bbf,stroke:#333
 ```
 
 **Diagram sources**
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 
 **Section sources**
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts)
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts)
 
 ### DatabaseAlertHandler Class
 
@@ -994,7 +994,7 @@ export async function setupMonitoringWithDatabaseAlerts() {
 ```
 
 **Section sources**
-- [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
+- [database-alert-integration.ts](file://packages\audit\src\examples\database-alert-integration.ts)
 
 ### Alert Data Model
 
@@ -1059,13 +1059,13 @@ style RC fill:#bbf,stroke:#333
 ```
 
 **Diagram sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
-- [pseudonym_mapping](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
+- [pseudonym_mapping](file://packages\audit-db\drizzle\migrations\0006_silly_tyger_tiger.sql)
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [pseudonymMapping](file://packages/audit-db/src/db/schema.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [pseudonymMapping](file://packages\audit-db\src\db\schema.ts)
 
 ### GDPRComplianceService Class
 
@@ -1156,7 +1156,7 @@ console.log('Export completed:', exportResult.recordCount, 'records')
 ```
 
 **Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ### Usage Patterns
 
@@ -1198,13 +1198,13 @@ style RC fill:#bbf,stroke:#333
 ```
 
 **Diagram sources**
-- [authz.ts](file://packages/auth/src/permissions.ts)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
-- [organization_role](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql)
+- [authz.ts](file://packages\auth\src\permissions.ts)
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
+- [organization_role](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql)
 
 **Section sources**
-- [authz.ts](file://packages/auth/src/permissions.ts)
-- [organization_role](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql)
+- [authz.ts](file://packages\auth\src\permissions.ts)
+- [organization_role](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql)
 
 ### AuthorizationService Class
 
@@ -1297,8 +1297,8 @@ if (role) {
 ```
 
 **Section sources**
-- [authz.ts](file://packages/auth/src/permissions.ts)
-- [organization_role](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql)
+- [authz.ts](file://packages\auth\src\permissions.ts)
+- [organization_role](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql)
 
 ## Conclusion
 

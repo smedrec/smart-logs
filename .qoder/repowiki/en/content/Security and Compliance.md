@@ -3,30 +3,28 @@
 <cite>
 **Referenced Files in This Document**   
 - [crypto.ts](file://packages\audit\src\crypto.ts) - *Updated in recent commit*
-- [types.ts](file://packages\audit\src\config\types.ts) - *Updated in recent commit*
-- [client.ts](file://packages\infisical-kms\src\client.ts) - *Updated in recent commit*
-- [base.ts](file://packages\infisical-kms\src\base.ts) - *Updated in recent commit*
-- [types.ts](file://packages\infisical-kms\src\types.ts) - *Updated in recent commit*
-- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts) - *Updated in recent commit*
-- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts) - *Updated in recent commit*
-- [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts) - *Updated in recent commit*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit*
+- [permissions.ts](file://packages\auth\src\permissions.ts) - *Updated in recent commit*
+- [compliance-features.md](file://apps\docs\src\content\docs\audit\compliance-features.md) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Completely rewritten documentation to reflect updated cryptographic protocols, KMS integration, compliance requirements, and practical examples
-- Added detailed implementation specifics from code analysis
-- Updated all diagrams to accurately represent current architecture
-- Enhanced troubleshooting guidance with specific error scenarios
-- Improved source tracking with precise file references and line numbers
+- Added new section on Cryptographic Verification in Event Processing to reflect integration of CryptoService
+- Updated Cryptographic Protocols section with implementation details from crypto.ts
+- Enhanced Compliance Requirements section with organization role management details
+- Added new diagram for cryptographic verification workflow
+- Updated troubleshooting guide with hash verification failure scenarios
+- Added sources for new and updated sections
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Cryptographic Protocols](#cryptographic-protocols)
-3. [KMS Integration](#kms-integration)
-4. [Compliance Requirements](#compliance-requirements)
-5. [Practical Examples](#practical-examples)
-6. [Troubleshooting Guide](#troubleshooting-guide)
+3. [Cryptographic Verification in Event Processing](#cryptographic-verification-in-event-processing)
+4. [KMS Integration](#kms-integration)
+5. [Compliance Requirements](#compliance-requirements)
+6. [Practical Examples](#practical-examples)
+7. [Troubleshooting Guide](#troubleshooting-guide)
 
 ## Introduction
 The Security and Compliance framework provides robust mechanisms for ensuring data integrity, confidentiality, and regulatory compliance within the audit system. This documentation details the cryptographic protocols, KMS integration, and compliance requirements that form the foundation of the system's security posture. The framework supports HIPAA and GDPR compliance reporting, cryptographic integrity verification, and secure key management through external KMS integration.
@@ -51,12 +49,40 @@ G --> H
 H --> I[Store Signed Event]
 ```
 
-**Diagram sources**
-- [crypto.ts](file://packages\audit\src\crypto.ts#L0-L53)
-- [crypto.ts](file://packages\audit\src\crypto.ts#L150-L280)
-
 **Section sources**
 - [crypto.ts](file://packages\audit\src\crypto.ts#L0-L383)
+
+## Cryptographic Verification in Event Processing
+The framework now integrates cryptographic verification during event processing to ensure data integrity throughout the audit workflow. When an audit event is processed, the system verifies the event's hash before storing it in the database, providing an additional layer of security against tampering.
+
+The verification process occurs in the worker service, where each incoming audit event is checked against its cryptographic hash. If the hash verification fails, the event is rejected and an error is logged. This verification step is critical for maintaining the integrity of the audit trail and preventing malicious modifications to audit data.
+
+The CryptoService is initialized with security configuration and used to verify event hashes during processing. The service extracts critical fields from the event, generates a deterministic string representation, and computes the SHA-256 hash for comparison with the expected hash value.
+
+```mermaid
+sequenceDiagram
+participant Worker
+participant CryptoService
+participant Database
+Worker->>CryptoService : processAuditEvent(event)
+activate CryptoService
+CryptoService->>CryptoService : extractCriticalFields(event)
+CryptoService->>CryptoService : createDeterministicString(fields)
+CryptoService->>CryptoService : generateHash(event)
+CryptoService->>CryptoService : verifyHash(event, event.hash)
+alt Hash Verification Success
+CryptoService-->>Worker : true
+Worker->>Database : Store event
+else Hash Verification Failed
+CryptoService-->>Worker : false
+Worker->>Worker : Log error and reject event
+end
+deactivate CryptoService
+```
+
+**Section sources**
+- [index.ts](file://apps\worker\src\index.ts#L450-L480)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L150-L280)
 
 ## KMS Integration
 The framework integrates with Infisical KMS for secure cryptographic operations, providing encryption, decryption, signing, and verification capabilities. The integration follows a standardized client pattern with built-in retry mechanisms and error handling.
@@ -96,11 +122,6 @@ InfisicalKmsClient ..> KmsApiError : "throws"
 InfisicalKmsClient ..> KmsError : "throws"
 ```
 
-**Diagram sources**
-- [client.ts](file://packages\infisical-kms\src\client.ts#L0-L38)
-- [base.ts](file://packages\infisical-kms\src\base.ts#L0-L50)
-- [types.ts](file://packages\infisical-kms\src\types.ts#L0-L56)
-
 **Section sources**
 - [client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
 - [base.ts](file://packages\infisical-kms\src\base.ts#L0-L99)
@@ -113,7 +134,7 @@ HIPAA compliance reports track PHI (Protected Health Information) access and mod
 
 GDPR compliance reports focus on data processing activities, consent management, and data subject rights. The framework tracks data classification levels (PUBLIC, INTERNAL, CONFIDENTIAL, PHI) and ensures appropriate handling of personal data according to regulatory requirements.
 
-The compliance configuration allows organizations to enable specific regulatory frameworks, set retention periods, and define default data classification levels. The system automatically generates compliance reports based on the configured schedule and requirements.
+The framework has been enhanced with organization role management using Redis caching and PostgreSQL persistence. This enables fine-grained access control and ensures that compliance requirements are met through proper authorization mechanisms. The role-based access control system supports inheritance and permission caching for improved performance.
 
 ```mermaid
 classDiagram
@@ -158,15 +179,11 @@ RiskAssessment --> ComplianceReportEvent : "highRiskEvents"
 RiskAssessment --> SuspiciousPattern : "suspiciousPatterns"
 ```
 
-**Diagram sources**
-- [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts#L99-L156)
-- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts#L201-L241)
-- [types.ts](file://apps\server\src\lib\graphql\types.ts#L104-L171)
-
 **Section sources**
 - [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts#L99-L156)
 - [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts#L201-L241)
-- [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts#L0-L56)
+- [types.ts](file://apps\server\src\lib\graphql\types.ts#L104-L171)
+- [permissions.ts](file://packages\auth\src\permissions.ts#L0-L691)
 
 ## Practical Examples
 The Security and Compliance framework provides practical implementations for common security scenarios. Organizations can configure the system to meet their specific regulatory requirements and security policies.
@@ -251,6 +268,7 @@ When event integrity verification fails, consider the following:
 - Ensure critical event fields have not been modified
 - Check that the secret key used for HMAC generation matches the verification key
 - If using KMS, confirm the signing key ID is correct and accessible
+- Review the worker logs for hash verification failures during event processing
 
 The framework logs detailed error messages for cryptographic operations, which can be used to diagnose and resolve issues.
 
@@ -259,3 +277,4 @@ The framework logs detailed error messages for cryptographic operations, which c
 - [client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
 - [crypto.ts](file://packages\audit\src\crypto.ts#L0-L383)
 - [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts#L0-L56)
+- [index.ts](file://apps\worker\src\index.ts#L450-L480)

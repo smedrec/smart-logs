@@ -17,6 +17,7 @@
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
+- [permissions.ts](file://packages/auth/src/permissions.ts) - *Contains permission definitions and role logic*
 </cite>
 
 ## Update Summary

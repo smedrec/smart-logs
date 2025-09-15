@@ -8,7 +8,20 @@
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 - [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts) - *Updated in recent commit*
+- [auth.ts](file://apps/server/src/lib/graphql/auth.ts) - *Updated in recent commit*
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added new section on Organization Role Management and Authorization Service
+- Updated Introduction to reflect new authorization features
+- Enhanced Architecture Overview with authorization layer
+- Added new class diagram for Authorization Service
+- Updated Core Components section to include role management
+- Added Section sources and Diagram sources for new content
+- Removed outdated references and updated file annotations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -22,7 +35,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides a comprehensive analysis of the security and access control mechanisms implemented in the smart-logs repository. The system is designed to ensure robust database security, enforce strict access policies, and maintain compliance with data protection regulations. The architecture incorporates encryption at rest, secure connection handling, authentication protocols, tenant isolation, and comprehensive audit trail generation. The enhanced client plays a central role in enforcing access policies, preventing injection attacks through parameterized queries, and managing secure database operations. Recent updates have enhanced the alert persistence system by integrating the EnhancedAuditDb client and configuration management, improving the security and reliability of monitoring operations.
+This document provides a comprehensive analysis of the security and access control mechanisms implemented in the smart-logs repository. The system is designed to ensure robust database security, enforce strict access policies, and maintain compliance with data protection regulations. The architecture incorporates encryption at rest, secure connection handling, authentication protocols, tenant isolation, and comprehensive audit trail generation. The enhanced client plays a central role in enforcing access policies, preventing injection attacks through parameterized queries, and managing secure database operations. Recent updates have enhanced the alert persistence system by integrating the EnhancedAuditDb client and configuration management, improving the security and reliability of monitoring operations. Additionally, the system now includes organization role management with Redis caching and PostgreSQL persistence, providing fine-grained access control for multi-tenant environments.
 
 ## Project Structure
 The repository follows a monorepo structure with multiple applications and packages organized under the `apps` and `packages` directories. The core security components are primarily located in the `packages` directory, specifically within `audit-db`, `audit`, and `auth`. The `apps` directory contains various application implementations including web, native, server, and documentation. The structure supports modular development with clear separation of concerns, enabling independent development and deployment of security-critical components.
@@ -64,16 +77,17 @@ auditDb --> redisClient
 - [package.json](file://package.json)
 
 ## Core Components
-The security architecture is built around several core components that work together to provide comprehensive database security and access control. The enhanced database client serves as the primary interface for secure database operations, integrating connection pooling, query caching, and performance monitoring. The audit database package provides the foundation for secure data storage with tenant isolation and compliance features. The configuration manager handles encryption at rest for sensitive configuration data, while the authentication package manages user access and permissions. The DatabaseAlertHandler component has been updated to use the EnhancedAuditDb client, ensuring that all alert persistence operations benefit from the same security and performance features as other database operations.
+The security architecture is built around several core components that work together to provide comprehensive database security and access control. The enhanced database client serves as the primary interface for secure database operations, integrating connection pooling, query caching, and performance monitoring. The audit database package provides the foundation for secure data storage with tenant isolation and compliance features. The configuration manager handles encryption at rest for sensitive configuration data, while the authentication package manages user access and permissions. The DatabaseAlertHandler component has been updated to use the EnhancedAuditDb client, ensuring that all alert persistence operations benefit from the same security and performance features as other database operations. The Authorization Service has been enhanced with organization role management, providing Redis caching and PostgreSQL persistence for role definitions and permissions.
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts)
 
 ## Architecture Overview
-The security architecture implements a multi-layered approach to database security and access control. At the foundation is encryption at rest for sensitive data, complemented by secure connection handling with SSL/TLS support. The enhanced client enforces access policies and prevents injection attacks through parameterized queries. Tenant isolation is achieved through organizational identifiers in database tables, ensuring data separation between different organizations. Row-level security considerations are addressed through comprehensive audit trails and cryptographic integrity verification.
+The security architecture implements a multi-layered approach to database security and access control. At the foundation is encryption at rest for sensitive data, complemented by secure connection handling with SSL/TLS support. The enhanced client enforces access policies and prevents injection attacks through parameterized queries. Tenant isolation is achieved through organizational identifiers in database tables, ensuring data separation between different organizations. Row-level security considerations are addressed through comprehensive audit trails and cryptographic integrity verification. The authorization layer has been enhanced with organization role management, providing fine-grained access control with Redis caching for performance.
 
 ```mermaid
 graph TD
@@ -83,6 +97,7 @@ Connection["Secure Connection Handling"]
 Authentication["Authentication Protocols"]
 Access["Access Control Policies"]
 Audit["Audit Trail Generation"]
+Authorization["Authorization Service"]
 end
 subgraph "Database Security"
 Client["Enhanced Client"]
@@ -110,12 +125,16 @@ Client --> GDPR
 Client --> HIPAA
 Client --> Retention
 Client --> Archival
+Access --> Authorization
+Authorization --> Redis["Redis Cache"]
+Authorization --> PostgreSQL["PostgreSQL Persistence"]
 ```
 
 **Diagram sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts)
 
 ## Detailed Component Analysis
 
@@ -372,6 +391,58 @@ DatabaseAlertHandler --> EnhancedAuditDb : "uses"
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 - [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts)
 
+### Organization Role Management and Authorization Service
+The system has been enhanced with organization role management capabilities, providing fine-grained access control for multi-tenant environments. The Authorization Service manages permissions and access control, with Redis caching for performance and PostgreSQL persistence for reliability. Role definitions are stored in the database with organization-specific scope, and cached in Redis for fast access. The service supports role inheritance, allowing for hierarchical permission structures.
+
+```mermaid
+classDiagram
+class AuthorizationService {
+-redis : RedisInstanceType
+-db : PostgresJsDatabase
+-roleCachePrefix : string
+-permissionCachePrefix : string
+-retentionPeriod : number
++hasPermission(session, resource, action, context) : Promise~boolean~
++canAccessOrganization(session, organizationId) : Promise~boolean~
++getOrganizationRole(session, organizationId) : Promise~string | null~
++addRole(role : Role) : Promise~void~
++removeRole(roleName : string) : Promise~void~
++getRole(roleName : string) : Promise~Role | undefined~
++getAllRoles() : Promise~Role[]~
++clearUserCache(userId : string) : Promise~void~
++clearCache() : Promise~void~
+}
+class Role {
++name : string
++description? : string
++permissions : Permission[]
++inherits? : string[]
+}
+class Permission {
++resource : string
++action : string
++conditions? : Record~string, any~
+}
+class Session {
++session : SessionData
++user : UserData
+}
+AuthorizationService --> Role : "manages"
+AuthorizationService --> Permission : "evaluates"
+AuthorizationService --> Session : "authenticates"
+AuthorizationService --> Redis : "caches"
+AuthorizationService --> PostgreSQL : "persists"
+```
+
+**Diagram sources**
+- [permissions.ts](file://packages/auth/src/permissions.ts)
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts)
+
+**Section sources**
+- [permissions.ts](file://packages/auth/src/permissions.ts)
+- [authz.ts](file://packages/auth/src/db/schema/authz.ts)
+- [auth.ts](file://apps/server/src/lib/graphql/auth.ts)
+
 ## Dependency Analysis
 The security components have well-defined dependencies that ensure proper isolation and modular. The enhanced client depends on the connection pool, partition manager, and performance monitor, creating a layered architecture. The connection pool depends on the postgres.js driver and Drizzle ORM for database interactions. The configuration manager depends on Node.js crypto modules for encryption operations. These dependencies are managed through the monorepo structure, allowing for independent versioning and testing of security-critical components.
 
@@ -391,6 +462,8 @@ ConfigManager --> S3["AWS S3 SDK"]
 AuthPackage["auth package"] --> Drizzle
 AuthPackage --> RedisClient["redis-client"]
 EnhancedClient --> AuthPackage
+AuthorizationService["AuthorizationService"] --> Redis["Redis Cache"]
+AuthorizationService --> PostgreSQL["PostgreSQL"]
 ```
 
 **Diagram sources**
@@ -398,11 +471,13 @@ EnhancedClient --> AuthPackage
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts)
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts)
 
 ## Performance Considerations
 The security implementation balances robust protection with performance optimization. The enhanced client incorporates query caching to reduce database load while maintaining security. Connection pooling minimizes connection overhead and improves response times. The system includes comprehensive performance monitoring with automatic reporting and optimization recommendations. These features ensure that security measures do not unduly impact system performance, maintaining responsiveness even under heavy load.
@@ -412,12 +487,13 @@ The security implementation balances robust protection with performance optimiza
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 
 ## Troubleshooting Guide
-When encountering security-related issues, first verify the configuration of the enhanced client and connection pool. Check that SSL settings are properly configured for production deployments. Ensure that the Redis connection is available for query caching. Verify that encryption keys are properly set in environment variables. Monitor the performance reports for any anomalies in connection acquisition times or cache hit ratios. For tenant isolation issues, confirm that organization IDs are correctly set in queries and that row-level security policies are properly enforced.
+When encountering security-related issues, first verify the configuration of the enhanced client and connection pool. Check that SSL settings are properly configured for production deployments. Ensure that the Redis connection is available for query caching. Verify that encryption keys are properly set in environment variables. Monitor the performance reports for any anomalies in connection acquisition times or cache hit ratios. For tenant isolation issues, confirm that organization IDs are correctly set in queries and that row-level security policies are properly enforced. For authorization issues, check that roles are properly defined in both Redis cache and PostgreSQL database, and that permission inheritance is correctly configured.
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts)
 
 ## Conclusion
-The security and access control implementation in the smart-logs repository provides a comprehensive solution for protecting sensitive audit data. The architecture combines encryption at rest, secure connection handling, and robust tenant isolation to ensure data confidentiality and integrity. The enhanced client serves as a central security enforcement point, preventing injection attacks through parameterized queries and providing comprehensive audit trail generation. The system is designed to comply with data protection regulations while maintaining high performance through connection pooling and query caching. This implementation provides a solid foundation for secure audit logging in multi-tenant environments.
+The security and access control implementation in the smart-logs repository provides a comprehensive solution for protecting sensitive audit data. The architecture combines encryption at rest, secure connection handling, and robust tenant isolation to ensure data confidentiality and integrity. The enhanced client serves as a central security enforcement point, preventing injection attacks through parameterized queries and providing comprehensive audit trail generation. The system is designed to comply with data protection regulations while maintaining high performance through connection pooling and query caching. The recent addition of organization role management with Redis caching and PostgreSQL persistence provides fine-grained access control for multi-tenant environments. This implementation provides a solid foundation for secure audit logging in multi-tenant environments.
