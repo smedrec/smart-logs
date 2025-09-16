@@ -490,6 +490,15 @@ export interface LoggingConfig {
 
 	/** Log retention period in days */
 	retentionDays: number
+
+	/** Export type for log messages */
+	exporterType: 'console' | 'jaeger' | 'zipkin' | 'otlp'
+
+	/** Exporter endpoint */
+	exporterEndpoint?: string
+
+	/** Exporter headers */
+	exporterHeaders?: Record<string, string>
 }
 
 /**

@@ -300,6 +300,11 @@ export function createDevelopmentConfig(): AuditConfig {
 			format: 'json',
 			enableCorrelationIds: true,
 			retentionDays: 30,
+			exporterType: 'otlp',
+			exporterEndpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+			exporterHeaders: {
+				...getAuthHeaders(),
+			},
 		},
 	}
 }
@@ -860,4 +865,23 @@ export function mergeConfigurations(
 	merged.lastUpdated = new Date().toISOString()
 
 	return merged
+}
+
+/**
+ * Get authentication headers based on configuration
+ */
+function getAuthHeaders(): Record<string, string> {
+	const headers: Record<string, string> = {}
+
+	// Support different authentication methods
+	if (process.env.OTLP_API_KEY) {
+		headers['Authorization'] = `Bearer ${process.env.OTLP_API_KEY}`
+	} else if (process.env.OTLP_AUTH_HEADER) {
+		const [key, value] = process.env.OTLP_AUTH_HEADER.split(':')
+		if (key && value) {
+			headers[key.trim()] = value.trim()
+		}
+	}
+
+	return headers
 }

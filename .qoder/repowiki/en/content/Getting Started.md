@@ -14,16 +14,20 @@
 - [apps/docs/src/content/docs/audit/get-started.md](file://apps\docs\src\content\docs\audit\get-started.md) - *Quick start content updated*
 - [packages/audit-client/docs/PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md) - *Added plugin architecture documentation*
 - [packages/audit-client/docs/FRAMEWORK_INTEGRATION.md](file://packages\audit-client\docs\FRAMEWORK_INTEGRATION.md) - *Added framework integration examples*
+- [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts) - *Updated in commit 75f0971d*
+- [apps/worker/src/index.ts](file://apps\worker\src\index.ts) - *Updated in commit f954e0a3*
+- [packages/audit/src/observability/tracer.ts](file://packages\audit\src\observability\tracer.ts) - *OTLP exporter implementation*
+- [packages/infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts) - *KMS client implementation*
 </cite>
 
 ## Update Summary
-- Updated documentation structure to reflect new sidebar organization prioritizing "Getting Started" and "Audit Client Library"
-- Replaced references to deprecated `@repo/audit-sdk` with current `@repo/audit` and `@repo/audit-client` packages
-- Updated quick start guide to align with current implementation
-- Removed outdated Hello World example using deprecated SDK
-- Added new sections for Audit Client Library usage, Plugin Architecture, and Framework Integration
-- Updated table of contents and navigation structure
-- Enhanced examples with plugin system and framework integration patterns
+- Added new section for OTLP Exporter Configuration based on recent commit changes
+- Added new section for KMS Encryption Configuration based on recent commit changes
+- Updated Quick Start with Audit Client Library to include OTLP configuration
+- Updated Plugin Architecture System to include observability plugins
+- Added environment variable references for OTLP and KMS configuration
+- Enhanced Common Setup Issues with solutions for OTLP and KMS related problems
+- Updated Introduction to reflect new observability and security features
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,12 +38,14 @@
 6. [Quick Start with Audit Client Library](#quick-start-with-audit-client-library)
 7. [Plugin Architecture System](#plugin-architecture-system)
 8. [Framework Integration Examples](#framework-integration-examples)
-9. [Common Setup Issues and Solutions](#common-setup-issues-and-solutions)
+9. [OTLP Exporter Configuration](#otlp-exporter-configuration)
+10. [KMS Encryption Configuration](#kms-encryption-configuration)
+11. [Common Setup Issues and Solutions](#common-setup-issues-and-solutions)
 
 ## Introduction
 This guide provides comprehensive instructions for setting up the SMEDREC Smart Logs development environment. You will learn how to install dependencies, run applications, configure the database, and use the audit client library to emit test events. By following this guide, developers can have the full system running locally within 15 minutes.
 
-The audit system has been restructured with a new client library approach, deprecating the previous SDK in favor of a more modular and maintainable architecture with extensible plugin capabilities.
+The audit system has been restructured with a new client library approach, deprecating the previous SDK in favor of a more modular and maintainable architecture with extensible plugin capabilities. Recent updates have enhanced the system with OpenTelemetry (OTLP) exporter support for distributed tracing and KMS encryption for secure configuration management.
 
 ## Development Environment Setup
 
@@ -218,6 +224,16 @@ NODE_ENV=development
 
 # Authentication
 AUTH_SECRET=your-auth-secret-key
+
+# OTLP Configuration
+OTLP_ENDPOINT=http://localhost:4318/v1/traces
+OTLP_API_KEY=your-otlp-api-key
+
+# KMS Configuration
+KMS_BASE_URL=https://kms.example.com
+KMS_ACCESS_TOKEN=your-kms-access-token
+KMS_ENCRYPTION_KEY=key-encryption-123
+KMS_SIGNING_KEY=key-signing-456
 ```
 
 ### Service Connections
@@ -226,6 +242,7 @@ Ensure the following services are running and properly connected:
 - **PostgreSQL**: Running on port 5432
 - **Redis**: Running on port 6379
 - **Inngest**: For workflow processing (if applicable)
+- **OpenTelemetry Collector**: Running on port 4318 for OTLP traces
 
 The server application automatically connects to these services using the environment variables.
 
@@ -536,6 +553,221 @@ export async function deleteDocument(documentId: string) {
 - [packages/audit-client/src/examples/client-usage.ts](file://packages\audit-client\src\examples\client-usage.ts)
 - [packages/audit-client/src/core/client.ts](file://packages\audit-client\src\core\client.ts)
 
+## OTLP Exporter Configuration
+
+### Overview
+The audit system now supports OpenTelemetry Protocol (OTLP) exporter for distributed tracing. This allows integration with various observability platforms like Grafana Tempo, DataDog, OpenObserve, and Honeycomb.
+
+### Configuration
+The OTLP exporter is configured through environment variables and code configuration:
+
+```typescript
+const observabilityConfig = {
+  tracing: {
+    enabled: true,
+    serviceName: 'audit-system',
+    sampleRate: 1.0,
+    exporterType: 'otlp' as const,
+    exporterEndpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+    headers: {
+      'stream-name': 'default',
+    },
+  },
+};
+```
+
+### Environment Variables
+Set these environment variables for OTLP configuration:
+
+```env
+# OTLP Configuration
+OTLP_ENDPOINT=http://localhost:4318/v1/traces
+OTLP_API_KEY=your-api-key-here
+# OR for custom headers
+OTLP_AUTH_HEADER="Authorization: Bearer your-token-here"
+```
+
+### Supported Platforms
+#### Grafana Tempo
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://tempo-us-central1.grafana.net/tempo/v1/traces'
+}
+```
+
+#### DataDog
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://trace.agent.datadoghq.com/v1/traces'
+}
+```
+
+#### OpenObserve
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://your-org.observe.com/api/default/traces'
+}
+```
+
+#### Honeycomb
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://api.honeycomb.io/v1/traces/your-dataset'
+}
+```
+
+### Features
+#### Batch Processing
+- **Automatic batching**: Spans are automatically batched for efficient transmission
+- **Configurable batch size**: Default 100 spans per batch
+- **Timeout-based flushing**: Batches are flushed every 5 seconds
+- **Immediate flushing**: Large batches are sent immediately
+
+#### Error Handling & Reliability
+- **Exponential backoff**: Automatic retry with increasing delays
+- **Rate limiting handling**: Respects `Retry-After` headers
+- **Circuit breaking**: Fails fast for client errors (4xx)
+- **Network resilience**: Retries network failures up to 3 times
+
+#### Performance Optimizations
+- **Compression support**: Automatic compression for large payloads (future feature)
+- **Efficient encoding**: Proper OTLP format with base64 encoding
+- **Memory management**: Automatic cleanup of old spans
+
+**Section sources**
+- [apps/worker/src/index.ts](file://apps\worker\src\index.ts)
+- [packages/audit/src/observability/tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [packages/audit/docs/observability/otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md)
+
+## KMS Encryption Configuration
+
+### Overview
+The audit system now supports KMS (Key Management Service) encryption for secure configuration management. This allows encryption of sensitive configuration data using external KMS providers.
+
+### Configuration
+The KMS encryption is configured through environment variables and code configuration:
+
+```typescript
+const securityConfig: SecurityConfig = {
+  enableIntegrityVerification: true,
+  hashAlgorithm: 'SHA-256',
+  enableEventSigning: true,
+  encryptionKey: 'your-encryption-key',
+  enableLogEncryption: true,
+  kms: {
+    enabled: true,
+    encryptionKey: process.env.KMS_ENCRYPTION_KEY || 'key-encryption-123',
+    signingKey: process.env.KMS_SIGNING_KEY || 'key-signing-456',
+    accessToken: process.env.KMS_ACCESS_TOKEN || 'your-kms-access-token',
+    baseUrl: process.env.KMS_BASE_URL || 'https://kms.example.com',
+    algorithm: 'AES-256-GCM',
+    kdf: 'PBKDF2',
+    salt: 'your-salt-here',
+    iterations: 10000,
+  }
+};
+```
+
+### Environment Variables
+Set these environment variables for KMS configuration:
+
+```env
+# KMS Configuration
+KMS_BASE_URL=https://kms.example.com
+KMS_ACCESS_TOKEN=your-kms-access-token
+KMS_ENCRYPTION_KEY=key-encryption-123
+KMS_SIGNING_KEY=key-signing-456
+```
+
+### KMS Client Implementation
+The Infisical KMS client provides methods for encryption and decryption:
+
+```typescript
+import { InfisicalKmsClient } from '@repo/infisical-kms';
+
+// Initialize KMS client
+const kmsClient = new InfisicalKmsClient({
+  baseUrl: process.env.KMS_BASE_URL!,
+  accessToken: process.env.KMS_ACCESS_TOKEN!,
+  encryptionKey: process.env.KMS_ENCRYPTION_KEY!,
+  signingKey: process.env.KMS_SIGNING_KEY!,
+});
+
+// Encrypt data
+const encrypted = await kmsClient.encrypt('sensitive-data');
+console.log('Encrypted:', encrypted.ciphertext);
+
+// Decrypt data
+const decrypted = await kmsClient.decrypt(encrypted.ciphertext);
+console.log('Decrypted:', decrypted.plaintext);
+```
+
+### Error Handling
+The KMS client provides specific error classes for error handling:
+
+```typescript
+import { InfisicalKmsClient, KmsApiError, KmsError } from '@repo/infisical-kms';
+
+try {
+  const encrypted = await kmsClient.encrypt('sensitive-data');
+} catch (error) {
+  if (error instanceof KmsApiError) {
+    console.error('KMS API error:', error.message, 'Status:', error.status);
+  } else if (error instanceof KmsError) {
+    console.error('KMS client error:', error.message);
+  } else {
+    console.error('An unexpected error occurred:', error);
+  }
+}
+```
+
+### Use Cases
+#### Secure Configuration Storage
+```typescript
+// Encrypt configuration file
+const configManager = new ConfigurationManager(process.env.CONFIG_PATH!, 's3');
+await configManager.initialize();
+
+// The configuration manager automatically uses KMS for encryption
+// when kms.enabled is set to true in the secureStorageConfig
+```
+
+#### Data Encryption
+```typescript
+// Encrypt sensitive audit data
+const encryptedData = await kmsClient.encrypt(JSON.stringify(auditEvent));
+auditEvent.encryptedPayload = encryptedData.ciphertext;
+```
+
+#### Digital Signatures
+```typescript
+// Sign audit events for integrity verification
+const signature = await kmsClient.sign(JSON.stringify(auditEvent), 'HMAC-SHA256');
+auditEvent.signature = signature.signature;
+auditEvent.signingKeyId = signature.keyId;
+```
+
+**Section sources**
+- [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts)
+- [packages/infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts)
+- [packages/audit/src/config/manager.ts](file://packages\audit\src\config\manager.ts)
+
 ## Common Setup Issues and Solutions
 
 ### PNPM Installation Issues
@@ -585,6 +817,40 @@ pnpm install
 ```bash
 pnpm db:down
 pnpm db:migrate
+```
+
+### OTLP Exporter Issues
+**Problem**: "OTLP exporter endpoint not configured" warnings  
+**Solution**: Set the OTLP_ENDPOINT environment variable:
+```bash
+export OTLP_ENDPOINT=http://localhost:4318/v1/traces
+```
+
+**Problem**: Authentication failures with OTLP endpoint  
+**Solution**: Set the appropriate authentication method:
+```bash
+# For API key authentication
+export OTLP_API_KEY=your-api-key-here
+
+# For custom header authentication
+export OTLP_AUTH_HEADER="Authorization: Bearer your-token-here"
+```
+
+### KMS Configuration Issues
+**Problem**: "KMS client not initialized" errors  
+**Solution**: Ensure all KMS environment variables are set:
+```bash
+export KMS_BASE_URL=https://kms.example.com
+export KMS_ACCESS_TOKEN=your-access-token
+export KMS_ENCRYPTION_KEY=key-encryption-123
+export KMS_SIGNING_KEY=key-signing-456
+```
+
+**Problem**: Encryption/decryption failures  
+**Solution**: Verify KMS service is accessible and credentials are correct:
+```bash
+# Test KMS connectivity
+curl -H "Authorization: Bearer $KMS_ACCESS_TOKEN" $KMS_BASE_URL/api/v1/kms/health
 ```
 
 These solutions address the most common setup issues encountered when initializing the development environment.

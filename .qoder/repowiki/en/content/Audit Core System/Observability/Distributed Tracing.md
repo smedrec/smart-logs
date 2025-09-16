@@ -2,11 +2,19 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
-- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts#L1-L216)
-- [index.ts](file://packages/audit/src/observability/index.ts#L1-L70)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated to enable OTLP exporter with batch processing and authentication*
+- [types.ts](file://packages/audit/src/observability/types.ts) - *Contains updated tracing and observability type definitions*
+- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts) - *Updated test coverage for OTLP functionality*
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *New documentation for OTLP configuration*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated integration section to reflect OTLP as primary exporter with batch processing
+- Added details on authentication header usage and retry mechanisms
+- Removed outdated console exporter references
+- Enhanced performance analysis section with batch processing details
+- Updated diagram to reflect current export workflow
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -18,7 +26,7 @@
 7. [Trace Data Interpretation and Correlation](#trace-data-interpretation-and-correlation)
 
 ## Introduction
-The Distributed Tracing system in the audit event processing workflow provides end-to-end visibility across microservices, enabling comprehensive monitoring of audit events from creation to archival. This documentation details the implementation of the tracer module, which creates and propagates trace IDs, span contexts, and parent-child relationships throughout the system. The tracing infrastructure supports integration with external Application Performance Monitoring (APM) tools through OpenTelemetry standards, allowing organizations to leverage existing monitoring ecosystems. The system captures detailed performance metrics, error information, and execution context, which can be used to identify bottlenecks, debug complex failures, and measure latency across distributed components.
+The Distributed Tracing system in the audit event processing workflow provides end-to-end visibility across microservices, enabling comprehensive monitoring of audit events from creation to archival. This documentation details the implementation of the tracer module, which creates and propagates trace IDs, span contexts, and parent-child relationships throughout the system. The tracing infrastructure supports integration with external Application Performance Monitoring (APM) tools through OpenTelemetry standards, with a focus on OTLP (OpenTelemetry Protocol) as the primary export mechanism. The system captures detailed performance metrics, error information, and execution context, which can be used to identify bottlenecks, debug complex failures, and measure latency across distributed components.
 
 ## Core Tracing Components
 
@@ -97,13 +105,9 @@ AuditTracer --> AuditSpan : creates
 AuditTracer --> Span : manages
 ```
 
-**Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
-
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Updated implementation with OTLP exporter*
+- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *Type definitions for tracing components*
 
 ## Trace Context Propagation
 
@@ -132,50 +136,46 @@ ServiceA-->>Client : 201 Created
 Note over ServiceA,ServiceC : Complete trace with parent-child relationships<br/>across service boundaries
 ```
 
-**Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
-
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Context propagation implementation*
+- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *TraceContext interface definition*
 
 ## Integration with External APM Tools
 
-The tracing system supports integration with external APM tools through multiple exporter types, with a particular focus on OpenTelemetry via the OTLP (OpenTelemetry Protocol) exporter. The `ObservabilityConfig` interface defines the configuration options for tracing, including the `exporterType` which can be set to 'console', 'jaeger', 'zipkin', or 'otlp'. When configured for OTLP export, the system formats trace data according to the OpenTelemetry specification, enabling seamless integration with any OpenTelemetry-compatible backend.
+The tracing system now primarily supports integration with external APM tools through the OTLP (OpenTelemetry Protocol) exporter, replacing the previous console exporter as the default. The `ObservabilityConfig` interface defines the configuration options for tracing, including the `exporterType` which can be set to 'otlp' for OpenTelemetry-compatible backends. When configured for OTLP export, the system formats trace data according to the OpenTelemetry specification, enabling seamless integration with platforms like Grafana Tempo, DataDog, and Honeycomb.
 
-The `exportToOTLP` method transforms the internal span representation into the OTLP format, converting trace and span IDs from hexadecimal strings to binary buffers, and adjusting timestamps from milliseconds to nanoseconds as required by the specification. The exported data includes resource attributes, instrumentation library spans, and detailed span information with attributes, events (logs), and status. This comprehensive data model allows external APM tools to provide rich visualizations of system behavior, including service maps, dependency graphs, and performance heatmaps.
+The `exportToOTLP` method implements batch processing for efficient transmission, with spans collected in batches of up to 100 or flushed every 5 seconds. The implementation includes robust retry logic with exponential backoff, handling up to 3 retry attempts with increasing delays. It also respects rate limiting via `Retry-After` headers and distinguishes between client errors (4xx) that should not be retried and server/network errors that warrant retry attempts. Authentication is supported through environment variables (`OTLP_API_KEY` for Bearer tokens or `OTLP_AUTH_HEADER` for custom headers).
 
 ```mermaid
 flowchart TD
 A["Audit Event Processing"] --> B["Create Span"]
 B --> C["Add Tags and Logs"]
-C --> D["Configure Exporter"]
-D --> E{"Exporter Type?"}
-E --> |console| F["Log to Console"]
-E --> |jaeger| G["Format for Jaeger"]
-E --> |zipkin| H["Format for Zipkin"]
-E --> |otlp| I["Format for OTLP"]
-I --> J["Convert IDs to Binary"]
-J --> K["Convert Timestamps to Nanoseconds"]
-K --> L["Map to OTLP Schema"]
-L --> M["Send to OTLP Endpoint"]
-M --> N["External APM Tool"]
-N --> O["Visualization and Analysis"]
+C --> D["Configure OTLP Exporter"]
+D --> E["Add to Batch"]
+E --> F{"Batch Full or Timeout?"}
+F --> |Yes| G["Flush Batch to OTLP"]
+F --> |No| H["Wait for Next Trigger"]
+G --> I{"Export Successful?"}
+I --> |Yes| J["Success: Debug Log"]
+I --> |Rate Limited| K["Backoff: Use Retry-After"]
+I --> |Client Error| L["Fail Fast: 4xx Errors"]
+I --> |Network Error| M["Retry: Exponential Backoff"]
+K --> N["Wait and Retry"]
+L --> O["Log Error"]
+M --> N
+N --> G
+J --> P["External APM Tool"]
+O --> P
+P --> Q["Visualization and Analysis"]
+style G fill:#f9f,stroke:#333
 style I fill:#f9f,stroke:#333
-style J fill:#f9f,stroke:#333
-style K fill:#f9f,stroke:#333
-style L fill:#f9f,stroke:#333
-style M fill:#f9f,stroke:#333
+style N fill:#f9f,stroke:#333
 ```
 
-**Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
-
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *OTLP exporter with batch processing and retry logic*
+- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *Configuration interface for OTLP*
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Detailed OTLP configuration guide*
 
 ## Trace Context Preservation in Asynchronous Operations
 
@@ -207,19 +207,15 @@ Decorator-->>Test : Return result or re-throw error
 Note over Decorator,Tracer : Automatic span management<br/>for synchronous and asynchronous methods
 ```
 
-**Diagram sources**
-- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts#L1-L216)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-
 **Section sources**
-- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts#L1-L216)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
+- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts#L1-L216) - *Test coverage for trace context preservation*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *trace decorator implementation*
 
 ## Performance Analysis and Bottleneck Identification
 
-The tracing data collected by the system serves as a foundation for performance analysis and bottleneck identification. Each span captures detailed timing information, including start time, end time, and calculated duration, which can be aggregated to identify operations with high latency. The system also supports sampling based on the configured `sampleRate`, allowing organizations to balance the overhead of tracing with the need for comprehensive data collection.
+The tracing data collected by the system serves as a foundation for performance analysis and bottleneck identification. Each span captures detailed timing information, including start time, end time, and calculated duration, which can be aggregated to identify operations with high latency. The system supports sampling based on the configured `sampleRate`, allowing organizations to balance the overhead of tracing with the need for comprehensive data collection.
 
-The `BottleneckAnalysis` interface, defined in the types, provides a structured approach to identifying performance issues, including metrics such as average time, maximum time, 95th and 99th percentiles, and sample count. These metrics can be used to detect operations that are consistently slow or exhibit high variance in execution time. The severity level (LOW, MEDIUM, HIGH, CRITICAL) helps prioritize remediation efforts, while recommendations provide actionable guidance for improving performance.
+The `BottleneckAnalysis` interface, defined in the types, provides a structured approach to identifying performance issues, including metrics such as average time, maximum time, 95th and 99th percentiles, and sample count. These metrics can be used to detect operations that are consistently slow or exhibit high variance in execution time. The severity level (LOW, MEDIUM, HIGH, CRITICAL) helps prioritize remediation efforts, while recommendations provide actionable guidance for improving performance. The batch processing implementation in the OTLP exporter also contributes to performance optimization by reducing the number of HTTP requests and improving network efficiency.
 
 ```mermaid
 flowchart TD
@@ -240,13 +236,9 @@ style K fill:#f96,stroke:#333
 style L fill:#f96,stroke:#333
 ```
 
-**Diagram sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-
 **Section sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
+- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *BottleneckAnalysis interface*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Performance metrics collection and export*
 
 ## Trace Data Interpretation and Correlation
 
@@ -281,10 +273,6 @@ style K fill:#bbf,stroke:#333
 style L fill:#bbf,stroke:#333
 ```
 
-**Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
-
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Trace data correlation mechanisms*
+- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *Data structures for trace interpretation*

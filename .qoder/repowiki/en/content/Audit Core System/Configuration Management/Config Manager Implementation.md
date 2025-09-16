@@ -2,18 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [manager.ts](file://packages/audit/src/config/manager.ts) - *Updated in recent commit*
+- [manager.ts](file://packages/audit/src/config/manager.ts) - *Updated in recent commit with KMS encryption support*
+- [types.ts](file://packages/audit/src/config/types.ts) - *Updated with KMS configuration types*
 - [validator.ts](file://packages/audit/src/config/validator.ts) - *Updated in recent commit*
-- [types.ts](file://packages/audit/src/config/types.ts) - *Updated in recent commit*
+- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts) - *KMS client implementation*
+- [infisical-kms/types.ts](file://packages/infisical-kms/src/types.ts) - *KMS configuration types*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated document to reflect recent changes in the repository structure
-- Maintained all technical content about the Config Manager implementation
-- Preserved code examples, diagrams, and architectural details
-- Updated source references to maintain accuracy
-- Kept comprehensive documentation of configuration management features
+- Added comprehensive documentation for KMS encryption integration in the ConfigurationManager
+- Updated Secure Storage section to include KMS configuration and workflow
+- Enhanced Configuration Loading and Storage section with KMS encryption flow
+- Updated Core Architecture diagram to include KMS client relationship
+- Added new code examples for KMS configuration and usage
+- Updated Factory Pattern Integration section with secure storage configuration
+- Maintained all existing technical content about the Config Manager implementation
+- Updated source references to maintain accuracy with recent changes
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,16 +35,17 @@
 12. [Code Examples](#code-examples)
 
 ## Introduction
-The ConfigurationManager class provides a comprehensive solution for centralized configuration management in the audit system. It enables loading configuration from multiple sources, handling hierarchical overrides, ensuring thread-safe access, and supporting runtime reconfiguration through event-driven architecture. This document details the implementation, covering its role in the system architecture, internal state management, change detection mechanisms, and integration patterns with other components.
+The ConfigurationManager class provides a comprehensive solution for centralized configuration management in the audit system. It enables loading configuration from multiple sources, handling hierarchical overrides, ensuring thread-safe access, and supporting runtime reconfiguration through event-driven architecture. This document details the implementation, covering its role in the system architecture, internal state management, change detection mechanisms, and integration patterns with other components. Recent updates have added KMS (Key Management Service) integration for enhanced security of configuration data.
 
 ## Core Architecture
-The ConfigurationManager implements a centralized configuration management system that serves as the single source of truth for application settings. It extends Node.js's EventEmitter class, enabling an event-driven architecture for configuration changes.
+The ConfigurationManager implements a centralized configuration management system that serves as the single source of truth for application settings. It extends Node.js's EventEmitter class, enabling an event-driven architecture for configuration changes. The system now includes integration with Infisical KMS for secure encryption and decryption of configuration data.
 
 ```mermaid
 classDiagram
 class ConfigurationManager {
 -db : PostgresJsDatabase
 -s3 : S3Client
+-kms : InfisicalKmsClient
 -config : AuditConfig
 -configPath : string
 -storageType : StorageType
@@ -96,31 +102,43 @@ class ConfigChangeEvent {
 +newVersion : string
 }
 ConfigurationManager --> ConfigChangeEvent : "emits"
+class InfisicalKmsClient {
++constructor(config : InfisicalKmsClientConfig)
++encrypt(plaintext : string) : Promise~EncryptResponse~
++decrypt(ciphertext : string) : Promise~DecryptResponse~
++sign(data : string, algorithm? : SigningAlgorithm) : Promise~SignResponse~
++verify(data : string, signature : string, algorithm? : SigningAlgorithm) : Promise~VerifyResponse~
+}
+ConfigurationManager --> InfisicalKmsClient : "uses for secure storage"
 ```
 
 **Diagram sources**
 - [manager.ts](file://packages/audit/src/config/manager.ts#L33-L825)
+- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts#L15-L145)
 
 **Section sources**
 - [manager.ts](file://packages/audit/src/config/manager.ts#L33-L825)
 
 ## Configuration Loading and Storage
-The ConfigurationManager supports multiple storage backends for configuration data, including local file system and Amazon S3. It also provides secure storage capabilities through encryption.
+The ConfigurationManager supports multiple storage backends for configuration data, including local file system and Amazon S3. It also provides secure storage capabilities through encryption, now enhanced with KMS (Key Management Service) integration for improved security.
 
 ### Storage Types
 The system supports two primary storage types:
 - **File**: Local file system storage
 - **S3**: Amazon S3 cloud storage
 
-### Secure Storage
-When secure storage is enabled, configurations are encrypted using AES-256-GCM algorithm with PBKDF2 or scrypt key derivation functions.
+### Secure Storage with KMS
+When secure storage is enabled with KMS, configurations are encrypted using the Infisical KMS service. The system supports both local encryption (AES-256-GCM with PBKDF2 or scrypt key derivation) and KMS-based encryption.
 
 ```mermaid
 flowchart TD
 Start([Load Configuration]) --> CheckSecure["Is secure storage enabled?"]
-CheckSecure --> |Yes| Decrypt["Decrypt configuration file"]
+CheckSecure --> |Yes| CheckKMS["Is KMS enabled?"]
 CheckSecure --> |No| CheckStorage["Check storage type"]
-Decrypt --> CheckStorage
+CheckKMS --> |Yes| DecryptKMS["Decrypt using KMS service"]
+CheckKMS --> |No| DecryptLocal["Decrypt using local key derivation"]
+DecryptKMS --> CheckStorage
+DecryptLocal --> CheckStorage
 CheckStorage --> |S3| LoadS3["Load from S3 bucket"]
 CheckStorage --> |File| LoadFile["Load from local file"]
 LoadS3 --> Parse["Parse JSON configuration"]
@@ -252,6 +270,7 @@ class ConfigurationManager {
 -config : AuditConfig | null
 -db : PostgresJsDatabase | null
 -s3 : S3Client | null
+-kms : InfisicalKmsClient | null
 -watcherActive : boolean
 -encryptionKey : Buffer | null
 -bucket : string | null
@@ -449,13 +468,19 @@ sequenceDiagram
 participant Client as "Client"
 participant ConfigManager as "ConfigurationManager"
 participant S3 as "S3 Client"
+participant KMS as "KMS Service"
 participant Database as "Database"
 participant File as "Configuration File"
 Client->>ConfigManager : initializeConfig(configPath)
 ConfigManager->>ConfigManager : getConfigurationManager()
 ConfigManager->>ConfigManager : initialize()
 alt Secure Storage Enabled
-ConfigManager->>ConfigManager : initializeEncryption()
+alt KMS Enabled
+ConfigManager->>KMS : initializeKMS()
+KMS-->>ConfigManager : KMS Client
+else Local Encryption
+ConfigManager->>ConfigManager : deriveEncryptionKey()
+end
 end
 alt Storage Type S3
 ConfigManager->>S3 : initializeS3()
@@ -505,6 +530,7 @@ The system handles various error scenarios:
 3. **Storage Errors**: When S3 or file operations fail
 4. **Database Errors**: When database operations fail
 5. **Hot Reload Errors**: When configuration reloading fails
+6. **KMS Errors**: When KMS encryption/decryption operations fail
 
 ```typescript
 async initialize(): Promise<void> {
@@ -592,7 +618,27 @@ export async function initializeConfig(
 }
 ```
 
-### Factory Usage
+### Factory Usage with KMS
+```typescript
+// Example of initializing with KMS secure storage
+const secureConfig: SecureStorageConfig = {
+    enabled: true,
+    algorithm: 'AES-256-GCM',
+    kdf: 'PBKDF2',
+    salt: process.env.AUDIT_CONFIG_SALT || randomBytes(32).toString('hex'),
+    iterations: 100000,
+    kms: {
+        enabled: true,
+        encryptionKey: process.env.KMS_ENCRYPTION_KEY || '',
+        signingKey: process.env.KMS_SIGNING_KEY || '',
+        accessToken: process.env.INFISICAL_ACCESS_TOKEN || '',
+        baseUrl: process.env.INFISICAL_URL || '',
+    },
+}
+
+const configManager = await initializeConfig('./config.json', 'file', undefined, secureConfig)
+```
+
 ```mermaid
 classDiagram
 class ConfigurationManager {
@@ -762,5 +808,41 @@ const getRedisConfig = (configManager: ConfigurationManager): RedisConfig => {
 }
 ```
 
+### KMS Secure Storage Configuration
+```typescript
+import { ConfigurationManager } from '@repo/audit/config'
+import { InfisicalKmsClient } from '@repo/infisical-kms'
+
+// Configure secure storage with KMS
+const secureStorageConfig = {
+    enabled: true,
+    algorithm: 'AES-256-GCM',
+    kdf: 'PBKDF2',
+    salt: process.env.AUDIT_CONFIG_SALT || randomBytes(32).toString('hex'),
+    iterations: 100000,
+    kms: {
+        enabled: true,
+        encryptionKey: process.env.KMS_ENCRYPTION_KEY || '',
+        signingKey: process.env.KMS_SIGNING_KEY || '',
+        accessToken: process.env.INFISICAL_ACCESS_TOKEN || '',
+        baseUrl: process.env.INFISICAL_URL || '',
+    },
+}
+
+// Initialize configuration manager with KMS
+const configManager = new ConfigurationManager(
+    './config.json',
+    'file',
+    { enabled: true, reloadableFields: ['monitoring.enabled', 'archive.enabled'], checkInterval: 30000 },
+    secureStorageConfig
+)
+
+await configManager.initialize()
+
+// The configuration will be automatically encrypted/decrypted using KMS
+await configManager.updateConfig('database.url', 'postgresql://new-host:5432/audit', 'admin', 'Database migration')
+```
+
 **Section sources**
 - [manager.ts](file://packages/audit/src/config/manager.ts#L133-L197)
+- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts#L15-L145)

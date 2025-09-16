@@ -11,6 +11,9 @@
 - [audit-preset.ts](file://packages\audit\src\preset\audit-preset.ts) - *Updated in recent commit*
 - [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Database schema reference*
 - [error-handling.ts](file://packages\audit\src\error\error-handling.ts) - *Error handling implementation*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated in recent commit*
+- [manager.ts](file://packages\audit\src\config\manager.ts) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\config\types.ts) - *Configuration types reference*
 </cite>
 
 ## Update Summary
@@ -20,6 +23,9 @@
 - Added detailed error handling strategies based on new error classification system
 - Updated domain models with additional context from database schema
 - Improved integration points documentation with real-time monitoring capabilities
+- Added OTLP exporter configuration and KMS encryption support details
+- Integrated observability tracing capabilities into architecture overview
+- Enhanced security configuration documentation with KMS integration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,6 +36,8 @@
 6. [Processing Rules](#processing-rules)
 7. [Error Handling Strategies](#error-handling-strategies)
 8. [Integration Points](#integration-points)
+9. [Observability Configuration](#observability-configuration)
+10. [Security and Configuration Management](#security-and-configuration-management)
 
 ## Introduction
 The Audit Event Processing subsystem provides a robust framework for capturing, validating, and persisting audit events across the system. It ensures data integrity, supports compliance requirements, and enables reliable event delivery through a comprehensive processing pipeline. This documentation details the architecture, domain models, and operational mechanics of the audit system.
@@ -50,15 +58,23 @@ I[Presets] --> B
 J[Compliance Rules] --> B
 K[Crypto Service] --> B
 B --> L[Metrics Collector]
+B --> M[Tracer]
+M --> N[OTLP Exporter]
+O[KMS] --> K
+P[Configuration Manager] --> B
 ```
 
 **Diagram sources**
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
+- [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
 
 **Section sources**
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
+- [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
 
 ## Event Lifecycle
 
@@ -68,6 +84,7 @@ participant App as Application
 participant Audit as Audit Service
 participant Processor as Reliable Processor
 participant Storage as Persistent Storage
+participant Tracer as OTLP Tracer
 App->>Audit : Create Event
 Audit->>Audit : Validate & Sanitize
 Audit->>Audit : Apply Presets
@@ -78,6 +95,7 @@ Processor->>Processor : Execute with Retry Logic
 alt Success
 Processor->>Storage : Persist Event
 Processor->>Audit : Confirm Processing
+Audit->>Tracer : Export Trace Data
 Audit->>App : Acknowledge Success
 else Failure
 Processor->>Processor : Increment Retry Count
@@ -93,10 +111,12 @@ end
 **Diagram sources**
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
 
 **Section sources**
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
 
 ## Domain Models
 
@@ -253,11 +273,13 @@ G --> H[Signature Generation]
 H --> I[Presets Application]
 I --> J[Compliance Validation]
 J --> K[Queue for Reliable Processing]
+K --> L[OTLP Trace Export]
 ```
 
 **Diagram sources**
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 - [validation.ts](file://packages\audit\src\validation.ts)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
 
 ### Preset Configuration Model
 ```mermaid
@@ -380,11 +402,14 @@ F[Reliable Processor]
 G[Presets Service]
 H[Crypto Service]
 I[Validation Service]
+J[Configuration Manager]
+K[Tracer]
 end
 subgraph "Storage"
-J[Primary Event Store]
-K[Dead Letter Queue]
-L[Metrics Store]
+L[Primary Event Store]
+M[Dead Letter Queue]
+N[Metrics Store]
+O[OTLP Endpoint]
 end
 A --> E
 B --> E
@@ -394,17 +419,22 @@ E --> F
 E --> G
 E --> H
 E --> I
-F --> J
-F --> K
+E --> J
+E --> K
 F --> L
-G --> J
-H --> J
+F --> M
+F --> N
+K --> O
+G --> L
+H --> L
 I --> F
 ```
 
 **Diagram sources**
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts#L1-L538)
+- [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
 
 ### API Integration Methods
 ```mermaid
@@ -480,3 +510,158 @@ class DataLogDetails {
 
 **Section sources**
 - [audit.ts](file://packages\audit\src\audit.ts#L1-L906)
+
+## Observability Configuration
+
+### OTLP Exporter Configuration
+```mermaid
+classDiagram
+class AuditTracer {
++ObservabilityConfig config
++Map~string, Span~ spans
++Map~string, Span~ activeSpans
++startSpan(operationName : string, parentContext? : TraceContext) : Span
++finishSpan(span : Span) : void
++injectContext(span : Span) : TraceContext
++extractContext(headers : Record~string, string~) : TraceContext | null
++createChildSpan(parentSpan : Span, operationName : string) : Span
++exportSpan(span : Span) : void
++sendSpansToOTLP(spans : Span[]) : Promise~void~
++flushBatch() : Promise~void~
++getAuthHeaders() : Record~string, string~
+}
+class Span {
++string traceId
++string spanId
++string? parentSpanId
++string operationName
++number startTime
++number? endTime
++number? duration
++Record~string, any~ tags
++SpanLog[] logs
++SpanStatus status
++string component
++setTag(key : string, value : any) : void
++setTags(tags : Record~string, any~) : void
++log(level : 'debug'|'info'|'warn'|'error', message : string, fields? : Record~string, any~) : void
++setStatus(code : 'OK'|'ERROR'|'TIMEOUT'|'CANCELLED', message? : string) : void
++finish() : void
+}
+```
+
+**Diagram sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
+- [types.ts](file://packages\audit\src\observability\types.ts#L268-L302)
+
+**Section sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
+- [types.ts](file://packages\audit\src\observability\types.ts#L268-L302)
+
+### OTLP Exporter Features
+```mermaid
+flowchart TD
+A[Span Creation] --> B{OTLP Exporter Enabled?}
+B --> |Yes| C[Sample Based on Rate]
+B --> |No| D[Skip Export]
+C --> E{Sampled?}
+E --> |Yes| F[Add to Batch]
+E --> |No| G[Skip Export]
+F --> H{Batch Full or Timeout?}
+H --> |Yes| I[Send to OTLP Endpoint]
+H --> |No| J[Wait for Next Trigger]
+I --> K{Success?}
+K --> |Yes| L[Complete Export]
+K --> |No| M{Retry Limit Reached?}
+M --> |No| N[Exponential Backoff]
+N --> O[Retry Export]
+M --> |Yes| P[Log Export Failure]
+```
+
+**Diagram sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
+
+**Section sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676)
+
+## Security and Configuration Management
+
+### Configuration Manager with KMS Integration
+```mermaid
+classDiagram
+class ConfigurationManager {
++string configPath
++StorageType storageType
++HotReloadConfig hotReloadConfig
++SecureStorageConfig secureStorageConfig
++PostgresJsDatabase<any> | null db
++S3Client | null s3
++InfisicalKmsClient | null kms
++Buffer | null encryptionKey
++string | null bucket
++AuditConfig | null config
++initialize() : Promise~void~
++getConfig() : AuditConfig
++getConfigValue~T~(path : string) : T
++updateConfig(path : string, newValue : any, changedBy : string, reason? : string) : Promise~void~
++getChangeHistory(limit? : number) : Promise~ConfigChangeEvent[]~
++reloadConfiguration() : Promise~void~
++validateCurrentConfig() : Promise~void~
++exportConfig(includeSensitive? : boolean) : Partial~AuditConfig~
++shutdown() : Promise~void~
++initializeEncryption() : Promise~void~
++initializeS3() : Promise~void~
++initializeDatabase() : Promise~void~
++loadConfiguration() : Promise~void~
++saveConfiguration() : Promise~void~
++encryptConfigFile(data : string) : Promise~void~
++decryptConfigFile() : Promise~string~
++startHotReloading() : Promise~void~
++stopHotReloading() : Promise~void~
++isHotReloadable(path : string) : boolean
++generateVersion() : string
++getNestedObject(obj : any, keys : string[]) : any
++detectChanges(oldConfig : AuditConfig, newConfig : AuditConfig) : {path : string, oldValue : any, newValue : any}[]
++maskSensitiveUrl(url : string) : string
++mapDatabaseChangeEventToChangeEvent(dbChangeEvent : any) : ConfigChangeEvent
+}
+```
+
+**Diagram sources**
+- [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
+- [types.ts](file://packages\audit\src\config\types.ts#L1-L713)
+
+**Section sources**
+- [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
+- [types.ts](file://packages\audit\src\config\types.ts#L1-L713)
+
+### KMS-Enabled Configuration Flow
+```mermaid
+flowchart TD
+A[Configuration Request] --> B{Secure Storage Enabled?}
+B --> |Yes| C{KMS Enabled?}
+B --> |No| D[Use File/S3 Storage]
+C --> |Yes| E[Initialize KMS Client]
+C --> |No| F[Derive Key from Password]
+E --> G[Encrypt Configuration]
+F --> G
+G --> H[Store in S3/File]
+H --> I[Configuration Saved]
+I --> J[Configuration Load Request]
+J --> K{Secure Storage Enabled?}
+K --> |Yes| L{KMS Enabled?}
+K --> |No| M[Load from File/S3]
+L --> |Yes| N[Initialize KMS Client]
+L --> |No| O[Derive Key from Password]
+N --> P[Decrypt Configuration]
+O --> P
+P --> Q[Parse Configuration]
+Q --> R[Validate Configuration]
+R --> S[Configuration Ready]
+```
+
+**Diagram sources**
+- [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
+
+**Section sources**
+- [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)

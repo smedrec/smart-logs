@@ -36,7 +36,7 @@ import {
 	errorAggregation,
 	errorLog,
 } from '@repo/audit-db'
-import { ConsoleLogger } from '@repo/logs'
+import { ConsoleLogger, OTPLLogger } from '@repo/logs'
 import {
 	closeSharedRedisConnection,
 	getRedisConnectionStatus,
@@ -49,15 +49,29 @@ import type { AuditLogEvent, ObservabilityConfig, ReliableProcessorConfig } from
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
 
-const logger = new ConsoleLogger({
-	environment: 'development',
-	application: 'worker',
-	module: 'SmartLogs',
-	version: '0.1.0',
-	defaultFields: {
+const logger = new OTPLLogger(
+	{
 		environment: 'development',
+		application: 'worker',
+		module: 'SmartLogs',
+		version: '0.1.0',
+		defaultFields: {
+			environment: 'development',
+		},
 	},
-})
+	{
+		level: 'debug',
+		structured: true,
+		format: 'json',
+		enableCorrelationIds: true,
+		retentionDays: 30,
+		exporterType: 'otlp',
+		exporterEndpoint: 'http://localhost:5080/api/default/default/_json',
+		exporterHeaders: {
+			Authorization: 'Basic am9zZWFudGNvcmRlaXJvQGdtYWlsLmNvbTpST3pVRnROWHVkZFdTeGZF',
+		},
+	}
+)
 
 // Configuration manager
 let configManager: ConfigurationManager | undefined = undefined

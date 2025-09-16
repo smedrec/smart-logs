@@ -20,6 +20,8 @@
 - [docs/README.md](file://packages/audit/docs/README.md) - *Updated with comprehensive documentation structure*
 - [api-reference/audit-class.md](file://packages/audit/docs/api-reference/audit-class.md) - *Updated with detailed API reference*
 - [api-reference/event-types.md](file://packages/audit/docs/api-reference/event-types.md) - *Updated with comprehensive event types*
+- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated with OTLP exporter implementation*
+- [config/types.ts](file://packages/audit/src/config/types.ts) - *Updated with KMS encryption options*
 </cite>
 
 ## Update Summary
@@ -34,9 +36,12 @@
 - Added security and compliance features documentation
 - Enhanced architecture section with detailed component descriptions
 - Added detailed information about monitoring and observability features
+- Added OTLP exporter configuration and usage details
+- Updated configuration management section with KMS encryption support
 
 **List of new sections added**
-- None
+- Observability and OTLP Exporter Configuration
+- KMS Encryption in Configuration Management
 
 **List of deprecated/removed sections**
 - None
@@ -46,6 +51,8 @@
 - Added new source files for comprehensive documentation structure
 - Updated section sources to reflect changes in documentation organization
 - Added new sources for API reference documentation
+- Added sources for OTLP exporter implementation
+- Added sources for KMS encryption configuration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -62,6 +69,8 @@
 12. [Performance and Scalability](#performance-and-scalability)
 13. [GDPR Compliance and Pseudonymization](#gdpr-compliance-and-pseudonymization)
 14. [Plugin Architecture](#plugin-architecture)
+15. [Observability and OTLP Exporter Configuration](#observability-and-otlp-exporter-configuration)
+16. [KMS Encryption in Configuration Management](#kms-encryption-in-configuration-management)
 
 ## Introduction
 
@@ -88,21 +97,26 @@ A --> E[Reliable Processor]
 A --> F[Event Categorization]
 A --> G[Plugin System]
 A --> H[GDPR Compliance]
-B --> I[File Storage]
-B --> J[S3 Storage]
-C --> K[Validation Rules]
-D --> L[SHA-256 Hashing]
-D --> M[HMAC-SHA256 Signatures]
-E --> N[BullMQ Queue]
-E --> O[Redis]
-E --> P[Circuit Breaker]
-E --> Q[Dead Letter Queue]
-G --> R[Middleware Plugins]
-G --> S[Storage Plugins]
-G --> T[Auth Plugins]
-H --> U[Data Pseudonymization]
-H --> V[Retention Policies]
-H --> W[Data Export]
+A --> I[Observability Tracer]
+B --> J[File Storage]
+B --> K[S3 Storage]
+B --> L[KMS Encryption]
+C --> M[Validation Rules]
+D --> N[SHA-256 Hashing]
+D --> O[HMAC-SHA256 Signatures]
+E --> P[BullMQ Queue]
+E --> Q[Redis]
+E --> R[Circuit Breaker]
+E --> S[Dead Letter Queue]
+G --> T[Middleware Plugins]
+G --> U[Storage Plugins]
+G --> V[Auth Plugins]
+H --> W[Data Pseudonymization]
+H --> X[Retention Policies]
+H --> Y[Data Export]
+I --> Z[OTLP Exporter]
+I --> AA[Batch Processing]
+I --> AB[Error Handling]
 ```
 
 **Diagram sources**
@@ -112,6 +126,7 @@ H --> W[Data Export]
 - [crypto.ts](file://packages/audit/src/crypto.ts)
 - [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
 - [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
+- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
 
 **Section sources**
 - [audit.ts](file://packages/audit/src/audit.ts)
@@ -802,3 +817,192 @@ Plugins are configured through the `AuditConfig` object and can be dynamically l
 - [audit.ts](file://packages/audit/src/audit.ts)
 - [config/types.ts](file://packages/audit/src/config/types.ts)
 - [config/manager.ts](file://packages/audit/src/config/manager.ts)
+
+## Observability and OTLP Exporter Configuration
+
+The Audit Core System now supports OTLP (OpenTelemetry Protocol) HTTP exporter for distributed tracing, replacing the previous console-based exporter. This enhancement enables integration with modern observability platforms for comprehensive monitoring and analysis.
+
+```mermaid
+classDiagram
+class AuditTracer {
+-config : TracingConfig
+-spans : Map~string, Span~
+-activeSpans : Map~string, Span~
+-spanBatch : Span[]
+-batchTimeout : Timeout
++BATCH_SIZE : 100
++BATCH_TIMEOUT_MS : 5000
++startSpan(operationName : string, parentContext? : TraceContext) : Span
++finishSpan(span : Span) : void
++injectContext(span : Span) : TraceContext
++extractContext(headers : Record~string, string~) : TraceContext | null
++createChildSpan(parentSpan : Span, operationName : string) : Span
++getTraceSpans(traceId : string) : Span[]
++getActiveSpans() : Span[]
++exportSpan(span : Span) : void
++exportToConsole(span : Span) : void
++exportToJaeger(span : Span) : void
++exportToZipkin(span : Span) : void
++exportToOTLP(span : Span) : void
++addToBatch(span : Span) : void
++flushBatch() : Promise~void~
++sendSpansToOTLP(spans : Span[]) : Promise~void~
++createOTLPPayload(spans : Span[]) : any
++getAuthHeaders() : Record~string, string~
++compressPayload(data : string) : Promise~{ data : string; encoding : string } | null~
++hexToBase64(hex : string) : string
++timestampToNanos(timestamp : number) : string
++getSpanKind(kind? : string) : number
++getStatusCode(status : string) : number
++convertAttributes(obj : Record~string, any~) : { key : string; value : any }[]
++cleanup() : void
+}
+class TracingConfig {
++enabled : boolean
++serviceName : string
++sampleRate : number
++exporterType : 'console' | 'jaeger' | 'zipkin' | 'otlp'
++exporterEndpoint? : string
++headers? : Record~string, string~
+}
+class Span {
++traceId : string
++spanId : string
++parentSpanId? : string
++operationName : string
++startTime : number
++endTime? : number
++duration? : number
++tags : Record~string, any~
++logs : SpanLog[]
++status : SpanStatus
++component : string
++setTag(key : string, value : any) : void
++setTags(tags : Record~string, any) : void
++log(level : 'debug' | 'info' | 'warn' | 'error', message : string, fields? : Record~string, any~) : void
++setStatus(code : 'OK' | 'ERROR' | 'TIMEOUT' | 'CANCELLED', message? : string) : void
++finish() : void
+}
+AuditTracer --> TracingConfig : uses
+AuditTracer --> Span : creates
+```
+
+**Diagram sources**
+- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
+- [observability/types.ts](file://packages/audit/src/observability/types.ts)
+
+The OTLP exporter provides several key features:
+
+- **Multiple Exporter Types**: Support for console, Jaeger, Zipkin, and OTLP exporters
+- **Batch Processing**: Automatic batching of spans for efficient transmission with configurable batch size (default 100) and timeout (default 5 seconds)
+- **Authentication Support**: Multiple authentication methods including Bearer tokens via OTLP_API_KEY environment variable and custom headers via OTLP_AUTH_HEADER
+- **Error Handling**: Robust error handling with exponential backoff (up to 3 retries), rate limiting support (respects Retry-After headers), and circuit breaking for client errors (4xx)
+- **Compression**: Support for payload compression (future feature) to reduce network overhead
+- **Standard Compliance**: Full OTLP compliance with proper base64 encoding of trace and span IDs
+
+The exporter can be configured to send traces to various observability platforms:
+
+```typescript
+// Configuration for different platforms
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://your-platform.com/v1/traces'
+}
+
+// Environment variables for authentication
+// OTLP_API_KEY=your-api-key-here
+// OTLP_AUTH_HEADER="Authorization: Basic base64credentials"
+```
+
+Supported platforms include Grafana Tempo, DataDog, OpenObserve, Honeycomb, New Relic, and AWS X-Ray (via OTEL Collector). The migration from previous exporters is seamless, requiring only a change in the exporter type and endpoint configuration.
+
+**Section sources**
+- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
+- [observability/types.ts](file://packages/audit/src/observability/types.ts)
+- [docs/observability/otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md)
+
+## KMS Encryption in Configuration Management
+
+The Configuration Manager now supports KMS (Key Management Service) encryption for secure storage of configuration files, enhancing security for sensitive configuration data.
+
+```mermaid
+classDiagram
+class ConfigurationManager {
+-config : AuditConfig
+-secureStorageConfig : SecureStorageConfig
+-kms : InfisicalKmsClient
++initializeEncryption() : Promise~void~
++encryptConfigFile(data : string) : Promise~void~
++decryptConfigFile() : Promise~string~
+}
+class SecureStorageConfig {
++enabled : boolean
++algorithm : 'AES-256-GCM' | 'AES-256-CBC'
++kdf : 'PBKDF2' | 'scrypt'
++salt : string
++iterations : number
++kms : KMSConfig
+}
+class KMSConfig {
++enabled : boolean
++encryptionKey : string
++signingKey : string
++accessToken : string
++baseUrl : string
++algorithm? : 'AES-256-GCM' | 'AES-256-CBC'
++kdf? : 'PBKDF2' | 'scrypt'
++salt? : string
++iterations? : number
+}
+class InfisicalKmsClient {
++encrypt(plaintext : string) : Promise~EncryptResponse~
++decrypt(ciphertext : string) : Promise~DecryptResponse~
+}
+ConfigurationManager --> SecureStorageConfig : uses
+SecureStorageConfig --> KMSConfig : uses
+ConfigurationManager --> InfisicalKmsClient : uses
+InfisicalKmsClient --> KMSConfig : config
+```
+
+**Diagram sources**
+- [config/manager.ts](file://packages/audit/src/config/manager.ts)
+- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts)
+
+The KMS encryption feature provides:
+
+- **Secure Configuration Storage**: Configuration files can be encrypted using either local AES-256-GCM with PBKDF2 key derivation or via Infisical KMS
+- **Flexible Encryption Options**: Support for both local encryption and cloud-based KMS services
+- **Environment Variable Configuration**: KMS settings can be configured through environment variables (INFISICAL_URL, INFISICAL_ACCESS_TOKEN, KMS_ENCRYPTION_KEY, KMS_SIGNING_KEY)
+- **Seamless Integration**: The KMS client automatically handles encryption and decryption operations when secure storage is enabled
+- **Error Handling**: Comprehensive error handling for KMS operations with specific error types (KmsError, KmsApiError)
+
+Configuration example:
+
+```typescript
+const secureStorageConfig = {
+  enabled: true,
+  algorithm: 'AES-256-GCM',
+  kdf: 'PBKDF2',
+  salt: process.env.AUDIT_CONFIG_SALT,
+  iterations: 100000,
+  kms: {
+    enabled: true,
+    encryptionKey: process.env.KMS_ENCRYPTION_KEY,
+    signingKey: process.env.KMS_SIGNING_KEY,
+    accessToken: process.env.INFISICAL_ACCESS_TOKEN,
+    baseUrl: process.env.INFISICAL_URL,
+  },
+}
+```
+
+The system automatically detects whether to use local encryption or KMS based on the configuration. When KMS is enabled, all configuration operations (load, save) are transparently encrypted and decrypted using the KMS service.
+
+**Section sources**
+- [config/manager.ts](file://packages/audit/src/config/manager.ts)
+- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts)
+- [infisical-kms/types.ts](file://packages/infisical-kms/src/types.ts)

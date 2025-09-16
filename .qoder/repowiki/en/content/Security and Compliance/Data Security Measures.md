@@ -2,23 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L218) - *Updated cryptographic implementation*
-- [client.ts](file://packages/infisical-kms/src/client.ts#L0-L146) - *Updated in commit 1fb280cfc30f7d0053b43ff0abd5ffbe6494b84a*
-- [types.ts](file://packages/infisical-kms/src/types.ts#L0-L48) - *Updated in commit 1fb280cfc30f7d0053b43ff0abd5ffbe6494b84a*
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L765)
-- [permissions.ts](file://packages/auth/src/permissions.ts#L0-L593)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L487)
-- [validation.ts](file://packages/audit/src/validation.ts#L0-L866)
-- [types.ts](file://packages/audit/src/types.ts#L0-L286)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L383) - *Updated cryptographic implementation with KMS support*
+- [types.ts](file://packages/infisical-kms/src/types.ts#L0-L56) - *Signing algorithms and KMS response types*
+- [client.ts](file://packages/infisical-kms/src/client.ts#L0-L146) - *KMS client implementation for encryption and signing*
+- [types.ts](file://packages/audit/src/types.ts#L0-L286) - *Audit event structure definitions*
+- [types.ts](file://packages/audit/src/config/types.ts#L0-L712) - *Security and KMS configuration types*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated cryptographic algorithms section to reflect new default signing algorithm
-- Added documentation for Infisical KMS integration and its signing capabilities
-- Enhanced key management section to include external KMS solutions
-- Updated diagram sources to reflect new cryptographic service implementation
-- Maintained existing security framework documentation while incorporating new KMS details
+- Added comprehensive documentation for KMS encryption support and configuration
+- Updated cryptographic algorithms section to include KMS-backed signing capabilities
+- Enhanced key management section with external KMS integration details
+- Expanded security configuration documentation to cover KMS settings
+- Updated diagram sources and section references to reflect new implementation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,22 +32,32 @@ This document provides a comprehensive overview of the data security measures im
 
 ## Data Encryption Implementation
 
-The system implements cryptographic integrity verification for audit events using SHA-256 hashing and HMAC-SHA256 signatures. The `CryptoService` class in `crypto.ts` provides tamper detection capabilities for audit log events, ensuring data integrity both at rest and in transit.
+The system implements cryptographic integrity verification for audit events using SHA-256 hashing and multiple signature algorithms. The `CryptoService` class in `crypto.ts` provides tamper detection capabilities for audit log events, ensuring data integrity both at rest and in transit. The service now supports both local HMAC-SHA256 signatures and KMS-backed digital signatures.
 
 ```mermaid
 classDiagram
 class CryptoService {
-+config : CryptoConfig
++config : SecurityConfig
 +generateHash(event : AuditLogEvent) : string
 +verifyHash(event : AuditLogEvent, expectedHash : string) : boolean
-+generateEventSignature(event : AuditLogEvent) : string
-+verifyEventSignature(event : AuditLogEvent, signature : string) : boolean
-+getConfig() : Omit<CryptoConfig, 'secretKey'>
++generateEventSignature(event : AuditLogEvent, algorithm? : SigningAlgorithm) : Promise<EventSignatureResponse>
++verifyEventSignature(event : AuditLogEvent, signature : string, algorithm? : SigningAlgorithm) : Promise<boolean>
++getConfig() : any
 }
-class CryptoConfig {
+class SecurityConfig {
++enableIntegrityVerification : boolean
 +hashAlgorithm : 'SHA-256'
-+signatureAlgorithm : 'HMAC-SHA256'
-+secretKey? : string
++enableEventSigning : boolean
++encryptionKey? : string
++kms : KmsConfig
+}
+class KmsConfig {
++enabled : boolean
++encryptionKey : string
++signingKey : string
++accessToken : string
++baseUrl : string
++algorithm? : 'AES-256-GCM' | 'AES-256-CBC'
 }
 class AuditLogEvent {
 +timestamp : string
@@ -62,45 +69,50 @@ class AuditLogEvent {
 +hashAlgorithm? : 'SHA-256'
 +signature? : string
 }
-class CryptoUtils {
-+generateHash(event : AuditLogEvent) : string
-+verifyHash(event : AuditLogEvent, expectedHash : string) : boolean
-+generateSignature(event : AuditLogEvent) : string
-+verifySignature(event : AuditLogEvent, signature : string) : boolean
+class InfisicalKmsClient {
++encrypt(plaintext : string) : Promise<EncryptResponse>
++decrypt(ciphertext : string) : Promise<DecryptResponse>
++sign(data : string, algorithm? : SigningAlgorithm) : Promise<SignResponse>
++verify(data : string, signature : string, algorithm? : SigningAlgorithm) : Promise<VerifyResponse>
 }
-CryptoService --> CryptoConfig : "uses"
+CryptoService --> SecurityConfig : "uses"
 CryptoService --> AuditLogEvent : "processes"
-CryptoUtils --> CryptoService : "delegates to"
+CryptoService --> InfisicalKmsClient : "delegates to when KMS enabled"
+InfisicalKmsClient --> KmsConfig : "configured with"
 ```
 
 **Diagram sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L218)
-- [types.ts](file://packages/audit/src/types.ts#L0-L286)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L383)
+- [types.ts](file://packages/audit/src/config/types.ts#L0-L712)
+- [client.ts](file://packages/infisical-kms/src/client.ts#L0-L146)
 
 **Section sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L218)
-- [types.ts](file://packages/audit/src/types.ts#L0-L286)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L0-L383)
+- [types.ts](file://packages/audit/src/config/types.ts#L0-L712)
 
 ### Cryptographic Algorithms and Key Management
-The system uses industry-standard cryptographic algorithms:
+The system uses industry-standard cryptographic algorithms with flexible key management options:
 - **SHA-256**: For generating deterministic hashes of audit event critical fields
-- **HMAC-SHA256**: For creating cryptographic signatures using a secret key
-- **RSASSA-PSS-SHA-256**: For digital signatures via Infisical KMS integration
+- **HMAC-SHA256**: For creating cryptographic signatures using a local secret key
+- **RSASSA-PSS-SHA-256**: Default algorithm for digital signatures via Infisical KMS integration
+- **Additional KMS algorithms**: RSASSA-PSS-SHA-384, RSASSA-PSS-SHA-512, and PKCS#1 v1.5 variants
 
 Key management is implemented through multiple approaches:
 1. **Local key management**: Environment-based configuration with secret keys set via environment variables
 2. **External KMS integration**: Infisical KMS for secure key management and cryptographic operations
 
-The `CryptoService` extracts critical fields from audit events in a deterministic order, creates a standardized string representation, and applies SHA-256 hashing. This ensures consistency across the system regardless of object property order. The HMAC-SHA256 signature provides additional security by incorporating the secret key, preventing tampering even if an attacker gains access to the hash algorithm.
+The `CryptoService` extracts critical fields from audit events in a deterministic order, creates a standardized string representation, and applies SHA-256 hashing. This ensures consistency across the system regardless of object property order. The service now conditionally uses either local HMAC-SHA256 signatures or KMS-backed digital signatures based on the `kms.enabled` configuration flag.
 
-For enhanced security requirements, the system integrates with Infisical KMS, which supports advanced signing algorithms including RSASSA-PSS-SHA-256 (now the default), RSASSA-PSS-SHA-384, RSASSA-PSS-SHA-512, and PKCS#1 v1.5 variants. This integration allows for hardware-backed key storage and more robust cryptographic operations.
+For enhanced security requirements, the system integrates with Infisical KMS, which supports advanced signing algorithms. This integration allows for hardware-backed key storage and more robust cryptographic operations. The KMS client is initialized when KMS is enabled in the security configuration, using the `baseUrl`, `encryptionKey`, `signingKey`, and `accessToken` from the configuration.
 
 ### Data Integrity Verification
 The cryptographic implementation focuses on integrity verification rather than encryption of data at rest. Each audit event can include:
 - **Hash**: A SHA-256 hash of critical fields (timestamp, action, status, principalId, etc.)
-- **Signature**: An HMAC-SHA256 signature generated using the hash and secret key
+- **Signature**: Either an HMAC-SHA256 signature (local) or digital signature (KMS) generated using the hash
 
 This two-layer approach allows for both basic integrity checking (via hash comparison) and authenticated integrity verification (via signature validation). The system automatically validates these cryptographic elements during audit processing, logging any verification failures for security monitoring.
+
+The `generateEventSignature` and `verifyEventSignature` methods now return promises and support optional signing algorithm specification. When KMS is enabled, these methods delegate to the Infisical KMS client for cryptographic operations, providing enhanced security through external key management.
 
 ## Authentication and Authorization
 
@@ -345,7 +357,7 @@ The system implements zero-trust security principles with a focus on audit data 
 
 ### Audit Data Protection
 Audit data is protected through multiple layers:
-- **Cryptographic integrity**: SHA-256 hashes and HMAC signatures ensure data cannot be tampered with
+- **Cryptographic integrity**: SHA-256 hashes and configurable signatures (HMAC or KMS) ensure data cannot be tampered with
 - **Access controls**: Strict RBAC limits who can view, modify, or delete audit data
 - **Immutable design**: Audit events are append-only with no modification capabilities
 - **Retention policies**: Configurable data retention based on compliance requirements
@@ -373,8 +385,9 @@ Recommended security best practices for the system include:
 - Keeping dependencies updated
 - Using HTTPS for all communications
 - Implementing multi-factor authentication for administrative accounts
+- Configuring KMS integration for enhanced cryptographic security in high-compliance environments
 
 These practices, combined with the built-in security features, create a robust defense-in-depth strategy that protects sensitive audit data and ensures compliance with healthcare regulations.
 
 ## Conclusion
-The smart-logs system implements a comprehensive security framework that addresses data encryption, authentication, authorization, and vulnerability mitigation. The architecture follows zero-trust principles with defense-in-depth strategies across multiple layers. Key strengths include cryptographic integrity verification for audit data, robust role-based access control, and comprehensive middleware protections. The system is designed to meet healthcare compliance requirements while providing strong protection against common security threats. By following the documented best practices and maintaining proper configuration, organizations can ensure the confidentiality, integrity, and availability of their audit data.
+The smart-logs system implements a comprehensive security framework that addresses data encryption, authentication, authorization, and vulnerability mitigation. The architecture follows zero-trust principles with defense-in-depth strategies across multiple layers. Key strengths include cryptographic integrity verification for audit data, robust role-based access control, and comprehensive middleware protections. The system now supports KMS integration for enhanced cryptographic operations, providing organizations with flexible security options based on their compliance requirements. By following the documented best practices and maintaining proper configuration, organizations can ensure the confidentiality, integrity, and availability of their audit data.

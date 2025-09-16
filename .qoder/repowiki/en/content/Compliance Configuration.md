@@ -7,14 +7,22 @@
 - [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
 - [compliance.test.ts](file://packages/audit-client/src/services/compliance.ts)
-- [types.ts](file://packages/audit/src/config/types.ts)
-- [manager.ts](file://packages/audit/src/config/manager.ts)
+- [types.ts](file://packages/audit/src/config/types.ts) - *Updated in recent commit*
+- [manager.ts](file://packages/audit/src/config/manager.ts) - *Updated in recent commit*
+- [factory.ts](file://packages/audit/src/config/factory.ts) - *Updated in recent commit*
 - [configuration.md](file://packages/audit-db/docs/getting-started/configuration.md)
 - [healthcare-compliance.md](file://packages/audit/docs/tutorials/healthcare-compliance.md)
 - [compliance-features.md](file://apps/docs/src/content/docs/audit/compliance-features.md)
 - [monitoring.md](file://apps/worker/docs/tutorials/monitoring.md)
 - [faq.md](file://apps/worker/docs/faq.md)
 </cite>
+
+## Update Summary
+- Added KMS encryption support in configuration manager
+- Updated secure storage configuration options
+- Enhanced configuration security with KMS integration
+- Added secure configuration storage settings
+- Updated configuration manager initialization with secure storage options
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -281,6 +289,8 @@ The system supports hot reloading of configuration changes and maintains a chang
 
 **Section sources**
 - [manager.ts](file://packages/audit/src/config/manager.ts#L0-L799)
+- [types.ts](file://packages/audit/src/config/types.ts#L552-L609)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L83-L134)
 
 ## Practical Examples
 

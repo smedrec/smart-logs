@@ -377,8 +377,8 @@ export class AuditTracer implements Tracer {
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json',
 			'User-Agent': `audit-system-tracer/1.0.0`,
-			...this.config.headers,
 			...this.getAuthHeaders(),
+			...this.config.headers,
 		}
 
 		let body = JSON.stringify(otlpPayload)

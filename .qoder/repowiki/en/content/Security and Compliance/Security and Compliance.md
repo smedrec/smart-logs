@@ -9,6 +9,8 @@
 - [client.ts](file://packages\infisical-kms\src\client.ts) - *KMS integration for pseudonymization*
 - [permissions.ts](file://packages\auth\src\permissions.ts) - *Updated in recent commit*
 - [authz.ts](file://packages\auth\src\db\schema\authz.ts) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\config\types.ts) - *Added KMS encryption support*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *OTLP exporter with auth headers*
 </cite>
 
 ## Update Summary
@@ -21,6 +23,8 @@
 - Added documentation for organization role management with Redis caching
 - Updated security measures section to include role-based access control with Redis caching
 - Added new class diagram for AuthorizationService and role management
+- Added new section on OTLP observability exporter with authentication support
+- Integrated KMS encryption configuration details into security measures
 - Maintained existing structure while incorporating new pseudonymization features
 
 ## Table of Contents
@@ -328,6 +332,30 @@ Role --> Permission : "contains"
 - [permissions.ts](file://packages\auth\src\permissions.ts#L0-L691)
 - [authz.ts](file://packages\auth\src\db\schema\authz.ts#L0-L118)
 
+### KMS Encryption Configuration
+The system supports KMS encryption through configurable settings in the SecurityConfig interface. This allows for centralized key management and enhanced security for sensitive operations including pseudonymization and data protection.
+
+```typescript
+interface SecurityConfig {
+  /** Enable KMS encryption */
+  kms: {
+    enabled: boolean
+    encryptionKey: string
+    signingKey: string
+    accessToken: string
+    baseUrl: string
+    algorithm?: 'AES-256-GCM' | 'AES-256-CBC'
+    kdf?: 'PBKDF2' | 'scrypt'
+    salt?: string
+    iterations?: number
+  }
+}
+```
+
+**Section sources**
+- [types.ts](file://packages\audit\src\config\types.ts#L430-L475)
+- [client.ts](file://packages\infisical-kms\src\client.ts)
+
 ## Compliance Reporting and Data Export
 
 The system provides comprehensive compliance reporting and data export capabilities for regulatory requirements.
@@ -542,3 +570,29 @@ async applyRetentionPolicies(): Promise<ArchivalResult[]> {
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L280-L320)
+
+### OTLP Observability Exporter
+The system supports OTLP (OpenTelemetry Protocol) for distributed tracing export to observability platforms. The exporter includes authentication support through environment variables.
+
+```mermaid
+sequenceDiagram
+participant App as "Application"
+participant Tracer as "AuditTracer"
+participant OTLP as "OTLP Endpoint"
+participant Auth as "Authentication System"
+App->>Tracer : startSpan(operation)
+Tracer->>Tracer : Create span with trace context
+App->>Tracer : finishSpan(span)
+Tracer->>Tracer : addToBatch(span)
+Tracer->>Tracer : flushBatch() when full or timed
+Tracer->>Auth : getAuthHeaders()
+Auth->>Tracer : Return Authorization headers
+Tracer->>OTLP : sendSpansToOTLP() with auth headers
+OTLP-->>Tracer : 200 OK
+Tracer->>App : Complete export
+Note over Tracer : Automatic batching, exponential<br/>backoff, and authentication<br/>header support
+```
+
+**Section sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L487-L537)
+- [types.ts](file://packages\audit\src\config\types.ts#L430-L475)

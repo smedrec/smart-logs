@@ -2,23 +2,26 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [manager.ts](file://packages\audit\src\config\manager.ts) - *Updated in recent commit*
-- [types.ts](file://packages\audit\src\config\types.ts) - *Updated in recent commit*
+- [manager.ts](file://packages\audit\src\config\manager.ts) - *Updated in recent commit with KMS encryption support*
+- [types.ts](file://packages\audit\src\config\types.ts) - *Updated in recent commit with KMS configuration options*
 - [validator.ts](file://packages\audit\src\config\validator.ts) - *Updated in recent commit*
 - [factory.ts](file://packages\audit\src\config\factory.ts)
 - [api-reference.md](file://apps\docs\src\content\docs\audit\api-reference.md)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Added GDPR pseudonymization features*
 - [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts) - *Added GDPR utility functions*
 - [audit-client/src/infrastructure/plugins/utils.ts](file://packages\audit-client\src\infrastructure\plugins\utils.ts) - *Added plugin architecture*
+- [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts) - *Added in recent commit for KMS integration*
+- [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts) - *Added in recent commit for KMS configuration*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated documentation to reflect the centralized documentation approach
-- Removed outdated references to README content that has been moved to the documentation site
-- Updated configuration guide references to point to the new documentation structure
-- Maintained all technical details about configuration options and implementation
-- Updated file references to reflect the new documentation location
+- Added new section on KMS Encryption Integration to document the new KMS support
+- Updated Secure Configuration Storage section to include KMS encryption details
+- Updated Configuration Schema and Options to include KMS configuration fields
+- Added references to Infisical KMS package files
+- Updated diagram in Secure Configuration Storage to show KMS integration
+- Maintained all existing documentation while enhancing KMS-related content
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,6 +38,7 @@
 12. [Extending the Configuration Schema](#extending-the-configuration-schema)
 13. [Plugin Architecture](#plugin-architecture)
 14. [GDPR Pseudonymization Configuration](#gdpr-pseudonymization-configuration)
+15. [KMS Encryption Integration](#kms-encryption-integration)
 
 ## Introduction
 The Configuration Management system provides a comprehensive solution for managing application settings across different environments. It supports hierarchical configuration loading, environment-specific overrides, runtime reconfiguration, and secure storage. The system is designed to handle complex configuration needs for audit logging, database connections, retention policies, compliance requirements, and integration endpoints. This document details the design and implementation of the Config Manager class, its integration with various subsystems, and best practices for configuration management.
@@ -167,7 +171,7 @@ AuditConfig --> PluginConfig
 ```
 
 **Section sources**
-- [types.ts](file://packages\audit\src\config\types.ts#L0-L682)
+- [types.ts](file://packages\audit\src\config\types.ts#L0-L712)
 
 ## Hierarchical Configuration Loading
 
@@ -329,19 +333,30 @@ sequenceDiagram
 participant App as Application
 participant ConfigManager as ConfigurationManager
 participant Encryption as Crypto Module
+participant KMS as KMS Service
 participant Storage as Storage (File/S3)
 App->>ConfigManager : initialize() with secureStorageConfig
 ConfigManager->>ConfigManager : initializeEncryption()
+alt KMS Enabled
+ConfigManager->>KMS : Initialize InfisicalKmsClient
+KMS-->>ConfigManager : kmsClient
+else Local Encryption
 ConfigManager->>Encryption : pbkdf2/scrypt(password, salt)
 Encryption-->>ConfigManager : encryptionKey
+end
 ConfigManager->>ConfigManager : loadConfiguration()
 alt Secure Storage Enabled
 ConfigManager->>Storage : Read encrypted config
 Storage-->>ConfigManager : encryptedData
+alt KMS Enabled
+ConfigManager->>KMS : decrypt(encryptedData)
+KMS-->>ConfigManager : decrypted config
+else Local Encryption
 ConfigManager->>Encryption : createDecipheriv()
 Encryption->>Encryption : setAuthTag() if GCM
 Encryption->>Encryption : decrypt data
 Encryption-->>ConfigManager : decrypted config
+end
 ConfigManager->>ConfigManager : parse JSON
 else Secure Storage Disabled
 ConfigManager->>Storage : Read config file
@@ -352,6 +367,7 @@ ConfigManager-->>App : configuration loaded
 
 **Section sources**
 - [manager.ts](file://packages\audit\src\config\manager.ts#L0-L874)
+- [types.ts](file://packages\audit\src\config\types.ts#L0-L712)
 
 ## Integration with Subsystems
 
@@ -400,7 +416,7 @@ ConfigurationManager --> Security
 ```
 
 **Section sources**
-- [types.ts](file://packages\audit\src\config\types.ts#L0-L682)
+- [types.ts](file://packages\audit\src\config\types.ts#L0-L712)
 - [manager.ts](file://packages\audit\src\config\manager.ts#L0-L874)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L0-L600)
 
@@ -505,7 +521,7 @@ CustomFactory --> ExtendedAuditConfig : "creates"
 ```
 
 **Section sources**
-- [types.ts](file://packages\audit\src\config\types.ts#L0-L682)
+- [types.ts](file://packages\audit\src\config\types.ts#L0-L712)
 - [validator.ts](file://packages\audit\src\config\validator.ts#L0-L659)
 - [factory.ts](file://packages\audit\src\config\factory.ts#L0-L751)
 
@@ -588,3 +604,52 @@ GDPRService-->>App : {pseudonymId, recordsAffected}
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L192-L275)
 - [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts#L0-L45)
 - [types.ts](file://packages\audit\src\config\types.ts#L500-L550)
+
+## KMS Encryption Integration
+
+The configuration manager now supports integration with external Key Management Systems (KMS) through the Infisical KMS client. This allows for centralized key management and enhanced security for configuration encryption.
+
+```mermaid
+sequenceDiagram
+participant App as Application
+participant ConfigManager as ConfigurationManager
+participant KMS as Infisical KMS
+participant Storage as S3/File Storage
+App->>ConfigManager : initialize() with KMS config
+ConfigManager->>ConfigManager : initializeEncryption()
+alt KMS Enabled
+ConfigManager->>KMS : new InfisicalKmsClient(config)
+KMS-->>ConfigManager : kmsClient
+ConfigManager->>ConfigManager : loadConfiguration()
+ConfigManager->>Storage : Get encrypted config
+Storage-->>ConfigManager : encryptedData
+ConfigManager->>KMS : decrypt(encryptedData.ciphertext)
+KMS-->>ConfigManager : plaintext
+ConfigManager->>ConfigManager : parse JSON
+else Local Encryption
+ConfigManager->>ConfigManager : use local encryption
+end
+ConfigManager-->>App : configuration loaded
+```
+
+The KMS integration is configured through the `secureStorageConfig.kms` object in the configuration, which includes the following properties:
+
+- **enabled**: Boolean flag to enable KMS encryption
+- **encryptionKey**: KMS encryption key ID
+- **signingKey**: KMS signing key ID  
+- **accessToken**: KMS access token for authentication
+- **baseUrl**: Base URL for the KMS service
+- **algorithm**: Encryption algorithm to use (optional, defaults to AES-256-GCM)
+- **kdf**: Key derivation function (optional)
+- **salt**: Salt for key derivation (optional)
+- **iterations**: Number of iterations for key derivation (optional)
+
+When KMS is enabled, the configuration manager uses the InfisicalKmsClient to encrypt and decrypt configuration files, eliminating the need to manage encryption keys locally. This provides enhanced security through centralized key management and key rotation capabilities.
+
+The KMS client handles encryption and decryption operations asynchronously and includes built-in retry logic with exponential backoff for resilience against network issues. Error handling is comprehensive, with specific error types for KMS API errors and general KMS errors.
+
+**Section sources**
+- [manager.ts](file://packages\audit\src\config\manager.ts#L38-L83)
+- [types.ts](file://packages\audit\src\config\types.ts#L0-L712)
+- [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
+- [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts#L0-L56)

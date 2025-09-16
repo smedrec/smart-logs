@@ -10,16 +10,19 @@
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Updated in recent commit*
 - [audit-preset.ts](file://packages\audit\src\preset\audit-preset.ts) - *Unchanged*
 - [preset-types.ts](file://packages\audit\src\preset\preset-types.ts) - *Unchanged*
+- [infisical-kms/README.md](file://packages\infisical-kms\README.md) - *KMS integration documentation*
+- [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts) - *KMS client implementation*
+- [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts) - *KMS type definitions*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added comprehensive documentation for the plugin architecture system
-- Expanded GDPR compliance section with detailed pseudonymization implementation
-- Updated compliance configuration section to include new pseudonymization flag
-- Enhanced configuration schema overview with plugin system integration
-- Added new section for plugin architecture and configuration
-- Updated source tracking annotations to reflect recent changes
+- Added comprehensive documentation for KMS encryption support in security configuration
+- Updated Security Configuration section with detailed KMS properties and integration
+- Enhanced Configuration Management section with KMS client initialization details
+- Added new section for KMS Integration and secure storage configuration
+- Updated source tracking annotations to reflect recent changes and new dependencies
+- Added documentation for secure configuration storage with KMS encryption
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -33,6 +36,7 @@
 9. [Integration and Extensibility](#integration-and-extensibility)
 10. [Plugin Architecture](#plugin-architecture)
 11. [Configuration Change Tracking](#configuration-change-tracking)
+12. [KMS Integration](#kms-integration)
 
 ## Introduction
 The Configuration Schema and Types system provides a comprehensive, type-safe framework for managing audit system configuration across environments. Built with TypeScript, the system enforces compile-time validation, supports IDE autocompletion, and enables runtime safety through comprehensive validation. The configuration schema is structured hierarchically, covering database connections, retention policies, compliance requirements (GDPR/HIPAA), integration endpoints, monitoring thresholds, and plugin extensions. This documentation details every configuration option, type hierarchy, and integration point, providing guidance for both standard and custom deployments.
@@ -348,6 +352,18 @@ class SecurityConfig {
 +enableEventSigning : boolean
 +encryptionKey : string
 +enableLogEncryption : boolean
++kms : KMSConfig
+}
+class KMSConfig {
++enabled : boolean
++encryptionKey : string
++signingKey : string
++accessToken : string
++baseUrl : string
++algorithm? : 'AES-256-GCM' | 'AES-256-CBC'
++kdf? : 'PBKDF2' | 'scrypt'
++salt? : string
++iterations? : number
 }
 class ValidationConfig {
 +requiredFields : string[]
@@ -373,6 +389,7 @@ FieldValidator --> ValidationRule : "contains"
 
 **Section sources**
 - [types.ts](file://packages\audit\src\config\types.ts#L320-L360)
+- [types.ts](file://packages\audit\src\config\types.ts#L291-L296)
 
 ## Configuration Management
 
@@ -442,7 +459,7 @@ class PresetHandler {
 +createPreset(preset)
 +updatePreset(preset)
 +deletePreset(name, organizationId)
-}
++}
 class AuditPreset {
 +name : string
 +description? : string
@@ -531,3 +548,85 @@ CONFIG_CHANGE_EVENT ||--|| AuditConfig : "tracks changes to"
 **Section sources**
 - [manager.ts](file://packages\audit\src\config\manager.ts#L200-L240)
 - [types.ts](file://packages\audit\src\config\types.ts#L377-L400)
+
+## KMS Integration
+
+The Key Management Service (KMS) integration provides enterprise-grade encryption for configuration storage and sensitive data protection. The system integrates with Infisical KMS to manage encryption keys, perform cryptographic operations, and ensure secure configuration storage.
+
+### KMS Configuration
+The KMS configuration enables secure storage of configuration files using external key management services. This feature is particularly important for production environments where configuration files may contain sensitive information.
+
+```mermaid
+classDiagram
+class SecureStorageConfig {
++enabled : boolean
++algorithm : 'AES-256-GCM' | 'AES-256-CBC'
++kdf : 'PBKDF2' | 'scrypt'
++salt : string
++iterations : number
++kms : KMSConfig
+}
+class KMSConfig {
++enabled : boolean
++encryptionKey : string
++signingKey : string
++accessToken : string
++baseUrl : string
++algorithm? : 'AES-256-GCM' | 'AES-256-CBC'
++kdf? : 'PBKDF2' | 'scrypt'
++salt? : string
++iterations? : number
+}
+class InfisicalKmsClient {
++encrypt(plaintext : string) : Promise<EncryptResponse>
++decrypt(ciphertext : string) : Promise<DecryptResponse>
++sign(data : string) : Promise<SignResponse>
++verify(data : string, signature : string) : Promise<VerifyResponse>
+}
+SecureStorageConfig --> KMSConfig : "contains"
+ConfigurationManager --> InfisicalKmsClient : "uses"
+InfisicalKmsClient --> KMSConfig : "configured with"
+```
+
+**Section sources**
+- [types.ts](file://packages\audit\src\config\types.ts#L400-L450)
+- [manager.ts](file://packages\audit\src\config\manager.ts#L150-L200)
+- [integration.ts](file://packages\audit\src\config\integration.ts#L100-L150)
+
+### KMS Integration Workflow
+The KMS integration follows a secure workflow for encrypting and decrypting configuration files, ensuring that sensitive data is protected both at rest and in transit.
+
+```mermaid
+sequenceDiagram
+participant App as "Application"
+participant Manager as "ConfigurationManager"
+participant KMS as "InfisicalKmsClient"
+participant Storage as "S3/File Storage"
+App->>Manager : initialize()
+Manager->>Manager : Initialize KMS client
+Manager->>KMS : Initialize with config
+KMS->>KMS : Validate KMS credentials
+Manager->>Storage : Load encrypted config
+Storage-->>Manager : Return encrypted data
+Manager->>KMS : decrypt(ciphertext)
+KMS->>KMS : Call KMS API /decrypt
+KMS-->>Manager : Return plaintext
+Manager->>Manager : Parse configuration
+Manager->>Manager : Validate configuration
+Manager-->>App : Configuration ready
+App->>Manager : updateConfig(path, value)
+Manager->>Manager : Validate new config
+Manager->>Manager : Apply changes
+Manager->>Manager : Serialize config
+Manager->>KMS : encrypt(plaintext)
+KMS->>KMS : Call KMS API /encrypt
+KMS-->>Manager : Return ciphertext
+Manager->>Storage : Save encrypted config
+Storage-->>Manager : Confirmation
+Manager-->>App : Update complete
+```
+
+**Diagram sources**
+- [manager.ts](file://packages\audit\src\config\manager.ts#L250-L300)
+- [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts#L15-L145)
+- [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts#L1-L56)

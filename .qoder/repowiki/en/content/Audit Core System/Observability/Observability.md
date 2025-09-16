@@ -2,7 +2,10 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated in recent commit*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated in recent commit to enable OTLP exporter*
+- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated to support OTLP configuration*
+- [index.ts](file://apps/worker/src/index.ts) - *Updated to configure OTLP endpoint*
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Comprehensive OTLP configuration guide*
 - [dashboard.ts](file://packages/audit/src/observability/dashboard.ts) - *Updated in recent commit*
 - [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts) - *Updated in recent commit*
 - [health-check.ts](file://packages/audit/src/monitor/health-check.ts) - *Updated in recent commit*
@@ -10,7 +13,6 @@
 - [monitoring.test.ts](file://packages/audit/src/__tests__/monitoring.test.ts) - *Updated in recent commit*
 - [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts) - *Updated in recent commit*
 - [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts) - *Updated in recent commit*
-- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated in recent commit*
 - [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts) - *Updated in recent commit*
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Updated in recent commit*
 - [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts) - *Updated in recent commit*
@@ -20,9 +22,11 @@
 
 ## Update Summary
 **Changes Made**   
-- Updated documentation to reflect centralized documentation structure
-- Added references to new documentation site structure
+- Updated documentation to reflect OTLP exporter implementation
+- Added comprehensive OTLP configuration details and examples
+- Enhanced distributed tracing section with OTLP-specific information
 - Updated file references to reflect current implementation
+- Added platform-specific configuration examples
 - Enhanced source tracking with commit annotations
 - Maintained all technical content while updating references
 
@@ -228,7 +232,7 @@ These thresholds can be customized based on deployment requirements and performa
 The distributed tracing system provides end-to-end visibility into audit event processing across multiple services and components.
 
 ### Tracer Implementation
-The tracer implementation follows the OpenTracing specification and provides comprehensive span management:
+The tracer implementation now supports OTLP (OpenTelemetry Protocol) as the primary exporter for distributed traces, enabling integration with modern observability platforms. The system has been updated from console-based logging to a production-ready OTLP exporter with comprehensive error handling and reliability features.
 
 ```mermaid
 classDiagram
@@ -277,6 +281,99 @@ AuditSpan --> SpanStatus
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L50-L100)
 - [types.ts](file://packages/audit/src/observability/types.ts#L10-L50)
 
+### OTLP Exporter Configuration
+The system has been updated to use OTLP as the default tracing exporter, replacing the previous console exporter. This enables integration with industry-standard observability platforms like Jaeger, Grafana Tempo, DataDog, and others.
+
+```typescript
+// Updated configuration in worker/index.ts
+const observabilityConfig: ObservabilityConfig = {
+	tracing: {
+		enabled: true,
+		serviceName: 'audit-system',
+		sampleRate: 1.0,
+		exporterType: 'otlp' as const,
+		exporterEndpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+		headers: {
+			'stream-name': 'default',
+		},
+	},
+	// ... other configuration
+}
+```
+
+The OTLP exporter provides several key benefits:
+- **Standardized protocol**: Uses OpenTelemetry Protocol for compatibility with all major APM tools
+- **Efficient transmission**: Batched transmission of spans for network efficiency
+- **Reliable delivery**: Built-in retry logic with exponential backoff
+- **Authentication support**: Multiple authentication methods including Bearer tokens and custom headers
+
+**Section sources**
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L300-L450)
+- [index.ts](file://apps/worker/src/index.ts#L100-L150)
+- [types.ts](file://packages/audit/src/observability/types.ts#L250-L300)
+
+### Platform-Specific Integration
+The OTLP exporter supports integration with various observability platforms through specific configuration:
+
+#### Grafana Tempo
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://tempo-us-central1.grafana.net/tempo/v1/traces'
+}
+
+// Set environment variable:
+// OTLP_AUTH_HEADER="Authorization: Basic base64(username:password)"
+```
+
+#### DataDog
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://trace.agent.datadoghq.com/v1/traces'
+}
+
+// Set environment variable:
+// OTLP_API_KEY=your-datadog-api-key
+```
+
+#### OpenObserve
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://your-org.observe.com/api/default/traces'
+}
+
+// Set environment variable:
+// OTLP_AUTH_HEADER="Authorization: Basic base64(username:password)"
+```
+
+#### Honeycomb
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://api.honeycomb.io/v1/traces/your-dataset'
+}
+
+// Set environment variable:
+// OTLP_API_KEY=your-honeycomb-api-key
+```
+
+**Section sources**
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L50-L150)
+
 ### Trace Context Propagation
 The system supports trace context propagation through HTTP headers:
 
@@ -315,6 +412,40 @@ This enables end-to-end tracing of audit events across service boundaries.
 
 **Section sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L150-L200)
+
+### Batch Processing and Reliability
+The OTLP exporter implements robust batch processing and reliability features:
+
+```mermaid
+flowchart TD
+A[Span Created] --> B{Batch Full?}
+B --> |Yes| C[Flush Batch Immediately]
+B --> |No| D{Timeout Reached?}
+D --> |Yes| C
+D --> |No| E[Add to Batch]
+E --> F[Pending Batch]
+C --> G[Send to OTLP Endpoint]
+G --> H{Success?}
+H --> |Yes| I[Clear Batch]
+H --> |No| J{Retry Limit?}
+J --> |No| K[Exponential Backoff]
+K --> G
+J --> |Yes| L[Log Error]
+L --> M[Continue Processing]
+```
+
+**Diagram sources**
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L350-L450)
+
+Key reliability features include:
+- **Automatic batching**: Default batch size of 100 spans
+- **Timeout-based flushing**: Batches flushed every 5 seconds
+- **Exponential backoff**: Retry delays increase exponentially
+- **Rate limiting handling**: Respects Retry-After headers
+- **Circuit breaking**: Fails fast for client errors (4xx)
+
+**Section sources**
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L300-L450)
 
 ## Dashboard and Data Visualization
 The dashboard system aggregates observability data and provides visual representations of system health and performance.
