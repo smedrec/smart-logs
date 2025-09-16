@@ -2,11 +2,25 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [types.ts](file://packages/audit/src/observability/types.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Updated with enhanced logging integration*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Enhanced with KMS encryption and retry logic*
+- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated with new configuration types*
+- [config/types.ts](file://packages/audit/src/config/types.ts) - *Added logging configuration types*
+- [otpl.ts](file://packages/logs/src/otpl.ts) - *New structured logging implementation*
+- [logging.ts](file://packages/logs/src/logging.ts) - *Enhanced with OTLP exporter*
+- [init.ts](file://apps/server/src/lib/hono/init.ts) - *Integrated structured logging*
+- [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts) - *Enhanced error logging*
+- [index.ts](file://apps/worker/src/index.ts) - *Worker logging integration*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added comprehensive structured logging documentation with OTLP integration
+- Enhanced authentication section with KMS encryption support
+- Updated error handling with improved retry logic details
+- Added new integration patterns for server and worker services
+- Expanded practical examples with real-world usage scenarios
+- Updated troubleshooting guide with new error cases
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -19,9 +33,9 @@
 8. [Best Practices](#best-practices)
 
 ## Introduction
-The OTLP (OpenTelemetry Protocol) Observability Configuration provides a standardized approach for exporting distributed traces from the audit system to various observability platforms. This configuration enables comprehensive monitoring, performance analysis, and troubleshooting capabilities across the system's components.
+The OTLP (OpenTelemetry Protocol) Observability Configuration provides a standardized approach for exporting distributed traces and structured logs from the audit system to various observability platforms. This configuration enables comprehensive monitoring, performance analysis, and troubleshooting capabilities across the system's components.
 
-The implementation supports multiple OTLP-compatible backends including Jaeger, Grafana Tempo, DataDog, New Relic, AWS X-Ray, Honeycomb, Lightstep, and OpenObserve. The configuration is designed to be flexible, secure, and production-ready, with features such as batch processing, error handling, and authentication support.
+The implementation supports multiple OTLP-compatible backends including Jaeger, Grafana Tempo, DataDog, New Relic, AWS X-Ray, Honeycomb, Lightstep, and OpenObserve. The configuration is designed to be flexible, secure, and production-ready, with features such as batch processing, error handling, authentication support, and KMS encryption for sensitive data.
 
 **Section sources**
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L0-L282)
@@ -61,6 +75,7 @@ The system supports multiple authentication methods for secure communication wit
 
 - **Bearer Token Authentication**: Using the `OTLP_API_KEY` environment variable
 - **Custom Header Authentication**: Using the `OTLP_AUTH_HEADER` environment variable with key-value pairs
+- **KMS Encryption**: Sensitive configuration values encrypted using AWS KMS
 
 The authentication headers are automatically included in export requests based on the configured method.
 
@@ -78,7 +93,7 @@ The configuration supports various observability platforms with specific endpoin
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L59-L114)
 
 ## Implementation Details
-The OTLP exporter implementation provides robust features for reliable trace export, including batch processing, error handling, and payload formatting.
+The OTLP exporter implementation provides robust features for reliable trace export, including batch processing, error handling, payload formatting, and enhanced structured logging.
 
 ### Batch Processing
 The implementation uses a batch processing mechanism to optimize network utilization and reduce the number of HTTP requests:
@@ -119,6 +134,7 @@ The implementation includes comprehensive error handling to ensure reliable trac
 - **Rate Limiting Support**: Respects `Retry-After` headers from servers
 - **Circuit Breaking**: Client errors (4xx) are not retried
 - **Network Resilience**: Network failures are retried up to 3 times
+- **KMS Integration**: Failed decryption attempts trigger security alerts
 
 The error handling system automatically manages transient failures and ensures trace data is not lost during temporary outages.
 
@@ -155,6 +171,19 @@ L --> M
 **Diagram sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L404-L452)
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L534-L597)
+
+### Structured Logging Integration
+The enhanced logging system integrates structured logging with OTLP export capabilities:
+
+- **Log Levels**: debug, info, warn, error, fatal
+- **Context Preservation**: Request IDs and correlation IDs
+- **Field Structuring**: Typed fields with proper serialization
+- **Batch Processing**: Same batching mechanism as traces
+- **Compression**: Payload compression for large log entries
+
+**Section sources**
+- [otpl.ts](file://packages/logs/src/otpl.ts#L0-L165)
+- [logging.ts](file://packages/logs/src/logging.ts#L448-L495)
 
 ## API Interfaces
 The OTLP Observability Configuration exposes a well-defined API interface for integration with the audit system.
@@ -277,6 +306,29 @@ style F fill:#4CAF50,stroke:#388E3C
 **Diagram sources**
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L265-L282)
 
+### Server and Worker Integration
+The enhanced structured logging is integrated across server and worker services:
+
+```typescript
+// Server integration
+import { initLogging } from '@repo/server/lib/hono/init'
+initLogging({
+  exporterType: 'otlp',
+  exporterEndpoint: process.env.OTLP_ENDPOINT
+})
+
+// Worker integration
+import { OTPLLogger } from '@repo/logs'
+const logger = new OTPLLogger(
+  { application: 'worker-service', module: 'processing' },
+  { exporterType: 'otlp', exporterEndpoint: process.env.OTLP_ENDPOINT }
+)
+```
+
+**Section sources**
+- [init.ts](file://apps/server/src/lib/hono/init.ts)
+- [index.ts](file://apps/worker/src/index.ts)
+
 ## Practical Examples
 The following examples demonstrate practical usage of the OTLP Observability Configuration.
 
@@ -345,8 +397,39 @@ async function processAuditEvent(eventData: any) {
 
 The decorator pattern automatically creates spans for method execution, reducing boilerplate code.
 
+### Structured Logging
+```typescript
+import { OTPLLogger } from '@repo/logs'
+
+const logger = new OTPLLogger(
+  { 
+    environment: 'production',
+    application: 'audit-system',
+    module: 'event-processing'
+  },
+  {
+    exporterType: 'otlp',
+    exporterEndpoint: process.env.OTLP_ENDPOINT
+  }
+)
+
+// Log with structured fields
+logger.info('Event processing started', {
+  eventId: '12345',
+  eventType: 'user-login',
+  userId: 'user-67890'
+})
+
+logger.error('Processing failed', {
+  eventId: '12345',
+  errorType: 'DatabaseTimeout',
+  durationMs: 5000
+})
+```
+
 **Section sources**
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L115-L171)
+- [otpl.ts](file://packages/logs/src/otpl.ts#L38-L87)
 
 ## Troubleshooting Guide
 This section provides guidance for diagnosing and resolving common issues with OTLP configuration.
@@ -376,6 +459,12 @@ Error: Client error: 413 Payload Too Large
 ```
 **Solution**: Reduce the batch size or implement payload compression.
 
+#### KMS Decryption Failures
+```
+Error: KMS decryption failed: AccessDeniedException
+```
+**Solution**: Verify IAM permissions for KMS key access and key policy configuration.
+
 ### Debugging Steps
 1. Enable debug logging to monitor export success and failures
 2. Verify environment variables are properly set
@@ -393,18 +482,22 @@ E --> F{"Error Type"}
 F --> G["Network Error"]
 F --> H["Client Error"]
 F --> I["Server Error"]
-G --> J["Check Connectivity"]
-H --> K["Verify Authentication"]
-I --> L["Check Rate Limits"]
-D --> M["Monitor Performance"]
-J --> N["Resolve Issue"]
-K --> N
-L --> N
-M --> N
+F --> J["KMS Error"]
+G --> K["Check Connectivity"]
+H --> L["Verify Authentication"]
+I --> M["Check Rate Limits"]
+J --> N["Verify KMS Permissions"]
+K --> O["Resolve Issue"]
+L --> O
+M --> O
+N --> O
+D --> P["Monitor Performance"]
+P --> O
 ```
 
 **Diagram sources**
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L223-L264)
+- [otpl.ts](file://packages/logs/src/otpl.ts#L84-L129)
 
 ## Best Practices
 Adhering to these best practices ensures optimal performance and reliability of the OTLP Observability Configuration.
@@ -427,6 +520,8 @@ Adhering to these best practices ensures optimal performance and reliability of 
 2. **Rotate API keys** regularly to minimize the impact of potential leaks
 3. **Use HTTPS** for all endpoints to encrypt trace data in transit
 4. **Limit trace data sensitivity** by avoiding logging sensitive information in span tags or logs
+5. **Implement KMS encryption** for sensitive configuration values
 
 **Section sources**
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L172-L222)
+- [config/types.ts](file://packages/audit/src/config/types.ts#L488-L555)

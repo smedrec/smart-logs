@@ -13,16 +13,20 @@
 - [infisical-kms/README.md](file://packages\infisical-kms\README.md) - *KMS integration documentation*
 - [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts) - *KMS client implementation*
 - [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts) - *KMS type definitions*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *OTLP exporter implementation*
+- [types.ts](file://packages\audit\src\observability\types.ts) - *Observability type definitions*
+- [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added comprehensive documentation for KMS encryption support in security configuration
+- Added comprehensive documentation for OTLP exporter configuration and implementation
 - Updated Security Configuration section with detailed KMS properties and integration
 - Enhanced Configuration Management section with KMS client initialization details
-- Added new section for KMS Integration and secure storage configuration
+- Added new section for OTLP Exporter and observability integration
 - Updated source tracking annotations to reflect recent changes and new dependencies
 - Added documentation for secure configuration storage with KMS encryption
+- Integrated observability configuration types into the core documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -37,6 +41,7 @@
 10. [Plugin Architecture](#plugin-architecture)
 11. [Configuration Change Tracking](#configuration-change-tracking)
 12. [KMS Integration](#kms-integration)
+13. [OTLP Exporter](#otlp-exporter)
 
 ## Introduction
 The Configuration Schema and Types system provides a comprehensive, type-safe framework for managing audit system configuration across environments. Built with TypeScript, the system enforces compile-time validation, supports IDE autocompletion, and enables runtime safety through comprehensive validation. The configuration schema is structured hierarchically, covering database connections, retention policies, compliance requirements (GDPR/HIPAA), integration endpoints, monitoring thresholds, and plugin extensions. This documentation details every configuration option, type hierarchy, and integration point, providing guidance for both standard and custom deployments.
@@ -275,7 +280,7 @@ class ArchiveRetrievalRequest {
 +archiveId? : string
 +principalId? : string
 +organizationId? : string
-+dateRange? : DateRange
++dateRange? : string
 +actions? : string[]
 +dataClassifications? : string[]
 +retentionPolicies? : string[]
@@ -438,7 +443,7 @@ The configuration integration module provides functions for initializing audit c
 classDiagram
 class ConfigIntegrationOptions {
 +configPath? : string
-+storageType? : StorageType
++storageType? : string
 +environment? : string
 +enableHotReload? : boolean
 +hotReloadConfig? : Partial<HotReloadConfig>
@@ -630,3 +635,123 @@ Manager-->>App : Update complete
 - [manager.ts](file://packages\audit\src\config\manager.ts#L250-L300)
 - [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts#L15-L145)
 - [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts#L1-L56)
+
+## OTLP Exporter
+
+The OpenTelemetry Protocol (OTLP) exporter provides standardized observability data export for distributed tracing and metrics collection. This integration enables seamless connection with various observability platforms while maintaining data consistency and reliability.
+
+### OTLP Configuration
+The OTLP exporter is configured through the logging configuration interface, allowing flexible setup for different observability backends. The configuration supports multiple authentication methods and export formats.
+
+```mermaid
+classDiagram
+class LoggingConfig {
++level : 'debug' | 'info' | 'warn' | 'error'
++structured : boolean
++format : 'json' | 'text'
++enableCorrelationIds : boolean
++retentionDays : number
++exporterType : 'console' | 'jaeger' | 'zipkin' | 'otlp'
++exporterEndpoint? : string
++exporterHeaders? : Record<string, string>
+}
+class ObservabilityConfig {
++tracing : TracingConfig
++metrics : MetricsConfig
++profiling : ProfilingConfig
++dashboard : DashboardConfig
+}
+class TracingConfig {
++enabled : boolean
++serviceName : string
++sampleRate : number
++exporterType : 'console' | 'jaeger' | 'zipkin' | 'otlp'
++exporterEndpoint? : string
++headers? : Record<string, string>
+}
+class OTPLLogger {
++config : LoggingConfig
++logBatch : Log[]
++batchTimeout : Timeout
++BATCH_SIZE : 100
++BATCH_TIMEOUT_MS : 5000
++sendLogToOTLP(log : Log) : Promise<void>
++compressPayload(data : string) : Promise<CompressionResult>
+}
+class AuditTracer {
++config : TracingConfig
++spanBatch : Span[]
++batchTimeout : Timeout
++BATCH_SIZE : 100
++BATCH_TIMEOUT_MS : 5000
++exportToOTLP(span : Span) : void
++sendSpansToOTLP(spans : Span[]) : Promise<void>
++createOTLPPayload(spans : Span[]) : OTLPPayload
++getAuthHeaders() : Record<string, string>
+}
+LoggingConfig --> OTPLLogger : "configures"
+ObservabilityConfig --> AuditTracer : "configures"
+TracingConfig --> AuditTracer : "contains"
+```
+
+**Section sources**
+- [types.ts](file://packages\audit\src\config\types.ts#L488-L555)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L207-L676)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L0-L165)
+- [types.ts](file://packages\audit\src\observability\types.ts#L254-L302)
+
+### OTLP Export Workflow
+The OTLP export workflow implements batch processing, error handling, and authentication to ensure reliable data transmission to observability platforms. The system automatically handles network issues and rate limiting.
+
+```mermaid
+sequenceDiagram
+participant App as "Application"
+participant Logger as "OTPLLogger"
+participant Tracer as "AuditTracer"
+participant OTLP as "OTLP Endpoint"
+App->>Logger : debug/info/warn/error(message)
+Logger->>Logger : marshal log entry
+Logger->>Logger : addToBatch(log)
+Logger->>Logger : flushBatch() if batch full or timeout
+Logger->>Logger : sendLogToOTLP(batch)
+Logger->>OTLP : POST /v1/logs with authentication
+alt Success
+OTLP-->>Logger : 200 OK
+Logger-->>App : Export successful
+else Rate Limited
+OTLP-->>Logger : 429 Too Many Requests
+Logger->>Logger : exponential backoff
+Logger->>Logger : retry with delay
+else Client Error
+OTLP-->>Logger : 4xx Error
+Logger-->>App : Log client error, no retry
+else Network Error
+Logger->>Logger : exponential backoff
+Logger->>Logger : retry with delay
+end
+App->>Tracer : startSpan(operation)
+Tracer->>Tracer : create span
+Tracer->>Tracer : addToBatch(span)
+Tracer->>Tracer : flushBatch() if batch full or timeout
+Tracer->>Tracer : sendSpansToOTLP(batch)
+Tracer->>OTLP : POST /v1/traces with authentication
+alt Success
+OTLP-->>Tracer : 200 OK
+Tracer-->>App : Export successful
+else Rate Limited
+OTLP-->>Tracer : 429 Too Many Requests
+Tracer->>Tracer : exponential backoff
+Tracer->>Tracer : retry with delay
+else Client Error
+OTLP-->>Tracer : 4xx Error
+Tracer-->Tracer : Log client error, no retry
+else Network Error
+Tracer->>Tracer : exponential backoff
+Tracer->>Tracer : retry with delay
+end
+```
+
+**Diagram sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L304-L452)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L129-L165)
+- [types.ts](file://packages\audit\src\config\types.ts#L488-L555)

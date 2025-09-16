@@ -2,26 +2,26 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [index.ts](file://apps/worker/src/index.ts) - *Updated in recent commit to enable OTLP exporter*
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated to use OTLP exporter and fix auth header usage*
-- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Documentation for OTLP configuration*
-- [Dockerfile](file://apps/worker/Dockerfile) - *Updated for observability changes*
-- [package.json](file://apps/worker/package.json) - *Updated with new observability dependencies*
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [console.ts](file://packages/logs/src/console.ts)
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit to integrate LoggerFactory from @repo/logs*
+- [logging.ts](file://packages\logs\src\logging.ts) - *Contains LoggerFactory implementation for enhanced structured logging*
+- [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation with batch processing*
+- [interface.ts](file://packages\logs\src\interface.ts) - *Logger interface and LoggingConfig definition*
+- [log.ts](file://packages\logs\src\log.ts) - *Log class and schema definitions*
+- [Dockerfile](file://apps\worker\Dockerfile) - *Updated for observability changes*
+- [package.json](file://apps\worker\package.json) - *Updated with new observability dependencies*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated to use OTLP exporter and fix auth header usage*
+- [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *Documentation for OTLP configuration*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated observability implementation to use OTLP exporter instead of console exporter
-- Modified tracer configuration in index.ts to enable OTLP export and fix authentication header usage
-- Updated documentation to reflect OTLP-based observability architecture
-- Added new section on OTLP configuration and authentication methods
-- Updated architecture overview and component analysis to reflect OTLP changes
-- Enhanced troubleshooting guide with OTLP-specific issues
-- Removed outdated references to console-based tracing in documentation
+- Updated worker initialization to use LoggerFactory from @repo/logs package for enhanced structured logging
+- Integrated new logging system with OTLP export capabilities and batch processing
+- Updated documentation to reflect the new LoggerFactory-based logging architecture
+- Added new section on enhanced structured logging implementation
+- Updated architecture overview and component analysis to reflect logging changes
+- Enhanced troubleshooting guide with logging-specific issues
+- Removed outdated references to ConsoleLogger in documentation
 - Updated diagram sources to reflect actual code changes
 
 ## Table of Contents
@@ -73,14 +73,14 @@ G --> N[PostgreSQL]
 ```
 
 **Diagram sources**
-- [index.ts](file://apps/worker/src/index.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
+- [index.ts](file://apps\worker\src\index.ts)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
 
 **Section sources**
-- [index.ts](file://apps/worker/src/index.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
+- [index.ts](file://apps\worker\src\index.ts)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
 
 ## Core Components
 The Worker Service's functionality is driven by several core components:
@@ -90,16 +90,16 @@ The Worker Service's functionality is driven by several core components:
 - **AuditTracer**: Provides distributed tracing for observability with OTLP export.
 - **DatabaseAlertHandler**: Persists alerts to PostgreSQL and manages alert lifecycle.
 - **CryptoService**: Verifies the integrity of audit events through hash verification.
-- **ConsoleLogger**: Unified logging implementation across the worker service.
+- **StructuredLogger**: Enhanced structured logging implementation with OTLP export capabilities.
 
 These components are orchestrated through dependency injection and support pluggable handlers for extensibility.
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [console.ts](file://packages/logs/src/console.ts)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [logging.ts](file://packages\logs\src\logging.ts)
 
 ## Architecture Overview
 The Worker Service follows an event-driven, microservices-inspired architecture. It consumes audit log events from a message queue (via Inngest), processes them for compliance and security monitoring, and emits alerts and metrics.
@@ -124,7 +124,7 @@ Metrics[RedisMetricsCollector]
 Tracer[AuditTracer]
 Alerts[DatabaseAlertHandler]
 Crypto[CryptoService]
-Logger[ConsoleLogger]
+Logger[StructuredLogger]
 end
 MQ --> Inngest
 Inngest --> Monitor
@@ -138,15 +138,16 @@ Alerts --> DB
 Metrics --> Cache
 Monitor --> SMTP
 Tracer --> OTLP
+Logger --> OTLP
 ```
 
 **Diagram sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [console.ts](file://packages/logs/src/console.ts)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [logging.ts](file://packages\logs\src\logging.ts)
 
 ## Detailed Component Analysis
 
@@ -193,12 +194,12 @@ MonitoringService --> "Pattern Detection" : "composes"
 ```
 
 **Diagram sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+- [monitoring-types.ts](file://packages\audit\src\monitor\monitoring-types.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L799)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L799)
 
 ### CryptoService Implementation
 The `CryptoService` provides cryptographic integrity verification for audit events, ensuring that events have not been tampered with during transmission or storage. It implements SHA-256 hashing of critical event fields and supports both local HMAC-SHA256 signatures and integration with external Key Management Services (KMS).
@@ -227,11 +228,11 @@ Monitor->>Monitor : detectPatterns()
 ```
 
 **Diagram sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L72-L315)
-- [index.ts](file://apps/worker/src/index.ts#L300-L350)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L72-L315)
+- [index.ts](file://apps\worker\src\index.ts#L300-L350)
 
 **Section sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts#L72-L315)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L72-L315)
 
 ### Metrics Collection Flow
 The metrics collection system uses Redis as a high-performance backend to track key performance indicators such as events processed, error rates, processing latency, and alert counts.
@@ -256,8 +257,8 @@ Monitor->>Monitor : detectPatterns()
 ```
 
 **Diagram sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L200-L300)
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L100-L200)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L200-L300)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L100-L200)
 
 ### Distributed Tracing Implementation with OTLP
 The `AuditTracer` provides distributed tracing capabilities with OTLP export, enabling end-to-end visibility into audit event processing. It supports trace context propagation via HTTP headers and exports spans to OTLP endpoints with configurable authentication.
@@ -282,12 +283,12 @@ Backoff --> Success
 ```
 
 **Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677)
-- [index.ts](file://apps/worker/src/index.ts#L1-L747)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L677)
+- [index.ts](file://apps\worker\src\index.ts#L1-L747)
 
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677)
-- [index.ts](file://apps/worker/src/index.ts#L1-L747)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L677)
+- [index.ts](file://apps\worker\src\index.ts#L1-L747)
 
 ### OTLP Configuration and Authentication
 The OTLP exporter is configured with multiple authentication methods and endpoint options for different observability platforms.
@@ -315,38 +316,44 @@ const observabilityConfig: ObservabilityConfig = {
 - **Environment-based**: Configuration via environment variables for secure credential management
 
 **Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L487-L537)
-- [index.ts](file://apps/worker/src/index.ts#L1-L747)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L487-L537)
+- [index.ts](file://apps\worker\src\index.ts#L1-L747)
 
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L487-L537)
-- [index.ts](file://apps/worker/src/index.ts#L1-L747)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L487-L537)
+- [index.ts](file://apps\worker\src\index.ts#L1-L747)
 
-### Logging Implementation
-The `ConsoleLogger` provides unified logging across the Worker Service, replacing the previous pino-based implementation. It formats log entries with structured metadata including environment, application, module, version, and request context.
+### Enhanced Structured Logging Implementation
+The `LoggerFactory` from `@repo/logs` provides enhanced structured logging with multiple output options including console, file, Redis, and OTLP. The logging system supports correlation IDs, contextual information, performance metrics, and error tracking.
 
 ```mermaid
 sequenceDiagram
 participant Service as MonitoringService
-participant Logger as ConsoleLogger
-participant Output as Console Output
+participant LoggerFactory as LoggerFactory
+participant Logger as StructuredLogger
+participant Output as OTLP Endpoint
+Service->>LoggerFactory : createLogger({service : 'worker'})
+LoggerFactory->>Logger : new StructuredLogger(config, context)
 Service->>Logger : info("Processing event")
 Logger->>Logger : marshal(level, message, fields)
 Logger->>Logger : create Log object
-Logger->>Output : console.info(formatted message)
+Logger->>Output : sendLogToOTLP(formatted message)
 Service->>Logger : error("Processing failed", {error : details})
 Logger->>Logger : marshal("error", message, fields)
-Logger->>Output : console.error(formatted message)
+Logger->>Output : sendLogToOTLP(formatted message)
 ```
 
 **Diagram sources**
-- [console.ts](file://packages/logs/src/console.ts#L1-L90)
-- [index.ts](file://apps/worker/src/index.ts#L1-L747)
+- [index.ts](file://apps\worker\src\index.ts#L1-L784)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L166)
 
 **Section sources**
-- [console.ts](file://packages/logs/src/console.ts#L1-L90)
-- [package.json](file://apps/worker/package.json)
-- [Dockerfile](file://apps/worker/Dockerfile)
+- [index.ts](file://apps\worker\src\index.ts#L1-L784)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L166)
+- [package.json](file://apps\worker\package.json)
+- [Dockerfile](file://apps\worker\Dockerfile)
 
 ## Dependency Analysis
 The Worker Service has a layered dependency structure:
@@ -370,14 +377,14 @@ Logs --> PinoElastic[pino-elasticsearch]
 All shared packages are managed via the monorepo's `pnpm-workspace.yaml`, ensuring version consistency and efficient development.
 
 **Diagram sources**
-- [package.json](file://apps/worker/package.json)
-- [package.json](file://packages/audit/package.json)
-- [package.json](file://packages/logs/package.json)
+- [package.json](file://apps\worker\package.json)
+- [package.json](file://packages\audit\package.json)
+- [package.json](file://packages\logs\package.json)
 
 **Section sources**
-- [package.json](file://apps/worker/package.json)
-- [package.json](file://packages/audit/package.json)
-- [package.json](file://packages/logs/package.json)
+- [package.json](file://apps\worker\package.json)
+- [package.json](file://packages\audit\package.json)
+- [package.json](file://packages\logs\package.json)
 
 ## Performance Considerations
 The worker is optimized for high-throughput, low-latency processing:
@@ -388,7 +395,7 @@ The worker is optimized for high-throughput, low-latency processing:
 - **Tracing**: Samples spans based on configurable rate to balance insight and overhead.
 - **Health Checks**: Aggregates metrics asynchronously to avoid blocking event processing.
 - **Cryptographic Verification**: Implements efficient hashing of critical fields only, with configurable KMS integration for enhanced security.
-- **Logging**: Uses ConsoleLogger for unified logging with structured output, replacing the previous pino implementation.
+- **Logging**: Uses LoggerFactory and StructuredLogger for enhanced structured logging with OTLP export, replacing the previous ConsoleLogger implementation.
 - **OTLP Export**: Implements batch processing with configurable batch size (default 100 spans) and timeout (5 seconds) to optimize network efficiency.
 
 The system is horizontally scalable via Kubernetes, with each worker instance maintaining independent state while sharing Redis and PostgreSQL backends.
@@ -402,16 +409,18 @@ Common issues and their resolutions:
 - **Missing Metrics**: Ensure `RedisMetricsCollector` is properly initialized with a valid Redis connection.
 - **Tracing Not Exporting**: Confirm `ObservabilityConfig.tracing.enabled` is true and exporter type is set to 'otlp'. Verify that `OTLP_ENDPOINT` environment variable is correctly configured.
 - **Hash Verification Failures**: Verify that the `AUDIT_CRYPTO_SECRET` is properly configured and consistent across services. Check that critical event fields match between sender and receiver.
-- **Logging Issues**: Ensure ConsoleLogger is properly initialized with correct environment, application, and module parameters. Verify that LOG_LEVEL environment variable is set appropriately.
+- **Logging Issues**: Ensure LoggerFactory is properly initialized with correct configuration. Verify that LOG_LEVEL environment variable is set appropriately. Check that OTLP endpoint is reachable and properly configured.
 - **OTLP Authentication Failures**: Check that either `OTLP_API_KEY` or `OTLP_AUTH_HEADER` environment variables are properly configured. Verify that the authentication method matches the target OTLP endpoint requirements.
 - **OTLP Export Failures**: Monitor for 429 (rate limited) responses and implement appropriate retry logic. Check network connectivity to the OTLP endpoint and verify that the endpoint URL is correct.
+- **LoggerFactory Configuration Issues**: Ensure default configuration is set before creating loggers. Verify that output types (console, otpl) are correctly specified in the configuration.
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L500-L600)
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L300-L350)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L400-L426)
-- [crypto.ts](file://packages/audit/src/crypto.ts#L150-L200)
-- [console.ts](file://packages/logs/src/console.ts#L1-L90)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L500-L600)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L300-L350)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L400-L426)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L150-L200)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L166)
 
 ## Conclusion
 The Worker Service is a robust, scalable background processor designed for real-time compliance and security monitoring. Its modular architecture, deep observability, and resilience patterns make it well-suited for mission-critical audit processing.
@@ -420,6 +429,6 @@ By leveraging Redis for metrics, PostgreSQL for persistent alert storage, and In
 
 The observability system has been upgraded to use OTLP export instead of console export, providing better integration with modern observability platforms like Grafana Tempo, DataDog, and Honeycomb. This change enables more sophisticated monitoring, analysis, and alerting capabilities while maintaining compatibility with the existing tracing API.
 
-The logging system has been unified with ConsoleLogger, providing consistent structured logging across the service while maintaining compatibility with the observability stack. This change simplifies log management and ensures consistent log formatting across all components.
+The logging system has been enhanced with the LoggerFactory from `@repo/logs`, providing consistent structured logging across the service while maintaining compatibility with the observability stack. This change simplifies log management, enables OTLP export with batch processing and retry logic, and ensures consistent log formatting across all components.
 
 Future enhancements could include ML-based anomaly detection, integration with SIEM systems, and enhanced cryptographic features such as digital signatures and certificate-based authentication. The codebase demonstrates strong separation of concerns, extensive testing, and clear extensibility points through pluggable alert handlers and metrics collectors.

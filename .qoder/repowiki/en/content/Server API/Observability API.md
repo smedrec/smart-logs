@@ -5,7 +5,19 @@
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L1-L612)
 - [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L1-L400)
 - [types.ts](file://packages/audit/src/observability/types.ts#L254-L301)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400) - *Updated in recent commit*
+- [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts#L1-L343) - *Updated in recent commit*
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L620) - *Updated in recent commit*
+- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L166) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated Data Collection Mechanism section to reflect enhanced structured logging implementation
+- Added details about LoggerFactory and StructuredLogger in data collection process
+- Enhanced error handling and logging details in middleware instrumentation
+- Updated section sources to include newly modified files
+- Added references to OTLP export configuration in logging system
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -499,20 +511,22 @@ Key components are instrumented with monitoring middleware that automatically ca
 
 The middleware uses the OpenTelemetry standard for tracing, creating spans that represent discrete units of work. Each span includes metadata about the operation, start time, duration, and relationships to other spans.
 
-### Structured Logging
-All system components use structured logging with a consistent format that includes:
-- Timestamp
-- Component identifier
-- Operation name
-- Duration metrics
-- Status (success/failure)
-- Error details (when applicable)
-- Correlation IDs for tracing
+### Enhanced Structured Logging
+The system has been updated to use an enhanced structured logging system based on the `StructuredLogger` and `LoggerFactory` classes. All system components now use this consistent logging framework which includes:
 
-These logs are processed and aggregated to generate the performance metrics and analytics available through the API.
+- **Correlation ID tracking**: Each request is assigned a unique correlation ID that is included in all related log entries
+- **Contextual information**: Logs include request context such as user ID, organization ID, endpoint, and method
+- **Performance metrics**: Automatic collection of memory usage, CPU usage, and response times
+- **Error tracking**: Comprehensive error information including stack traces (when enabled)
+- **Multiple output formats**: Support for console, JSON, OTLP, and file outputs
+
+The logging system is initialized in the server startup process where `LoggerFactory.setDefaultConfig()` is called with configuration from the server config, setting the log level, format (pretty for development, JSON for production), and outputs (console and OTLP). The `StructuredLogger` instances are created with request-specific context and automatically include performance metrics when enabled.
 
 **Section sources**
-- [middleware.ts](file://packages/audit/src/observability/middleware.ts)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
+- [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts#L1-L343)
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
+- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L166)
 
 ## Error Handling
 The Observability API implements comprehensive error handling to provide meaningful feedback while maintaining system security.

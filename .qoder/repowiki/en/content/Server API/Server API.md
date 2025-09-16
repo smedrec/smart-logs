@@ -16,16 +16,17 @@
 - [alerts.ts](file://apps/server/src/routers/alerts.ts) - *Updated in recent commit*
 - [organization-api.ts](file://apps/server/src/routes/organization-api.ts) - *Added organization role management*
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added organization_role table*
+- [init.ts](file://apps/server/src/lib/hono/init.ts) - *Updated in recent commit*
+- [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on Organization Role Management API
-- Updated Authentication and Access Control section with new role management capabilities
-- Added new database schema details for organization_role table
-- Enhanced Access Control Rules diagram to include role creation
+- Added new section on Enhanced Structured Logging System
+- Updated Error Handling section with enhanced error context and unified error handling
+- Added details about LoggerFactory and StructuredLogger implementation
 - Updated Section sources and Referenced Files to include new files
-- Added details about organization role creation endpoint and database integration
+- Enhanced error handling documentation with new context enrichment and recovery strategies
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -40,7 +41,8 @@
 10. [Metrics API](#metrics-api)
 11. [Observability API](#observability-api)
 12. [Organization Role Management API](#organization-role-management-api)
-13. [Request and Response Examples](#request-and-response-examples)
+13. [Enhanced Structured Logging System](#enhanced-structured-logging-system)
+14. [Request and Response Examples](#request-and-response-examples)
 
 ## Introduction
 The SMEDREC Audit System REST API provides comprehensive access to healthcare audit functionality through a well-structured RESTful interface. The API supports audit event management, compliance reporting, system monitoring, and observability features. Built on Hono with OpenAPI documentation, the API follows modern REST principles with robust security, rate limiting, and error handling.
@@ -239,11 +241,12 @@ A9[503] --> B9[SERVICE_UNAVAILABLE]
 - [http.ts](file://apps/server/src/lib/errors/http.ts#L1-L314)
 - [openapi_responses.ts](file://apps/server/src/lib/errors/openapi_responses.ts#L1-L91)
 
-The error handling middleware automatically converts exceptions to the appropriate error response format and logs errors for monitoring and debugging.
+The error handling middleware automatically converts exceptions to the appropriate error response format and logs errors for monitoring and debugging. The system now uses a unified error handling approach with enhanced context enrichment, capturing detailed information about each request including user ID, session ID, organization ID, endpoint, method, user agent, IP address, and metadata.
 
 **Section sources**
 - [http.ts](file://apps/server/src/lib/errors/http.ts#L1-L314)
 - [openapi_responses.ts](file://apps/server/src/lib/errors/openapi_responses.ts#L1-L91)
+- [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts#L1-L372)
 
 ## Pagination
 List endpoints support pagination to handle large datasets efficiently.
@@ -632,6 +635,104 @@ The table includes a composite primary key of organization_id and name, with a f
 **Section sources**
 - [organization-api.ts](file://apps/server/src/routes/organization-api.ts#L1-L222)
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+
+## Enhanced Structured Logging System
+The server implements an enhanced structured logging system for comprehensive monitoring, debugging, and auditing.
+
+### LoggerFactory and StructuredLogger
+The system uses a factory pattern with `LoggerFactory` to create consistent `StructuredLogger` instances across services. The logger captures detailed contextual information and supports multiple output formats.
+
+**Key Features:**
+- Correlation ID tracking for request tracing
+- Contextual information (user ID, session ID, organization ID)
+- Performance metrics (memory usage, CPU usage)
+- Error tracking with stack traces
+- Log aggregation support
+
+### Logger Configuration
+The default logger configuration is set during server initialization:
+
+```typescript
+LoggerFactory.setDefaultConfig({
+	level: config.server.monitoring.logLevel,
+	enablePerformanceLogging: true,
+	enableErrorTracking: true,
+	enableMetrics: config.server.monitoring.enableMetrics,
+	format: config.server.environment === 'development' ? 'pretty' : 'json',
+	outputs: ['console', 'otpl'],
+	otplConfig: {
+		endpoint: config.logging.exporterEndpoint || '',
+		headers: config.logging.exporterHeaders || {},
+	},
+})
+```
+
+### Log Entry Structure
+All log entries follow a standardized structure:
+
+```json
+{
+	"timestamp": "2024-01-01T00:00:00.000Z",
+	"level": "info",
+	"message": "Request completed",
+	"context": {
+		"requestId": "req_123",
+		"userId": "usr_456",
+		"sessionId": "sess_789",
+		"organizationId": "org_012",
+		"endpoint": "/api/v1/audit/events",
+		"method": "POST"
+	},
+	"metadata": {
+		"request": {
+			"method": "POST",
+			"path": "/api/v1/audit/events",
+			"statusCode": 201,
+			"duration": 45
+		}
+	},
+	"performance": {
+		"memoryUsage": {
+			"rss": 30000000,
+			"heapTotal": 20000000,
+			"heapUsed": 15000000,
+			"external": 1000000
+		},
+		"cpuUsage": {
+			"user": 1000000,
+			"system": 500000
+		}
+	}
+}
+```
+
+### Output Targets
+The logging system supports multiple output targets:
+- **Console**: For development and debugging
+- **OTLP**: For observability platforms (OpenTelemetry)
+- **File**: For persistent storage
+- **Redis**: For log aggregation
+
+### Request Context Enrichment
+The error handling middleware includes request context enrichment, capturing detailed information about each request:
+
+```mermaid
+sequenceDiagram
+participant Client
+participant Server
+participant Logger
+Client->>Server : API Request
+Server->>Logger : Create request context
+Logger->>Logger : Add requestId, userId, sessionId
+Logger->>Logger : Add endpoint, method, userAgent
+Logger->>Logger : Add IP address, metadata
+Server->>Client : Process request
+```
+
+**Section sources**
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
+- [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts#L1-L372)
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
 
 ## Request and Response Examples
 This section provides practical examples of API usage.

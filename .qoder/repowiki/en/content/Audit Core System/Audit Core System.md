@@ -22,6 +22,8 @@
 - [api-reference/event-types.md](file://packages/audit/docs/api-reference/event-types.md) - *Updated with comprehensive event types*
 - [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated with OTLP exporter implementation*
 - [config/types.ts](file://packages/audit/src/config/types.ts) - *Updated with KMS encryption options*
+- [config/manager.ts](file://packages/audit/src/config/manager.ts) - *Updated with KMS integration*
+- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts) - *KMS client implementation*
 </cite>
 
 ## Update Summary
@@ -38,6 +40,7 @@
 - Added detailed information about monitoring and observability features
 - Added OTLP exporter configuration and usage details
 - Updated configuration management section with KMS encryption support
+- Added comprehensive details about KMS integration and error handling
 
 **List of new sections added**
 - Observability and OTLP Exporter Configuration
@@ -53,6 +56,7 @@
 - Added new sources for API reference documentation
 - Added sources for OTLP exporter implementation
 - Added sources for KMS encryption configuration
+- Added source for Infisical KMS client implementation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -878,7 +882,7 @@ class Span {
 +status : SpanStatus
 +component : string
 +setTag(key : string, value : any) : void
-+setTags(tags : Record~string, any) : void
++setTags(tags : Record~string, any~) : void
 +log(level : 'debug' | 'info' | 'warn' | 'error', message : string, fields? : Record~string, any~) : void
 +setStatus(code : 'OK' | 'ERROR' | 'TIMEOUT' | 'CANCELLED', message? : string) : void
 +finish() : void
@@ -1000,6 +1004,8 @@ const secureStorageConfig = {
 ```
 
 The system automatically detects whether to use local encryption or KMS based on the configuration. When KMS is enabled, all configuration operations (load, save) are transparently encrypted and decrypted using the KMS service.
+
+The `InfisicalKmsClient` class provides a robust interface for interacting with the Infisical KMS API. It supports encryption, decryption, signing, and verification operations with comprehensive error handling. The client implements retry logic with exponential backoff and handles different authentication methods. It also provides type-safe interfaces for all operations, ensuring type safety throughout the encryption workflow.
 
 **Section sources**
 - [config/manager.ts](file://packages/audit/src/config/manager.ts)
