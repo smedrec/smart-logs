@@ -2,15 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [apps/server/docker-compose.yml](file://apps/server/docker-compose.yml)
-- [apps/server/docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
-- [apps/server/docker/redis.conf](file://apps/server/docker/redis.conf)
-- [apps/server/docker/redis.prod.conf](file://apps/server/docker/redis.prod.conf)
-- [packages/audit/src/config/types.ts](file://packages/audit/src/config/types.ts)
-- [packages/audit-db/src/db/connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
-- [packages/audit-db/src/db/enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
-- [apps/server/init-scripts/01-init-audit-db.sql](file://apps/server/init-scripts/01-init-audit-db.sql)
+- [packages/audit/README.md](file://packages\audit\README.md) - *Updated in recent commit*
+- [packages/audit/docs/getting-started/configuration.md](file://packages\audit\docs\getting-started\configuration.md) - *Comprehensive configuration guide*
+- [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts) - *Configuration type definitions*
+- [packages/audit/src/config/manager.ts](file://packages\audit\src\config\manager.ts) - *Configuration manager implementation*
+- [packages/audit/src/config/integration.ts](file://packages\audit\src\config\integration.ts) - *Configuration integration service*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect the new documentation structure where README content has been centralized into detailed documentation site
+- Added comprehensive configuration details from the new configuration guide
+- Enhanced sections with specific code examples and implementation details
+- Updated source references to reflect the current file structure and content
+- Added new sections on configuration management, validation, and security
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -18,7 +23,7 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
+6. [Configuration Management System](#configuration-management-system)
 7. [Performance Considerations](#performance-considerations)
 8. [Troubleshooting Guide](#troubleshooting-guide)
 9. [Conclusion](#conclusion)
@@ -221,34 +226,174 @@ end
 - [packages/audit-db/src/db/enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts#L160-L215)
 - [packages/audit-db/src/db/connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts#L200-L348)
 
-## Dependency Analysis
-The integration components have a clear dependency hierarchy, with higher-level components depending on lower-level ones. The EnhancedDatabaseClient depends on both the EnhancedConnectionPool and the query cache implementation, while these components in turn depend on external services like PostgreSQL and Redis.
+## Configuration Management System
+The audit system features a comprehensive configuration management system that supports environment-specific configurations, hot reloading, encrypted storage, and validation.
 
-```mermaid
-graph TD
-Client[EnhancedDatabaseClient] --> Pool[EnhancedConnectionPool]
-Client --> Cache[Query Cache]
-Pool --> DB[(PostgreSQL)]
-Cache --> Redis[(Redis)]
-Cache --> Pool
-Config[Configuration] --> Client
-Config --> Pool
-Config --> Cache
-style Client fill:#bbf,stroke:#333
-style Pool fill:#bbf,stroke:#333
-style Cache fill:#bbf,stroke:#333
-style DB fill:#f96,stroke:#333
-style Redis fill:#f96,stroke:#333
-style Config fill:#9f9,stroke:#333
+### Configuration Structure
+The configuration system is based on the AuditConfig interface which defines all configurable aspects of the audit system:
+
+```typescript
+export interface AuditConfig {
+	environment: Environment
+	version: string
+	lastUpdated: string
+	redis: RedisConfig
+	database: DatabaseConfig
+	enhancedClient: EnhancedClientConfig
+	server: ServerConfig
+	worker: WorkerConfig
+	retry: RetryConfig
+	reliableProcessor: ReliableProcessorConfig
+	monitoring: MonitoringConfig
+	security: SecurityConfig
+	compliance: ComplianceConfig
+	validation: ValidationConfig
+	archive: ArchiveConfig
+	logging: LoggingConfig
+}
 ```
 
-**Diagram sources**
-- [packages/audit-db/src/db/enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
-- [packages/audit-db/src/db/connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
+**Section sources**
+- [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts#L15-L66)
+
+### Environment-Specific Configuration
+The system supports different configurations for various environments (development, staging, production, test) with appropriate security and performance settings:
+
+```typescript
+// config/audit-config.ts
+export function getAuditConfig(environment: string): AuditConfig {
+  const baseConfig: Partial<AuditConfig> = {
+    version: '1.0',
+    environment
+  }
+  
+  switch (environment) {
+    case 'development':
+      return {
+        ...baseConfig,
+        reliableProcessor: {
+          queueName: 'dev-audit',
+          maxRetries: 1,
+          concurrency: 1
+        },
+        security: {
+          enableEncryption: false,
+          enableTamperDetection: false
+        },
+        observability: {
+          enableMetrics: false,
+          enableTracing: false
+        }
+      } as AuditConfig
+      
+    case 'production':
+      return {
+        ...baseConfig,
+        reliableProcessor: {
+          queueName: 'prod-audit',
+          maxRetries: 3,
+          concurrency: 10,
+          enableCircuitBreaker: true
+        },
+        security: {
+          enableEncryption: true,
+          enableTamperDetection: true,
+          requireDigitalSignatures: true
+        },
+        compliance: {
+          hipaa: { 
+            enabled: true, 
+            retentionYears: 6,
+            enableSecurityIncidentReporting: true
+          },
+          gdpr: { 
+            enabled: true, 
+            retentionDays: 2190,
+            enableDataSubjectRights: true
+          }
+        },
+        observability: {
+          enableMetrics: true,
+          enableTracing: true,
+          enableHealthChecks: true
+        }
+      } as AuditConfig
+  }
+}
+```
 
 **Section sources**
-- [packages/audit-db/src/db/enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
-- [packages/audit-db/src/db/connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
+- [packages/audit/docs/getting-started/configuration.md](file://packages\audit\docs\getting-started\configuration.md#L377-L489)
+
+### Configuration Validation
+The system includes comprehensive validation to ensure configuration integrity:
+
+```typescript
+export function validateEnvironmentConfig(config: AuditConfig): void {
+	const environment = config.environment
+
+	// Production-specific validations
+	if (environment === 'production') {
+		if (!config.security.enableIntegrityVerification) {
+			throw new Error('Integrity verification must be enabled in production')
+		}
+
+		if (!config.database.ssl) {
+			throw new Error('Database SSL must be enabled in production')
+		}
+
+		if (!config.security.encryptionKey && config.security.enableLogEncryption) {
+			throw new Error('Encryption key is required when log encryption is enabled in production')
+		}
+	}
+}
+```
+
+**Section sources**
+- [packages/audit/src/config/integration.ts](file://packages\audit\src\config\integration.ts#L300-L330)
+
+### Hot Reloading Configuration
+The configuration system supports hot reloading for certain parameters without requiring service restarts:
+
+```typescript
+const DEFAULT_HOT_RELOADABLE_FIELDS = [
+	'worker.concurrency',
+	'monitoring.metricsInterval',
+	'monitoring.alertThresholds.errorRate',
+	'monitoring.alertThresholds.processingLatency',
+	'monitoring.healthCheckInterval',
+	'retry.maxRetries',
+	'logging.level',
+	'compliance.reportingSchedule.enabled',
+	'compliance.reportingSchedule.frequency',
+]
+```
+
+**Section sources**
+- [packages/audit/src/config/integration.ts](file://packages\audit\src\config\integration.ts#L30-L60)
+
+### Secure Configuration Storage
+Configuration can be stored securely using encryption and KMS integration:
+
+```typescript
+export interface SecureStorageConfig {
+	enabled: boolean
+	algorithm: 'AES-256-GCM' | 'AES-256-CBC'
+	kdf: 'PBKDF2' | 'scrypt'
+	salt: string
+	iterations: number
+	kms: {
+		enabled: boolean
+		encryptionKey: string
+		signingKey: string
+		accessToken: string
+		baseUrl: string
+	}
+}
+```
+
+**Section sources**
+- [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts#L370-L395)
 
 ## Performance Considerations
 The integration configuration includes several performance optimization features, including connection pooling, query caching, and database-level performance tuning. These features work together to ensure the system can handle high loads efficiently while maintaining low latency.

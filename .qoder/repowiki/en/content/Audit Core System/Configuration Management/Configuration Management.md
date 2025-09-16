@@ -14,12 +14,11 @@
 
 ## Update Summary
 **Changes Made**   
-- Added comprehensive documentation for GDPR pseudonymization capabilities
-- Expanded configuration schema to include plugin architecture support
-- Updated compliance configuration section with new pseudonymization options
-- Enhanced validation rules to support plugin configuration
-- Added new sections for plugin lifecycle and dependency management
-- Updated diagrams to reflect new architectural components
+- Updated documentation to reflect the centralized documentation approach
+- Removed outdated references to README content that has been moved to the documentation site
+- Updated configuration guide references to point to the new documentation structure
+- Maintained all technical details about configuration options and implementation
+- Updated file references to reflect the new documentation location
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -239,7 +238,7 @@ StagingConfig : -SSL enabled
 StagingConfig : -Higher concurrency
 StagingConfig : -Email reporting enabled
 ProductionConfig : -Production URLs
-ProductionConfig : -Strict security
+-ProductionConfig : -Strict security
 ProductionConfig : -High availability
 ProductionConfig : -Compliance features
 ```

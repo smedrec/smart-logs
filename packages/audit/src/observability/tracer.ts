@@ -308,11 +308,144 @@ export class AuditTracer implements Tracer {
 	}
 
 	/**
-	 * Export span to OTLP (placeholder implementation)
+	 * Export span to OTLP HTTP endpoint
 	 */
 	private exportToOTLP(span: Span): void {
-		// TODO: In a real implementation, this would send to OTLP endpoint
-		console.log('🚀 OTLP Export:', {
+		if (!this.config.exporterEndpoint) {
+			console.warn('OTLP exporter endpoint not configured, falling back to console')
+			this.exportToConsole(span)
+			return
+		}
+
+		// Add to batch for efficient processing
+		this.addToBatch(span)
+	}
+
+	// Batch processing for OTLP exports
+	private spanBatch: Span[] = []
+	private batchTimeout: NodeJS.Timeout | null = null
+	private readonly BATCH_SIZE = 100
+	private readonly BATCH_TIMEOUT_MS = 5000
+
+	/**
+	 * Add span to batch for efficient OTLP export
+	 */
+	private addToBatch(span: Span): void {
+		this.spanBatch.push(span)
+
+		// Send batch if it reaches max size
+		if (this.spanBatch.length >= this.BATCH_SIZE) {
+			this.flushBatch()
+		} else if (!this.batchTimeout) {
+			// Set timeout to flush batch
+			this.batchTimeout = setTimeout(() => this.flushBatch(), this.BATCH_TIMEOUT_MS)
+		}
+	}
+
+	/**
+	 * Flush current batch to OTLP endpoint
+	 */
+	private async flushBatch(): Promise<void> {
+		if (this.spanBatch.length === 0) return
+
+		const spans = [...this.spanBatch]
+		this.spanBatch = []
+
+		if (this.batchTimeout) {
+			clearTimeout(this.batchTimeout)
+			this.batchTimeout = null
+		}
+
+		try {
+			await this.sendSpansToOTLP(spans)
+		} catch (error) {
+			console.error('Failed to export spans to OTLP:', error)
+			// Could implement retry logic here
+		}
+	}
+
+	/**
+	 * Send spans to OTLP HTTP endpoint
+	 */
+	private async sendSpansToOTLP(spans: Span[]): Promise<void> {
+		if (!this.config.exporterEndpoint) {
+			throw new Error('OTLP exporter endpoint not configured')
+		}
+
+		const otlpPayload = this.createOTLPPayload(spans)
+
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json',
+			'User-Agent': `audit-system-tracer/1.0.0`,
+			...this.config.headers,
+			//...this.getAuthHeaders(),
+		}
+
+		let body = JSON.stringify(otlpPayload)
+
+		// Add compression if large payload
+		if (body.length > 1024) {
+			const compressed = await this.compressPayload(body)
+			if (compressed) {
+				body = compressed.data
+				headers['Content-Encoding'] = compressed.encoding
+			}
+		}
+
+		const requestConfig: RequestInit = {
+			method: 'POST',
+			headers,
+			body,
+		}
+
+		const maxRetries = 3
+		let retryDelay = 1000
+
+		for (let attempt = 0; attempt <= maxRetries; attempt++) {
+			try {
+				const response = await fetch(this.config.exporterEndpoint, requestConfig)
+
+				if (response.ok) {
+					console.debug(`Successfully exported ${spans.length} spans to OTLP`)
+					return
+				}
+
+				// Handle different error scenarios
+				if (response.status === 429) {
+					// Rate limited - implement backoff
+					const retryAfter = response.headers.get('Retry-After')
+					retryDelay = retryAfter ? parseInt(retryAfter) * 1000 : retryDelay * 2
+				} else if (response.status >= 400 && response.status < 500) {
+					// Client error - don't retry
+					throw new Error(`Client error: ${response.status} ${response.statusText}`)
+				}
+
+				if (attempt === maxRetries) {
+					throw new Error(
+						`Failed after ${maxRetries} attempts: ${response.status} ${response.statusText}`
+					)
+				}
+
+				// Wait before retry
+				await new Promise((resolve) => setTimeout(resolve, retryDelay))
+				retryDelay *= 2 // Exponential backoff
+			} catch (error) {
+				if (attempt === maxRetries) {
+					throw error
+				}
+
+				// Wait before retry for network errors
+				await new Promise((resolve) => setTimeout(resolve, retryDelay))
+				retryDelay *= 2
+			}
+		}
+	}
+
+	/**
+	 * Create OTLP compliant payload
+	 */
+	private createOTLPPayload(spans: Span[]): any {
+		return {
 			resourceSpans: [
 				{
 					resource: {
@@ -321,49 +454,162 @@ export class AuditTracer implements Tracer {
 								key: 'service.name',
 								value: { stringValue: this.config.serviceName },
 							},
+							{
+								key: 'service.version',
+								value: { stringValue: process.env.npm_package_version || '1.0.0' },
+							},
+							{
+								key: 'telemetry.sdk.name',
+								value: { stringValue: 'audit-system-tracer' },
+							},
+							{
+								key: 'telemetry.sdk.version',
+								value: { stringValue: '1.0.0' },
+							},
 						],
 					},
-					instrumentationLibrarySpans: [
+					scopeSpans: [
 						{
-							spans: [
-								{
-									traceId: Buffer.from(span.traceId, 'hex'),
-									spanId: Buffer.from(span.spanId, 'hex'),
-									parentSpanId: span.parentSpanId
-										? Buffer.from(span.parentSpanId, 'hex')
-										: undefined,
-									name: span.operationName,
-									startTimeUnixNano: span.startTime * 1000000,
-									endTimeUnixNano: (span.endTime || span.startTime) * 1000000,
-									attributes: Object.entries(span.tags).map(([key, value]) => ({
-										key,
-										value: { stringValue: String(value) },
-									})),
-									events: span.logs.map((log) => ({
-										timeUnixNano: log.timestamp * 1000000,
-										name: log.message,
-										attributes: log.fields
-											? Object.entries(log.fields).map(([k, v]) => ({
-													key: k,
-													value: { stringValue: String(v) },
-												}))
-											: [],
-									})),
-									status: {
-										code: span.status.code === 'OK' ? 1 : 2,
-										message: span.status.message,
-									},
+							scope: {
+								name: 'audit-system',
+								version: '1.0.0',
+							},
+							spans: spans.map((span) => ({
+								traceId: this.hexToBase64(span.traceId),
+								spanId: this.hexToBase64(span.spanId),
+								parentSpanId: span.parentSpanId ? this.hexToBase64(span.parentSpanId) : undefined,
+								name: span.operationName,
+								kind: this.getSpanKind(span.tags['span.kind']),
+								startTimeUnixNano: this.timestampToNanos(span.startTime),
+								endTimeUnixNano: this.timestampToNanos(span.endTime || span.startTime),
+								attributes: this.convertAttributes(span.tags),
+								events: span.logs.map((log) => ({
+									timeUnixNano: this.timestampToNanos(log.timestamp),
+									name: log.message,
+									attributes: log.fields ? this.convertAttributes(log.fields) : [],
+								})),
+								status: {
+									code: this.getStatusCode(span.status.code),
+									message: span.status.message || '',
 								},
-							],
+							})),
 						},
 					],
 				},
 			],
+		}
+	}
+
+	/**
+	 * Get authentication headers based on configuration
+	 */
+	private getAuthHeaders(): Record<string, string> {
+		const headers: Record<string, string> = {}
+
+		// Support different authentication methods
+		if (process.env.OTLP_API_KEY) {
+			headers['Authorization'] = `Bearer ${process.env.OTLP_API_KEY}`
+		} else if (process.env.OTLP_AUTH_HEADER) {
+			const [key, value] = process.env.OTLP_AUTH_HEADER.split(':')
+			if (key && value) {
+				headers[key.trim()] = value.trim()
+			}
+		}
+
+		return headers
+	}
+
+	/**
+	 * Compress payload if beneficial
+	 */
+	private async compressPayload(data: string): Promise<{ data: string; encoding: string } | null> {
+		// For now, return null (no compression)
+		// In a full implementation, you could use zlib:
+		// const compressed = await gzip(Buffer.from(data))
+		// return { data: compressed.toString('base64'), encoding: 'gzip' }
+		return null
+	}
+
+	/**
+	 * Convert hex string to base64 for OTLP
+	 */
+	private hexToBase64(hex: string): string {
+		return Buffer.from(hex, 'hex').toString('base64')
+	}
+
+	/**
+	 * Convert timestamp to nanoseconds
+	 */
+	private timestampToNanos(timestamp: number): string {
+		return (timestamp * 1000000).toString()
+	}
+
+	/**
+	 * Get OTLP span kind
+	 */
+	private getSpanKind(kind?: string): number {
+		switch (kind) {
+			case 'server':
+				return 2
+			case 'client':
+				return 3
+			case 'producer':
+				return 4
+			case 'consumer':
+				return 5
+			case 'internal':
+			default:
+				return 1
+		}
+	}
+
+	/**
+	 * Get OTLP status code
+	 */
+	private getStatusCode(status: string): number {
+		switch (status) {
+			case 'OK':
+				return 1
+			case 'ERROR':
+				return 2
+			case 'TIMEOUT':
+				return 2
+			case 'CANCELLED':
+				return 2
+			default:
+				return 0 // UNSET
+		}
+	}
+
+	/**
+	 * Convert tags/fields to OTLP attributes
+	 */
+	private convertAttributes(obj: Record<string, any>): Array<{ key: string; value: any }> {
+		return Object.entries(obj).map(([key, value]) => {
+			let otlpValue: any
+
+			if (typeof value === 'string') {
+				otlpValue = { stringValue: value }
+			} else if (typeof value === 'number') {
+				if (Number.isInteger(value)) {
+					otlpValue = { intValue: value.toString() }
+				} else {
+					otlpValue = { doubleValue: value }
+				}
+			} else if (typeof value === 'boolean') {
+				otlpValue = { boolValue: value }
+			} else if (Array.isArray(value)) {
+				otlpValue = { arrayValue: { values: value.map((v) => ({ stringValue: String(v) })) } }
+			} else {
+				otlpValue = { stringValue: JSON.stringify(value) }
+			}
+
+			return { key, value: otlpValue }
 		})
 	}
 
 	/**
-	 * Clear old spans to prevent memory leaks
+	 * Clear old spans to prevent memory leaks and flush any pending batches
 	 */
 	cleanup(): void {
 		const cutoffTime = Date.now() - 24 * 60 * 60 * 1000 // 24 hours
@@ -372,6 +618,11 @@ export class AuditTracer implements Tracer {
 			if (span.startTime < cutoffTime) {
 				this.spans.delete(spanId)
 			}
+		}
+
+		// Flush any pending batches
+		if (this.spanBatch.length > 0) {
+			this.flushBatch()
 		}
 	}
 }

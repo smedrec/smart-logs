@@ -274,6 +274,7 @@ export interface ObservabilityConfig {
 		sampleRate: number
 		exporterType: 'console' | 'jaeger' | 'zipkin' | 'otlp'
 		exporterEndpoint?: string
+		headers?: Record<string, string>
 	}
 
 	// Metrics configuration

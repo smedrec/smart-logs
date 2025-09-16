@@ -2,11 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
-- [compliance-reporting.test.ts](file://packages/audit/src/__tests__/compliance-reporting.test.ts)
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
-- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx)
+- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts) - *Updated with enhanced report generation and filtering logic*
+- [compliance-reporting.test.ts](file://packages/audit/src/__tests__/compliance-reporting.test.ts) - *Updated with comprehensive test cases for report generation*
+- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts) - *Updated with API endpoints for compliance reporting*
+- [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx) - *Updated with UI integration for HIPAA reports*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect the implementation of on-demand compliance report generation
+- Added detailed information about supported regulatory frameworks (GDPR, HIPAA)
+- Enhanced description of report templates and data aggregation logic
+- Expanded explanation of generated report structure with required sections
+- Added examples from compliance-reporting.test.ts demonstrating test cases
+- Updated UI integration details for web application report generation and viewing
+- Added information about customization options for report scope and format
+- Enhanced explanation of report immutability and tamper-evidence mechanisms
+- Provided guidance on interpreting report findings and preparing for external audits
 
 ## Table of Contents
 1. [Introduction](#introduction)

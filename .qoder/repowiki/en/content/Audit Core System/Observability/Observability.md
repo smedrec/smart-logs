@@ -2,21 +2,29 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [dashboard.ts](file://packages/audit/src/observability/dashboard.ts)
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts)
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts)
-- [observability-api.ts](file://apps/server/src/routes/observability-api.ts)
-- [monitoring.test.ts](file://packages/audit/src/__tests__/monitoring.test.ts)
-- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts)
-- [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts)
-- [types.ts](file://packages/audit/src/observability/types.ts)
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts)
-- [health.ts](file://apps/server/src/lib/services/health.ts)
-- [health-api.ts](file://apps/server/src/routes/health-api.ts)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated in recent commit*
+- [dashboard.ts](file://packages/audit/src/observability/dashboard.ts) - *Updated in recent commit*
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts) - *Updated in recent commit*
+- [health-check.ts](file://packages/audit/src/monitor/health-check.ts) - *Updated in recent commit*
+- [observability-api.ts](file://apps/server/src/routes/observability-api.ts) - *Updated in recent commit*
+- [monitoring.test.ts](file://packages/audit/src/__tests__/monitoring.test.ts) - *Updated in recent commit*
+- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts) - *Updated in recent commit*
+- [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts) - *Updated in recent commit*
+- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated in recent commit*
+- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts) - *Updated in recent commit*
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Updated in recent commit*
+- [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts) - *Updated in recent commit*
+- [health.ts](file://apps/server/src/lib/services/health.ts) - *Updated in recent commit*
+- [health-api.ts](file://apps/server/src/routes/health-api.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect centralized documentation structure
+- Added references to new documentation site structure
+- Updated file references to reflect current implementation
+- Enhanced source tracking with commit annotations
+- Maintained all technical content while updating references
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -54,10 +62,9 @@ E --> O[Alerts]
 ```
 
 **Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [dashboard.ts](file://packages/audit/src/observability/dashboard.ts)
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts)
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L50)
+- [dashboard.ts](file://packages/audit/src/observability/dashboard.ts#L1-L50)
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L50)
 
 **Section sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L50)

@@ -109,9 +109,6 @@ AuditConfig --> LoggingConfig : "contains"
 AuditConfig --> PluginConfig : "contains"
 ```
 
-**Diagram sources**
-- [types.ts](file://packages\audit\src\config\types.ts#L45-L110)
-
 **Section sources**
 - [types.ts](file://packages\audit\src\config\types.ts#L45-L110)
 

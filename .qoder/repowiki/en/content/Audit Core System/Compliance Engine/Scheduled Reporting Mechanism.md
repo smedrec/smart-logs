@@ -4,7 +4,7 @@
 **Referenced Files in This Document**   
 - [scheduled-reporting.test.ts](file://packages/audit/src/__tests__/scheduled-reporting.test.ts)
 - [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts)
-- [inngest/functions/alerts/cleanup-old-alerts.ts](file://apps/inngest/src/inngest/functions/alerts/cleanup-old-alerts.ts)
+- [scheduleReport.ts](file://apps/server/src/lib/inngest/functions/reports/scheduleReport.ts)
 - [index.ts](file://apps/worker/src/index.ts)
 - [data-export.ts](file://packages/audit/src/report/data-export.ts)
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
@@ -64,7 +64,7 @@ Worker --> Webhook
 **Diagram sources**
 - [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts)
 - [index.ts](file://apps/worker/src/index.ts)
-- [cleanup-old-alerts.ts](file://apps/inngest/src/inngest/functions/alerts/cleanup-old-alerts.ts)
+- [scheduleReport.ts](file://apps/server/src/lib/inngest/functions/reports/scheduleReport.ts)
 
 ## Core Components
 
@@ -220,12 +220,36 @@ Inngest serves as the workflow orchestration engine, enabling event-driven execu
 
 ### Inngest Function Structure
 ```typescript
-export const processDueReports = inngest.createFunction(
-  { id: 'process-due-reports' },
-  { cron: 'TZ=UTC 0 9 * * *' }, // Daily at 9 AM UTC
-  async ({ step, event, services }) => {
-    const { scheduledReporting } = services
-    await step.run('process-due-reports', () => scheduledReporting.processDueReports())
+export const scheduleReport = inngest.createFunction(
+  {
+    id: 'schedule-report',
+    name: 'Schedule Report',
+    description: 'Schedule a report to be executed at a later time',
+  },
+  {
+    event: 'reports/schedule.report',
+  },
+  async ({ event, step, services }) => {
+    const { compliance } = services
+    const { config } = event.data
+    const date = new Date(config.nextRun!)
+
+    const unscheduleReport = await step.waitForEvent('wait-for-unschedule-report', {
+      event: 'reports/unschedule.report',
+      timeout: date,
+      if: `async.data.reportId == "${config.id}"`,
+    })
+
+    if (!unscheduleReport) {
+      const report = await compliance.scheduled.executeReport(config.id)
+      return { message: 'Report executed', report }
+    } else {
+      const updatedReport = await compliance.scheduled.updateScheduledReport(config.id, {
+        enabled: false,
+        updatedBy: 'inngest',
+      })
+      return { message: 'Report disabled', updatedReport }
+    }
   }
 )
 ```
@@ -249,11 +273,11 @@ Worker->>Inngest : Acknowledge completion
 ```
 
 **Diagram sources**
-- [cleanup-old-alerts.ts](file://apps/inngest/src/inngest/functions/alerts/cleanup-old-alerts.ts#L15-L41)
-- [index.ts](file://apps/inngest/src/index.ts#L45-L62)
+- [scheduleReport.ts](file://apps/server/src/lib/inngest/functions/reports/scheduleReport.ts#L15-L41)
+- [index.ts](file://apps/worker/src/index.ts#L45-L62)
 
 **Section sources**
-- [cleanup-old-alerts.ts](file://apps/inngest/src/inngest/functions/alerts/cleanup-old-alerts.ts#L15-L41)
+- [scheduleReport.ts](file://apps/server/src/lib/inngest/functions/reports/scheduleReport.ts#L15-L41)
 
 ## Worker Service for Background Processing
 

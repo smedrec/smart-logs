@@ -2,12 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
-- [dead-letter-queue.test.ts](file://packages/audit/src/__tests__/dead-letter-queue.test.ts)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [retry.ts](file://packages/audit/src/retry.ts)
+- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts) - *Updated in recent commit*
+- [dead-letter-queue.test.ts](file://packages/audit/src/__tests__/dead-letter-queue.test.ts) - *Updated in recent commit*
+- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts) - *Updated in recent commit*
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Security enhancements in recent commit*
+- [retry.ts](file://packages/audit/src/retry.ts) - *Retry mechanism improvements*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated Dead Letter Queue implementation details with enhanced alerting system
+- Added details on message processing and cleanup workflows
+- Enhanced security measures section with cryptographic configuration details
+- Updated configuration options with new alerting and retention parameters
+- Improved failure recovery scenarios with additional test coverage details
+- Added integration details between reliable processor and dead letter queue
 
 ## Table of Contents
 1. [Introduction](#introduction)

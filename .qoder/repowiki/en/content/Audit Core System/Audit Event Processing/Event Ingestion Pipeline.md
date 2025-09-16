@@ -10,16 +10,16 @@
 - [audit.ts](file://packages/audit/src/audit.ts) - *Updated in recent commit*
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added in recent commit*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
+- [README.md](file://packages/audit/README.md) - *Replaced with link to detailed docs*
+- [audit-class.md](file://packages/audit/docs/api-reference/audit-class.md) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
-- Added comprehensive documentation for plugin architecture and middleware integration
-- Integrated GDPR pseudonymization and data export compliance features
-- Updated ingestion flow to include plugin hooks for authentication, storage, and processing extensions
-- Enhanced metadata enrichment process with GDPR-specific fields and pseudonymization capabilities
-- Added new sections on GDPR compliance workflows and data subject rights handling
-- Updated error handling to include GDPR-specific validation and compliance errors
-- Added best practices for GDPR-compliant event production and data handling
+- Updated documentation structure to reflect centralized documentation site
+- Replaced README content with redirect to comprehensive documentation
+- Added references to new documentation structure and organization
+- Updated source tracking to reflect current file locations and documentation flow
+- Maintained all technical content about event ingestion pipeline while updating structural references
 
 ## Table of Contents
 1. [Introduction](#introduction)

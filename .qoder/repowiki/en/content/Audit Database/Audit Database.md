@@ -9,15 +9,16 @@
 - [future-enhancements.md](file://packages\audit-db\docs\future-enhancements.md) - *Updated in recent commit*
 - [organization_role](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql) - *Added in recent commit*
 - [authz.ts](file://packages\auth\src\permissions.ts) - *Added in recent commit*
+- [redis-query-cache.ts](file://packages\audit-db\src\cache\redis-query-cache.ts) - *Updated in recent commit*
+- [cache-factory.ts](file://packages\audit-db\src\cache\cache-factory.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
-- Added new section on organization role management with database integration and Redis caching
-- Updated data model documentation to include the new organization_role table
-- Added details on role-based access control implementation and permission management
-- Updated architecture overview to include role management components
-- Added new diagram for organization role management architecture
-- Updated section sources to reflect new and modified files
+- Added new section on Redis caching for authorization and role management
+- Updated query caching strategy section to include permission caching details
+- Enhanced organization role management section with caching implementation details
+- Added cache configuration details for authorization layer
+- Updated section sources to reflect new and modified files related to caching
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -596,6 +597,41 @@ The system uses a multi-layer cache access pattern:
 4. **Cache Population**: Store results in both L1 and L2 caches
 
 This approach minimizes latency for frequently accessed data while maintaining consistency across distributed application instances.
+
+### Authorization Layer Caching
+
+The authorization system implements Redis caching for role-based access control with the following configuration:
+
+```typescript
+interface AuthorizationCacheConfig {
+  roleCachePrefix: string
+  permissionCachePrefix: string
+  retentionPeriod: number
+  enableCompression: boolean
+}
+```
+
+Key features:
+- **Role caching**: Stores role definitions in Redis with `authz:roles:` prefix
+- **Permission caching**: Caches permission checks for 5 minutes with `authz:permissions:` prefix
+- **Cache invalidation**: Provides methods to clear user-specific or global permission caches
+- **Cache warming**: Pre-loads default roles during service initialization
+
+The `AuthorizationService` class implements the following cache methods:
+
+```typescript
+class AuthorizationService {
+  async hasPermission(session: Session, resource: string, action: string): Promise<boolean>
+  async clearUserCache(userId: string): Promise<void>
+  async clearCache(): Promise<void>
+  async getRole(roleName: string): Promise<Role | undefined>
+  async getAllRoles(): Promise<Role[]>
+}
+```
+
+**Section sources**
+- [authz.ts](file://packages\auth\src\permissions.ts)
+- [redis-query-cache.ts](file://packages\audit-db\src\cache\redis-query-cache.ts)
 
 ## Performance Monitoring Tools
 

@@ -598,7 +598,7 @@ This approach ensures that only the relevant configuration changes are validated
 - **Solution**: Set database.ssl to true in production configuration
 - **Security Note**: SSL is required in production to encrypt database traffic
 
-**:Error: "Field logging.level should not be debug in production"**
+**:Error: "logging.level should not be debug in production"**
 - **Cause**: Debug logging is enabled in production
 - **Solution**: Set logging.level to 'info', 'warn', or 'error' in production
 - **Performance Note**: Debug logging generates excessive output and impacts performance

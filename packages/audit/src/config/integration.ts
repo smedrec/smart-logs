@@ -138,7 +138,9 @@ export async function initializeAuditConfig(
 export function getDefaultConfigPath(): string {
 	const environment = process.env.NODE_ENV || 'development'
 	const configDir = process.env.AUDIT_CONFIG_DIR || join(process.cwd(), 'config')
-	return join(configDir, `audit-${environment}.json`)
+	return `${configDir}/audit-${environment}.json`
+	// FIXME: This is a temporary fix for the issue with the config path on windows
+	//return join(configDir, `audit-${environment}.json`)
 }
 
 /**

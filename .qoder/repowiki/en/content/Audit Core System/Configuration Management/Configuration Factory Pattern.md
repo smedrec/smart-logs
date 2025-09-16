@@ -2,12 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [factory.ts](file://packages/audit/src/config/factory.ts)
-- [types.ts](file://packages/audit/src/config/types.ts)
-- [validator.ts](file://packages/audit/src/config/validator.ts)
-- [manager.ts](file://packages/audit/src/config/manager.ts)
-- [index.ts](file://packages/audit/src/index.ts)
+- [factory.ts](file://packages/audit/src/config/factory.ts) - *Updated in recent commit*
+- [types.ts](file://packages/audit/src/config/types.ts) - *Updated in recent commit*
+- [validator.ts](file://packages/audit/src/config/validator.ts) - *Updated in recent commit*
+- [manager.ts](file://packages/audit/src/config/manager.ts) - *Updated in recent commit*
+- [configuration.md](file://packages/audit/docs/getting-started/configuration.md) - *Documentation moved to centralized site*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated document sources to reflect the centralized documentation structure
+- Added note about documentation migration to comprehensive site
+- Verified all code examples and configuration details remain accurate
+- Maintained complete source tracking for all referenced files
+- Confirmed configuration factory implementation unchanged despite documentation relocation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -25,9 +33,11 @@
 ## Introduction
 The Configuration Factory Pattern in the audit system provides a robust mechanism for creating and managing environment-specific configurations with proper defaults, validation, and dependency injection. This document details the implementation of the factory pattern, its integration with the configuration manager and validator, and practical usage patterns for initializing audit systems across different deployment scenarios.
 
+The recent documentation update has centralized all audit-related documentation on a comprehensive site, replacing the extensive README content with a brief overview and redirect. This change does not affect the underlying implementation but improves documentation organization and accessibility.
+
 **Section sources**
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
-- [types.ts](file://packages/audit/src/config/types.ts#L1-L545)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
+- [types.ts](file://packages/audit/src/config/types.ts#L1-L712)
 
 ## Configuration Factory Overview
 The Configuration Factory Pattern implements a comprehensive system for creating audit configurations with environment-specific defaults, validation, and merging capabilities. The factory provides multiple entry points for configuration creation, including environment-specific profiles, minimal configurations, and merged configurations with override precedence.
@@ -62,13 +72,13 @@ ConfigurationManager --> ConfigValidator : "delegates validation"
 ```
 
 **Diagram sources**
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
-- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L873)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L938)
 - [validator.ts](file://packages/audit/src/config/validator.ts#L1-L658)
 
 **Section sources**
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
-- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L873)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L938)
 - [validator.ts](file://packages/audit/src/config/validator.ts#L1-L658)
 
 ## Core Configuration Types
@@ -161,10 +171,10 @@ AuditConfig --> ComplianceConfig
 ```
 
 **Diagram sources**
-- [types.ts](file://packages/audit/src/config/types.ts#L1-L545)
+- [types.ts](file://packages/audit/src/config/types.ts#L1-L712)
 
 **Section sources**
-- [types.ts](file://packages/audit/src/config/types.ts#L1-L545)
+- [types.ts](file://packages/audit/src/config/types.ts#L1-L712)
 
 ## Factory Creation Workflow
 The configuration factory follows a hierarchical creation workflow that starts with environment-specific base configurations and allows for merging and customization. The workflow ensures that configurations are validated and properly bootstrapped before being used by the system.
@@ -210,14 +220,14 @@ end
 ```
 
 **Diagram sources**
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
 - [validator.ts](file://packages/audit/src/config/validator.ts#L1-L658)
-- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L873)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L938)
 
 **Section sources**
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
 - [validator.ts](file://packages/audit/src/config/validator.ts#L1-L658)
-- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L873)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L938)
 
 ## Environment-Specific Configuration Profiles
 The factory provides four distinct configuration profiles tailored to different deployment scenarios: development, staging, production, and test. Each profile inherits from the previous one, creating a hierarchy of increasing strictness and optimization.
@@ -484,12 +494,12 @@ Manager-->>App : Update successful
 ```
 
 **Diagram sources**
-- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L873)
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L938)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
 
 **Section sources**
-- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L873)
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
+- [manager.ts](file://packages/audit/src/config/manager.ts#L1-L938)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
 
 ## Factory Usage Examples
 The Configuration Factory Pattern provides several practical usage patterns for initializing audit systems with custom configurations. These examples demonstrate how to use the factory in different scenarios, from simple environment-based initialization to complex configuration merging.
@@ -808,7 +818,7 @@ function createHighAvailabilityConfig(): AuditConfig {
 ```
 
 **Section sources**
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
 
 ### Integration with Dependency Injection Containers
 The configuration system can be integrated with dependency injection containers to provide configuration-driven service instantiation.
@@ -843,5 +853,5 @@ container.bind<MonitoringService>('MonitoringService').toDynamicValue((context) 
 ```
 
 **Section sources**
-- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L750)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L1-L799)
 - [index.ts](file://packages/audit/src/index.ts#L1-L73)

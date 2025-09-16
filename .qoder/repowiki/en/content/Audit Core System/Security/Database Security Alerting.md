@@ -10,6 +10,7 @@
 - [manager.ts](file://packages/audit/src/config/manager.ts) - *Configuration management*
 - [index.ts](file://packages/audit-db/src/db/index.ts) - *EnhancedAuditDb client*
 - [connection.ts](file://packages/redis-client/src/connection.ts) - *Redis connection management*
+- [permissions.ts](file://packages/auth/src/permissions.ts) - *Redis caching for authorization and role management*
 </cite>
 
 ## Update Summary
@@ -18,6 +19,7 @@
 - Added information about the new configuration management system
 - Updated code examples to show the use of EnhancedAuditDb client instead of direct database connection
 - Added details about centralized configuration and improved Redis integration
+- Added documentation for Redis caching in authorization and role management
 - Updated section sources to reflect the new files analyzed
 
 ## Table of Contents

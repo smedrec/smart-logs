@@ -6,16 +6,16 @@
 - [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit*
 - [permissions.ts](file://packages\auth\src\permissions.ts) - *Updated in recent commit*
 - [compliance-features.md](file://apps\docs\src\content\docs\audit\compliance-features.md) - *Updated in recent commit*
+- [best-practices.md](file://packages\audit-db\docs\guides\best-practices.md) - *Added Redis caching for authorization*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on Cryptographic Verification in Event Processing to reflect integration of CryptoService
-- Updated Cryptographic Protocols section with implementation details from crypto.ts
-- Enhanced Compliance Requirements section with organization role management details
-- Added new diagram for cryptographic verification workflow
-- Updated troubleshooting guide with hash verification failure scenarios
+- Added new section on Redis-Based Authorization Caching to reflect recent implementation
+- Updated Compliance Requirements section with detailed Redis caching implementation
+- Enhanced troubleshooting guide with cache-related issues and solutions
 - Added sources for new and updated sections
+- Updated diagram in Compliance Requirements to reflect caching architecture
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -136,54 +136,65 @@ GDPR compliance reports focus on data processing activities, consent management,
 
 The framework has been enhanced with organization role management using Redis caching and PostgreSQL persistence. This enables fine-grained access control and ensures that compliance requirements are met through proper authorization mechanisms. The role-based access control system supports inheritance and permission caching for improved performance.
 
+### Redis-Based Authorization Caching
+The authorization system implements a multi-layer caching strategy using Redis to optimize permission checks and role management. Permission evaluations are cached for 5 minutes with automatic invalidation on role changes, significantly reducing database load and improving response times.
+
+The caching architecture follows a write-through pattern where role definitions are stored in both Redis and PostgreSQL. When a user's permissions are checked, the system first queries the Redis cache using a composite key of user ID, resource, and action. If the permission is not found in cache, the system evaluates the role hierarchy and stores the result in Redis for subsequent requests.
+
+Cache invalidation occurs automatically when roles are modified, added, or removed. The system also provides methods to clear individual user caches or the entire permission cache, ensuring consistency between cached and persistent data.
+
 ```mermaid
 classDiagram
-class ComplianceReport {
-+string id
-+ComplianceReportType type
-+ReportCriteria criteria
-+string generatedAt
-+string status
-+ReportSummary summary
-+string? downloadUrl
+class AuthorizationService {
++string roleCachePrefix
++string permissionCachePrefix
++number retentionPeriod
++hasPermission(session, resource, action, context)
++getUserPermissions(session)
++canAccessOrganization(session, organizationId)
++getOrganizationRole(session, organizationId)
++clearUserCache(userId)
++clearCache()
++addRole(role)
++removeRole(roleName)
++getRole(roleName)
 }
-class HIPAAComplianceReport {
-+string reportType
-+HIPAASpecific hipaaSpecific
-+RiskAssessment riskAssessment
+class Redis {
++set(key, value)
++get(key)
++exists(key)
++del(key)
++keys(pattern)
++setex(key, seconds, value)
 }
-class GDPRComplianceReport {
-+string reportType
-+GDPRSpecific gdprSpecific
-+DataSubjectRights dataSubjectRights
+class PostgreSQL {
++insert(table, values)
++delete(table, condition)
++query(table, condition)
++update(table, values, condition)
 }
-class ComplianceReportEvent {
-+number? id
-+string timestamp
-+string? principalId
-+string? organizationId
-+string action
-+string? targetResourceType
-+string? targetResourceId
-+string status
-+string? outcomeDescription
-+DataClassification? dataClassification
-+SessionContext? sessionContext
-+string? integrityStatus
-+string? correlationId
-}
-ComplianceReport <|-- HIPAAComplianceReport
-ComplianceReport <|-- GDPRComplianceReport
-HIPAAComplianceReport --> ComplianceReportEvent : "contains"
-RiskAssessment --> ComplianceReportEvent : "highRiskEvents"
-RiskAssessment --> SuspiciousPattern : "suspiciousPatterns"
+AuthorizationService --> Redis : "Uses for caching"
+AuthorizationService --> PostgreSQL : "Uses for persistence"
+Redis ..> AuthorizationService : "Returns cached data"
+PostgreSQL ..> AuthorizationService : "Returns persistent data"
+note right of AuthorizationService
+Caches permissions for 5 minutes
+Supports role inheritance
+Automatic cache invalidation
+Write-through caching strategy
+end note
 ```
+
+**Diagram sources**
+- [permissions.ts](file://packages\auth\src\permissions.ts#L0-L691) - *Implementation of caching strategy*
+- [best-practices.md](file://packages\audit-db\docs\guides\best-practices.md#L0-L676) - *Caching strategy documentation*
 
 **Section sources**
 - [compliance-reporting.ts](file://packages\audit\src\report\compliance-reporting.ts#L99-L156)
 - [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts#L201-L241)
 - [types.ts](file://apps\server\src\lib\graphql\types.ts#L104-L171)
 - [permissions.ts](file://packages\auth\src\permissions.ts#L0-L691)
+- [best-practices.md](file://packages\audit-db\docs\guides\best-practices.md#L0-L676)
 
 ## Practical Examples
 The Security and Compliance framework provides practical implementations for common security scenarios. Organizations can configure the system to meet their specific regulatory requirements and security policies.
@@ -270,7 +281,15 @@ When event integrity verification fails, consider the following:
 - If using KMS, confirm the signing key ID is correct and accessible
 - Review the worker logs for hash verification failures during event processing
 
-The framework logs detailed error messages for cryptographic operations, which can be used to diagnose and resolve issues.
+### Redis Cache Issues
+When experiencing authorization or permission issues, check the Redis caching system:
+- Verify Redis connection is established and stable
+- Check that permission cache keys are being created with proper TTL (5 minutes)
+- Ensure cache invalidation occurs when roles are modified
+- Monitor cache hit rate to identify potential performance bottlenecks
+- Validate that role inheritance is properly cached and accessible
+
+The framework logs detailed error messages for cache operations, which can be used to diagnose and resolve issues. Use the `clearUserCache` and `clearCache` methods to resolve consistency issues between cached and persistent role data.
 
 **Section sources**
 - [base.ts](file://packages\infisical-kms\src\base.ts#L0-L50)
@@ -278,3 +297,4 @@ The framework logs detailed error messages for cryptographic operations, which c
 - [crypto.ts](file://packages\audit\src\crypto.ts#L0-L383)
 - [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts#L0-L56)
 - [index.ts](file://apps\worker\src\index.ts#L450-L480)
+- [permissions.ts](file://packages\auth\src\permissions.ts#L0-L691)

@@ -45,7 +45,7 @@ import {
 } from '@repo/redis-client'
 
 import type { LogLevel } from 'workers-tagged-logger'
-import type { AuditLogEvent, ReliableProcessorConfig } from '@repo/audit'
+import type { AuditLogEvent, ObservabilityConfig, ReliableProcessorConfig } from '@repo/audit'
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
 
@@ -88,6 +88,40 @@ let dashboard: AuditMonitoringDashboard | undefined = undefined
 // Error handling services
 let errorHandler: ErrorHandler | undefined = undefined
 let databaseErrorLogger: DatabaseErrorLogger | undefined = undefined
+
+const observabilityConfig: ObservabilityConfig = {
+	tracing: {
+		enabled: true,
+		serviceName: 'audit-system',
+		sampleRate: 1.0,
+		exporterType: 'console' as const,
+		/**exporterType: 'otlp' as const,
+		exporterEndpoint: 'http://joseantcordeiro.hopto.org:4317',
+		headers: {
+			Authorization:
+				process.env.OTEL_EXPORTER_OTLP_HEADERS_API_KEY ||
+				'Basic process.env.OTEL_EXPORTER_OTLP_BASIC_AUTH_KEY',
+			'stream-name': 'default',
+		},*/
+	},
+	metrics: {
+		enabled: true,
+		collectionInterval: 30000, // 30 seconds
+		retentionPeriod: 86400, // 24 hours
+		exporterType: 'console' as const,
+	},
+	profiling: {
+		enabled: true,
+		sampleRate: 0.1, // 10% sampling
+		maxProfiles: 100,
+		profileDuration: 60000, // 1 minute
+	},
+	dashboard: {
+		enabled: true,
+		refreshInterval: 30000, // 30 seconds
+		historyRetention: 86400, // 24 hours
+	},
+}
 
 // Simple healthcheck server for audit worker
 const app = new Hono()
@@ -399,7 +433,7 @@ async function main() {
 
 	// 5.1. Initialize observability services
 	if (!tracer) {
-		tracer = new AuditTracer(DEFAULT_OBSERVABILITY_CONFIG.tracing)
+		tracer = new AuditTracer(observabilityConfig.tracing)
 	}
 	if (!enhancedMetricsCollector) {
 		enhancedMetricsCollector = new RedisEnhancedMetricsCollector(

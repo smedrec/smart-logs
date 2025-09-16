@@ -1,6 +1,7 @@
 /**
  * Configuration factory for creating environment-specific configurations
  */
+import 'dotenv/config'
 
 import { generateDefaultSecret } from '../crypto.js'
 

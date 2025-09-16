@@ -2,26 +2,26 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [Dockerfile](file://apps/server/Dockerfile)
-- [docker-compose.yml](file://apps/server/docker-compose.yml)
-- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [k8s/service.yaml](file://apps/server/k8s/service.yaml)
-- [k8s/ingress.yaml](file://apps/server/k8s/ingress.yaml)
-- [k8s/hpa.yaml](file://apps/server/k8s/hpa.yaml)
-- [k8s/configmap.yaml](file://apps/server/k8s/configmap.yaml)
-- [k8s/secret.yaml](file://apps/server/k8s/secret.yaml)
-- [docker/nginx.conf](file://apps/server/docker/nginx.conf)
-- [docker/redis.conf](file://apps/server/docker/redis.conf)
-- [docker/redis.prod.conf](file://apps/server/docker/redis.prod.conf)
-- [scripts/docker-build.sh](file://apps/server/scripts/docker-build.sh)
-- [scripts/k8s-deploy.sh](file://apps/server/scripts/k8s-deploy.sh)
-- [README.Docker.md](file://apps/server/README.Docker.md)
-- [src/index.ts](file://apps/server/src/index.ts)
-- [docker/infisical/docker-compose.prod.yml](file://docker/infisical/docker-compose.prod.yml) - *Added in recent commit*
-- [docker/inngest/docker-compose.yml](file://docker/inngest/docker-compose.yml) - *Added in recent commit*
-- [docker/openobserve/docker-compose.yml](file://docker/openobserve/docker-compose.yml) - *Added in recent commit*
-- [docker/pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml) - *Added in recent commit*
+- [Dockerfile](file://apps\server\Dockerfile)
+- [docker-compose.yml](file://apps\server\docker-compose.yml)
+- [docker-compose.prod.yml](file://apps\server\docker-compose.prod.yml)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [k8s/service.yaml](file://apps\server\k8s\service.yaml)
+- [k8s/ingress.yaml](file://apps\server\k8s\ingress.yaml)
+- [k8s/hpa.yaml](file://apps\server\k8s\hpa.yaml)
+- [k8s/configmap.yaml](file://apps\server\k8s\configmap.yaml)
+- [k8s/secret.yaml](file://apps\server\k8s\secret.yaml)
+- [docker/nginx.conf](file://apps\server\docker\nginx.conf)
+- [docker/redis.conf](file://apps\server\docker\redis.conf)
+- [docker/redis.prod.conf](file://apps\server\docker\redis.prod.conf)
+- [scripts/docker-build.sh](file://apps\server\scripts\docker-build.sh)
+- [scripts/k8s-deploy.sh](file://apps\server\scripts\k8s-deploy.sh)
+- [README.Docker.md](file://apps\server\README.Docker.md)
+- [src/index.ts](file://apps\server\src\index.ts)
+- [docker/infisical/docker-compose.prod.yml](file://docker\infisical\docker-compose.prod.yml) - *Added in recent commit*
+- [docker/inngest/docker-compose.yml](file://docker\inngest\docker-compose.yml) - *Added in recent commit*
+- [docker/openobserve/docker-compose.yml](file://docker\openobserve\docker-compose.yml) - *Added in recent commit*
+- [docker/pgvector/docker-compose.yml](file://docker\pgvector\docker-compose.yml) - *Added in recent commit*
 </cite>
 
 ## Update Summary
@@ -88,14 +88,14 @@ style Ingress fill:#FF9800,stroke:#F57C00
 ```
 
 **Diagram sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [k8s/service.yaml](file://apps/server/k8s/service.yaml)
-- [k8s/ingress.yaml](file://apps/server/k8s/ingress.yaml)
-- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [k8s/service.yaml](file://apps\server\k8s\service.yaml)
+- [k8s/ingress.yaml](file://apps\server\k8s\ingress.yaml)
+- [docker-compose.prod.yml](file://apps\server\docker-compose.prod.yml)
 
 **Section sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [docker-compose.prod.yml](file://apps\server\docker-compose.prod.yml)
 
 ## Server Architecture
 
@@ -133,8 +133,8 @@ style J fill:#4CAF50,stroke:#388E3C
 ```
 
 **Diagram sources**
-- [k8s/ingress.yaml](file://apps/server/k8s/ingress.yaml)
-- [docker/nginx.conf](file://apps/server/docker/nginx.conf)
+- [k8s/ingress.yaml](file://apps\server\k8s\ingress.yaml)
+- [docker/nginx.conf](file://apps\server\docker\nginx.conf)
 
 ### Redis Caching Strategy
 
@@ -176,9 +176,9 @@ CacheStrategy --> UseCases : "supports"
 ```
 
 **Diagram sources**
-- [docker/redis.conf](file://apps/server/docker/redis.conf)
-- [docker/redis.prod.conf](file://apps/server/docker/redis.prod.conf)
-- [docker-compose.yml](file://apps/server/docker-compose.yml)
+- [docker/redis.conf](file://apps\server\docker\redis.conf)
+- [docker/redis.prod.conf](file://apps\server\docker\redis.prod.conf)
+- [docker-compose.yml](file://apps\server\docker-compose.yml)
 
 ### PostgreSQL Database Architecture
 
@@ -192,9 +192,9 @@ The PostgreSQL database stores audit logs, user data, and application metadata. 
 The database schema is managed through Drizzle ORM with migration scripts for version control.
 
 **Section sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [docker/nginx.conf](file://apps/server/docker/nginx.conf)
-- [docker/redis.conf](file://apps/server/docker/redis.conf)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [docker/nginx.conf](file://apps\server\docker\nginx.conf)
+- [docker/redis.conf](file://apps\server\docker\redis.conf)
 
 ## Container Configuration
 
@@ -249,8 +249,8 @@ D --> D5
 ```
 
 **Diagram sources**
-- [Dockerfile](file://apps/server/Dockerfile)
-- [scripts/docker-build.sh](file://apps/server/scripts/docker-build.sh)
+- [Dockerfile](file://apps\server\Dockerfile)
+- [scripts/docker-build.sh](file://apps\server\scripts\docker-build.sh)
 
 ### Container Security Configuration
 
@@ -275,8 +275,8 @@ securityContext:
 ```
 
 **Section sources**
-- [Dockerfile](file://apps/server/Dockerfile)
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
+- [Dockerfile](file://apps\server\Dockerfile)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
 
 ## Local Deployment with Docker Compose
 
@@ -347,9 +347,9 @@ deploy:
 ```
 
 **Section sources**
-- [docker-compose.yml](file://apps/server/docker-compose.yml)
-- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
-- [README.Docker.md](file://apps/server/README.Docker.md)
+- [docker-compose.yml](file://apps\server\docker-compose.yml)
+- [docker-compose.prod.yml](file://apps\server\docker-compose.prod.yml)
+- [README.Docker.md](file://apps\server\README.Docker.md)
 
 ## Infrastructure Services
 
@@ -377,7 +377,7 @@ networks:
 ```
 
 **Section sources**
-- [docker/infisical/docker-compose.prod.yml](file://docker/infisical/docker-compose.prod.yml)
+- [docker/infisical/docker-compose.prod.yml](file://docker\infisical\docker-compose.prod.yml)
 
 ### Inngest Event Processing
 
@@ -406,7 +406,7 @@ networks:
 ```
 
 **Section sources**
-- [docker/inngest/docker-compose.yml](file://docker/inngest/docker-compose.yml)
+- [docker/inngest/docker-compose.yml](file://docker\inngest\docker-compose.yml)
 
 ### OpenObserve Logging and Observability
 
@@ -433,7 +433,7 @@ volumes:
 ```
 
 **Section sources**
-- [docker/openobserve/docker-compose.yml](file://docker/openobserve/docker-compose.yml)
+- [docker/openobserve/docker-compose.yml](file://docker\openobserve\docker-compose.yml)
 
 ### PGVector Database Extension
 
@@ -480,7 +480,7 @@ volumes:
 ```
 
 **Section sources**
-- [docker/pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml)
+- [docker/pgvector/docker-compose.yml](file://docker\pgvector\docker-compose.yml)
 
 ## Production Deployment with Kubernetes
 
@@ -583,12 +583,12 @@ spec:
 The autoscaler maintains 3-10 replicas based on resource usage.
 
 **Section sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [k8s/service.yaml](file://apps/server/k8s/service.yaml)
-- [k8s/ingress.yaml](file://apps/server/k8s/ingress.yaml)
-- [k8s/hpa.yaml](file://apps/server/k8s/hpa.yaml)
-- [k8s/configmap.yaml](file://apps/server/k8s/configmap.yaml)
-- [k8s/secret.yaml](file://apps/server/k8s/secret.yaml)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [k8s/service.yaml](file://apps\server\k8s\service.yaml)
+- [k8s/ingress.yaml](file://apps\server\k8s\ingress.yaml)
+- [k8s/hpa.yaml](file://apps\server\k8s\hpa.yaml)
+- [k8s/configmap.yaml](file://apps\server\k8s\configmap.yaml)
+- [k8s/secret.yaml](file://apps\server\k8s\secret.yaml)
 
 ## Infrastructure Requirements
 
@@ -632,8 +632,8 @@ The networking configuration includes:
 - **Security groups**: Restrict access to trusted sources
 
 **Section sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [docker-compose.prod.yml](file://apps\server\docker-compose.prod.yml)
 
 ## Scalability and Auto-Scaling
 
@@ -709,8 +709,8 @@ K8s->>K8s : Update complete
 The deployment strategy ensures service continuity during updates.
 
 **Section sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [k8s/hpa.yaml](file://apps/server/k8s/hpa.yaml)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [k8s/hpa.yaml](file://apps\server\k8s\hpa.yaml)
 
 ## Monitoring and Logging
 
@@ -782,9 +782,9 @@ The application exposes metrics for:
 - Queue lengths
 
 **Section sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [docker-compose.yml](file://apps/server/docker-compose.yml)
-- [src/index.ts](file://apps/server/src/index.ts)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [docker-compose.yml](file://apps\server\docker-compose.yml)
+- [src/index.ts](file://apps\server\src\index.ts)
 
 ## Backup and Disaster Recovery
 
@@ -833,8 +833,8 @@ The system is configured for high availability:
 - **Redundant networking**: Multiple network paths
 
 **Section sources**
-- [k8s/deployment.yaml](file://apps/server/k8s/deployment.yaml)
-- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
+- [k8s/deployment.yaml](file://apps\server\k8s\deployment.yaml)
+- [docker-compose.prod.yml](file://apps\server\docker-compose.prod.yml)
 
 ## Sample Deployment Scenarios
 
@@ -911,6 +911,6 @@ curl http://localhost:3000/api/endpoint
 ```
 
 **Section sources**
-- [scripts/docker-build.sh](file://apps/server/scripts/docker-build.sh)
-- [scripts/k8s-deploy.sh](file://apps/server/scripts/k8s-deploy.sh)
-- [README.Docker.md](file://apps/server/README.Docker.md)
+- [scripts/docker-build.sh](file://apps\server\scripts\docker-build.sh)
+- [scripts/k8s-deploy.sh](file://apps\server\scripts\k8s-deploy.sh)
+- [README.Docker.md](file://apps\server\README.Docker.md)

@@ -9,14 +9,16 @@
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 - [data-export.ts](file://packages/audit/src/report/data-export.ts)
 - [archival-service.ts](file://packages/audit/src/archival/archival-service.ts)
+- [README.md](file://packages/audit/README.md) - *Updated in recent commit*
+- [docs/README.md](file://packages/audit/docs/README.md) - *Added in recent commit*
 </cite>
 
 ## Update Summary
-- Enhanced documentation for GDPR pseudonymization and audit trail reporting
-- Updated section sources to reflect recent code changes
-- Added new pseudonymization strategy details in GDPR compliance implementation
-- Updated compliance reporting system with enhanced pseudonymization status tracking
-- Maintained consistency with existing documentation structure while incorporating new features
+- Updated documentation to reflect centralized audit documentation structure
+- Added references to new comprehensive documentation site
+- Maintained all technical content about GDPR compliance, reporting, and data export
+- Enhanced source tracking with new documentation files
+- Preserved all existing implementation details and code examples
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,6 +31,12 @@
 
 ## Introduction
 The Compliance Engine is a comprehensive system designed to ensure regulatory adherence, particularly with GDPR and HIPAA standards. It provides robust mechanisms for handling data subject rights, generating compliance reports, managing data exports, and preserving audit integrity. This document details the technical implementation of these features, focusing on key components such as GDPR compliance, report generation, data export, and scheduled reporting workflows.
+
+The audit system is part of the `@repo/audit` package, which provides a comprehensive audit logging solution designed specifically for healthcare applications. It ensures compliance with HIPAA and GDPR regulations while offering cryptographically secure, tamper-resistant audit trails.
+
+**Section sources**
+- [README.md](file://packages/audit/README.md) - *Updated in recent commit*
+- [docs/README.md](file://packages/audit/docs/README.md) - *Added in recent commit*
 
 ## GDPR Compliance Implementation
 

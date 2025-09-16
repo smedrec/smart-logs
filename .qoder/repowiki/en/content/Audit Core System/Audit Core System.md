@@ -16,30 +16,36 @@
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added in recent commit*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
+- [README.md](file://packages/audit/README.md) - *Updated with link to detailed documentation*
+- [docs/README.md](file://packages/audit/docs/README.md) - *Updated with comprehensive documentation structure*
+- [api-reference/audit-class.md](file://packages/audit/docs/api-reference/audit-class.md) - *Updated with detailed API reference*
+- [api-reference/event-types.md](file://packages/audit/docs/api-reference/event-types.md) - *Updated with comprehensive event types*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated Cryptographic Security section to reflect new asynchronous event signature capabilities with KMS algorithms
-- Added documentation for the new async SHA-256 method with base64 encoding
-- Enhanced the Audit Event Structure section to include the new algorithm field
-- Updated Usage Examples to demonstrate the new signature generation method
-- Modified the Cryptographic Security diagram to reflect the updated interface
-- Added new section on GDPR Compliance and Pseudonymization
-- Added new section on Plugin Architecture
-- Updated Core Components diagram to include plugin system
+- Updated documentation structure to reflect centralized documentation approach
+- Replaced extensive README content with brief overview and redirect to comprehensive documentation site
+- Added detailed documentation structure in docs/README.md
+- Updated API reference documentation for audit-class and event-types
+- Enhanced documentation with comprehensive examples and usage patterns
+- Added detailed information about healthcare-specific features and compliance requirements
+- Updated quick start guide with healthcare-compliant configuration example
+- Added security and compliance features documentation
+- Enhanced architecture section with detailed component descriptions
+- Added detailed information about monitoring and observability features
 
 **List of new sections added**
-- GDPR Compliance and Pseudonymization
-- Plugin Architecture
+- None
 
 **List of deprecated/removed sections**
 - None
 
 **Source tracking system updates and new source files**
-- Added annotations to updated files in referenced files list
-- Updated section sources to reflect changes in crypto.ts, audit.ts, and types.ts
-- Added new source files for GDPR compliance and plugin architecture
+- Added annotations for updated README files
+- Added new source files for comprehensive documentation structure
+- Updated section sources to reflect changes in documentation organization
+- Added new sources for API reference documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -65,6 +71,7 @@ This documentation provides a comprehensive overview of the Audit Core System, d
 
 **Section sources**
 - [audit.md](file://apps/docs/src/content/docs/audit/audit.md)
+- [docs/README.md](file://packages/audit/docs/README.md)
 
 ## Core Components
 
@@ -152,6 +159,7 @@ Data classification is a critical aspect of the event structure, with predefined
 
 **Section sources**
 - [types.ts](file://packages/audit/src/types.ts)
+- [api-reference/event-types.md](file://packages/audit/docs/api-reference/event-types.md)
 
 ## Event Ingestion Pipeline
 

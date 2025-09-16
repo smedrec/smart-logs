@@ -10,6 +10,8 @@
 - [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
 - [error-handling.test.ts](file://packages/audit/src/__tests__/error-handling.test.ts)
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts)
+- [permissions.ts](file://packages/auth/src/permissions.ts) - *Added Redis caching for authorization and role management in commit a386f63b*
+- [redis.ts](file://packages/auth/src/redis.ts) - *Redis connection management for caching in commit a386f63b*
 </cite>
 
 ## Update Summary
@@ -17,8 +19,9 @@
 - Updated Cryptographic Functions section to include KMS integration and multiple signing algorithms
 - Enhanced the HMAC Signature Verification section with details about the new async signature response format
 - Updated the Security Alerting System section with enhanced alert persistence features and cleanup functionality
-- Added new code examples and diagrams to reflect the updated security architecture
-- Maintained all existing security documentation while adding new content for the updated cryptographic functions and alert persistence
+- Added new section on Redis-based Authorization and Role Caching to document recent security enhancements
+- Added code examples and architectural details for permission and role caching mechanisms
+- Maintained all existing security documentation while adding new content for the updated cryptographic functions, alert persistence, and authorization caching
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,9 +32,10 @@
 6. [Security Testing and Attack Scenarios](#security-testing-and-attack-scenarios)
 7. [Common Vulnerabilities and Mitigations](#common-vulnerabilities-and-mitigations)
 8. [Configuration and Incident Response](#configuration-and-incident-response)
+9. [Redis-based Authorization and Role Caching](#redis-based-authorization-and-role-caching)
 
 ## Introduction
-The Security subsystem ensures data integrity, confidentiality, and availability across the audit logging system. It implements cryptographic verification, secure error handling, alerting mechanisms, and message durability to protect against tampering, data leakage, and service disruption. This document details the implementation of key security components, including cryptographic functions, error sanitization, database monitoring, and secure message queuing.
+The Security subsystem ensures data integrity, confidentiality, and availability across the audit logging system. It implements cryptographic verification, secure error handling, alerting mechanisms, and message durability to protect against tampering, data leakage, and service disruption. This document details the implementation of key security components, including cryptographic functions, error sanitization, database monitoring, secure message queuing, and authorization caching.
 
 ## Cryptographic Functions for Data Protection
 
@@ -496,3 +500,116 @@ For high error volumes:
 - Review recent deployments for regressions
 - Examine network connectivity and dependencies
 - Scale resources if necessary
+
+## Redis-based Authorization and Role Caching
+
+The authorization system implements Redis-based caching for permissions and roles to enhance security and performance.
+
+### Permission Caching Architecture
+The `AuthorizationService` uses Redis to cache permission checks with a 5-minute retention period:
+- Cache keys follow the pattern `authz:permissions:{userId}:{resource}:{action}:{context}`
+- Results are stored as 'true' or 'false' strings
+- Cache is automatically invalidated after the retention period
+- Cache misses trigger database queries and subsequent caching
+
+```mermaid
+classDiagram
+class AuthorizationService {
+-private roleCachePrefix : string
+-private permissionCachePrefix : string
+-private retentionPeriod : number
++hasPermission(session, resource, action, context) Promise~boolean~
++getUserPermissions(session) Promise~Permission[]~
++getRole(roleName) Promise~Role | undefined~
++addRole(role) Promise~void~
++removeRole(roleName) Promise~void~
++clearUserCache(userId) Promise~void~
++clearCache() Promise~void~
+}
+class Permission {
++resource : string
++action : string
++conditions? : Record<string, any>
+}
+class Role {
++name : string
++description? : string
++permissions : Permission[]
++inherits? : string[]
+}
+AuthorizationService --> Permission : "manages"
+AuthorizationService --> Role : "manages"
+```
+
+**Diagram sources**
+- [permissions.ts](file://packages/auth/src/permissions.ts#L100-L600)
+
+**Section sources**
+- [permissions.ts](file://packages/auth/src/permissions.ts#L0-L691)
+- [redis.ts](file://packages/auth/src/redis.ts#L0-L130)
+
+### Role Management and Caching
+Roles are cached in Redis with the prefix `authz:roles:`:
+- System roles (user, admin) and organization roles (org:member, org:admin, org:owner) are pre-cached
+- Custom roles are added to both Redis cache and PostgreSQL database
+- Role retrieval first checks Redis, falling back to database if not found
+- Retrieved roles are automatically cached for subsequent requests
+
+### Cache Invalidation Strategies
+The system implements multiple cache invalidation methods:
+- **User-specific invalidation**: `clearUserCache(userId)` removes all permission caches for a user
+- **Global invalidation**: `clearCache()` removes all permission caches
+- **Role-specific invalidation**: `removeRole(roleName)` removes role cache and database entry
+- **Automatic expiration**: All caches expire after 5 minutes
+
+### Secure Cache Implementation
+The Redis connection is secured through:
+- Connection timeout of 10 seconds to prevent hanging connections
+- Environment variable-based Redis URL configuration
+- Comprehensive error handling for connection failures
+- Automatic reconnection handling
+- Separate connection instance management through singleton pattern
+
+```typescript
+export function getRedisConnection(redisUrl?: string, options?: RedisOptions): RedisInstanceType {
+	if (redisConnection) {
+		return redisConnection
+	}
+
+	if (!redisUrl) {
+		throw new Error(
+			'[RedisClient] Initialization Error: BETTER_AUTH_REDIS_URL is not defined in environment variables and no default was provided.'
+		)
+	}
+
+	const connectionOptions: RedisOptions = {
+		...DEFAULT_REDIS_OPTIONS,
+		...options,
+	}
+
+	try {
+		console.log(`[RedisClient] Attempting to connect to Redis at ${redisUrl.split('@').pop()}...`)
+		redisConnection = new Redis(redisUrl, connectionOptions)
+
+		redisConnection.on('connect', () => {
+			console.log('[RedisClient] Successfully connected to Redis.')
+		})
+
+		redisConnection.on('error', (err: Error) => {
+			console.error(`[RedisClient] Redis Connection Error: ${err.message}`, err)
+		})
+	} catch (error) {
+		console.error('[RedisClient] Failed to create Redis instance:', error)
+		redisConnection = null
+		throw new Error(`[RedisClient] Failed to initialize Redis connection. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+	}
+
+	return redisConnection
+}
+```
+
+This caching system significantly reduces database load while maintaining security through proper cache invalidation and secure connection management.
+
+**Section sources**
+- [redis.ts](file://packages/auth/src/redis.ts#L0-L130)
+- [permissions.ts](file://packages/auth/src/permissions.ts#L400-L600)
