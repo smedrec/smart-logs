@@ -12,8 +12,8 @@ const streamToOpenObserve = pinoLogs({
 	esVersion: 7,
 	flushBytes: 1000,
 	auth: {
-		username: 'joseantcordeiro@gmail.com',
-		password: 'vida2009',
+		username: process.env.ELASTICSEARCH_USERNAME,
+		password: process.env.ELASTICSEARCH_PASSWORD,
 	},
 })
 
