@@ -8,6 +8,7 @@
 - [cached-query-executor.ts](file://packages\audit-db\src\cache\cached-query-executor.ts) - *Query execution with caching logic*
 - [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts) - *Integration with enhanced database client*
 - [REDIS_CACHE_GUIDE.md](file://packages\audit-db\REDIS_CACHE_GUIDE.md) - *Additional usage documentation*
+- [permissions.ts](file://packages\auth\src\permissions.ts) - *Added Redis caching for organization role management*
 </cite>
 
 ## Update Summary
@@ -17,6 +18,7 @@
 - Enhanced architecture overview with L1/L2 cache interaction details
 - Updated performance considerations with hybrid caching benefits
 - Added new section on cache configuration strategies for different environments
+- Integrated documentation of Redis caching for authorization layer and organization role management
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -27,10 +29,11 @@
 6. [Dependency Analysis](#dependency-analysis)
 7. [Performance Considerations](#performance-considerations)
 8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+9. [Authorization Layer Caching](#authorization-layer-caching)
+10. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides a comprehensive overview of the Redis-based query caching system implemented in the audit-db package. The caching strategy is designed to optimize performance for audit data retrieval operations by reducing database load through intelligent caching of frequently accessed query results. The system features a pluggable architecture with factory patterns, TTL management, and cache invalidation policies tailored for audit data workloads. Recent updates include a hybrid L1/L2 caching strategy with local memory as L1 cache and Redis as L2 cache for improved performance of organization role queries and other frequently accessed data.
+This document provides a comprehensive overview of the Redis-based query caching system implemented in the audit-db package. The caching strategy is designed to optimize performance for audit data retrieval operations by reducing database load through intelligent caching of frequently accessed query results. The system features a pluggable architecture with factory patterns, TTL management, and cache invalidation policies tailored for audit data workloads. Recent updates include a hybrid L1/L2 caching strategy with local memory as L1 cache and Redis as L2 cache for improved performance of organization role queries and other frequently accessed data. The system has been extended to include Redis caching for authorization layer operations, particularly for organization role management.
 
 ## Project Structure
 The Redis caching implementation is located within the `packages/audit-db/src/cache` directory. This modular structure separates caching concerns from database operations while maintaining tight integration with the enhanced database client.
@@ -72,16 +75,17 @@ The caching system consists of four primary components that work together to pro
 - **RedisQueryCache**: Concrete implementation using Redis as the backend with optional local L1 cache
 - **CachedQueryExecutor**: Mediator that orchestrates cached query execution
 
-These components follow the Strategy and Factory design patterns, allowing for flexible configuration and potential replacement of the caching backend. The RedisQueryCache now supports hybrid caching with local memory as L1 cache and Redis as L2 cache, particularly beneficial for organization role queries and other frequently accessed data.
+These components follow the Strategy and Factory design patterns, allowing for flexible configuration and potential replacement of the caching backend. The RedisQueryCache now supports hybrid caching with local memory as L1 cache and Redis as L2 cache, particularly beneficial for organization role queries and other frequently accessed data. Additionally, the authorization service in the auth package now leverages Redis caching for role and permission management.
 
 **Section sources**
 - [cache-factory.ts](file://packages\audit-db\src\cache\cache-factory.ts)
 - [query-cache.ts](file://packages\audit-db\src\cache\query-cache.ts)
 - [redis-query-cache.ts](file://packages\audit-db\src\cache\redis-query-cache.ts)
 - [cached-query-executor.ts](file://packages\audit-db\src\cache\cached-query-executor.ts)
+- [permissions.ts](file://packages\auth\src\permissions.ts)
 
 ## Architecture Overview
-The caching architecture implements a decorator pattern around database queries, intercepting requests and serving cached results when available. This approach minimizes changes to existing code while providing significant performance benefits. The system now supports a hybrid L1/L2 caching strategy where frequently accessed data like organization roles are cached in local memory (L1) and distributed Redis (L2).
+The caching architecture implements a decorator pattern around database queries, intercepting requests and serving cached results when available. This approach minimizes changes to existing code while providing significant performance benefits. The system now supports a hybrid L1/L2 caching strategy where frequently accessed data like organization roles are cached in local memory (L1) and distributed Redis (L2). The authorization service also implements Redis caching for permission checks and role management.
 
 ```mermaid
 sequenceDiagram
@@ -256,5 +260,126 @@ Common issues and their solutions when working with the Redis caching system:
 - [cached-query-executor.ts](file://packages\audit-db\src\cache\cached-query-executor.ts#L80-L120)
 - [REDIS_CACHE_GUIDE.md](file://packages\audit-db\REDIS_CACHE_GUIDE.md)
 
+## Authorization Layer Caching
+The authorization service now implements Redis caching for improved performance of permission checks and role management. This caching layer reduces database load and improves response times for authorization operations.
+
+### Permission Caching
+Permission checks are cached with a TTL of 5 minutes to balance performance and data freshness. The cache key includes the user ID, resource, action, and context to ensure proper isolation.
+
+```mermaid
+sequenceDiagram
+participant User as "User"
+participant Authz as "AuthorizationService"
+participant Redis as "Redis Cache"
+participant DB as "Database"
+User->>Authz : hasPermission(userId, resource, action)
+Authz->>Redis : GET authz : permissions : {userId} : {resource} : {action}
+Redis-->>Authz : null or cached result
+alt Cache Miss
+Authz->>DB : Query role and permissions
+DB-->>Authz : Role data
+Authz->>Redis : SETEX authz : permissions : {userId} : {resource} : {action} 300 true/false
+Redis-->>Authz : Success
+end
+Authz-->>User : Permission result
+```
+
+**Section sources**
+- [permissions.ts](file://packages\auth\src\permissions.ts#L116-L210)
+
+### Role Management Caching
+Organization roles are cached in Redis with the prefix `authz:roles:`. The system caches both system-level roles and organization-specific roles to minimize database queries during authorization checks.
+
+```typescript
+/**
+ * Initialize default roles and permissions
+ */
+private initializeRoles(): void {
+    // System-level roles
+    const systemRoles: Role[] = [
+        {
+            name: 'user',
+            permissions: [
+                { resource: 'audit.events', action: 'read' },
+                { resource: 'audit.events', action: 'create' },
+            ],
+        },
+        {
+            name: 'admin',
+            permissions: [
+                { resource: '*', action: '*' }, // Super admin has all permissions
+            ],
+        },
+    ]
+
+    // Default Organization-level roles
+    const organizationRoles: Role[] = [
+        {
+            name: 'org:member',
+            permissions: [
+                { resource: 'audit.events', action: 'read' },
+                { resource: 'audit.events', action: 'create' },
+            ],
+        },
+        {
+            name: 'org:admin',
+            permissions: [
+                { resource: 'audit.events', action: 'read' },
+                { resource: 'audit.events', action: 'create' },
+                { resource: 'audit.events', action: 'update' },
+                { resource: 'audit.events', action: 'delete' },
+            ],
+        },
+    ]
+
+    // Cache all roles
+    const allRoles = systemRoles.concat(organizationRoles)
+    allRoles.forEach((role) => {
+        const key = `${this.roleCachePrefix}${role.name}`
+        this.redis.set(key, JSON.stringify(role))
+    })
+}
+```
+
+**Section sources**
+- [permissions.ts](file://packages\auth\src\permissions.ts#L50-L115)
+
+### Cache Invalidation
+The authorization service provides methods to clear permission caches when roles or permissions are updated:
+
+```typescript
+/**
+ * Clear permission cache for a user
+ */
+async clearUserCache(userId: string): Promise<void> {
+    try {
+        const pattern = `${this.permissionCachePrefix}${userId}`
+        const keys = await this.redis.keys(pattern)
+
+        for (const key of keys) {
+            try {
+                await this.redis.del(key)
+            } catch (error) {
+                console.warn('Failed to delete user permission', { key, error: error })
+            }
+        }
+    } catch (error) {
+        console.error('Failed to delete user permissions', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        })
+    }
+}
+
+/**
+ * Clear all permission cache
+ */
+async clearCache(): Promise<void> {
+    await this.redis.del(this.permissionCachePrefix)
+}
+```
+
+**Section sources**
+- [permissions.ts](file://packages\auth\src\permissions.ts#L300-L330)
+
 ## Conclusion
-The Redis-based query caching system provides a robust solution for improving performance of audit data retrieval operations. By implementing a clean separation of concerns through the CacheFactory, QueryCache, and CachedQueryExecutor components, the system offers both high performance and maintainability. The architecture supports easy configuration, monitoring, and troubleshooting, making it a reliable component of the overall audit data infrastructure. Recent enhancements include Redis caching for organization roles and hybrid L1/L2 caching strategies. For optimal results, monitor cache hit ratios and adjust TTL values based on access patterns and data volatility requirements.
+The Redis-based query caching system provides a robust solution for improving performance of audit data retrieval operations. By implementing a clean separation of concerns through the CacheFactory, QueryCache, and CachedQueryExecutor components, the system offers both high performance and maintainability. The architecture supports easy configuration, monitoring, and troubleshooting, making it a reliable component of the overall audit data infrastructure. Recent enhancements include Redis caching for organization roles and hybrid L1/L2 caching strategies. The authorization layer now also leverages Redis caching for permission checks and role management, further reducing database load and improving system responsiveness. For optimal results, monitor cache hit ratios and adjust TTL values based on access patterns and data volatility requirements.

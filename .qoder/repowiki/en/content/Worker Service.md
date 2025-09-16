@@ -2,27 +2,28 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit*
-- [crypto.ts](file://packages\audit\src\crypto.ts) - *New cryptographic service implementation*
+- [index.ts](file://apps/worker/src/index.ts) - *Updated in recent commit*
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *New cryptographic service implementation*
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
 - [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts)
 - [types.ts](file://packages/audit/src/observability/types.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
+- [package.json](file://apps/worker/package.json) - *Updated with new logging dependencies*
+- [Dockerfile](file://apps/worker/Dockerfile) - *Updated for logging changes*
+- [ConsoleLogger.ts](file://packages/logs/src/console.ts) - *Primary logging implementation*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated initialization sequence for monitoring service and alert handlers in the Worker Service
-- Corrected service instantiation order to ensure proper dependency injection
-- Added explicit configuration manager initialization before other services
-- Updated health check service registration to include processor-dependent checks
-- Enhanced error handling during service initialization
-- Integrated CryptoService for event hash verification in the processing pipeline
-- Added detailed documentation for cryptographic integrity verification
-- Updated architecture overview to include security verification layer
-- Enhanced detailed component analysis with new CryptoService section
+- Updated logging implementation from pino to ConsoleLogger across the Worker Service
+- Added new dependencies for pino and pino-elasticsearch in the logs package
+- Updated package.json and Dockerfile to reflect logging changes
+- Revised documentation to reflect unified logging with ConsoleLogger
+- Removed outdated references to pino-based logging in documentation
+- Updated architecture overview to reflect current logging stack
+- Enhanced component analysis with updated logging service details
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -69,18 +70,17 @@ D --> J[Circuit Breaker]
 D --> K[Dead Letter Queue]
 E --> L[Hash Verification]
 F --> M[Redis]
-G --> N[Database Alert Handler]
-N --> O[PostgreSQL]
+G --> N[PostgreSQL]
 ```
 
 **Diagram sources**
-- [index.ts](file://apps\worker\src\index.ts)
+- [index.ts](file://apps/worker/src/index.ts)
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [crypto.ts](file://packages/audit/src/crypto.ts)
 
 **Section sources**
-- [index.ts](file://apps\worker\src\index.ts)
+- [index.ts](file://apps/worker/src/index.ts)
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 
 ## Core Components
@@ -91,6 +91,7 @@ The Worker Service's functionality is driven by several core components:
 - **AuditTracer**: Provides distributed tracing for observability.
 - **DatabaseAlertHandler**: Persists alerts to PostgreSQL and manages alert lifecycle.
 - **CryptoService**: Verifies the integrity of audit events through hash verification.
+- **ConsoleLogger**: Unified logging implementation across the worker service.
 
 These components are orchestrated through dependency injection and support pluggable handlers for extensibility.
 
@@ -98,7 +99,8 @@ These components are orchestrated through dependency injection and support plugg
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [crypto.ts](file://packages/audit/src/crypto.ts)
+- [console.ts](file://packages/logs/src/console.ts)
 
 ## Architecture Overview
 The Worker Service follows an event-driven, microservices-inspired architecture. It consumes audit log events from a message queue (via Inngest), processes them for compliance and security monitoring, and emits alerts and metrics.
@@ -122,6 +124,7 @@ Metrics[RedisMetricsCollector]
 Tracer[AuditTracer]
 Alerts[DatabaseAlertHandler]
 Crypto[CryptoService]
+Logger[ConsoleLogger]
 end
 MQ --> Inngest
 Inngest --> Monitor
@@ -129,6 +132,7 @@ Monitor --> Metrics
 Monitor --> Tracer
 Monitor --> Alerts
 Monitor --> Crypto
+Monitor --> Logger
 Crypto --> KMS
 Alerts --> DB
 Metrics --> Cache
@@ -140,7 +144,8 @@ Monitor --> SMTP
 - [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
-- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [crypto.ts](file://packages/audit/src/crypto.ts)
+- [console.ts](file://packages/logs/src/console.ts)
 
 ## Detailed Component Analysis
 
@@ -189,7 +194,7 @@ MonitoringService --> "Pattern Detection" : "composes"
 **Diagram sources**
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
-- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [crypto.ts](file://packages/audit/src/crypto.ts)
 
 **Section sources**
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L799)
@@ -221,11 +226,11 @@ Monitor->>Monitor : detectPatterns()
 ```
 
 **Diagram sources**
-- [crypto.ts](file://packages\audit\src\crypto.ts#L72-L315)
-- [index.ts](file://apps\worker\src\index.ts#L300-L350)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L72-L315)
+- [index.ts](file://apps/worker/src/index.ts#L300-L350)
 
 **Section sources**
-- [crypto.ts](file://packages\audit\src\crypto.ts#L72-L315)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L72-L315)
 
 ### Metrics Collection Flow
 The metrics collection system uses Redis as a high-performance backend to track key performance indicators such as events processed, error rates, processing latency, and alert counts.
@@ -278,6 +283,32 @@ Export --> OTLP["OTLP Exporter"]
 **Section sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L426)
 
+### Logging Implementation
+The `ConsoleLogger` provides unified logging across the Worker Service, replacing the previous pino-based implementation. It formats log entries with structured metadata including environment, application, module, version, and request context.
+
+```mermaid
+sequenceDiagram
+participant Service as MonitoringService
+participant Logger as ConsoleLogger
+participant Output as Console Output
+Service->>Logger : info("Processing event")
+Logger->>Logger : marshal(level, message, fields)
+Logger->>Logger : create Log object
+Logger->>Output : console.info(formatted message)
+Service->>Logger : error("Processing failed", {error : details})
+Logger->>Logger : marshal("error", message, fields)
+Logger->>Output : console.error(formatted message)
+```
+
+**Diagram sources**
+- [console.ts](file://packages/logs/src/console.ts#L1-L90)
+- [index.ts](file://apps/worker/src/index.ts#L1-L717)
+
+**Section sources**
+- [console.ts](file://packages/logs/src/console.ts#L1-L90)
+- [package.json](file://apps/worker/package.json)
+- [Dockerfile](file://apps/worker/Dockerfile)
+
 ## Dependency Analysis
 The Worker Service has a layered dependency structure:
 
@@ -292,6 +323,9 @@ Worker --> Inngest[inngest]
 Worker --> Hono[hono]
 Audit --> Zod[zod]
 Audit --> Bcrypt[bcrypt]
+Worker --> Logs[@repo/logs]
+Logs --> Pino[pino]
+Logs --> PinoElastic[pino-elasticsearch]
 ```
 
 All shared packages are managed via the monorepo's `pnpm-workspace.yaml`, ensuring version consistency and efficient development.
@@ -299,10 +333,12 @@ All shared packages are managed via the monorepo's `pnpm-workspace.yaml`, ensuri
 **Diagram sources**
 - [package.json](file://apps/worker/package.json)
 - [package.json](file://packages/audit/package.json)
+- [package.json](file://packages/logs/package.json)
 
 **Section sources**
 - [package.json](file://apps/worker/package.json)
 - [package.json](file://packages/audit/package.json)
+- [package.json](file://packages/logs/package.json)
 
 ## Performance Considerations
 The worker is optimized for high-throughput, low-latency processing:
@@ -313,6 +349,7 @@ The worker is optimized for high-throughput, low-latency processing:
 - **Tracing**: Samples spans based on configurable rate to balance insight and overhead.
 - **Health Checks**: Aggregates metrics asynchronously to avoid blocking event processing.
 - **Cryptographic Verification**: Implements efficient hashing of critical fields only, with configurable KMS integration for enhanced security.
+- **Logging**: Uses ConsoleLogger for unified logging with structured output, replacing the previous pino implementation.
 
 The system is horizontally scalable via Kubernetes, with each worker instance maintaining independent state while sharing Redis and PostgreSQL backends.
 
@@ -325,16 +362,20 @@ Common issues and their resolutions:
 - **Missing Metrics**: Ensure `RedisMetricsCollector` is properly initialized with a valid Redis connection.
 - **Tracing Not Exporting**: Confirm `ObservabilityConfig.tracing.enabled` is true and exporter type is valid.
 - **Hash Verification Failures**: Verify that the `AUDIT_CRYPTO_SECRET` is properly configured and consistent across services. Check that critical event fields match between sender and receiver.
+- **Logging Issues**: Ensure ConsoleLogger is properly initialized with correct environment, application, and module parameters. Verify that LOG_LEVEL environment variable is set appropriately.
 
 **Section sources**
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L500-L600)
 - [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L300-L350)
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L400-L426)
-- [crypto.ts](file://packages\audit\src\crypto.ts#L150-L200)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L150-L200)
+- [console.ts](file://packages/logs/src/console.ts#L1-L90)
 
 ## Conclusion
 The Worker Service is a robust, scalable background processor designed for real-time compliance and security monitoring. Its modular architecture, deep observability, and resilience patterns make it well-suited for mission-critical audit processing.
 
 By leveraging Redis for metrics, PostgreSQL for persistent alert storage, and Inngest for orchestration, the service achieves high availability and operational transparency. The recent integration of CryptoService enhances security by providing cryptographic integrity verification of audit events, ensuring data authenticity and protection against tampering.
+
+The logging system has been unified with ConsoleLogger, providing consistent structured logging across the service while maintaining compatibility with the observability stack. This change simplifies log management and ensures consistent log formatting across all components.
 
 Future enhancements could include ML-based anomaly detection, integration with SIEM systems, and enhanced cryptographic features such as digital signatures and certificate-based authentication. The codebase demonstrates strong separation of concerns, extensive testing, and clear extensibility points through pluggable alert handlers and metrics collectors.

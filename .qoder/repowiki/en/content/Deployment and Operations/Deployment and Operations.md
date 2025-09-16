@@ -18,7 +18,19 @@
 - [scripts/k8s-deploy.sh](file://apps/server/scripts/k8s-deploy.sh)
 - [README.Docker.md](file://apps/server/README.Docker.md)
 - [src/index.ts](file://apps/server/src/index.ts)
+- [docker/infisical/docker-compose.prod.yml](file://docker/infisical/docker-compose.prod.yml) - *Added in recent commit*
+- [docker/inngest/docker-compose.yml](file://docker/inngest/docker-compose.yml) - *Added in recent commit*
+- [docker/openobserve/docker-compose.yml](file://docker/openobserve/docker-compose.yml) - *Added in recent commit*
+- [docker/pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml) - *Added in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added new section on Infrastructure Services with Docker Compose configurations
+- Updated Local Deployment section to include new infrastructure services
+- Enhanced Table of Contents to reflect new content
+- Added references to new Docker Compose files for infrastructure services
+- Updated Section sources to include newly added infrastructure service files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -26,12 +38,13 @@
 3. [Server Architecture](#server-architecture)
 4. [Container Configuration](#container-configuration)
 5. [Local Deployment with Docker Compose](#local-deployment-with-docker-compose)
-6. [Production Deployment with Kubernetes](#production-deployment-with-kubernetes)
-7. [Infrastructure Requirements](#infrastructure-requirements)
-8. [Scalability and Auto-Scaling](#scalability-and-auto-scaling)
-9. [Monitoring and Logging](#monitoring-and-logging)
-10. [Backup and Disaster Recovery](#backup-and-disaster-recovery)
-11. [Sample Deployment Scenarios](#sample-deployment-scenarios)
+6. [Infrastructure Services](#infrastructure-services)
+7. [Production Deployment with Kubernetes](#production-deployment-with-kubernetes)
+8. [Infrastructure Requirements](#infrastructure-requirements)
+9. [Scalability and Auto-Scaling](#scalability-and-auto-scaling)
+10. [Monitoring and Logging](#monitoring-and-logging)
+11. [Backup and Disaster Recovery](#backup-and-disaster-recovery)
+12. [Sample Deployment Scenarios](#sample-deployment-scenarios)
 
 ## Introduction
 
@@ -337,6 +350,137 @@ deploy:
 - [docker-compose.yml](file://apps/server/docker-compose.yml)
 - [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
 - [README.Docker.md](file://apps/server/README.Docker.md)
+
+## Infrastructure Services
+
+New infrastructure services have been added to support the audit logging system. These services are configured using dedicated Docker Compose files and provide essential functionality for secrets management, event processing, observability, and vector database capabilities.
+
+### Infisical Secrets Management
+
+Infisical provides secure secrets management for the application. The production configuration is defined in `docker/infisical/docker-compose.prod.yml`:
+
+```yaml
+services:
+  backend:
+    container_name: infisical-backend
+    restart: always
+    image: infisical/infisical:latest-postgres
+    pull_policy: always
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
+```
+
+**Section sources**
+- [docker/infisical/docker-compose.prod.yml](file://docker/infisical/docker-compose.prod.yml)
+
+### Inngest Event Processing
+
+Inngest handles event-driven workflows and background processing. The configuration is defined in `docker/inngest/docker-compose.yml`:
+
+```yaml
+services:
+  inngest:
+    image: inngest/inngest
+    command: 'inngest start -u http://192.168.1.114:3000/api/inngest'
+    container_name: inngest
+    restart: always
+    ports:
+      - '8288:8288'
+      - '8289:8289'
+    environment:
+      - INNGEST_EVENT_KEY=${INNGEST_EVENT_KEY}
+      - INNGEST_SIGNING_KEY=${INNGEST_SIGNING_KEY}
+      - INNGEST_POSTGRES_URI=${INNGEST_POSTGRES_URI}
+      - INNGEST_REDIS_URI=${INNGEST_REDIS_URI}
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
+```
+
+**Section sources**
+- [docker/inngest/docker-compose.yml](file://docker/inngest/docker-compose.yml)
+
+### OpenObserve Logging and Observability
+
+OpenObserve provides centralized logging and observability capabilities. The configuration is defined in `docker/openobserve/docker-compose.yml`:
+
+```yaml
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    restart: always
+    ports:
+      - "5080:5080"
+    environment:
+      - ZO_DATA_DIR=/data
+      - ZO_ROOT_USER_EMAIL=${OPENOBSERVE_ROOT_USER_EMAIL}
+      - ZO_ROOT_USER_PASSWORD=${OPENOBSERVE_ROOT_USER_PASSWORD}
+    volumes:
+      - openobserve_data:/data
+
+volumes:
+  openobserve_data:
+    driver: local
+```
+
+**Section sources**
+- [docker/openobserve/docker-compose.yml](file://docker/openobserve/docker-compose.yml)
+
+### PGVector Database Extension
+
+PGVector provides vector database capabilities for advanced analytics. The configuration is defined in `docker/pgvector/docker-compose.yml`:
+
+```yaml
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: pgvector
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '25432:5432'
+    volumes:
+      - pgvector:/var/lib/postgresql/data
+    command: postgres -c shared_preload_libraries='pg_stat_statements' -c wal_level=logical
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${AUDIT_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  electric:
+    image: docker.io/electricsql/electric:latest
+    container_name: electric
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${AUDIT_DB}?sslmode=disable
+      ELECTRIC_INSECURE: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
+
+volumes:
+  pgvector:
+    driver: local
+```
+
+**Section sources**
+- [docker/pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml)
 
 ## Production Deployment with Kubernetes
 

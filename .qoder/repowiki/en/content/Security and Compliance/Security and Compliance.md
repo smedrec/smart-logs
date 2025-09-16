@@ -7,6 +7,8 @@
 - [schema.ts](file://packages\audit-db\src\db\schema.ts)
 - [pseudonym_mapping.sql](file://packages\audit-db\drizzle\migrations\0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [client.ts](file://packages\infisical-kms\src\client.ts) - *KMS integration for pseudonymization*
+- [permissions.ts](file://packages\auth\src\permissions.ts) - *Updated in recent commit*
+- [authz.ts](file://packages\auth\src\db\schema\authz.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
@@ -16,6 +18,9 @@
 - Updated code examples to reflect current pseudonymization implementation with KMS integration
 - Added new section on pseudonymization strategies and their implementation
 - Updated sequence diagram to show KMS encryption in pseudonym mapping storage
+- Added documentation for organization role management with Redis caching
+- Updated security measures section to include role-based access control with Redis caching
+- Added new class diagram for AuthorizationService and role management
 - Maintained existing structure while incorporating new pseudonymization features
 
 ## Table of Contents
@@ -243,7 +248,7 @@ I --> J["Generate Integrity Report"]
 - [client.ts](file://packages\infisical-kms\src\client.ts#L100-L120)
 
 ### Secure Authentication and Access Controls
-The system implements secure authentication through audit logging of all authentication events and role-based access controls.
+The system implements secure authentication through audit logging of all authentication events and role-based access controls. The authorization service uses Redis caching to improve performance of permission checks.
 
 ```mermaid
 classDiagram
@@ -276,6 +281,52 @@ AuditLogEvent --> SessionContext : "sessionContext"
 
 **Section sources**
 - [types.ts](file://packages\audit\src\types.ts#L150-L180)
+
+### Organization Role Management with Redis Caching
+The system implements organization role management with Redis caching for improved performance. Roles are stored in both PostgreSQL and Redis, with Redis serving as the primary cache for permission checks.
+
+```mermaid
+classDiagram
+class AuthorizationService {
++hasPermission(session, resource, action)
++getUserPermissions(session)
++getRole(roleName)
++addRole(role)
++removeRole(roleName)
++getAllRoles()
++clearUserCache(userId)
++clearCache()
+}
+class RedisCache {
++authz : roles : * : Role
++authz : permissions : * : boolean
+}
+class PostgreSQL {
++organization_role table
++active_organization table
++report_config table
+}
+class Role {
++name : string
++description? : string
++permissions : Permission[]
++inherits? : string[]
+}
+class Permission {
++resource : string
++action : string
++conditions? : Record<string, any>
+}
+AuthorizationService --> RedisCache : "reads/writes"
+AuthorizationService --> PostgreSQL : "persists data"
+RedisCache --> Role : "stores"
+PostgreSQL --> Role : "stores"
+Role --> Permission : "contains"
+```
+
+**Section sources**
+- [permissions.ts](file://packages\auth\src\permissions.ts#L0-L691)
+- [authz.ts](file://packages\auth\src\db\schema\authz.ts#L0-L118)
 
 ## Compliance Reporting and Data Export
 
