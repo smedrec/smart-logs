@@ -94,15 +94,11 @@ const observabilityConfig: ObservabilityConfig = {
 		enabled: true,
 		serviceName: 'audit-system',
 		sampleRate: 1.0,
-		exporterType: 'console' as const,
-		/**exporterType: 'otlp' as const,
-		exporterEndpoint: 'http://joseantcordeiro.hopto.org:4317',
+		exporterType: 'otlp' as const,
+		exporterEndpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
 		headers: {
-			Authorization:
-				process.env.OTEL_EXPORTER_OTLP_HEADERS_API_KEY ||
-				'Basic process.env.OTEL_EXPORTER_OTLP_BASIC_AUTH_KEY',
 			'stream-name': 'default',
-		},*/
+		},
 	},
 	metrics: {
 		enabled: true,
