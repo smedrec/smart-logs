@@ -577,6 +577,36 @@ export interface SecureStorageConfig {
 
 	/** Number of iterations for key derivation */
 	iterations: number
+
+	/** KMS encryption settings */
+	kms: {
+		/** Enable KMS encryption */
+		enabled: boolean
+
+		/** KMS encryption key ID */
+		encryptionKey: string
+
+		/** KMS signing key ID */
+		signingKey: string
+
+		/** KMS access token */
+		accessToken: string
+
+		/** KMS base URL */
+		baseUrl: string
+
+		/** KMS encryption algorithm */
+		algorithm?: 'AES-256-GCM' | 'AES-256-CBC'
+
+		/** KMS key derivation function */
+		kdf?: 'PBKDF2' | 'scrypt'
+
+		/** KMS salt for key derivation */
+		salt?: string
+
+		/** KMS number of iterations for key derivation */
+		iterations?: number
+	}
 }
 
 /**

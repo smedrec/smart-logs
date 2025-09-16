@@ -105,6 +105,13 @@ export async function initializeAuditConfig(
 				kdf: 'PBKDF2',
 				salt: process.env.AUDIT_CONFIG_SALT || (await generateSalt()),
 				iterations: 100000,
+				kms: {
+					enabled: true,
+					encryptionKey: process.env.KMS_ENCRYPTION_KEY || '',
+					signingKey: process.env.KMS_SIGNING_KEY || '',
+					accessToken: process.env.INFISICAL_ACCESS_TOKEN || '',
+					baseUrl: process.env.INFISICAL_URL || '',
+				},
 				...secureStorageConfig,
 			}
 		: undefined

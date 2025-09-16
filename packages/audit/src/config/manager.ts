@@ -14,6 +14,8 @@ import { sql } from 'drizzle-orm'
 import { drizzle, PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
+import { InfisicalKmsClient } from '@repo/infisical-kms'
+
 import { validateConfiguration } from './validator.js'
 
 import type {
@@ -34,6 +36,7 @@ const scryptAsync = promisify(scrypt)
 export class ConfigurationManager extends EventEmitter {
 	private db: PostgresJsDatabase<any> | null = null
 	private s3: S3Client | null = null
+	private kms: InfisicalKmsClient | null = null
 	private config: AuditConfig | null = null
 	private configPath: string
 	private storageType: StorageType
@@ -63,6 +66,13 @@ export class ConfigurationManager extends EventEmitter {
 			kdf: 'PBKDF2',
 			salt: process.env.AUDIT_CONFIG_SALT || randomBytes(32).toString('hex'),
 			iterations: 100000,
+			kms: {
+				enabled: false,
+				encryptionKey: process.env.KMS_ENCRYPTION_KEY || '',
+				signingKey: process.env.KMS_SIGNING_KEY || '',
+				accessToken: process.env.INFISICAL_ACCESS_TOKEN || '',
+				baseUrl: process.env.INFISICAL_URL || '',
+			},
 		}
 	}
 
@@ -516,6 +526,16 @@ export class ConfigurationManager extends EventEmitter {
 	 * Initialize encryption for secure storage
 	 */
 	private async initializeEncryption(): Promise<void> {
+		if (this.secureStorageConfig.kms.enabled) {
+			this.kms = new InfisicalKmsClient({
+				baseUrl: this.secureStorageConfig.kms.baseUrl,
+				encryptionKey: this.secureStorageConfig.kms.encryptionKey,
+				signingKey: this.secureStorageConfig.kms.signingKey,
+				accessToken: this.secureStorageConfig.kms.accessToken,
+			})
+			return
+		}
+
 		const password = process.env.AUDIT_CONFIG_PASSWORD
 		if (!password) {
 			throw new Error('AUDIT_CONFIG_PASSWORD environment variable required for secure storage')
@@ -540,31 +560,44 @@ export class ConfigurationManager extends EventEmitter {
 	 * Encrypt configuration file
 	 */
 	private async encryptConfigFile(data: string): Promise<void> {
-		if (!this.encryptionKey) {
-			throw new Error('Encryption key not initialized')
+		let encryptedData: any
+
+		if (this.secureStorageConfig.kms.enabled) {
+			if (!this.kms) {
+				throw new Error('KMS client not initialized')
+			}
+			const encrypted = await this.kms.encrypt(data)
+			encryptedData = {
+				data: encrypted.ciphertext,
+			}
+		} else {
+			if (!this.encryptionKey) {
+				throw new Error('Encryption key not initialized')
+			}
+
+			const iv = randomBytes(16)
+			const cipher = createCipheriv(this.secureStorageConfig.algorithm, this.encryptionKey, iv)
+
+			let encrypted = cipher.update(data, 'utf8', 'hex')
+			encrypted += cipher.final('hex')
+
+			encryptedData = {
+				algorithm: this.secureStorageConfig.algorithm,
+				iv: iv.toString('hex'),
+				data: encrypted,
+			}
+
+			// Add authentication tag for GCM mode
+			if (this.secureStorageConfig.algorithm === 'AES-256-GCM') {
+				encryptedData.authTag = (cipher as any).getAuthTag().toString('hex')
+			}
 		}
+
 		if (!this.bucket && this.storageType === 's3') {
 			throw new Error('S3 bucket not configured')
 		}
 		if (!this.s3 && this.storageType === 's3') {
 			throw new Error('S3 client not initialized')
-		}
-
-		const iv = randomBytes(16)
-		const cipher = createCipheriv(this.secureStorageConfig.algorithm, this.encryptionKey, iv)
-
-		let encrypted = cipher.update(data, 'utf8', 'hex')
-		encrypted += cipher.final('hex')
-
-		const encryptedData: any = {
-			algorithm: this.secureStorageConfig.algorithm,
-			iv: iv.toString('hex'),
-			data: encrypted,
-		}
-
-		// Add authentication tag for GCM mode
-		if (this.secureStorageConfig.algorithm === 'AES-256-GCM') {
-			encryptedData.authTag = (cipher as any).getAuthTag().toString('hex')
 		}
 
 		if (this.storageType === 's3') {
@@ -584,9 +617,6 @@ export class ConfigurationManager extends EventEmitter {
 	 * Decrypt configuration file
 	 */
 	private async decryptConfigFile(): Promise<string> {
-		if (!this.encryptionKey) {
-			throw new Error('Encryption key not initialized')
-		}
 		if (!this.bucket && this.storageType === 's3') {
 			throw new Error('S3 bucket not configured')
 		}
@@ -612,18 +642,34 @@ export class ConfigurationManager extends EventEmitter {
 			encryptedData = JSON.parse(await readFile(this.configPath, 'utf-8'))
 		}
 
-		const iv = Buffer.from(encryptedData.iv, 'hex')
-		const decipher = createDecipheriv(encryptedData.algorithm, this.encryptionKey, iv)
+		if (this.secureStorageConfig.kms.enabled) {
+			if (!this.kms) {
+				throw new Error('KMS client not initialized')
+			}
+			try {
+				const decrypted = await this.kms.decrypt(encryptedData.data)
+				return decrypted.plaintext
+			} catch (error) {
+				throw new Error('Failed to decrypt configuration file')
+			}
+		} else {
+			if (!this.encryptionKey) {
+				throw new Error('Encryption key not initialized')
+			}
 
-		// Set authentication tag for GCM mode
-		if (this.secureStorageConfig.algorithm === 'AES-256-GCM' && encryptedData.authTag) {
-			;(decipher as any).setAuthTag(Buffer.from(encryptedData.authTag, 'hex'))
+			const iv = Buffer.from(encryptedData.iv, 'hex')
+			const decipher = createDecipheriv(encryptedData.algorithm, this.encryptionKey, iv)
+
+			// Set authentication tag for GCM mode
+			if (this.secureStorageConfig.algorithm === 'AES-256-GCM' && encryptedData.authTag) {
+				;(decipher as any).setAuthTag(Buffer.from(encryptedData.authTag, 'hex'))
+			}
+
+			let decrypted = decipher.update(encryptedData.data, 'hex', 'utf8')
+			decrypted += decipher.final('utf8')
+
+			return decrypted
 		}
-
-		let decrypted = decipher.update(encryptedData.data, 'hex', 'utf8')
-		decrypted += decipher.final('utf8')
-
-		return decrypted
 	}
 
 	/**

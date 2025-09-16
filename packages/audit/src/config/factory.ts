@@ -114,7 +114,7 @@ export function createDevelopmentConfig(): AuditConfig {
 				id: 'smart-logs-app-dev',
 				eventKey: process.env.INNGEST_EVENT_KEY || 'your-event-key-here',
 				signingKey: process.env.INNGEST_SIGNING_KEY || 'your-signing-key-here',
-				baseUrl: process.env.INNGEST_BASE_URL || 'https://inngest.teachhowtofish.org',
+				baseUrl: process.env.INNGEST_BASE_URL || 'https://inngest.smedrec.qzz.io',
 			},
 			monitoring: {
 				enableMetrics: true,
@@ -251,7 +251,7 @@ export function createDevelopmentConfig(): AuditConfig {
 				encryptionKey: process.env.KMS_ENCRYPTION_KEY_ID || 'your-encryption-key-id',
 				signingKey: process.env.KMS_SIGNING_KEY_ID || 'your-signing-key-id',
 				accessToken: process.env.INFISICAL_ACCESS_TOKEN || 'your-access-token',
-				baseUrl: process.env.INFISICAL_URL || 'https://infisical.teachhowtofish.org',
+				baseUrl: process.env.INFISICAL_URL || 'https://infisical.smedrec.qzz.io',
 			},
 		},
 		compliance: {
