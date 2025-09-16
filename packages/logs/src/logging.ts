@@ -51,11 +51,20 @@ export interface LoggerConfig {
 	enableErrorTracking: boolean
 	enableMetrics: boolean
 	format: 'json' | 'pretty'
-	outputs: ('console' | 'file' | 'redis')[]
+	outputs: ('console' | 'file' | 'redis' | 'otpl')[]
 	redisConfig?: {
 		key: string
 		maxEntries: number
 		ttl: number
+	}
+	fileConfig?: {
+		path: string
+		maxSize: number
+		maxFiles: number
+	}
+	otplConfig?: {
+		endpoint: string
+		headers?: Record<string, string>
 	}
 }
 
@@ -400,6 +409,9 @@ export class StructuredLogger {
 					case 'redis':
 						this.outputToRedis(logEntry)
 						break
+					case 'otpl':
+						this.outputToOtpl(logEntry)
+						break
 				}
 			} catch (error) {
 				// Fallback to console if other outputs fail
@@ -435,6 +447,80 @@ export class StructuredLogger {
 	/**
 	 * Output to file (placeholder - would need file system integration)
 	 */
+	private async outputToOtpl(logEntry: LogEntry): Promise<void> {
+		if (!this.config.otplConfig) {
+			throw new Error('OTLP exporter not configured')
+		}
+
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json',
+			'User-Agent': `audit-system-tracer/1.0.0`,
+			...this.config.otplConfig.headers,
+		}
+
+		let body = JSON.stringify(logEntry)
+
+		// Add compression if large payload
+		if (body.length > 1024) {
+			const compressed = await this.compressPayload(body)
+			if (compressed) {
+				body = compressed.data
+				headers['Content-Encoding'] = compressed.encoding
+			}
+		}
+
+		const requestConfig: RequestInit = {
+			method: 'POST',
+			headers,
+			body,
+		}
+
+		const maxRetries = 3
+		let retryDelay = 1000
+
+		for (let attempt = 0; attempt <= maxRetries; attempt++) {
+			try {
+				const response = await fetch(this.config.otplConfig.endpoint, requestConfig)
+
+				if (response.ok) {
+					console.debug(`Successfully exported log to OTLP`)
+					return
+				}
+
+				// Handle different error scenarios
+				if (response.status === 429) {
+					// Rate limited - implement backoff
+					const retryAfter = response.headers.get('Retry-After')
+					retryDelay = retryAfter ? parseInt(retryAfter) * 1000 : retryDelay * 2
+				} else if (response.status >= 400 && response.status < 500) {
+					// Client error - don't retry
+					throw new Error(`Client error: ${response.status} ${response.statusText}`)
+				}
+
+				if (attempt === maxRetries) {
+					throw new Error(
+						`Failed after ${maxRetries} attempts: ${response.status} ${response.statusText}`
+					)
+				}
+
+				// Wait before retry
+				await new Promise((resolve) => setTimeout(resolve, retryDelay))
+				retryDelay *= 2 // Exponential backoff
+			} catch (error) {
+				if (attempt === maxRetries) {
+					throw error
+				}
+
+				// Wait before retry for network errors
+				await new Promise((resolve) => setTimeout(resolve, retryDelay))
+				retryDelay *= 2
+			}
+		}
+	}
+
+	/**
+	 * Output to file (placeholder - would need file system integration)
+	 */
 	private outputToFile(logEntry: LogEntry): void {
 		// This would write to a log file
 		// For now, just output to console as JSON
@@ -448,6 +534,17 @@ export class StructuredLogger {
 		// This would send to Redis for log aggregation
 		// For now, just output to console as JSON
 		console.log(JSON.stringify(logEntry))
+	}
+
+	/**
+	 * Compress payload if beneficial
+	 */
+	private async compressPayload(data: string): Promise<{ data: string; encoding: string } | null> {
+		// For now, return null (no compression)
+		// In a full implementation, you could use zlib:
+		// const compressed = await gzip(Buffer.from(data))
+		// return { data: compressed.toString('base64'), encoding: 'gzip' }
+		return null
 	}
 }
 

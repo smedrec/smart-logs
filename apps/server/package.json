@@ -34,6 +34,7 @@
 		"@repo/auth": "workspace:*",
 		"@repo/hono-helpers": "workspace:*",
 		"@repo/infisical-kms": "workspace:*",
+		"@repo/logs": "workspace:*",
 		"@repo/mailer": "workspace:*",
 		"@repo/redis-client": "workspace:*",
 		"@repo/send-mail": "workspace:*",

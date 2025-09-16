@@ -13,9 +13,10 @@
 import { TRPCError } from '@trpc/server'
 import { GraphQLError } from 'graphql'
 
+import { LoggerFactory } from '@repo/logs'
+
 import { handleError } from '../errors/http'
 import { UnifiedErrorHandler } from '../errors/unified-handler'
-import { LoggerFactory } from '../services/logging'
 
 import type { GraphQLFormattedError } from 'graphql'
 import type { MiddlewareHandler } from 'hono'

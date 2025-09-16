@@ -32,11 +32,11 @@ import {
 } from '@repo/audit-db'
 import { Auth, createAuthorizationService } from '@repo/auth'
 import { InfisicalKmsClient } from '@repo/infisical-kms'
+import { LoggerFactory, StructuredLogger } from '@repo/logs'
 import { getRedisConnectionStatus, getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { bindingsMiddleware } from '../inngest/middleware.js'
 import { schemas } from '../inngest/types.js'
-import { LoggerFactory, StructuredLogger } from '../services/logging.js'
 import { PerformanceService } from '../services/performance.js'
 import { createResilienceService } from '../services/resilience.js'
 
@@ -188,7 +188,11 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 				enableErrorTracking: true,
 				enableMetrics: config.server.monitoring.enableMetrics,
 				format: config.server.environment === 'development' ? 'pretty' : 'json',
-				outputs: ['console'],
+				outputs: ['console', 'otpl'],
+				otplConfig: {
+					endpoint: config.logging.exporterEndpoint || '',
+					headers: config.logging.exporterHeaders || {},
+				},
 			})
 
 			structuredLogger = LoggerFactory.createLogger({

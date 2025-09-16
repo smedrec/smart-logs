@@ -36,7 +36,7 @@ import {
 	errorAggregation,
 	errorLog,
 } from '@repo/audit-db'
-import { ConsoleLogger, OTPLLogger } from '@repo/logs'
+import { LoggerFactory } from '@repo/logs'
 import {
 	closeSharedRedisConnection,
 	getRedisConnectionStatus,
@@ -49,29 +49,26 @@ import type { AuditLogEvent, ObservabilityConfig, ReliableProcessorConfig } from
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
 
-const logger = new OTPLLogger(
-	{
-		environment: 'development',
-		application: 'worker',
-		module: 'SmartLogs',
-		version: '0.1.0',
-		defaultFields: {
-			environment: 'development',
-		},
-	},
-	{
-		level: 'debug',
-		structured: true,
-		format: 'json',
-		enableCorrelationIds: true,
-		retentionDays: 30,
-		exporterType: 'otlp',
-		exporterEndpoint: 'http://localhost:5080/api/default/default/_json',
-		exporterHeaders: {
+// Initialize enhanced structured logger
+
+LoggerFactory.setDefaultConfig({
+	level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+	enablePerformanceLogging: true,
+	enableErrorTracking: true,
+	enableMetrics: false,
+	format: 'pretty',
+	outputs: ['console', 'otpl'],
+	otplConfig: {
+		endpoint: 'http://localhost:5080/api/default/default/_json',
+		headers: {
 			Authorization: 'Basic am9zZWFudGNvcmRlaXJvQGdtYWlsLmNvbTpST3pVRnROWHVkZFdTeGZF',
 		},
-	}
-)
+	},
+})
+
+const logger = LoggerFactory.createLogger({
+	service: 'worker',
+})
 
 // Configuration manager
 let configManager: ConfigurationManager | undefined = undefined
@@ -155,7 +152,10 @@ app.get('/healthz', async (c) => {
 		}
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Health check failed with error: ${errorMessage}`, { error: errorMessage })
+		logger.error(
+			`Health check failed with error: ${errorMessage}`,
+			error instanceof Error ? error : new Error('Unknown error')
+		)
 		c.status(503)
 		return c.json({
 			status: 'CRITICAL',
@@ -187,7 +187,10 @@ app.get('/metrics', async (c) => {
 		})
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to collect metrics: ${errorMessage}`, { error: errorMessage })
+		logger.error(
+			`Failed to collect metrics: ${errorMessage}`,
+			error instanceof Error ? error : new Error('Unknown error')
+		)
 		c.status(500)
 		return c.json({
 			error: 'Failed to collect metrics',
@@ -222,7 +225,10 @@ app.get('/health/:component', async (c) => {
 		return c.json(componentHealth)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to check component health: ${errorMessage}`, { error: errorMessage })
+		logger.error(
+			`Failed to check component health: ${errorMessage}`,
+			error instanceof Error ? error : new Error('Unknown error')
+		)
 		c.status(500)
 		return c.json({
 			error: 'Failed to check component health',
@@ -243,7 +249,10 @@ app.get('/observability/dashboard', async (c) => {
 		return c.json(dashboardData)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get dashboard data: ${errorMessage}`, { error: errorMessage })
+		logger.error(
+			`Failed to get dashboard data: ${errorMessage}`,
+			error instanceof Error ? error : new Error('Unknown error')
+		)
 		c.status(500)
 		return c.json({
 			error: 'Failed to get dashboard data',
@@ -270,7 +279,10 @@ app.get('/observability/metrics/enhanced', async (c) => {
 		return c.json(JSON.parse(metrics))
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to export enhanced metrics: ${errorMessage}`, { error: errorMessage })
+		logger.error(
+			`Failed to export enhanced metrics: ${errorMessage}`,
+			error instanceof Error ? error : new Error('Unknown error')
+		)
 		c.status(500)
 		return c.json({
 			error: 'Failed to export enhanced metrics',
@@ -290,7 +302,7 @@ app.get('/observability/bottlenecks', async (c) => {
 		return c.json(bottlenecks)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get bottleneck analysis: ${errorMessage}`, { error: errorMessage })
+		logger.error(`Failed to get bottleneck analysis: ${errorMessage}`)
 		c.status(500)
 		return c.json({
 			error: 'Failed to get bottleneck analysis',
@@ -316,7 +328,10 @@ app.get('/observability/traces', async (c) => {
 		return c.json(activeSpans)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get trace data: ${errorMessage}`, { error: errorMessage })
+		logger.error(
+			`Failed to get trace data: ${errorMessage}`,
+			error instanceof Error ? error : new Error('Unknown error')
+		)
 		c.status(500)
 		return c.json({
 			error: 'Failed to get trace data',
@@ -336,7 +351,10 @@ app.get('/observability/profiling', async (c) => {
 		return c.json(profilingResults)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get profiling results: ${errorMessage}`, { error: errorMessage })
+		logger.error(
+			`Failed to get profiling results: ${errorMessage}`,
+			error instanceof Error ? error : new Error('Unknown error')
+		)
 		c.status(500)
 		return c.json({
 			error: 'Failed to get profiling results',
@@ -363,8 +381,9 @@ async function main() {
 				error instanceof Error
 					? error.message
 					: 'Unknown error during configuration manager initialization'
-			logger.error(`🔴 Configuration manager initialization failed: ${message}`, { error: message })
-			throw new Error(message)
+			const err = new Error(message)
+			logger.error(`🔴 Configuration manager initialization failed: ${message}`, err)
+			throw err
 		}
 	}
 
@@ -379,10 +398,9 @@ async function main() {
 	} catch (error) {
 		// TODO: Optionally, implement retry logic here or ensure process exits.
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error('🔴 Halting worker start due to redis connection failure.', {
-			error: errorMessage,
-		})
-		throw error
+		const err = error instanceof Error ? error : new Error('Unknown error')
+		logger.error('🔴 Halting worker start due to redis connection failure.', err)
+		throw err
 	}
 
 	// Optional: Log connection status from the client
@@ -392,8 +410,10 @@ async function main() {
 	// We can add listeners here too, but it might be redundant if the shared client's logging is sufficient.
 	// For example, if specific actions for this worker are needed on 'error':
 	connection.on('error', (err) => {
-		const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-		logger.error('🔴 Redis connection error impacting BullMQ worker:', { error: errorMessage })
+		logger.error(
+			'🔴 Redis connection error impacting BullMQ worker:',
+			err instanceof Error ? err : new Error('Unknown error')
+		)
 		// Consider if process should exit or if client's reconnection logic is sufficient.
 	})
 
@@ -690,7 +710,10 @@ async function main() {
 			await reliableProcessor.start()
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : error
-			logger.error(`Failed to start reliable processor: ${errorMessage}`, { error: errorMessage })
+			logger.error(
+				`Failed to start reliable processor: ${errorMessage}`,
+				error instanceof Error ? error : new Error('Unknown error')
+			)
 			throw error
 		}
 	}
@@ -751,9 +774,10 @@ async function main() {
 // Start the application
 main().catch(async (error) => {
 	const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-	logger.error(`💥 Unhandled error in main application scope: ${errorMessage}`, {
-		error: errorMessage,
-	})
+	logger.error(
+		`💥 Unhandled error in main application scope: ${errorMessage}`,
+		error instanceof Error ? error : new Error(errorMessage)
+	)
 	await auditDbService?.end()
 	// Ensure Redis connection is closed on fatal error
 	void closeSharedRedisConnection().finally(() => process.exit(1))
