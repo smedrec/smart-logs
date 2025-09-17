@@ -454,7 +454,7 @@ export class StructuredLogger {
 
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json',
-			'User-Agent': `audit-system-tracer/1.0.0`,
+			'User-Agent': `audit-system-logger/1.0.0`,
 			...this.config.otplConfig.headers,
 		}
 
