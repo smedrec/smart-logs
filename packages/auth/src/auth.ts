@@ -171,6 +171,35 @@ class Auth {
 								},
 							}
 						},
+						after: async (session, ctx) => {
+							const emailDetails: MailerSendOptions = {
+								from: 'SMEDREC <no-reply@smedrec.com>',
+								to: ctx?.context.session?.user.email!,
+								subject: 'Successful login from new device',
+								html: `
+							<p>Hi ${ctx?.context.session?.user.name},</p>\r
+							<p>We're verifying a recent login for ${ctx?.context.session?.user.email}</p>
+							<p>Time: ${new Date().toISOString()}</p>
+							<p>IP Address: ${session.ipAddress}</p>
+							<p>User Agent: ${session.userAgent}</p>
+							<p>If you believe that this login is suspicious, please contact your administrator or reset your password immediately.</p>
+						`,
+							}
+							await inngest.send({
+								name: 'email/send',
+								data: {
+									principalId: session.userId,
+									organizationId: session.activeOrganizationId,
+									service: 'smart-logs',
+									action: 'sendSuccessfulLoginEmail',
+									emailDetails,
+								},
+								user: {
+									id: session.userId,
+									organizationId: session.activeOrganizationId,
+								},
+							})
+						},
 					},
 				},
 			},
