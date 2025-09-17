@@ -16,17 +16,18 @@
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *OTLP exporter implementation*
 - [types.ts](file://packages\audit\src\observability\types.ts) - *Observability type definitions*
 - [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation*
+- [logging.ts](file://packages\logs\src\logging.ts) - *Structured logging implementation*
+- [types.ts](file://packages\logs\src\interface.ts) - *Logging interface definitions*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added comprehensive documentation for OTLP exporter configuration and implementation
-- Updated Security Configuration section with detailed KMS properties and integration
-- Enhanced Configuration Management section with KMS client initialization details
-- Added new section for OTLP Exporter and observability integration
-- Updated source tracking annotations to reflect recent changes and new dependencies
-- Added documentation for secure configuration storage with KMS encryption
-- Integrated observability configuration types into the core documentation
+- Updated Logging Configuration section with new structured logging implementation and LoggerFactory
+- Added documentation for StructuredLogger class and its methods
+- Enhanced OTLP Exporter section with updated logging configuration details
+- Updated source tracking annotations to reflect new logging implementation files
+- Added documentation for logging configuration defaults and factory patterns
+- Integrated new logging implementation into the core documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -699,6 +700,7 @@ TracingConfig --> AuditTracer : "contains"
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts#L207-L676)
 - [otpl.ts](file://packages\logs\src\otpl.ts#L0-L165)
 - [types.ts](file://packages\audit\src\observability\types.ts#L254-L302)
+- [logging.ts](file://packages\logs\src\logging.ts#L0-L619)
 
 ### OTLP Export Workflow
 The OTLP export workflow implements batch processing, error handling, and authentication to ensure reliable data transmission to observability platforms. The system automatically handles network issues and rate limiting.

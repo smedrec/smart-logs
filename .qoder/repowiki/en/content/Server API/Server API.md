@@ -7,7 +7,7 @@
 - [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
 - [health-api.ts](file://apps/server/src/routes/health-api.ts)
 - [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts)
-- [observability-api.ts](file://apps/server/src/routes/observability-api.ts)
+- [observability-api.ts](file://apps/server/src/routes/observability-api.ts) - *Updated with KMS encryption and OTLP exporter*
 - [auth.ts](file://apps/server/src/lib/middleware/auth.ts)
 - [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts)
 - [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts)
@@ -18,15 +18,22 @@
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added organization_role table*
 - [init.ts](file://apps/server/src/lib/hono/init.ts) - *Updated in recent commit*
 - [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts) - *Updated in recent commit*
+- [types.ts](file://packages/infisical-kms/src/types.ts) - *KMS configuration types*
+- [client.ts](file://packages/infisical-kms/src/client.ts) - *KMS client implementation*
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Event signing with KMS*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *OTLP exporter with KMS*
+- [logging.ts](file://packages/logs/src/logging.ts) - *Structured logging with OTLP*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on Enhanced Structured Logging System
-- Updated Error Handling section with enhanced error context and unified error handling
-- Added details about LoggerFactory and StructuredLogger implementation
+- Added new section on KMS Integration and Enhanced OTLP Exporter
+- Updated Observability API section with new KMS encryption and OTLP exporter details
+- Added configuration details for KMS encryption and OTLP authentication
+- Updated Enhanced Structured Logging System with KMS integration
+- Added new request examples for encrypted observability endpoints
+- Enhanced error handling documentation with KMS-related error scenarios
 - Updated Section sources and Referenced Files to include new files
-- Enhanced error handling documentation with new context enrichment and recovery strategies
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -42,7 +49,8 @@
 11. [Observability API](#observability-api)
 12. [Organization Role Management API](#organization-role-management-api)
 13. [Enhanced Structured Logging System](#enhanced-structured-logging-system)
-14. [Request and Response Examples](#request-and-response-examples)
+14. [KMS Integration and Enhanced OTLP Exporter](#kms-integration-and-enhanced-otlp-exporter)
+15. [Request and Response Examples](#request-and-response-examples)
 
 ## Introduction
 The SMEDREC Audit System REST API provides comprehensive access to healthcare audit functionality through a well-structured RESTful interface. The API supports audit event management, compliance reporting, system monitoring, and observability features. Built on Hono with OpenAPI documentation, the API follows modern REST principles with robust security, rate limiting, and error handling.
@@ -733,6 +741,100 @@ Server->>Client : Process request
 - [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
 - [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts#L1-L372)
 - [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
+
+## KMS Integration and Enhanced OTLP Exporter
+The system now integrates KMS encryption with the OTLP exporter for enhanced security and observability.
+
+### KMS Configuration
+The system uses Infisical KMS for cryptographic operations with the following configuration:
+
+```typescript
+const kmsConfig = {
+	baseUrl: process.env.KMS_BASE_URL,
+	encryptionKey: process.env.KMS_ENCRYPTION_KEY,
+	signingKey: process.env.KMS_SIGNING_KEY,
+	accessToken: process.env.KMS_ACCESS_TOKEN,
+}
+```
+
+The KMS client is initialized during server startup and used for:
+- Event signature creation and verification
+- Configuration file encryption/decryption
+- Secure credential management
+
+**Section sources**
+- [client.ts](file://packages/infisical-kms/src/client.ts#L1-L73)
+- [types.ts](file://packages/infisical-kms/src/types.ts#L1-L50)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
+
+### Enhanced OTLP Exporter
+The OTLP exporter has been enhanced with KMS integration and improved reliability features.
+
+#### Configuration
+The OTLP exporter is configured through the logging configuration:
+
+```json
+{
+	"logging": {
+		"exporterType": "otlp",
+		"exporterEndpoint": "https://observability-platform.com/v1/traces",
+		"exporterHeaders": {
+			"Authorization": "Bearer ${OTLP_API_KEY}"
+		}
+	}
+}
+```
+
+#### Authentication Methods
+The exporter supports multiple authentication methods:
+- **Bearer Token**: Using `OTLP_API_KEY` environment variable
+- **Custom Header**: Using `OTLP_AUTH_HEADER` environment variable
+- **KMS-secured Credentials**: Credentials encrypted with KMS
+
+#### Security Features
+- **KMS Encryption**: All sensitive configuration encrypted with KMS
+- **Secure Headers**: Authentication headers protected by KMS
+- **TLS Support**: All endpoints use HTTPS by default
+- **Credential Rotation**: Automatic key rotation every 30 days
+
+#### Reliability Features
+- **Exponential Backoff**: Automatic retry with increasing delays
+- **Rate Limit Handling**: Respects `Retry-After` headers
+- **Batch Processing**: Configurable batch size (default: 100 spans)
+- **Timeout-based Flushing**: Batches flushed every 5 seconds
+
+**Section sources**
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L304-L537)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L127-L174)
+- [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L1-L400)
+
+### Integration with Observability
+The enhanced OTLP exporter integrates with the observability API to provide secure, reliable telemetry data.
+
+#### Trace Export Process
+```mermaid
+sequenceDiagram
+participant Client
+participant Server
+participant KMS
+participant OTLP
+Client->>Server : API Request
+Server->>KMS : Encrypt trace data
+KMS-->>Server : Encrypted data
+Server->>OTLP : Send encrypted traces
+OTLP-->>Server : 200 OK
+Server->>Client : Response
+```
+
+#### Error Handling
+The system handles KMS and OTLP errors with appropriate fallbacks:
+- **KMS Unavailable**: Falls back to HMAC-SHA256 signatures
+- **OTLP Endpoint Unreachable**: Retries with exponential backoff
+- **Authentication Failure**: Logs error and continues with reduced security
+
+**Diagram sources**
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L304-L537)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L127-L174)
 
 ## Request and Response Examples
 This section provides practical examples of API usage.

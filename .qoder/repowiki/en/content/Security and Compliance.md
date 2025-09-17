@@ -7,15 +7,19 @@
 - [permissions.ts](file://packages\auth\src\permissions.ts) - *Updated in recent commit*
 - [compliance-features.md](file://apps\docs\src\content\docs\audit\compliance-features.md) - *Updated in recent commit*
 - [best-practices.md](file://packages\audit-db\docs\guides\best-practices.md) - *Added Redis caching for authorization*
+- [auth.ts](file://packages\auth\src\auth.ts) - *Added new device login notification feature*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Enhanced OTLP exporter with KMS encryption*
+- [otpl.ts](file://packages\logs\src\otpl.ts) - *Added structured logging with OTLP support*
+- [types.ts](file://packages\infisical-kms\src\types.ts) - *Updated KMS types for enhanced security*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on Redis-Based Authorization Caching to reflect recent implementation
-- Updated Compliance Requirements section with detailed Redis caching implementation
-- Enhanced troubleshooting guide with cache-related issues and solutions
+- Added new section on New Device Login Notifications to reflect recent security enhancement
+- Updated KMS Integration section with enhanced OTLP exporter and structured logging capabilities
+- Enhanced Cryptographic Protocols section with KMS encryption details for observability
 - Added sources for new and updated sections
-- Updated diagram in Compliance Requirements to reflect caching architecture
+- Updated diagram in KMS Integration to reflect enhanced OTLP transmission
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -25,6 +29,7 @@
 5. [Compliance Requirements](#compliance-requirements)
 6. [Practical Examples](#practical-examples)
 7. [Troubleshooting Guide](#troubleshooting-guide)
+8. [New Device Login Notifications](#new-device-login-notifications)
 
 ## Introduction
 The Security and Compliance framework provides robust mechanisms for ensuring data integrity, confidentiality, and regulatory compliance within the audit system. This documentation details the cryptographic protocols, KMS integration, and compliance requirements that form the foundation of the system's security posture. The framework supports HIPAA and GDPR compliance reporting, cryptographic integrity verification, and secure key management through external KMS integration.
@@ -34,7 +39,7 @@ The framework implements SHA-256 hashing and HMAC-SHA256 signatures to ensure au
 
 The cryptographic service generates SHA-256 hashes of critical audit event fields including timestamp, action, status, principal ID, organization ID, and target resource information. These hashes are used for integrity verification, ensuring that any modification to the event data can be detected. Additionally, HMAC-SHA256 signatures provide an extra layer of security by authenticating events with a secret key.
 
-For environments requiring higher security, the framework supports integration with external Key Management Systems (KMS) for cryptographic operations, allowing organizations to leverage centralized key management and hardware security modules.
+For environments requiring higher security, the framework supports integration with external Key Management Systems (KMS) for cryptographic operations, allowing organizations to leverage centralized key management and hardware security modules. The integration now includes KMS-based encryption for OTLP telemetry data, ensuring end-to-end security for observability data.
 
 ```mermaid
 flowchart TD
@@ -47,10 +52,17 @@ E --> |No| G[Generate HMAC-SHA256 Signature]
 F --> H[Return Signature Response]
 G --> H
 H --> I[Store Signed Event]
+I --> J{OTLP Export Enabled?}
+J --> |Yes| K[Encrypt with KMS]
+J --> |No| L[Send Unencrypted]
+K --> M[Transmit Securely]
+L --> M
+M --> N[Store in Observability Platform]
 ```
 
-**Section sources**
+**Section sources**   
 - [crypto.ts](file://packages\audit\src\crypto.ts#L0-L383)
+- [types.ts](file://packages\infisical-kms\src\types.ts#L0-L56)
 
 ## Cryptographic Verification in Event Processing
 The framework now integrates cryptographic verification during event processing to ensure data integrity throughout the audit workflow. When an audit event is processed, the system verifies the event's hash before storing it in the database, providing an additional layer of security against tampering.
@@ -89,7 +101,7 @@ The framework integrates with Infisical KMS for secure cryptographic operations,
 
 The KMS client configuration requires the base URL, encryption key ID, signing key ID, and access token. These credentials enable the system to perform cryptographic operations through the KMS API. The client implements exponential backoff with configurable retry parameters, ensuring resilience against transient network failures.
 
-Cryptographic operations are performed through a well-defined interface that abstracts the underlying KMS implementation. The framework supports both local HMAC generation and KMS-based signing, allowing organizations to choose their preferred security model based on their compliance requirements and infrastructure capabilities.
+Cryptographic operations are performed through a well-defined interface that abstracts the underlying KMS implementation. The framework supports both local HMAC generation and KMS-based signing, allowing organizations to choose their preferred security model based on their compliance requirements and infrastructure capabilities. The integration has been enhanced to support KMS encryption for OTLP telemetry data, ensuring secure transmission of observability information.
 
 ```mermaid
 classDiagram
@@ -120,12 +132,25 @@ InfisicalKmsClient --> BaseResource : "extends"
 KmsApiError --> KmsError : "extends"
 InfisicalKmsClient ..> KmsApiError : "throws"
 InfisicalKmsClient ..> KmsError : "throws"
+note right of InfisicalKmsClient
+Supports encryption for :
+- Audit event signing
+- Log data protection
+- OTLP telemetry transmission
+- Configuration storage
+end note
 ```
+
+**Diagram sources**
+- [client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
+- [base.ts](file://packages\infisical-kms\src\base.ts#L0-L99)
 
 **Section sources**
 - [client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
 - [base.ts](file://packages\infisical-kms\src\base.ts#L0-L99)
 - [types.ts](file://packages\infisical-kms\src\types.ts#L0-L56)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L0-L677)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L0-L166)
 
 ## Compliance Requirements
 The framework supports comprehensive compliance reporting for HIPAA and GDPR regulations. Compliance reports include detailed event summaries, integrity verification results, and risk assessments tailored to specific regulatory requirements.
@@ -298,3 +323,33 @@ The framework logs detailed error messages for cache operations, which can be us
 - [compliance.ts](file://apps\server\src\lib\graphql\resolvers\compliance.ts#L0-L56)
 - [index.ts](file://apps\worker\src\index.ts#L450-L480)
 - [permissions.ts](file://packages\auth\src\permissions.ts#L0-L691)
+
+## New Device Login Notifications
+The framework now includes enhanced security features that notify users when they log in from a new device. This feature helps users detect potential unauthorized access to their accounts and improves overall account security posture.
+
+When a user successfully authenticates from a new device (identified by unique IP address and user agent combination), the system automatically sends an email notification containing details about the login event. The notification includes the timestamp, IP address, and user agent information to help users verify the legitimacy of the login.
+
+The implementation uses Inngest to handle the asynchronous email delivery, ensuring that the authentication process is not delayed by email transmission. The email content is templated and includes clear instructions for users to take action if they believe the login was unauthorized.
+
+```mermaid
+sequenceDiagram
+participant User
+participant AuthSystem
+participant Inngest
+participant EmailService
+User->>AuthSystem : Login Request
+AuthSystem->>AuthSystem : Authenticate User
+AuthSystem->>AuthSystem : Check device history
+alt New Device
+AuthSystem->>Inngest : Send email/send event
+Inngest->>EmailService : Process email/send event
+EmailService->>User : Send notification email
+else Known Device
+AuthSystem->>User : Return authentication response
+end
+AuthSystem->>User : Return authentication response
+```
+
+**Section sources**
+- [auth.ts](file://packages\auth\src\auth.ts#L159-L245)
+- [sendEmail.ts](file://apps\server\src\lib\inngest\functions\emails\sendEmail.ts#L101-L154)

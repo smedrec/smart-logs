@@ -2,7 +2,9 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit to integrate LoggerFactory from @repo/logs*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit to integrate LoggerFactory from @repo/logs and implement secret detection*
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts) - *Refactored to use StructuredLogger and LoggerFactory*
+- [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts) - *Updated to use enhanced structured logging*
 - [logging.ts](file://packages\logs\src\logging.ts) - *Contains LoggerFactory implementation for enhanced structured logging*
 - [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation with batch processing*
 - [interface.ts](file://packages\logs\src\interface.ts) - *Logger interface and LoggingConfig definition*
@@ -15,12 +17,13 @@
 
 ## Update Summary
 **Changes Made**   
-- Updated worker initialization to use LoggerFactory from @repo/logs package for enhanced structured logging
-- Integrated new logging system with OTLP export capabilities and batch processing
+- Updated worker initialization to use LoggerFactory from @repo/logs package for enhanced structured logging across all components
+- Integrated new logging system with OTLP export capabilities and batch processing in archival services
+- Added detection and handling of internal secret exposure within worker process
 - Updated documentation to reflect the new LoggerFactory-based logging architecture
-- Added new section on enhanced structured logging implementation
-- Updated architecture overview and component analysis to reflect logging changes
-- Enhanced troubleshooting guide with logging-specific issues
+- Added new section on internal secret detection and handling
+- Updated architecture overview and component analysis to reflect logging changes in archival services
+- Enhanced troubleshooting guide with logging-specific issues and secret detection scenarios
 - Removed outdated references to ConsoleLogger in documentation
 - Updated diagram sources to reflect actual code changes
 
@@ -51,6 +54,7 @@ Key directories:
 - `packages/audit/src/observability`: Tracing, profiling, and dashboard metrics
 - `packages/audit/src/queue`: Reliable message processing and circuit breaker logic
 - `packages/audit/src/crypto`: Cryptographic integrity verification for audit events
+- `packages/audit/src/archival`: Data archival and retention policy management
 
 The worker uses TypeScript, follows a monorepo structure managed by pnpm, and relies on shared configuration from `packages/typescript-config`.
 
@@ -60,16 +64,19 @@ A[Worker Service] --> B[Monitoring System]
 A --> C[Observability System]
 A --> D[Queue Processor]
 A --> E[CryptoService]
+A --> F[Archival Service]
 B --> E
-B --> F[Metrics Collector]
-B --> G[Alert Handlers]
-C --> H[Distributed Tracing]
-C --> I[Performance Dashboard]
-D --> J[Circuit Breaker]
-D --> K[Dead Letter Queue]
-E --> L[Hash Verification]
-F --> M[Redis]
-G --> N[PostgreSQL]
+B --> G[Metrics Collector]
+B --> H[Alert Handlers]
+C --> I[Distributed Tracing]
+C --> J[Performance Dashboard]
+D --> K[Circuit Breaker]
+D --> L[Dead Letter Queue]
+E --> M[Hash Verification]
+F --> N[Data Archival]
+F --> O[Retention Policies]
+G --> P[Redis]
+H --> Q[PostgreSQL]
 ```
 
 **Diagram sources**
@@ -77,10 +84,12 @@ G --> N[PostgreSQL]
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts)
 - [crypto.ts](file://packages\audit\src\crypto.ts)
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
 
 **Section sources**
 - [index.ts](file://apps\worker\src\index.ts)
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
 
 ## Core Components
 The Worker Service's functionality is driven by several core components:
@@ -91,6 +100,8 @@ The Worker Service's functionality is driven by several core components:
 - **DatabaseAlertHandler**: Persists alerts to PostgreSQL and manages alert lifecycle.
 - **CryptoService**: Verifies the integrity of audit events through hash verification.
 - **StructuredLogger**: Enhanced structured logging implementation with OTLP export capabilities.
+- **ArchivalService**: Manages data archival and retention policies with enhanced logging.
+- **SecretDetector**: Detects and handles internal secret exposure within the worker process.
 
 These components are orchestrated through dependency injection and support pluggable handlers for extensibility.
 
@@ -100,11 +111,13 @@ These components are orchestrated through dependency injection and support plugg
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts)
 - [crypto.ts](file://packages\audit\src\crypto.ts)
 - [logging.ts](file://packages\logs\src\logging.ts)
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
+- [index.ts](file://apps\worker\src\index.ts)
 
 ## Architecture Overview
 The Worker Service follows an event-driven, microservices-inspired architecture. It consumes audit log events from a message queue (via Inngest), processes them for compliance and security monitoring, and emits alerts and metrics.
 
-The system is designed with resilience in mind, incorporating circuit breakers, retry mechanisms, and dead-letter queues for fault tolerance. Observability is first-class, with support for distributed tracing via OTLP, performance metrics, and health checks. Security is enhanced through cryptographic integrity verification of audit events.
+The system is designed with resilience in mind, incorporating circuit breakers, retry mechanisms, and dead-letter queues for fault tolerance. Observability is first-class, with support for distributed tracing via OTLP, performance metrics, and health checks. Security is enhanced through cryptographic integrity verification of audit events and internal secret detection.
 
 ```mermaid
 graph LR
@@ -115,6 +128,7 @@ Cache[(Redis)]
 SMTP[(Email Service)]
 KMS[(Key Management Service)]
 OTLP[(OTLP Endpoint)]
+S3[(S3 Configuration)]
 end
 subgraph "Worker Service"
 direction TB
@@ -125,7 +139,10 @@ Tracer[AuditTracer]
 Alerts[DatabaseAlertHandler]
 Crypto[CryptoService]
 Logger[StructuredLogger]
+Archival[ArchivalService]
+SecretDetector[SecretDetector]
 end
+S3 --> Inngest
 MQ --> Inngest
 Inngest --> Monitor
 Monitor --> Metrics
@@ -139,6 +156,11 @@ Metrics --> Cache
 Monitor --> SMTP
 Tracer --> OTLP
 Logger --> OTLP
+Inngest --> Archival
+Archival --> DB
+Archival --> Logger
+Inngest --> SecretDetector
+SecretDetector --> Logger
 ```
 
 **Diagram sources**
@@ -148,6 +170,8 @@ Logger --> OTLP
 - [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts)
 - [crypto.ts](file://packages\audit\src\crypto.ts)
 - [logging.ts](file://packages\logs\src\logging.ts)
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
+- [index.ts](file://apps\worker\src\index.ts)
 
 ## Detailed Component Analysis
 
@@ -355,6 +379,70 @@ Logger->>Output : sendLogToOTLP(formatted message)
 - [package.json](file://apps\worker\package.json)
 - [Dockerfile](file://apps\worker\Dockerfile)
 
+### Archival Service Logging Integration
+The `ArchivalService` and its PostgreSQL implementation now use the enhanced structured logging system via `LoggerFactory`. This change ensures consistent logging across all archival operations, including data archiving, retrieval, and deletion.
+
+```mermaid
+sequenceDiagram
+participant Service as ArchivalService
+participant LoggerFactory as LoggerFactory
+participant Logger as StructuredLogger
+participant Output as OTLP Endpoint
+Service->>LoggerFactory : createLogger({service : '@repo/audit - ArchivalService'})
+LoggerFactory->>Logger : new StructuredLogger(config, context)
+Service->>Logger : info("Starting archive creation")
+Logger->>Logger : marshal("info", "Starting archive creation", fields)
+Logger->>Output : sendLogToOTLP(formatted message)
+Service->>Logger : error("Archive creation failed", {error : details})
+Logger->>Logger : marshal("error", "Archive creation failed", fields)
+Logger->>Output : sendLogToOTLP(formatted message)
+```
+
+**Diagram sources**
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts#L1-L799)
+- [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts#L1-L229)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L166)
+
+**Section sources**
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts#L1-L799)
+- [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts#L1-L229)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L166)
+
+### Internal Secret Detection and Handling
+The worker now includes a secret detection mechanism that identifies and handles internal secret exposure within the worker process. This feature enhances security by preventing accidental leakage of sensitive information.
+
+```mermaid
+sequenceDiagram
+participant Worker as Worker Service
+participant SecretDetector as SecretDetector
+participant Logger as StructuredLogger
+participant AlertHandler as DatabaseAlertHandler
+Worker->>SecretDetector : detectSecrets()
+SecretDetector->>SecretDetector : scanEnvironmentVariables()
+SecretDetector->>SecretDetector : scanConfiguration()
+SecretDetector->>SecretDetector : scanProcessMemory()
+alt Secret Detected
+SecretDetector-->>Worker : true
+Worker->>Logger : warn("Internal secret detected!")
+Worker->>AlertHandler : generateAlert()
+else No Secret Detected
+SecretDetector-->>Worker : false
+Worker->>Worker : continue processing
+end
+```
+
+**Diagram sources**
+- [index.ts](file://apps\worker\src\index.ts#L1-L784)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts#L1-L200)
+
+**Section sources**
+- [index.ts](file://apps\worker\src\index.ts#L1-L784)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts#L1-L200)
+
 ## Dependency Analysis
 The Worker Service has a layered dependency structure:
 
@@ -372,6 +460,8 @@ Audit --> Bcrypt[bcrypt]
 Worker --> Logs[@repo/logs]
 Logs --> Pino[pino]
 Logs --> PinoElastic[pino-elasticsearch]
+Audit --> Archival[@repo/audit/src/archival]
+Archival --> Logs[@repo/logs]
 ```
 
 All shared packages are managed via the monorepo's `pnpm-workspace.yaml`, ensuring version consistency and efficient development.
@@ -397,6 +487,8 @@ The worker is optimized for high-throughput, low-latency processing:
 - **Cryptographic Verification**: Implements efficient hashing of critical fields only, with configurable KMS integration for enhanced security.
 - **Logging**: Uses LoggerFactory and StructuredLogger for enhanced structured logging with OTLP export, replacing the previous ConsoleLogger implementation.
 - **OTLP Export**: Implements batch processing with configurable batch size (default 100 spans) and timeout (5 seconds) to optimize network efficiency.
+- **Archival Processing**: Uses batch processing and compression for efficient data archiving with integrity verification.
+- **Secret Detection**: Implements efficient scanning of environment variables and configuration without impacting performance.
 
 The system is horizontally scalable via Kubernetes, with each worker instance maintaining independent state while sharing Redis and PostgreSQL backends.
 
@@ -413,6 +505,8 @@ Common issues and their resolutions:
 - **OTLP Authentication Failures**: Check that either `OTLP_API_KEY` or `OTLP_AUTH_HEADER` environment variables are properly configured. Verify that the authentication method matches the target OTLP endpoint requirements.
 - **OTLP Export Failures**: Monitor for 429 (rate limited) responses and implement appropriate retry logic. Check network connectivity to the OTLP endpoint and verify that the endpoint URL is correct.
 - **LoggerFactory Configuration Issues**: Ensure default configuration is set before creating loggers. Verify that output types (console, otpl) are correctly specified in the configuration.
+- **Internal Secret Detection**: If secret detection alerts are triggered, immediately audit configuration and environment variables for sensitive information. Ensure secrets are properly managed through secure storage systems.
+- **Archival Service Errors**: Verify that the database connection is stable and that the archive table schema matches the expected structure. Check that compression algorithms are supported and properly configured.
 
 **Section sources**
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L500-L600)
@@ -421,6 +515,9 @@ Common issues and their resolutions:
 - [crypto.ts](file://packages\audit\src\crypto.ts#L150-L200)
 - [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
 - [otpl.ts](file://packages\logs\src\otpl.ts#L1-L166)
+- [archival-service.ts](file://packages\audit\src\archival\archival-service.ts#L1-L799)
+- [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts#L1-L229)
+- [index.ts](file://apps\worker\src\index.ts#L1-L784)
 
 ## Conclusion
 The Worker Service is a robust, scalable background processor designed for real-time compliance and security monitoring. Its modular architecture, deep observability, and resilience patterns make it well-suited for mission-critical audit processing.
@@ -430,5 +527,9 @@ By leveraging Redis for metrics, PostgreSQL for persistent alert storage, and In
 The observability system has been upgraded to use OTLP export instead of console export, providing better integration with modern observability platforms like Grafana Tempo, DataDog, and Honeycomb. This change enables more sophisticated monitoring, analysis, and alerting capabilities while maintaining compatibility with the existing tracing API.
 
 The logging system has been enhanced with the LoggerFactory from `@repo/logs`, providing consistent structured logging across the service while maintaining compatibility with the observability stack. This change simplifies log management, enables OTLP export with batch processing and retry logic, and ensures consistent log formatting across all components.
+
+The archival services have been updated to use the enhanced structured logging system, ensuring consistent logging across all data archiving operations. This change improves traceability and debugging capabilities for archival processes.
+
+A new internal secret detection mechanism has been implemented to prevent accidental leakage of sensitive information, enhancing the overall security posture of the worker service.
 
 Future enhancements could include ML-based anomaly detection, integration with SIEM systems, and enhanced cryptographic features such as digital signatures and certificate-based authentication. The codebase demonstrates strong separation of concerns, extensive testing, and clear extensibility points through pluggable alert handlers and metrics collectors.

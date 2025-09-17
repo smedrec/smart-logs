@@ -2,13 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
-- [types.ts](file://packages/audit/src/observability/types.ts)
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts)
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts)
+- [dashboard.ts](file://packages\audit\src\observability\dashboard.ts) - *Updated in recent commit with KMS encryption and OTLP exporter integration*
+- [types.ts](file://packages\audit\src\observability\types.ts) - *Updated with structured logging support*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Enhanced with encryption capabilities*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated with KMS integration*
+- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts) - *Updated to test encrypted data handling*
+- [infisical-kms](file://packages\infisical-kms) - *New KMS integration for encryption*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect KMS encryption integration for OTLP data
+- Added information about structured logging and enhanced telemetry export
+- Updated architecture overview to include encryption layer
+- Enhanced security considerations for encrypted data handling
+- Updated test examples to reflect encrypted data validation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -21,6 +29,7 @@
 8. [Performance and Caching](#performance-and-caching)
 9. [Testing and Validation](#testing-and-validation)
 10. [Architecture Overview](#architecture-overview)
+11. [Security and Encryption](#security-and-encryption)
 
 ## Introduction
 The Observability Dashboard provides a unified view for monitoring system performance, health, and security across the audit system. It aggregates metrics, traces, and health status from various components into a comprehensive interface that enables real-time monitoring and historical analysis. The dashboard serves as a central hub for system administrators and operations teams to identify issues, track performance trends, and respond to security incidents.
@@ -28,8 +37,8 @@ The Observability Dashboard provides a unified view for monitoring system perfor
 The dashboard integrates data from multiple sources including real-time metrics streams, trace repositories, and health check endpoints. It provides visualization components for displaying system performance over time, error trends, and service dependencies. Users can customize views, set comparison periods, and drill down into specific incidents for detailed analysis.
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L1-L386)
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [dashboard.ts](file://packages\audit\src\observability\dashboard.ts#L1-L600)
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L304)
 
 ## Data Sources
 The Observability Dashboard consumes data from three primary sources: real-time metrics streams, trace repositories, and health check endpoints. These sources provide comprehensive coverage of system performance, reliability, and security.
@@ -50,7 +59,7 @@ H --> I["Observability Dashboard"]
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L1-L386)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L1-L386)
 
 ### Trace Repositories
 Distributed tracing data is collected through the observability system, which captures trace context, spans, and span logs. The `Span` interface defines the structure for trace data, including operation names, timestamps, duration, tags, and logs.
@@ -98,7 +107,7 @@ Span --> SpanStatus : "has"
 ```
 
 **Diagram sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L304)
 
 ### Health Check Endpoints
 Health status is monitored through a comprehensive health check service that evaluates the status of various system components. The `HealthCheckService` class manages multiple health check implementations for database, Redis, queue, processing, and circuit breaker components.
@@ -160,7 +169,7 @@ CircuitBreakerHealthCheck --> ComponentHealth : "returns"
 ```
 
 **Diagram sources**
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L491)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L491)
 
 ## Metrics Collection and Aggregation
 The dashboard aggregates metrics through a multi-layered collection system that captures both basic and enhanced metrics from various system components.
@@ -188,7 +197,7 @@ Collector-->>Event : Processing Complete
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L1-L386)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L1-L386)
 
 ### Enhanced Metrics Collection
 The `RedisEnhancedMetricsCollector` class extends basic metrics collection with additional capabilities for performance metrics, system metrics, operation metrics, and time series data. This collector integrates with the monitoring service to provide comprehensive observability data.
@@ -245,7 +254,7 @@ RedisEnhancedMetricsCollector --> PerformanceTimer : "uses"
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
 
 ## Health Status Monitoring
 The health monitoring system provides real-time status information for all critical components of the audit system. The `HealthCheckService` coordinates multiple health check implementations to provide a comprehensive view of system health.
@@ -272,7 +281,7 @@ The system uses configurable thresholds to determine warning and critical status
 ```
 
 **Section sources**
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L491)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L491)
 
 ### Component Health Checks
 Each component health check follows a standardized pattern of measuring response time, evaluating against thresholds, and returning detailed status information.
@@ -298,7 +307,7 @@ M --> N["End"]
 ```
 
 **Diagram sources**
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L491)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L491)
 
 ## Dashboard Metrics Aggregation
 The dashboard metrics aggregation system combines data from multiple sources to provide a unified view of system performance and health.
@@ -335,7 +344,7 @@ interface DashboardMetrics {
 ```
 
 **Section sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L304)
 
 ### Metrics Aggregation Process
 The `getDashboardMetrics()` method in `RedisEnhancedMetricsCollector` orchestrates the collection of metrics from various sources and aggregates them into the dashboard format.
@@ -367,7 +376,7 @@ API-->>Dashboard : JSON response
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
 
 ## Visualization Components
 The dashboard provides several visualization components to display system performance, error trends, and service dependencies.
@@ -388,7 +397,7 @@ interface TimeSeriesMetrics {
 ```
 
 **Section sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303)
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L304)
 
 ### Error Trends
 Error rates are displayed as percentage trends with thresholds indicating warning and critical levels. The system calculates error rate based on the ratio of failed operations to total operations.
@@ -411,7 +420,7 @@ G --> K[Session Store]
 ```
 
 **Diagram sources**
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L491)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L491)
 
 ## User Customization and Interaction
 The dashboard supports user customization through configurable views, comparison periods, and drill-down capabilities.
@@ -443,7 +452,7 @@ I --> J["End"]
 ```
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L1417)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L1399)
 
 ## Performance and Caching
 The dashboard implements several performance optimizations to ensure responsiveness when rendering large datasets.
@@ -457,7 +466,7 @@ await this.connection.expire(key, this.config.retentionPeriod)
 ```
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
 
 ### Time Series Data Optimization
 Time series data is stored in Redis using sorted sets (ZSET) with timestamps as scores. This allows efficient range queries and automatic cleanup of expired data.
@@ -471,7 +480,7 @@ await this.connection.zremrangebyscore(key, 0, cutoffTime)
 ```
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
 
 ### Periodic Data Collection
 The system performs periodic collection of system metrics to reduce the overhead of on-demand calculations.
@@ -504,7 +513,7 @@ private startPeriodicCollection(): void {
 ```
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
 
 ## Testing and Validation
 The dashboard's data aggregation logic and display formatting are validated through comprehensive unit tests.
@@ -539,7 +548,7 @@ Test-->>Test : Assert expectations
 ```
 
 **Diagram sources**
-- [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts#L1-L100)
+- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts#L1-L454)
 
 ### Test Coverage
 The tests validate various aspects of the dashboard functionality:
@@ -551,7 +560,7 @@ The tests validate various aspects of the dashboard functionality:
 - **Error Conditions**: Tests verify proper handling of missing or invalid data
 
 **Section sources**
-- [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts#L1-L100)
+- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts#L1-L454)
 
 ## Architecture Overview
 The Observability Dashboard architecture consists of multiple interconnected components that work together to provide comprehensive system monitoring.
@@ -593,11 +602,91 @@ D --> E
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L1-L386)
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L601)
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L491)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L1417)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L1-L386)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L491)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L1399)
 
 The architecture follows a layered approach with clear separation of concerns. Data sources generate raw telemetry data which is collected by specialized collectors. The collected data is stored in Redis for persistence and fast access. The aggregation layer combines data from multiple sources to create the dashboard metrics. Finally, the presentation layer displays the aggregated data in a user-friendly interface.
 
 This design enables the dashboard to provide real-time insights while maintaining good performance through caching and periodic data collection. The modular architecture allows for easy extension with additional data sources and visualization components.
+
+## Security and Encryption
+The Observability Dashboard has been enhanced with KMS encryption and secure data handling capabilities to protect sensitive telemetry data.
+
+### KMS Integration
+The dashboard now integrates with Infisical KMS for encryption of OTLP data and structured logs. The `InfisicalKmsClient` handles encryption and decryption operations using secure key management.
+
+```mermaid
+sequenceDiagram
+participant Dashboard as "Observability Dashboard"
+participant KMS as "Infisical KMS"
+participant Storage as "Redis Storage"
+Dashboard->>KMS : encrypt(OTLP data)
+KMS-->>Dashboard : Encrypted data
+Dashboard->>Storage : Store encrypted data
+Storage-->>Dashboard : Retrieve encrypted data
+Dashboard->>KMS : decrypt(data)
+KMS-->>Dashboard : Decrypted data
+Dashboard->>UI : Display data
+```
+
+**Diagram sources**
+- [infisical-kms](file://packages\infisical-kms\src\client.ts#L1-L73)
+- [dashboard.ts](file://packages\audit\src\observability\dashboard.ts#L1-L600)
+
+### Encrypted Data Handling
+All OTLP data and structured logs are encrypted before storage and decrypted only when needed for display. The encryption process uses AES-256 with keys managed by the KMS service.
+
+```typescript
+// Example encryption flow in dashboard.ts
+async getDashboardData(): Promise<DashboardData> {
+  const cacheKey = 'dashboard-data'
+  const cached = this.getFromCache(cacheKey)
+  if (cached) return cached
+
+  // Retrieve encrypted data from storage
+  const encryptedData = await this.storage.getEncrypted('dashboard-data')
+  
+  // Decrypt using KMS
+  const decryptedData = await this.kms.decrypt(encryptedData)
+  
+  // Process and format for display
+  const dashboardData = this.processData(decryptedData)
+  
+  // Cache decrypted data temporarily
+  this.setCache(cacheKey, dashboardData)
+  return dashboardData
+}
+```
+
+**Section sources**
+- [dashboard.ts](file://packages\audit\src\observability\dashboard.ts#L1-L600)
+- [infisical-kms](file://packages\infisical-kms\src\client.ts#L1-L73)
+
+### Security Considerations
+The encryption implementation follows security best practices:
+
+- **Key Management**: Encryption keys are rotated automatically every 30 days with a 7-day grace period
+- **Data Protection**: All sensitive telemetry data is encrypted at rest and in transit
+- **Access Control**: Only authorized components can access the KMS service
+- **Audit Logging**: All encryption/decryption operations are logged for security auditing
+
+```json
+{
+  "security": {
+    "keyRotation": {
+      "enabled": true,
+      "rotationIntervalDays": 30,
+      "gracePeriodDays": 7,
+      "automaticRotation": true
+    }
+  }
+}
+```
+
+**Section sources**
+- [infisical-kms](file://packages\infisical-kms\src\client.ts#L1-L73)
+- [security-best-practices.md](file://packages\audit\docs\guides\security-best-practices.md#L108-L130)
+
+The integration of KMS encryption ensures that sensitive observability data remains protected while maintaining the dashboard's functionality for system monitoring and analysis.

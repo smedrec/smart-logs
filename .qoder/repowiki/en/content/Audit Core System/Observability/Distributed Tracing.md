@@ -2,19 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated to enable OTLP exporter with batch processing and authentication*
-- [types.ts](file://packages/audit/src/observability/types.ts) - *Contains updated tracing and observability type definitions*
-- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts) - *Updated test coverage for OTLP functionality*
-- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *New documentation for OTLP configuration*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated to enable OTLP exporter with batch processing, authentication, and KMS integration*
+- [types.ts](file://packages\audit\src\observability\types.ts) - *Contains updated tracing and observability type definitions*
+- [tracer.test.ts](file://packages\audit\src\observability\__tests__\tracer.test.ts) - *Updated test coverage for OTLP functionality*
+- [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *New documentation for OTLP configuration*
+- [crypto.ts](file://packages\audit\src\crypto.ts) - *KMS encryption support for trace data*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated integration section to reflect OTLP as primary exporter with batch processing
-- Added details on authentication header usage and retry mechanisms
+- Updated integration section to reflect OTLP as primary exporter with batch processing and KMS encryption
+- Added details on authentication header usage, retry mechanisms, and KMS integration
 - Removed outdated console exporter references
-- Enhanced performance analysis section with batch processing details
-- Updated diagram to reflect current export workflow
+- Enhanced performance analysis section with batch processing and compression details
+- Updated diagram to reflect current export workflow with security features
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -106,8 +107,8 @@ AuditTracer --> Span : manages
 ```
 
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Updated implementation with OTLP exporter*
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *Type definitions for tracing components*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676) - *Updated implementation with OTLP exporter*
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L303) - *Type definitions for tracing components*
 
 ## Trace Context Propagation
 
@@ -137,14 +138,14 @@ Note over ServiceA,ServiceC : Complete trace with parent-child relationships<br/
 ```
 
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Context propagation implementation*
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *TraceContext interface definition*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676) - *Context propagation implementation*
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L303) - *TraceContext interface definition*
 
 ## Integration with External APM Tools
 
 The tracing system now primarily supports integration with external APM tools through the OTLP (OpenTelemetry Protocol) exporter, replacing the previous console exporter as the default. The `ObservabilityConfig` interface defines the configuration options for tracing, including the `exporterType` which can be set to 'otlp' for OpenTelemetry-compatible backends. When configured for OTLP export, the system formats trace data according to the OpenTelemetry specification, enabling seamless integration with platforms like Grafana Tempo, DataDog, and Honeycomb.
 
-The `exportToOTLP` method implements batch processing for efficient transmission, with spans collected in batches of up to 100 or flushed every 5 seconds. The implementation includes robust retry logic with exponential backoff, handling up to 3 retry attempts with increasing delays. It also respects rate limiting via `Retry-After` headers and distinguishes between client errors (4xx) that should not be retried and server/network errors that warrant retry attempts. Authentication is supported through environment variables (`OTLP_API_KEY` for Bearer tokens or `OTLP_AUTH_HEADER` for custom headers).
+The `exportToOTLP` method implements batch processing for efficient transmission, with spans collected in batches of up to 100 or flushed every 5 seconds. The implementation includes robust retry logic with exponential backoff, handling up to 3 retry attempts with increasing delays. It also respects rate limiting via `Retry-After` headers and distinguishes between client errors (4xx) that should not be retried and server/network errors that warrant retry attempts. Authentication is supported through environment variables (`OTLP_API_KEY` for Bearer tokens or `OTLP_AUTH_HEADER` for custom headers). Additionally, KMS encryption support has been integrated to secure trace data during transmission.
 
 ```mermaid
 flowchart TD
@@ -173,9 +174,10 @@ style N fill:#f9f,stroke:#333
 ```
 
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *OTLP exporter with batch processing and retry logic*
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *Configuration interface for OTLP*
-- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Detailed OTLP configuration guide*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676) - *OTLP exporter with batch processing and retry logic*
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L303) - *Configuration interface for OTLP*
+- [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *Detailed OTLP configuration guide*
+- [crypto.ts](file://packages\audit\src\crypto.ts#L127-L174) - *KMS encryption integration for trace data*
 
 ## Trace Context Preservation in Asynchronous Operations
 
@@ -208,8 +210,8 @@ Note over Decorator,Tracer : Automatic span management<br/>for synchronous and a
 ```
 
 **Section sources**
-- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts#L1-L216) - *Test coverage for trace context preservation*
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *trace decorator implementation*
+- [tracer.test.ts](file://packages\audit\src\observability\__tests__\tracer.test.ts#L1-L216) - *Test coverage for trace context preservation*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676) - *trace decorator implementation*
 
 ## Performance Analysis and Bottleneck Identification
 
@@ -237,8 +239,8 @@ style L fill:#f96,stroke:#333
 ```
 
 **Section sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *BottleneckAnalysis interface*
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Performance metrics collection and export*
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L303) - *BottleneckAnalysis interface*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676) - *Performance metrics collection and export*
 
 ## Trace Data Interpretation and Correlation
 
@@ -274,5 +276,5 @@ style L fill:#bbf,stroke:#333
 ```
 
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L676) - *Trace data correlation mechanisms*
-- [types.ts](file://packages/audit/src/observability/types.ts#L1-L303) - *Data structures for trace interpretation*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L676) - *Trace data correlation mechanisms*
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L303) - *Data structures for trace interpretation*

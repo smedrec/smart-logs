@@ -2,7 +2,7 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [audit.ts](file://packages/audit/src/audit.ts)
+- [audit.ts](file://packages/audit/src/audit.ts) - *Updated in recent commit*
 - [log.ts](file://packages/logs/src/log.ts)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
@@ -13,7 +13,20 @@
 - [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md)
 - [logging-example.ts](file://packages/audit-client/src/examples/logging-example.ts)
 - [monitoring.md](file://apps/worker/docs/tutorials/monitoring.md)
+- [index.ts](file://packages/logs/src/index.ts) - *Refactored in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [logging.ts](file://packages/logs/src/logging.ts) - *Updated with StructuredLogger in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [otpl.ts](file://packages/logs/src/otpl.ts) - *Enhanced with KMS and OTLP features in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Integrated with KMS and OTLP exporter in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Added OTLP configuration guide in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated logging package documentation to reflect the replacement of ConsoleLogger with StructuredLogger and LoggerFactory
+- Added documentation for KMS encryption integration and enhanced OTLP exporter with structured logging
+- Updated application logging integration section to reflect new structured logging approach
+- Added new section on OTLP Exporter Configuration
+- Updated referenced files to include new and modified files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -195,34 +208,73 @@ style D fill:#69f,stroke:#333
 - [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md#L1-L200)
 
 ### Application Logging Integration
-OpenObserve provides seamless integration with applications through its audit client library. The integration supports various logging patterns, including synchronous, asynchronous, and buffered logging, with configurable levels and destinations.
+OpenObserve has been updated to use a structured logging approach with the new StructuredLogger and LoggerFactory classes. The integration now supports enhanced context, performance metrics, and multiple output destinations including OTLP.
 
 ```mermaid
 sequenceDiagram
 participant App as Application
-participant Client as Audit Client
+participant Logger as StructuredLogger
+participant Factory as LoggerFactory
 participant Buffer as Log Buffer
 participant Transport as Network Transport
-App->>Client : log(level, message, context)
-Client->>Client : Validate input
-Client->>Buffer : Add to buffer
+App->>Factory : createLogger(context)
+Factory-->>Logger : Returns configured logger
+App->>Logger : log(level, message, metadata, context)
+Logger->>Logger : Validate input and enrich with context
+Logger->>Buffer : Add to buffer with correlation ID
 loop Every N seconds or M entries
-Buffer->>Client : Flush batch
-Client->>Transport : Send events
-Transport->>Server : HTTP POST /events
+Buffer->>Logger : Flush batch
+Logger->>Transport : Send events to OTLP endpoint
+Transport->>Server : HTTP POST /v1/logs
 Server-->>Transport : 200 OK
-Transport-->>Client : Acknowledge
+Transport-->>Logger : Acknowledge
 end
-Note over Client,Transport : Configurable flush interval<br/>and batch size
+Note over Logger,Transport : Configurable flush interval<br/>and batch size with<br/>exponential backoff
 ```
 
 **Diagram sources**
-- [logging-example.ts](file://packages/audit-client/src/examples/logging-example.ts#L1-L200)
-- [audit-client.ts](file://apps/web/src/lib/audit-client.ts#L1-L100)
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
+- [index.ts](file://packages/logs/src/index.ts#L1-L3)
+- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165)
 
 **Section sources**
-- [logging-example.ts](file://packages/audit-client/src/examples/logging-example.ts#L1-L250)
-- [audit-client.ts](file://apps/web/src/lib/audit-client.ts#L1-L150)
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L620) - *Updated in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [index.ts](file://packages/logs/src/index.ts#L1-L3) - *Updated in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+
+### OTLP Exporter Configuration
+The OpenObserve system now includes an enhanced OTLP (OpenTelemetry Protocol) exporter for sending logs and traces to observability platforms. This feature integrates KMS encryption and supports multiple OTLP-compatible backends.
+
+```mermaid
+flowchart TD
+A[StructuredLogger] --> B{Output Configuration}
+B --> |OTLP| C[OTPLLogger]
+C --> D[Batch Processing]
+D --> E{Batch Size Check}
+E --> |Reached| F[Send to OTLP Endpoint]
+E --> |Timeout| F
+F --> G[Add KMS Encryption]
+G --> H[Add Authentication Headers]
+H --> I[Exponential Backoff]
+I --> J[Retry on Failure]
+J --> K[Success]
+J --> |Max Retries| L[Log Error]
+K --> M[Log Success]
+style C fill:#69f,stroke:#333
+style F fill:#f96,stroke:#333
+style K fill:#9f9,stroke:#333
+style L fill:#f96,stroke:#333
+```
+
+**Diagram sources**
+- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677)
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L1-L283)
+
+**Section sources**
+- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L1-L283) - *Added in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
 
 ### Alerting Setup
 The alerting system in OpenObserve monitors log data for specific patterns and conditions, generating alerts when predefined thresholds are exceeded. The system supports multiple notification channels and severity levels, with deduplication and cooldown mechanisms to prevent alert storms.

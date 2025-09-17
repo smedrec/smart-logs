@@ -2,12 +2,13 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated in recent commit to enable OTLP exporter*
-- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated to support OTLP configuration*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated in recent commit to enable OTLP exporter and integrate structured logging*
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts) - *Updated in recent commit to use StructuredLogger and LoggerFactory*
+- [dashboard.ts](file://packages/audit/src/observability/dashboard.ts) - *Updated in recent commit to support KMS encryption and enhanced OTLP exporter*
+- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated to support OTLP configuration and structured logging*
 - [index.ts](file://apps/worker/src/index.ts) - *Updated to configure OTLP endpoint*
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Comprehensive OTLP configuration guide*
-- [dashboard.ts](file://packages/audit/src/observability/dashboard.ts) - *Updated in recent commit*
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts) - *Updated in recent commit*
+- [logging.ts](file://packages/logs/src/logging.ts) - *Introduced StructuredLogger and LoggerFactory for enhanced telemetry*
 - [health-check.ts](file://packages/audit/src/monitor/health-check.ts) - *Updated in recent commit*
 - [observability-api.ts](file://apps/server/src/routes/observability-api.ts) - *Updated in recent commit*
 - [monitoring.test.ts](file://packages/audit/src/__tests__/monitoring.test.ts) - *Updated in recent commit*
@@ -15,18 +16,17 @@
 - [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts) - *Updated in recent commit*
 - [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts) - *Updated in recent commit*
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Updated in recent commit*
-- [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts) - *Updated in recent commit*
 - [health.ts](file://apps/server/src/lib/services/health.ts) - *Updated in recent commit*
 - [health-api.ts](file://apps/server/src/routes/health-api.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated documentation to reflect OTLP exporter implementation
-- Added comprehensive OTLP configuration details and examples
-- Enhanced distributed tracing section with OTLP-specific information
-- Updated file references to reflect current implementation
-- Added platform-specific configuration examples
+- Updated documentation to reflect integration of StructuredLogger and LoggerFactory
+- Enhanced OTLP exporter with KMS encryption, batching, and authentication improvements
+- Added detailed information about structured logging implementation and configuration
+- Updated file references to reflect current implementation with new logging infrastructure
+- Added platform-specific configuration examples for enhanced OTLP exporter
 - Enhanced source tracking with commit annotations
 - Maintained all technical content while updating references
 
@@ -42,10 +42,10 @@
 9. [Best Practices](#best-practices)
 
 ## Introduction
-The Observability system provides comprehensive monitoring, metrics collection, and health checking capabilities for the audit pipeline. This documentation details the implementation of observability features across the system, including event processing latency tracking, error rate monitoring, system resource usage collection, health check endpoints, distributed tracing, and data visualization through dashboards. The system is designed to provide full visibility into the audit pipeline's performance and reliability, enabling proactive issue detection and resolution.
+The Observability system provides comprehensive monitoring, metrics collection, and health checking capabilities for the audit pipeline. This documentation details the implementation of observability features across the system, including event processing latency tracking, error rate monitoring, system resource usage collection, health check endpoints, distributed tracing, and data visualization through dashboards. The system is designed to provide full visibility into the audit pipeline's performance and reliability, enabling proactive issue detection and resolution. Recent updates have enhanced the system with structured logging and improved OTLP exporter capabilities, including KMS encryption and more robust authentication mechanisms.
 
 ## Core Components
-The Observability system consists of several interconnected components that work together to provide comprehensive monitoring capabilities. The system is built around a modular architecture that separates concerns between metrics collection, health checking, distributed tracing, and data visualization.
+The Observability system consists of several interconnected components that work together to provide comprehensive monitoring capabilities. The system is built around a modular architecture that separates concerns between metrics collection, health checking, distributed tracing, and data visualization. Recent updates have introduced a structured logging framework and enhanced the OTLP exporter with encryption and improved reliability features.
 
 ```mermaid
 graph TD
@@ -63,20 +63,25 @@ E --> L[Bottleneck Analysis]
 B --> M[Performance Metrics]
 B --> N[System Metrics]
 E --> O[Alerts]
+D --> P[StructuredLogger]
+P --> Q[Log Aggregation]
+P --> R[OTLP Export]
 ```
 
 **Diagram sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L50)
 - [dashboard.ts](file://packages/audit/src/observability/dashboard.ts#L1-L50)
 - [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L50)
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L50)
 
 **Section sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L50)
 - [dashboard.ts](file://packages/audit/src/observability/dashboard.ts#L1-L50)
 - [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L50)
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L50)
 
 ## Metrics Collection
-The metrics collection system captures performance data at various stages of the audit pipeline, including event processing latency, error rates, and system resource usage. Metrics are collected using a Redis-based storage system that provides high-performance data storage and retrieval.
+The metrics collection system captures performance data at various stages of the audit pipeline, including event processing latency, error rates, and system resource usage. Metrics are collected using a Redis-based storage system that provides high-performance data storage and retrieval. The system has been updated to use structured logging for enhanced telemetry and debugging capabilities.
 
 ### Performance Metrics
 The system collects detailed performance metrics for each stage of the audit pipeline:
@@ -89,12 +94,14 @@ B --> C["Store Event<br/>recordStorageTime()"]
 C --> D["Queue Processing<br/>recordQueueWaitTime()"]
 D --> E["Database Operations<br/>recordDBConnectionTime()"]
 E --> F["Redis Operations<br/>recordRedisOperationTime()"]
-F --> End([Metrics Aggregation])
+F --> G["Structured Logging<br/>logPerformanceMetrics()"]
+G --> End([Metrics Aggregation])
 ```
 
 **Diagram sources**
 - [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L100-L150)
 - [types.ts](file://packages/audit/src/observability/types.ts#L50-L100)
+- [logging.ts](file://packages/logs/src/logging.ts#L300-L350)
 
 The metrics collector records the following performance metrics:
 - **Event processing time**: Total time to process an audit event
@@ -110,6 +117,7 @@ The metrics collector records the following performance metrics:
 **Section sources**
 - [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L100-L200)
 - [types.ts](file://packages/audit/src/observability/types.ts#L50-L100)
+- [logging.ts](file://packages/logs/src/logging.ts#L300-L350)
 
 ### System Metrics
 The system also collects comprehensive system resource metrics:
@@ -232,7 +240,7 @@ These thresholds can be customized based on deployment requirements and performa
 The distributed tracing system provides end-to-end visibility into audit event processing across multiple services and components.
 
 ### Tracer Implementation
-The tracer implementation now supports OTLP (OpenTelemetry Protocol) as the primary exporter for distributed traces, enabling integration with modern observability platforms. The system has been updated from console-based logging to a production-ready OTLP exporter with comprehensive error handling and reliability features.
+The tracer implementation now supports OTLP (OpenTelemetry Protocol) as the primary exporter for distributed traces, enabling integration with modern observability platforms. The system has been updated from console-based logging to a production-ready OTLP exporter with comprehensive error handling and reliability features. The tracer now integrates with the StructuredLogger for enhanced telemetry.
 
 ```mermaid
 classDiagram
@@ -282,7 +290,7 @@ AuditSpan --> SpanStatus
 - [types.ts](file://packages/audit/src/observability/types.ts#L10-L50)
 
 ### OTLP Exporter Configuration
-The system has been updated to use OTLP as the default tracing exporter, replacing the previous console exporter. This enables integration with industry-standard observability platforms like Jaeger, Grafana Tempo, DataDog, and others.
+The system has been updated to use OTLP as the default tracing exporter, replacing the previous console exporter. This enables integration with industry-standard observability platforms like Jaeger, Grafana Tempo, DataDog, and others. The OTLP exporter now includes KMS encryption and enhanced authentication mechanisms.
 
 ```typescript
 // Updated configuration in worker/index.ts
@@ -306,11 +314,13 @@ The OTLP exporter provides several key benefits:
 - **Efficient transmission**: Batched transmission of spans for network efficiency
 - **Reliable delivery**: Built-in retry logic with exponential backoff
 - **Authentication support**: Multiple authentication methods including Bearer tokens and custom headers
+- **Encryption**: KMS integration for secure transmission of sensitive trace data
 
 **Section sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L300-L450)
 - [index.ts](file://apps/worker/src/index.ts#L100-L150)
 - [types.ts](file://packages/audit/src/observability/types.ts#L250-L300)
+- [logging.ts](file://packages/logs/src/logging.ts#L400-L450)
 
 ### Platform-Specific Integration
 The OTLP exporter supports integration with various observability platforms through specific configuration:
@@ -443,9 +453,11 @@ Key reliability features include:
 - **Exponential backoff**: Retry delays increase exponentially
 - **Rate limiting handling**: Respects Retry-After headers
 - **Circuit breaking**: Fails fast for client errors (4xx)
+- **Error logging**: Comprehensive error logging through StructuredLogger
 
 **Section sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L300-L450)
+- [logging.ts](file://packages/logs/src/logging.ts#L400-L450)
 
 ## Dashboard and Data Visualization
 The dashboard system aggregates observability data and provides visual representations of system health and performance.

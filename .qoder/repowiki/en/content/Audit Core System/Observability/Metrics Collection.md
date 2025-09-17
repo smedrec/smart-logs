@@ -2,13 +2,22 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
-- [metrics-collector.test.ts](file://packages/audit/src/observability/__tests__/metrics-collector.test.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
-- [types.ts](file://packages/audit/src/observability/types.ts)
-- [index.ts](file://packages/audit/src/observability/index.ts)
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts) - *Updated with enhanced OTLP exporter and KMS encryption*
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Enhanced OTLP exporter with batch processing and authentication*
+- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated ObservabilityConfig interface*
+- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *OTLP configuration guide*
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Monitoring service implementation*
+- [otpl.ts](file://packages/logs/src/otpl.ts) - *OTLP logging implementation*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect integration of enhanced OTLP exporter with KMS encryption
+- Added details on batch processing, error handling, and authentication mechanisms
+- Enhanced section on integration with monitoring systems to include OTLP capabilities
+- Updated configuration options to include OTLP-specific settings
+- Added new diagram for OTLP export workflow
+- Updated test validation section to reflect new export capabilities
 
 ## Table of Contents
 1. [Metrics Collection System Overview](#metrics-collection-system-overview)
@@ -24,69 +33,65 @@
 
 The Metrics Collection system is a comprehensive observability framework designed to capture key performance indicators across the audit pipeline. It provides real-time monitoring of event throughput, processing latency, error rates, and system resource utilization. The system is built around two primary implementations: the basic `RedisMetricsCollector` for core monitoring needs and the enhanced `RedisEnhancedMetricsCollector` for comprehensive observability.
 
-The metrics collection system serves as the foundation for monitoring service health, enabling teams to establish baselines, detect anomalies, and set up proactive alerting. It integrates seamlessly with the broader monitoring ecosystem, providing data for dashboards, alerting systems, and compliance reporting.
+The metrics collection system serves as the foundation for monitoring service health, enabling teams to establish baselines, detect anomalies, and set up proactive alerting. It integrates seamlessly with the broader monitoring ecosystem, providing data for dashboards, alerting systems, and compliance reporting. Recent updates have enhanced the system with KMS encryption and an improved OTLP exporter with robust batch processing and error handling capabilities.
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L1-L50)
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L50) - *Updated in recent commit*
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L50)
 
 ## Core Metrics Collector Implementation
 
-The core metrics collection functionality is implemented through the `RedisMetricsCollector` class, which provides a robust interface for capturing and storing performance data. This implementation uses Redis as the primary storage backend, leveraging its high-performance characteristics for real-time metrics collection.
+The core metrics collection functionality is implemented through the `RedisEnhancedMetricsCollector` class, which provides a robust interface for capturing and storing performance data. This implementation uses Redis as the primary storage backend, leveraging its high-performance characteristics for real-time metrics collection.
 
 ```mermaid
 classDiagram
-class MetricsCollector {
+class EnhancedMetricsCollector {
 <<interface>>
-+recordEvent() : Promise~void~
-+recordProcessingLatency(latency : number) : Promise~void~
-+recordError() : Promise~void~
-+recordIntegrityViolation() : Promise~void~
-+recordQueueDepth(depth : number) : Promise~void~
-+getMetrics() : Promise~Metrics~
-+resetMetrics() : Promise~void~
-+recordSuspiciousPattern(suspiciousPatterns : number) : Promise~void~
-+recordAlertGenerated() : Promise~void~
-+setCooldown(cooldownKey : string, cooldownPeriod : number) : Promise~void~
-+isOnCooldown(cooldownKey : string) : Promise~boolean~
-+storeMetric(key : string, value : any, ttl? : number) : Promise~void~
-+getMetric(key : string) : Promise~any~
-+getMetricsByPattern(pattern : string) : Promise~any[]~
-+incrementCounter(key : string, value? : number) : Promise~void~
-+info(type? : string) : Promise~string~
-+dbsize() : Promise~number~
++recordPerformanceMetrics() : Promise~void~
++getPerformanceMetrics() : Promise~PerformanceMetrics~
++collectSystemMetrics() : Promise~SystemMetrics~
++recordSystemMetrics() : Promise~void~
++recordOperation() : Promise~void~
++getOperationMetrics() : Promise~AuditOperationMetrics[]~
++getDashboardMetrics() : Promise~DashboardMetrics~
++recordComponentHealth() : Promise~void~
++getComponentHealth() : Promise~ComponentHealthMetrics[]~
++recordTimeSeriesData() : Promise~void~
++getTimeSeriesData() : Promise~TimeSeriesMetrics[]~
++cleanup() : Promise~void~
++exportMetrics() : Promise~string~
 }
-class RedisMetricsCollector {
--metricsPrefix : string
--retentionPeriod : number
+class RedisEnhancedMetricsCollector {
+-keyPrefix : string
 -connection : RedisType
 -isSharedConnection : boolean
-+constructor(redisOrUrlOrOptions? : string | RedisType | { url? : string; options? : RedisOptions }, directConnectionOptions? : RedisOptions)
-+recordEvent() : Promise~void~
-+recordProcessingLatency(latency : number) : Promise~void~
-+recordError() : Promise~void~
-+getMetrics() : Promise~Metrics~
-+resetMetrics() : Promise~void~
-+recordSuspiciousPattern(suspiciousPatterns : number) : Promise~void~
-+recordAlertGenerated() : Promise~void~
-+setCooldown(cooldownKey : string, cooldownPeriod : number) : Promise~void~
-+isOnCooldown(cooldownKey : string) : Promise~boolean~
-+storeMetric(key : string, value : any, ttl? : number) : Promise~void~
-+getMetric(key : string) : Promise~any~
-+getMetricsByPattern(pattern : string) : Promise~any[]~
-+incrementCounter(key : string, value? : number) : Promise~void~
-+info(type? : string) : Promise~string~
-+dbsize() : Promise~number~
-+buildMetricKey(type : string, name : string, labels? : Record~string, string~) : string
+-monitor : MonitoringService
+-config : ObservabilityConfig['metrics']
++constructor(monitor, config, redisOrUrlOrOptions?, directConnectionOptions?)
++recordPerformanceMetrics() : Promise~void~
++getPerformanceMetrics() : Promise~PerformanceMetrics~
++collectSystemMetrics() : Promise~SystemMetrics~
++recordSystemMetrics() : Promise~void~
++recordOperation() : Promise~void~
++getOperationMetrics() : Promise~AuditOperationMetrics[]~
++getDashboardMetrics() : Promise~DashboardMetrics~
++recordComponentHealth() : Promise~void~
++getComponentHealth() : Promise~ComponentHealthMetrics[]~
++recordTimeSeriesData() : Promise~void~
++getTimeSeriesData() : Promise~TimeSeriesMetrics[]~
++cleanup() : Promise~void~
++exportMetrics() : Promise~string~
++formatPrometheusMetrics() : string
++startPeriodicCollection() : void
 }
-MetricsCollector <|.. RedisMetricsCollector : implements
+EnhancedMetricsCollector <|.. RedisEnhancedMetricsCollector : implements
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L25-L200)
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L25-L200) - *Updated in recent commit*
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L1-L200)
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L200) - *Updated in recent commit*
 
 ## Metric Types and Structure
 
@@ -181,11 +186,56 @@ This dimensional approach enables powerful analytical capabilities, such as:
 
 The metrics collection system integrates with various monitoring systems through multiple export mechanisms and API endpoints. This integration enables comprehensive observability across the entire audit pipeline.
 
+### Enhanced OTLP Exporter
+The system now features an enhanced OTLP (OpenTelemetry Protocol) exporter with advanced capabilities for sending metrics and traces to observability platforms. The enhanced exporter includes:
+
+- **Batch processing**: Automatic batching of spans for efficient transmission with configurable batch size (default: 100 spans) and timeout-based flushing (default: 5 seconds)
+- **Error handling and reliability**: Exponential backoff for retries, rate limiting handling via `Retry-After` headers, circuit breaking for client errors (4xx), and network resilience with up to 3 retry attempts
+- **Security features**: KMS encryption integration, multiple authentication methods (Bearer tokens, custom headers), and TLS support for HTTPS endpoints
+- **Performance optimizations**: Payload compression for large data, efficient OTLP format with base64 encoding, and automatic cleanup of old spans to prevent memory leaks
+
+```mermaid
+sequenceDiagram
+participant Application as "Application"
+participant Tracer as "AuditTracer"
+participant Batch as "Span Batch"
+participant OTLP as "OTLP Exporter"
+participant Endpoint as "Observability Endpoint"
+Application->>Tracer : startSpan(operationName)
+Tracer->>Tracer : Create AuditSpan with traceId/spanId
+Application->>Tracer : Add tags/logs to span
+Tracer->>Batch : addToBatch(span)
+Batch->>Batch : Check batch size >= 100?
+Batch-->>Batch : Yes : flushBatch()
+Batch-->>Batch : No : Set timeout 5s
+Batch->>OTLP : flushBatch()
+OTLP->>OTLP : createOTLPPayload(spans)
+OTLP->>OTLP : Add auth headers (Bearer token/custom header)
+OTLP->>OTLP : Compress payload if >1KB
+OTLP->>Endpoint : sendSpansToOTLP() with exponential backoff
+Endpoint-->>OTLP : Response (200 OK or error)
+alt Success
+OTLP-->>Batch : Success logged at debug level
+else Rate Limited (429)
+OTLP->>OTLP : Respect Retry-After header
+OTLP->>OTLP : Wait and retry with exponential backoff
+else Client Error (4xx)
+OTLP->>OTLP : Fail fast (circuit breaking)
+else Network Error
+OTLP->>OTLP : Retry up to 3 times with exponential backoff
+end
+```
+
+**Diagram sources**
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L304-L406) - *Enhanced OTLP exporter with batch processing*
+- [otpl.ts](file://packages/logs/src/otpl.ts#L84-L129) - *OTLP logging with error handling*
+
 ### Export Formats
 The system supports multiple export formats to accommodate different monitoring backends:
 
 - **Prometheus**: Exposes metrics in Prometheus text format for scraping
 - **Console**: Outputs metrics to console for debugging and development
+- **OTLP**: Sends metrics and traces to any OTLP-compatible observability platform (Jaeger, Grafana Tempo, DataDog, etc.)
 - **Custom**: Allows integration with proprietary monitoring systems
 
 ```mermaid
@@ -196,6 +246,7 @@ end
 subgraph "Export Mechanisms"
 P[Prometheus Exporter]
 C[Console Exporter]
+O[OTLP Exporter]
 X[Custom Exporter]
 end
 subgraph "Monitoring Systems"
@@ -203,19 +254,29 @@ PM[Prometheus]
 GF[Grafana]
 EL[Elasticsearch]
 KI[Kibana]
+JT[Jaeger]
+GT[Grafana Tempo]
+DD[DataDog]
+NR[New Relic]
 end
 MC --> P
 MC --> C
+MC --> O
 MC --> X
 P --> PM
 P --> GF
 C --> EL
 C --> KI
+O --> JT
+O --> GT
+O --> DD
+O --> NR
 X --> External[External Monitoring System]
 ```
 
 **Diagram sources**
 - [types.ts](file://packages/audit/src/observability/types.ts#L268-L302)
+- [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts#L308-L360)
 
 ### API Integration
 The system exposes metrics through REST API endpoints, enabling integration with external monitoring tools and dashboards.
@@ -244,6 +305,8 @@ API-->>Client : JSON response with metrics
 **Section sources**
 - [types.ts](file://packages/audit/src/observability/types.ts#L268-L302)
 - [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts#L308-L360)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L264-L358) - *OTLP export implementation*
+- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *OTLP configuration guide*
 
 ## Configuration Options
 
@@ -254,6 +317,16 @@ The `ObservabilityConfig` interface defines all configurable parameters for the 
 
 ```typescript
 export interface ObservabilityConfig {
+    // Tracing configuration
+    tracing: {
+        enabled: boolean
+        serviceName: string
+        sampleRate: number
+        exporterType: 'console' | 'jaeger' | 'zipkin' | 'otlp'
+        exporterEndpoint?: string
+        headers?: Record<string, string>
+    }
+    
     // Metrics configuration
     metrics: {
         enabled: boolean
@@ -261,6 +334,21 @@ export interface ObservabilityConfig {
         retentionPeriod: number
         exporterType: 'prometheus' | 'console' | 'custom'
         exporterEndpoint?: string
+    }
+    
+    // Profiling configuration
+    profiling: {
+        enabled: boolean
+        sampleRate: number
+        maxProfiles: number
+        profileDuration: number
+    }
+    
+    // Dashboard configuration
+    dashboard: {
+        enabled: boolean
+        refreshInterval: number
+        historyRetention: number
     }
 }
 ```
@@ -281,15 +369,27 @@ export interface ObservabilityConfig {
 - Default: 3600 seconds (1 hour)
 - Configurable to balance storage requirements with historical analysis needs
 
-**Export Formats**
+**Export Formats and Endpoints**
 - **exporterType**: Specifies the output format for metrics
   - 'prometheus': Exposes metrics in Prometheus format
   - 'console': Outputs to console for debugging
   - 'custom': Enables integration with custom monitoring systems
+  - 'otlp': Sends metrics to OTLP-compatible observability platforms
+- **exporterEndpoint**: Specifies the destination endpoint for exported metrics (required for 'otlp' exporter)
+
+**OTLP-Specific Configuration**
+- **Authentication**: Configured via environment variables:
+  - `OTLP_API_KEY`: Bearer token authentication
+  - `OTLP_AUTH_HEADER`: Custom header authentication (e.g., "X-API-Key: your-key")
+- **Batch Processing**: Configurable parameters:
+  - `BATCH_SIZE`: Default 100 spans per batch
+  - `BATCH_TIMEOUT_MS`: Default 5000ms (5 seconds) for timeout-based flushing
+- **Error Handling**: Automatic exponential backoff with up to 3 retry attempts and respect for `Retry-After` headers
 
 **Section sources**
 - [types.ts](file://packages/audit/src/observability/types.ts#L268-L302)
 - [index.ts](file://packages/audit/src/observability/index.ts#L48-L69)
+- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L1-L282) - *OTLP configuration details*
 
 ## Testing and Validation
 
@@ -347,9 +447,11 @@ The tests validate that:
 - Default values are returned when no data exists
 - Time-to-live (TTL) settings are applied correctly
 - Aggregated statistics are updated appropriately
+- OTLP export functionality handles authentication, batching, and error scenarios correctly
 
 **Section sources**
 - [metrics-collector.test.ts](file://packages/audit/src/observability/__tests__/metrics-collector.test.ts#L1-L200)
+- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts#L1-L150) - *OTLP exporter tests*
 
 ## Best Practices for Monitoring and Alerting
 
@@ -420,3 +522,4 @@ P --> F
 **Section sources**
 - [index.ts](file://packages/audit/src/observability/index.ts#L59-L68)
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L535-L582)
+- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L245-L282) - *Best practices for OTLP configuration*

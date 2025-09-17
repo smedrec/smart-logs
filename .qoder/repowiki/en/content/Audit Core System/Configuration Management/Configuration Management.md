@@ -2,26 +2,27 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [manager.ts](file://packages\audit\src\config\manager.ts) - *Updated in recent commit with KMS encryption support*
-- [types.ts](file://packages\audit\src\config\types.ts) - *Updated in recent commit with KMS configuration options*
+- [manager.ts](file://packages\audit\src\config\manager.ts) - *Updated in recent commit with KMS encryption support and structured logging*
+- [types.ts](file://packages\audit\src\config\types.ts) - *Updated in recent commit with KMS configuration options and logging enhancements*
 - [validator.ts](file://packages\audit\src\config\validator.ts) - *Updated in recent commit*
-- [factory.ts](file://packages\audit\src\config\factory.ts)
+- [factory.ts](file://packages\audit\src\config\factory.ts) - *Updated with structured logging defaults*
 - [api-reference.md](file://apps\docs\src\content\docs\audit\api-reference.md)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Added GDPR pseudonymization features*
 - [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts) - *Added GDPR utility functions*
 - [audit-client/src/infrastructure/plugins/utils.ts](file://packages\audit-client\src\infrastructure\plugins\utils.ts) - *Added plugin architecture*
 - [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts) - *Added in recent commit for KMS integration*
 - [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts) - *Added in recent commit for KMS configuration*
+- [logging.ts](file://packages\logs\src\logging.ts) - *Introduced StructuredLogger and LoggerFactory*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on KMS Encryption Integration to document the new KMS support
-- Updated Secure Configuration Storage section to include KMS encryption details
-- Updated Configuration Schema and Options to include KMS configuration fields
-- Added references to Infisical KMS package files
-- Updated diagram in Secure Configuration Storage to show KMS integration
-- Maintained all existing documentation while enhancing KMS-related content
+- Added new section on Structured Logging Configuration to document the replacement of ConsoleLogger with StructuredLogger
+- Updated Configuration Schema and Options to include new logging configuration fields and defaults
+- Updated Environment-Specific Configuration to reflect updated logging defaults in factory functions
+- Added references to logging.ts file in relevant sections
+- Updated Configuration Initialization Patterns to show LoggerFactory usage
+- Maintained all existing documentation while enhancing logging-related content
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -39,6 +40,7 @@
 13. [Plugin Architecture](#plugin-architecture)
 14. [GDPR Pseudonymization Configuration](#gdpr-pseudonymization-configuration)
 15. [KMS Encryption Integration](#kms-encryption-integration)
+16. [Structured Logging Configuration](#structured-logging-configuration)
 
 ## Introduction
 The Configuration Management system provides a comprehensive solution for managing application settings across different environments. It supports hierarchical configuration loading, environment-specific overrides, runtime reconfiguration, and secure storage. The system is designed to handle complex configuration needs for audit logging, database connections, retention policies, compliance requirements, and integration endpoints. This document details the design and implementation of the Config Manager class, its integration with various subsystems, and best practices for configuration management.
@@ -653,3 +655,76 @@ The KMS client handles encryption and decryption operations asynchronously and i
 - [types.ts](file://packages\audit\src\config\types.ts#L0-L712)
 - [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts#L0-L146)
 - [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts#L0-L56)
+
+## Structured Logging Configuration
+
+The logging system has been upgraded from ConsoleLogger to StructuredLogger with LoggerFactory for enhanced logging capabilities. The new system provides structured JSON logging, OTLP export support, and configurable log levels with correlation IDs.
+
+```mermaid
+classDiagram
+class LoggerFactory {
++defaultConfig : LoggerConfig
++setDefaultConfig(config : Partial~LoggerConfig~) : void
++createLogger(context : LogContext, config? : Partial~LoggerConfig~) : StructuredLogger
++createRequestLogger(requestId : string, method : string, path : string, additionalContext? : LogContext) : StructuredLogger
++createSilentLogger() : StructuredLogger
+}
+class StructuredLogger {
+-config : LoggerConfig
+-baseContext : LogContext
+-performanceStart : [number, number]
++child(context : LogContext) : StructuredLogger
++startTiming() : void
++endTiming() : number | undefined
++debug(message : string, metadata? : Record~string, any~) : void
++info(message : string, metadata? : Record~string, any~) : void
++warn(message : string, metadata? : Record~string, any~) : void
++error(message : string, error : Error, metadata? : Record~string, any~) : void
++flush() : Promise~void~
++getBuffer() : LogEntry[]
++clearBuffer() : void
+}
+class LoggerConfig {
++level : 'debug' | 'info' | 'warn' | 'error'
++enablePerformanceLogging : boolean
++enableErrorTracking : boolean
++enableMetrics : boolean
++format : 'json' | 'pretty'
++outputs : ('console' | 'file' | 'redis' | 'otpl')[]
++redisConfig? : RedisConfig
++fileConfig? : FileConfig
++otplConfig? : OtplConfig
+}
+class LogEntry {
++timestamp : string
++level : 'debug' | 'info' | 'warn' | 'error'
++message : string
++context : LogContext
++metadata? : Record~string, any~
++duration? : number
++error? : ErrorInfo
++performance? : PerformanceInfo
+}
+LoggerFactory --> StructuredLogger : "creates"
+StructuredLogger --> LoggerConfig : "uses"
+StructuredLogger --> LogEntry : "produces"
+```
+
+The logging configuration is defined in the `logging` section of the AuditConfig interface with the following properties:
+
+- **level**: Log level threshold (debug, info, warn, error)
+- **structured**: Boolean flag to enable structured logging
+- **format**: Output format (json or text)
+- **enableCorrelationIds**: Enable correlation and trace IDs in logs
+- **retentionDays**: Number of days to retain logs
+- **exporterType**: Log export destination (console, jaeger, zipkin, otlp)
+- **exporterEndpoint**: OTLP endpoint URL for distributed tracing
+- **exporterHeaders**: Headers for OTLP exporter authentication
+
+The LoggerFactory provides a consistent way to create loggers with default configuration. It supports creating specialized loggers for requests with automatic correlation IDs and silent loggers for testing environments.
+
+**Section sources**
+- [types.ts](file://packages\audit\src\config\types.ts#L0-L712)
+- [factory.ts](file://packages\audit\src\config\factory.ts#L0-L751)
+- [logging.ts](file://packages\logs\src\logging.ts#L0-L585)
+- [manager.ts](file://packages\audit\src\config\manager.ts#L0-L874)

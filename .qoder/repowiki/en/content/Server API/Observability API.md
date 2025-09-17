@@ -5,19 +5,23 @@
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L1-L612)
 - [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L1-L400)
 - [types.ts](file://packages/audit/src/observability/types.ts#L254-L301)
-- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400) - *Updated in recent commit*
-- [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts#L1-L343) - *Updated in recent commit*
-- [logging.ts](file://packages/logs/src/logging.ts#L1-L620) - *Updated in recent commit*
-- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L166) - *Updated in recent commit*
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
+- [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts#L1-L343)
+- [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
+- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L166)
+- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L174)
+- [client.ts](file://packages/infisical-kms/src/client.ts#L1-L73)
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated Data Collection Mechanism section to reflect enhanced structured logging implementation
-- Added details about LoggerFactory and StructuredLogger in data collection process
+- Updated Data Collection Mechanism section to reflect enhanced structured logging implementation with KMS encryption
+- Added details about OTLP exporter with encrypted transport and authentication
 - Enhanced error handling and logging details in middleware instrumentation
+- Added KMS integration for secure data export
 - Updated section sources to include newly modified files
-- Added references to OTLP export configuration in logging system
+- Added references to OTLP export configuration with security features
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -458,8 +462,11 @@ The API uses standard HTTP authentication mechanisms with the `Authorization` he
 Authorization: Bearer <JWT_TOKEN>
 ```
 
+The system now supports KMS encryption for sensitive data in transit, with the OTLP exporter configured to use encrypted transport. Authentication for OTLP endpoints can be configured via environment variables (`OTLP_API_KEY` or `OTLP_AUTH_HEADER`) to ensure secure communication with observability backends.
+
 **Section sources**
 - [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L241-L288)
+- [client.ts](file://packages/infisical-kms/src/client.ts#L1-L73)
 
 ## Data Retention and Rate Limits
 The Observability API implements specific data retention policies and rate limiting to ensure system stability and performance.
@@ -511,22 +518,30 @@ Key components are instrumented with monitoring middleware that automatically ca
 
 The middleware uses the OpenTelemetry standard for tracing, creating spans that represent discrete units of work. Each span includes metadata about the operation, start time, duration, and relationships to other spans.
 
-### Enhanced Structured Logging
-The system has been updated to use an enhanced structured logging system based on the `StructuredLogger` and `LoggerFactory` classes. All system components now use this consistent logging framework which includes:
+### Enhanced Structured Logging with KMS Encryption
+The system has been updated to use an enhanced structured logging system based on the `StructuredLogger` and `LoggerFactory` classes with integrated KMS encryption. All system components now use this consistent logging framework which includes:
 
 - **Correlation ID tracking**: Each request is assigned a unique correlation ID that is included in all related log entries
 - **Contextual information**: Logs include request context such as user ID, organization ID, endpoint, and method
 - **Performance metrics**: Automatic collection of memory usage, CPU usage, and response times
 - **Error tracking**: Comprehensive error information including stack traces (when enabled)
 - **Multiple output formats**: Support for console, JSON, OTLP, and file outputs
+- **KMS encryption**: Sensitive log data is encrypted using Infisical KMS before export
 
 The logging system is initialized in the server startup process where `LoggerFactory.setDefaultConfig()` is called with configuration from the server config, setting the log level, format (pretty for development, JSON for production), and outputs (console and OTLP). The `StructuredLogger` instances are created with request-specific context and automatically include performance metrics when enabled.
+
+The OTLP exporter now supports secure transmission with multiple authentication methods:
+- Bearer token authentication via `OTLP_API_KEY` environment variable
+- Custom header authentication via `OTLP_AUTH_HEADER` environment variable
+- Encrypted transport using TLS
+- Payload compression for large log entries
 
 **Section sources**
 - [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
 - [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts#L1-L343)
 - [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
 - [otpl.ts](file://packages/logs/src/otpl.ts#L1-L166)
+- [crypto.ts](file://packages/audit/src/crypto.ts#L1-L174)
 
 ## Error Handling
 The Observability API implements comprehensive error handling to provide meaningful feedback while maintaining system security.

@@ -41,10 +41,13 @@
 - Added OTLP exporter configuration and usage details
 - Updated configuration management section with KMS encryption support
 - Added comprehensive details about KMS integration and error handling
+- Replaced legacy ConsoleLogger with StructuredLogger and integrated LoggerFactory for consistent, factory-based logging across the system
+- Enhanced observability with structured logging, performance metrics, and error tracking capabilities
 
 **List of new sections added**
 - Observability and OTLP Exporter Configuration
 - KMS Encryption in Configuration Management
+- Structured Logging Implementation
 
 **List of deprecated/removed sections**
 - None
@@ -57,6 +60,7 @@
 - Added sources for OTLP exporter implementation
 - Added sources for KMS encryption configuration
 - Added source for Infisical KMS client implementation
+- Added sources for StructuredLogger and LoggerFactory implementations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -75,6 +79,7 @@
 14. [Plugin Architecture](#plugin-architecture)
 15. [Observability and OTLP Exporter Configuration](#observability-and-otlp-exporter-configuration)
 16. [KMS Encryption in Configuration Management](#kms-encryption-in-configuration-management)
+17. [Structured Logging Implementation](#structured-logging-implementation)
 
 ## Introduction
 
@@ -102,25 +107,29 @@ A --> F[Event Categorization]
 A --> G[Plugin System]
 A --> H[GDPR Compliance]
 A --> I[Observability Tracer]
-B --> J[File Storage]
-B --> K[S3 Storage]
-B --> L[KMS Encryption]
-C --> M[Validation Rules]
-D --> N[SHA-256 Hashing]
-D --> O[HMAC-SHA256 Signatures]
-E --> P[BullMQ Queue]
-E --> Q[Redis]
-E --> R[Circuit Breaker]
-E --> S[Dead Letter Queue]
-G --> T[Middleware Plugins]
-G --> U[Storage Plugins]
-G --> V[Auth Plugins]
-H --> W[Data Pseudonymization]
-H --> X[Retention Policies]
-H --> Y[Data Export]
-I --> Z[OTLP Exporter]
-I --> AA[Batch Processing]
-I --> AB[Error Handling]
+A --> J[Structured Logger]
+B --> K[File Storage]
+B --> L[S3 Storage]
+B --> M[KMS Encryption]
+C --> N[Validation Rules]
+D --> O[SHA-256 Hashing]
+D --> P[HMAC-SHA256 Signatures]
+E --> Q[BullMQ Queue]
+E --> R[Redis]
+E --> S[Circuit Breaker]
+E --> T[Dead Letter Queue]
+G --> U[Middleware Plugins]
+G --> V[Storage Plugins]
+G --> W[Auth Plugins]
+H --> X[Data Pseudonymization]
+H --> Y[Retention Policies]
+H --> Z[Data Export]
+I --> AA[OTLP Exporter]
+I --> AB[Batch Processing]
+I --> AC[Error Handling]
+J --> AD[Performance Logging]
+J --> AE[Error Tracking]
+J --> AF[Metrics Collection]
 ```
 
 **Diagram sources**
@@ -131,6 +140,8 @@ I --> AB[Error Handling]
 - [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
 - [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 - [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
+- [logging.ts](file://packages/logs/src/logging.ts)
+- [loggerFactory.ts](file://packages/logs/src/logging.ts)
 
 **Section sources**
 - [audit.ts](file://packages/audit/src/audit.ts)
@@ -1012,3 +1023,198 @@ The `InfisicalKmsClient` class provides a robust interface for interacting with 
 - [config/types.ts](file://packages/audit/src/config/types.ts)
 - [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts)
 - [infisical-kms/types.ts](file://packages/infisical-kms/src/types.ts)
+
+## Structured Logging Implementation
+
+The Audit Core System has been updated to replace the legacy ConsoleLogger with a modern StructuredLogger and LoggerFactory system. This enhancement provides consistent, factory-based logging across the system with improved observability, performance metrics, and error tracking capabilities.
+
+```mermaid
+classDiagram
+class LoggerFactory {
++defaultConfig : LoggerConfig
++setDefaultConfig(config : Partial~LoggerConfig~) : void
++createLogger(context : LogContext, config? : Partial~LoggerConfig~) : StructuredLogger
++createRequestLogger(requestId : string, method : string, path : string, additionalContext : LogContext) : StructuredLogger
++createServiceLogger(service : string, additionalContext : LogContext) : StructuredLogger
+}
+class StructuredLogger {
+-config : LoggerConfig
+-baseContext : LogContext
+-performanceStart : [number, number]
++child(context : LogContext) : StructuredLogger
++startTiming() : void
++endTiming() : number | undefined
++debug(message : string, metadata? : Record~string, any~, context? : LogContext) : void
++info(message : string, metadata? : Record~string, any~, context? : LogContext) : void
++warn(message : string, metadata? : Record~string, any~, context? : LogContext) : void
++error(message : string, error? : Error | string, metadata? : Record~string, any~, context? : LogContext) : void
++logRequestStart(method : string, path : string, context : LogContext, metadata? : Record~string, any~) : void
++logRequestEnd(method : string, path : string, statusCode : number, context : LogContext, metadata? : Record~string, any~) : void
++logDatabaseOperation(operation : string, table : string, duration : number, context : LogContext, metadata? : Record~string, any~) : void
++logAuthEvent(event : 'login' | 'logout' | 'token_refresh' | 'auth_failure', userId? : string, context? : LogContext, metadata? : Record~string, any~) : void
++logSecurityEvent(event : string, severity : 'low' | 'medium' | 'high' | 'critical', context : LogContext, metadata? : Record~string, any~) : void
++logPerformanceMetrics(operation : string, metrics : Record~string, number~, context : LogContext, metadata? : Record~string, any~) : void
++log(level : 'debug' | 'info' | 'warn' | 'error', message : string, metadata? : Record~string, any~, context? : LogContext) : void
++shouldLog(level : 'debug' | 'info' | 'warn' | 'error') : boolean
++extractErrorInfo(error? : Error | string) : any
++generateCorrelationId() : string
++output(logEntry : LogEntry) : void
++outputToConsole(logEntry : LogEntry) : void
++outputToOtpl(logEntry : LogEntry) : Promise~void~
++outputToFile(logEntry : LogEntry) : void
++outputToRedis(logEntry : LogEntry) : void
++compressPayload(data : string) : Promise~{ data : string; encoding : string } | null~
+}
+class LoggerConfig {
++level : 'debug' | 'info' | 'warn' | 'error'
++enablePerformanceLogging : boolean
++enableErrorTracking : boolean
++enableMetrics : boolean
++format : 'json' | 'pretty'
++outputs : string[]
++otplConfig? : OTPLConfig
+}
+class LogEntry {
++timestamp : string
++level : 'debug' | 'info' | 'warn' | 'error'
++message : string
++context : LogContext
++metadata? : Record~string, any~
++performance? : { memoryUsage : NodeJS.MemoryUsage; cpuUsage : { user : number; system : number } }
++duration? : number
+}
+class OTPLConfig {
++endpoint : string
++headers : Record~string, string~
+}
+LoggerFactory --> StructuredLogger : creates
+StructuredLogger --> LoggerConfig : uses
+StructuredLogger --> LogEntry : creates
+StructuredLogger --> OTPLConfig : uses
+```
+
+**Diagram sources**
+- [logging.ts](file://packages/logs/src/logging.ts)
+- [audit.ts](file://packages/audit/src/audit.ts)
+
+The structured logging system provides several key features:
+
+- **Factory Pattern**: The LoggerFactory provides a consistent interface for creating logger instances with shared configuration
+- **Hierarchical Context**: Loggers can be created with additional context that is inherited by child loggers
+- **Performance Timing**: Built-in support for measuring and logging operation durations
+- **Multiple Outputs**: Support for console, file, Redis, and OTLP outputs with configurable routing
+- **Structured Format**: JSON output format enables easy parsing and analysis by monitoring systems
+- **OTLP Integration**: Direct export to OTLP endpoints for integration with observability platforms
+- **Error Tracking**: Comprehensive error information including stack traces (when enabled)
+- **Performance Metrics**: Automatic collection of memory and CPU usage with log entries
+
+The LoggerFactory is initialized with default configuration that can be overridden at runtime:
+
+```typescript
+LoggerFactory.setDefaultConfig({
+    level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+    enablePerformanceLogging: true,
+    enableErrorTracking: true,
+    enableMetrics: false,
+    format: 'json',
+    outputs: ['otpl'],
+    otplConfig: {
+        endpoint: 'http://localhost:5080/api/default/default/_json',
+        headers: {
+            Authorization: process.env.OTLP_AUTH_HEADER || '',
+        },
+    },
+})
+
+const logger = LoggerFactory.createLogger({
+    service: '@repo/audit - audit',
+})
+```
+
+The structured logger provides specialized methods for common logging scenarios:
+
+- **Request Logging**: `logRequestStart` and `logRequestEnd` methods for HTTP request lifecycle tracking
+- **Database Operations**: `logDatabaseOperation` for tracking database query performance
+- **Authentication Events**: `logAuthEvent` for security-related authentication events
+- **Security Events**: `logSecurityEvent` for logging security incidents with severity levels
+- **Performance Metrics**: `logPerformanceMetrics` for capturing operation-specific performance data
+
+The OTLP output supports robust error handling with exponential backoff and circuit breaking for client errors:
+
+```typescript
+private async outputToOtpl(logEntry: LogEntry): Promise<void> {
+    if (!this.config.otplConfig) {
+        throw new Error('OTLP exporter not configured')
+    }
+
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': `audit-system-logger/1.0.0`,
+        ...this.config.otplConfig.headers,
+    }
+
+    let body = JSON.stringify(logEntry)
+
+    // Add compression if large payload
+    if (body.length > 1024) {
+        const compressed = await this.compressPayload(body)
+        if (compressed) {
+            body = compressed.data
+            headers['Content-Encoding'] = compressed.encoding
+        }
+    }
+
+    const requestConfig: RequestInit = {
+        method: 'POST',
+        headers,
+        body,
+    }
+
+    const maxRetries = 3
+    let retryDelay = 1000
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(this.config.otplConfig.endpoint, requestConfig)
+
+            if (response.ok) {
+                console.debug(`Successfully exported log to OTLP`)
+                return
+            }
+
+            // Handle different error scenarios
+            if (response.status === 429) {
+                // Rate limited - implement backoff
+                const retryAfter = response.headers.get('Retry-After')
+                retryDelay = retryAfter ? parseInt(retryAfter) * 1000 : retryDelay * 2
+            } else if (response.status >= 400 && response.status < 500) {
+                // Client error - don't retry
+                throw new Error(`Client error: ${response.status} ${response.statusText}`)
+            }
+
+            if (attempt === maxRetries) {
+                throw new Error(
+                    `Failed after ${maxRetries} attempts: ${response.status} ${response.statusText}`
+                )
+            }
+
+            // Wait before retry
+            await new Promise((resolve) => setTimeout(resolve, retryDelay))
+            retryDelay *= 2 // Exponential backoff
+        } catch (error) {
+            if (attempt === maxRetries) {
+                throw error
+            }
+
+            // Wait before retry for network errors
+            await new Promise((resolve) => setTimeout(resolve, retryDelay))
+            retryDelay *= 2
+        }
+    }
+}
+```
+
+**Section sources**
+- [logging.ts](file://packages/logs/src/logging.ts)
+- [audit.ts](file://packages/audit/src/audit.ts)
+- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
