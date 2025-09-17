@@ -71,7 +71,7 @@ LoggerFactory.setDefaultConfig({
 	format: 'pretty',
 	outputs: ['console', 'otpl'],
 	otplConfig: {
-		endpoint: 'http://localhost:5080/api/default/default/_json',
+		endpoint: process.env.OTLP_ENDPOINT || 'http://localhost:5080/api/default/default/_json',
 		headers: {
 			Authorization: process.env.OTLP_AUTH_HEADER || '',
 		},

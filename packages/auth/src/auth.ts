@@ -172,13 +172,17 @@ class Auth {
 							}
 						},
 						after: async (session, ctx) => {
+							const user = await this.db.query.user.findFirst({
+								where: (user, { eq }) => eq(user.id, session.userId),
+							})
+							if (!user) return
 							const emailDetails: MailerSendOptions = {
 								from: 'SMEDREC <no-reply@smedrec.com>',
-								to: ctx?.context.session?.user.email!,
+								to: user.email,
 								subject: 'Successful login from new device',
 								html: `
-							<p>Hi ${ctx?.context.session?.user.name},</p>\r
-							<p>We're verifying a recent login for ${ctx?.context.session?.user.email}</p>
+							<p>Hi ${user.name},</p>\r
+							<p>We're verifying a recent login for ${user.email}</p>
 							<p>Time: ${new Date().toISOString()}</p>
 							<p>IP Address: ${session.ipAddress}</p>
 							<p>User Agent: ${session.userAgent}</p>

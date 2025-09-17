@@ -25,6 +25,7 @@ COPY apps/worker/package.json ./apps/worker/
 COPY packages/audit/package.json ./packages/audit/
 COPY packages/audit-db/package.json ./packages/audit-db/
 COPY packages/redis-client/package.json ./packages/redis-client/
+COPY packages/infisical-kms/package.json ./packages/infisical-kms/
 COPY packages/logs/package.json ./packages/logs/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
@@ -42,6 +43,7 @@ COPY apps/worker ./apps/worker
 COPY packages/audit ./packages/audit
 COPY packages/audit-db ./packages/audit-db
 COPY packages/redis-client ./packages/redis-client
+COPY packages/infisical-kms ./packages/infisical-kms
 COPY packages/logs ./packages/logs
 COPY packages/typescript-config ./packages/typescript-config
 COPY packages/eslint-config ./packages/eslint-config
