@@ -1,7 +1,5 @@
 import { createGunzip, createInflate } from 'zlib'
 
-import { ConsoleLogger, Logger } from '@repo/logs'
-
 import { ArchivalService } from './archival-service.js'
 
 import type { ArchiveConfig, ArchiveRetrievalRequest } from './archival-service.js'
@@ -49,9 +47,9 @@ export class PostgresArchivalService extends ArchivalService {
 				lastRetrievedAt: archive.lastRetrievedAt,
 			})
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
-			this.logger.error(`Error storing archive: ${message}`, { error: message })
-			throw error
+			const err = error instanceof Error ? error : new Error(String(error))
+			this.logger.error(`Error storing archive: ${err.message}`, err)
+			throw err
 		}
 	}
 
@@ -80,11 +78,9 @@ export class PostgresArchivalService extends ArchivalService {
 
 			return archive
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
-			this.logger.error(`Error retrieving archive ${archiveId}: ${message}`, {
-				error: message,
-			})
-			throw error
+			const err = error instanceof Error ? error : new Error(String(error))
+			this.logger.error(`Error retrieving archive ${archiveId}: ${err.message}`, err)
+			throw err
 		}
 	}
 
@@ -139,11 +135,9 @@ export class PostgresArchivalService extends ArchivalService {
 				data: Buffer.from(archive.data, 'base64'),
 			}))
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
-			this.logger.error(`Error finding matching archives: ${message}`, {
-				error: message,
-			})
-			throw error
+			const err = error instanceof Error ? error : new Error(String(error))
+			this.logger.error(`Error finding matching archives: ${err.message}`, err)
+			throw err
 		}
 	}
 
@@ -170,11 +164,9 @@ export class PostgresArchivalService extends ArchivalService {
 					throw new Error(`Unsupported compression algorithm: ${compressionAlgorithm}`)
 			}
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
-			this.logger.error(`Error decompressing archive data: ${message}`, {
-				error: message,
-			})
-			throw error
+			const err = error instanceof Error ? error : new Error(String(error))
+			this.logger.error(`Error decompressing archive data: ${err.message}`, err)
+			throw err
 		}
 	}
 
@@ -225,12 +217,10 @@ export class PostgresArchivalService extends ArchivalService {
 				})
 				.where({ id: archiveId })
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error)
+			const err = error instanceof Error ? error : new Error(String(error))
 			this.logger.error(
-				`Error updating retrieval statistics for archive ${archiveId}: ${message}`,
-				{
-					error: message,
-				}
+				`Error updating retrieval statistics for archive ${archiveId}: ${err.message}`,
+				err
 			)
 			throw error
 		}

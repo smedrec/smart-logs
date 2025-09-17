@@ -1,6 +1,8 @@
+import 'dotenv/config'
+
 import Redis from 'ioredis'
 
-import { ConsoleLogger } from '@repo/logs'
+import { LoggerFactory } from '@repo/logs'
 
 import type { Redis as RedisInstanceType, RedisOptions } from 'ioredis'
 
@@ -29,15 +31,25 @@ interface RedisConfig {
 
 let redisConnection: RedisInstanceType | null = null
 
-const logger = new ConsoleLogger({
-	environment: 'development',
-	application: 'web',
-	module: 'RedisClient',
-	version: '0.1.0',
-	defaultFields: {
-		environment: 'development',
-		package: '@repo/redis-client',
+// Initialize enhanced structured logger
+
+LoggerFactory.setDefaultConfig({
+	level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+	enablePerformanceLogging: true,
+	enableErrorTracking: true,
+	enableMetrics: false,
+	format: 'json',
+	outputs: ['otpl'],
+	otplConfig: {
+		endpoint: 'http://localhost:5080/api/default/default/_json',
+		headers: {
+			Authorization: process.env.OTLP_AUTH_HEADER || '',
+		},
 	},
+})
+
+const logger = LoggerFactory.createLogger({
+	service: 'RedisClient',
 })
 
 /**
@@ -97,8 +109,7 @@ export function getSharedRedisConnectionWithConfig(redisConfig: RedisConfig): Re
 		})
 
 		redisConnection.on('error', (err: Error) => {
-			const message = err instanceof Error ? err.message : 'Unknown error'
-			logger.error(`[RedisClient] Redis Connection Error: ${message}`, { error: message })
+			logger.error(`[RedisClient] Redis Connection Error: ${err.message}`, err)
 			// Depending on the error, ioredis might attempt to reconnect automatically.
 			// If the error is critical (e.g., authentication failure), it might not.
 			// For critical errors during initial connection, ioredis might throw, caught below.
@@ -119,17 +130,20 @@ export function getSharedRedisConnectionWithConfig(redisConfig: RedisConfig): Re
 		// Note: ioredis handles reconnections automatically.
 		// The 'error' event will fire for failed reconnection attempts.
 	} catch (error) {
+		let err: Error
 		// This typically catches synchronous errors during Redis instantiation (e.g., invalid options)
 		// or immediate connection failures if ioredis is configured to throw them.
-		const message = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to create Redis instance: ${message}`, { error: message })
-		redisConnection = null // Ensure connection is null if creation failed
 		if (error instanceof Error) {
-			throw new Error(
+			err = new Error(
 				`[RedisClient] Failed to initialize Redis connection. Error: ${error.message}`
 			)
 		}
-		throw new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
+		err = new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
+		const message = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to create Redis instance: ${message}`, err)
+		redisConnection = null // Ensure connection is null if creation failed
+
+		throw err
 	}
 
 	return redisConnection
@@ -182,8 +196,7 @@ export function getSharedRedisConnection(options?: RedisOptions): RedisInstanceT
 		})
 
 		redisConnection.on('error', (err: Error) => {
-			const message = err instanceof Error ? err.message : 'Unknown error'
-			logger.error(`[RedisClient] Redis Connection Error: ${message}`, { error: message })
+			logger.error(`[RedisClient] Redis Connection Error: ${err.message}`, err)
 			// Depending on the error, ioredis might attempt to reconnect automatically.
 			// If the error is critical (e.g., authentication failure), it might not.
 			// For critical errors during initial connection, ioredis might throw, caught below.
@@ -204,17 +217,20 @@ export function getSharedRedisConnection(options?: RedisOptions): RedisInstanceT
 		// Note: ioredis handles reconnections automatically.
 		// The 'error' event will fire for failed reconnection attempts.
 	} catch (error) {
+		let err: Error
 		// This typically catches synchronous errors during Redis instantiation (e.g., invalid options)
 		// or immediate connection failures if ioredis is configured to throw them.
-		const message = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to create Redis instance: ${message}`, { error: message })
-		redisConnection = null // Ensure connection is null if creation failed
 		if (error instanceof Error) {
-			throw new Error(
+			err = new Error(
 				`[RedisClient] Failed to initialize Redis connection. Error: ${error.message}`
 			)
 		}
-		throw new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
+		err = new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
+		const message = error instanceof Error ? error.message : 'Unknown error'
+		logger.error(`Failed to create Redis instance: ${message}`, err)
+		redisConnection = null // Ensure connection is null if creation failed
+
+		throw err
 	}
 
 	return redisConnection
@@ -234,7 +250,10 @@ export async function closeSharedRedisConnection(): Promise<void> {
 			logger.info('Shared Redis connection closed gracefully.')
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Unknown error'
-			logger.error(`Error during Redis quit command: ${message}`, { error: message })
+			logger.error(
+				`Error during Redis quit command: ${message}`,
+				err instanceof Error ? err : new Error('Unknown error')
+			)
 			// Fallback to disconnect if quit fails
 			redisConnection.disconnect()
 			logger.info('Shared Redis connection disconnected forcefully.')

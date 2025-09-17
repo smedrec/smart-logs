@@ -445,7 +445,7 @@ export class StructuredLogger {
 	}
 
 	/**
-	 * Output to file (placeholder - would need file system integration)
+	 * Output to OTPL
 	 */
 	private async outputToOtpl(logEntry: LogEntry): Promise<void> {
 		if (!this.config.otplConfig) {

@@ -11,10 +11,8 @@
 		"lint": "eslint . --ext .ts"
 	},
 	"dependencies": {
-		"@openobserve/pino-openobserve": "^1.0.0",
 		"chalk": "^5.5.0",
-		"pino": "^9.9.5",
-		"pino-elasticsearch": "^8.1.0",
+		"dotenv": "17.2.0",
 		"zod": "^4.1.5"
 	},
 	"devDependencies": {
