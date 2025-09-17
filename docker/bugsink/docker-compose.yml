@@ -1,0 +1,34 @@
+services:
+  bugsink:
+    image: bugsink/bugsink:2
+    container_name: bugsink
+    restart: always
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      CREATE_SUPERUSER: ${CREATE_SUPERUSER}
+      PORT: 8000
+      DATABASE_URL: ${DATABASE_URL}
+      BEHIND_HTTPS_PROXY: "true"  # Change this for setups behind a proxy w/ ssl enabled
+      BASE_URL: "https://bugsink.smedrec.qzz.io"
+      TIME_ZONE: "Europe/Lisbon"
+      EMAIL_HOST: "joseantcordeiro.hopto.org"
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      EMAIL_PORT: 2525
+      EMAIL_USE_TLS: "False"
+      FILE_EVENT_STORAGE_PATH: "/opt/data"
+    volumes:
+      - data:/opt/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/\").raise_for_status()'"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  data:
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default

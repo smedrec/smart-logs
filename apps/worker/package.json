@@ -22,6 +22,7 @@
 		"@repo/audit-db": "workspace:*",
 		"@repo/logs": "workspace:*",
 		"@repo/redis-client": "workspace:*",
+		"@sentry/node": "^10.12.0",
 		"bullmq": "5.58.5",
 		"dotenv": "17.2.2",
 		"hono": "4.9.7",

@@ -234,7 +234,9 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			healthCheckService.registerHealthCheck(new RedisHealthCheck(() => getRedisConnectionStatus()))
 		}
 
-		if (!audit) audit = new Audit(config, auditDbInstance.getDrizzleInstance(), connection)
+		if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(auditDbInstance)
+
+		if (!audit) audit = new Audit(config, presetDatabaseHandler, connection)
 
 		if (!authInstance) authInstance = new Auth(config, inngest, audit)
 
@@ -343,7 +345,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 				deliveryConfig
 			)
 		}
-		if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(db.audit)
+
 		if (!gdprComplianceService)
 			gdprComplianceService = new GDPRComplianceService(client, audit, kms)
 

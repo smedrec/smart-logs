@@ -1,6 +1,7 @@
 import 'dotenv/config'
 
 import { serve } from '@hono/node-server'
+import * as Sentry from '@sentry/node'
 import { Hono } from 'hono'
 
 import {
@@ -48,6 +49,17 @@ import type { LogLevel } from 'workers-tagged-logger'
 import type { AuditLogEvent, ObservabilityConfig, ReliableProcessorConfig } from '@repo/audit'
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
+
+Sentry.init({
+	dsn: 'https://af6b20a8261b4d4981f0283f26d7795c@bugsink.smedrec.qzz.io/1',
+
+	// Alternatively, use `process.env.npm_package_version` for a dynamic release version
+	// if your build tool supports it.
+	release: 'smart-logs@0.1.0',
+
+	integrations: [],
+	tracesSampleRate: 0,
+})
 
 // Initialize enhanced structured logger
 

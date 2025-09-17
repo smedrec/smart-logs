@@ -1,69 +1,137 @@
 import { sql } from 'drizzle-orm'
 
+import { EnhancedAuditDatabaseClient, EnhancedAuditDb } from '@repo/audit-db'
+
 import { DataClassification } from '../types.js'
 import { PresetHandler } from './audit-preset.js'
 import { AuditPreset } from './preset-types.js'
-
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 
 /**
  * Database preset handler implementation
  */
 export class DatabasePresetHandler implements PresetHandler {
-	constructor(private db: PostgresJsDatabase<any>) {}
+	private client: EnhancedAuditDatabaseClient
+	constructor(auditDbInstance: EnhancedAuditDb) {
+		this.client = auditDbInstance.getEnhancedClientInstance()
+	}
 
 	/**
-	 * Get all presets
+	 * Get all presets for an organization with default fallbacks
+	 * Organization presets take priority over defaults with the same name
 	 */
 	async getPresets(organizationId?: string): Promise<(AuditPreset & { id?: string })[]> {
 		const orgId = organizationId || '*'
+
+		// If no organization specified, just return default presets
+		if (orgId === '*') {
+			return this.getDefaultPresets()
+		}
+
 		try {
-			const result = await this.db.execute(sql`
-        SELECT * FROM audit_preset
-        WHERE organization_id = ${orgId}
-        ORDER BY name
-      `)
+			// Fetch both organization and default presets in a single optimized query
+			const result = await this.client.executeOptimizedQuery(
+				(db) =>
+					db.execute(sql`
+						SELECT *,
+								 CASE WHEN organization_id = ${orgId} THEN 1 ELSE 0 END as priority
+						FROM audit_preset
+						WHERE organization_id IN (${orgId}, '*')
+						ORDER BY name, priority DESC
+					`),
+				{ cacheKey: `get_merged_presets_${orgId}` }
+			)
+
 			const rows = result || []
-			if (rows.length === 0) {
-				const result = await this.db.execute(sql`
-					SELECT * FROM audit_preset
-					WHERE organization_id = '*'
-					ORDER BY name
-				`)
-				const rows = result || []
-				return rows.map(this.mapDatabasePresetToPreset)
-			}
-			return rows.map(this.mapDatabasePresetToPreset)
+
+			// Merge presets: organization presets take priority over defaults
+			return this.mergePresetsWithPriority(rows)
 		} catch (error) {
-			throw new Error(`Failed to retrieve presets: ${error}`)
+			throw new Error(`Failed to retrieve presets. ${error}`)
 		}
 	}
 
 	/**
-	 * Get a preset by name
+	 * Get a preset by name with organization priority and default fallback
 	 */
 	async getPreset(
 		name: string,
 		organizationId?: string
 	): Promise<(AuditPreset & { id?: string }) | null> {
 		const orgId = organizationId || '*'
+
+		// If requesting default preset, get it directly
+		if (orgId === '*') {
+			return this.getDefaultPreset(name)
+		}
+
 		try {
-			const result = await this.db.execute(sql`
-				SELECT * FROM audit_preset
-				WHERE name = ${name}
-				AND organization_id = ${orgId}
-				LIMIT 1
-			`)
+			// Single query to get both organization and default preset with priority
+			const result = await this.client.executeOptimizedQuery(
+				(db) =>
+					db.execute(sql`
+						SELECT *,
+								 CASE WHEN organization_id = ${orgId} THEN 1 ELSE 0 END as priority
+						FROM audit_preset
+						WHERE name = ${name}
+						AND organization_id IN (${orgId}, '*')
+						ORDER BY priority DESC
+						LIMIT 1
+					`),
+				{ cacheKey: `get_preset_${name}_${orgId}` }
+			)
 
 			const rows = result || []
 			if (rows.length === 0) {
-				return await this.getDefaultPreset(name)
+				return null
 			}
 
 			return this.mapDatabasePresetToPreset(rows[0])
 		} catch (error) {
-			throw new Error(`Failed to retrieve preset by ID: ${error}`)
+			throw new Error(`Failed to retrieve preset by name. ${error}`)
 		}
+	}
+
+	/**
+	 * Get default presets only
+	 */
+	private async getDefaultPresets(): Promise<(AuditPreset & { id?: string })[]> {
+		try {
+			const result = await this.client.executeOptimizedQuery(
+				(db) =>
+					db.execute(sql`
+						SELECT * FROM audit_preset
+						WHERE organization_id = '*'
+						ORDER BY name
+					`),
+				{ cacheKey: 'get_default_presets' }
+			)
+
+			const rows = result || []
+			return rows.map(this.mapDatabasePresetToPreset)
+		} catch (error) {
+			throw new Error(`Failed to retrieve default presets. ${error}`)
+		}
+	}
+
+	/**
+	 * Merge presets giving priority to organization-specific ones
+	 * @param rows Database rows sorted by name and priority (org presets first)
+	 */
+	private mergePresetsWithPriority(rows: any[]): (AuditPreset & { id?: string })[] {
+		const presetMap = new Map<string, any>()
+
+		// Process rows - organization presets will overwrite defaults due to priority ordering
+		for (const row of rows) {
+			const presetName = row.name
+
+			// Only add if not already present (organization preset takes priority)
+			if (!presetMap.has(presetName)) {
+				presetMap.set(presetName, row)
+			}
+		}
+
+		// Convert map values to preset objects
+		return Array.from(presetMap.values()).map(this.mapDatabasePresetToPreset)
 	}
 
 	/**
@@ -71,12 +139,16 @@ export class DatabasePresetHandler implements PresetHandler {
 	 */
 	async getDefaultPreset(name: string): Promise<(AuditPreset & { id?: string }) | null> {
 		try {
-			const result = await this.db.execute(sql`
+			const result = await this.client.executeOptimizedQuery(
+				(db) =>
+					db.execute(sql`
 				SELECT * FROM audit_preset
 				WHERE name = ${name}
 				AND organization_id = '*'
 				LIMIT 1
-			`)
+			`),
+				{ cacheKey: `get_default_preset_${name}` }
+			)
 
 			const rows = result || []
 			if (rows.length === 0) {
@@ -95,8 +167,9 @@ export class DatabasePresetHandler implements PresetHandler {
 	async createPreset(
 		preset: AuditPreset & { createdBy: string }
 	): Promise<AuditPreset & { id?: string }> {
+		const db = this.client.getDatabase()
 		try {
-			const result = await this.db.execute(sql`
+			const result = await db.execute(sql`
 				INSERT INTO audit_preset (
 					name, description, organization_id, action, data_classification, required_fields, default_values, validation, created_by
 				) VALUES (
@@ -127,9 +200,10 @@ export class DatabasePresetHandler implements PresetHandler {
 	async updatePreset(
 		preset: AuditPreset & { id: string; updatedBy: string }
 	): Promise<AuditPreset & { id?: string }> {
+		const db = this.client.getDatabase()
 		const now = new Date().toISOString()
 		try {
-			const result = await this.db.execute(sql`
+			const result = await db.execute(sql`
 				UPDATE audit_preset
 				SET name = ${preset.name},
 					description = ${preset.description},
@@ -157,8 +231,9 @@ export class DatabasePresetHandler implements PresetHandler {
 	 * Delete a preset
 	 */
 	async deletePreset(name: string, organizationId: string): Promise<{ success: true }> {
+		const db = this.client.getDatabase()
 		try {
-			await this.db.execute(sql`
+			await db.execute(sql`
 				DELETE FROM audit_preset
 				WHERE name = ${name}
         AND organization_id = ${organizationId}
@@ -201,6 +276,8 @@ export class DatabasePresetHandler implements PresetHandler {
 /**
  * Factory function to create DatabasePresetHandler
  */
-export function createDatabasePresetHandler(db: PostgresJsDatabase<any>): DatabasePresetHandler {
-	return new DatabasePresetHandler(db)
+export function createDatabasePresetHandler(
+	auditDbInstance: EnhancedAuditDb
+): DatabasePresetHandler {
+	return new DatabasePresetHandler(auditDbInstance)
 }

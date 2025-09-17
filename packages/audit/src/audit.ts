@@ -95,7 +95,7 @@ export class Audit {
 	 */
 	constructor(
 		config: AuditConfig,
-		db: PostgresJsDatabase<any>,
+		presetsService: DatabasePresetHandler,
 		redisOrUrlOrOptions?: string | RedisType | { url?: string; options?: RedisOptions },
 		directConnectionOptions?: RedisOptions
 	) {
@@ -103,7 +103,7 @@ export class Audit {
 		this.queueName = this.config.reliableProcessor.queueName
 		this.isSharedConnection = false
 		this.cryptoService = new CryptoService(this.config.security)
-		this.presetsService = new DatabasePresetHandler(db)
+		this.presetsService = presetsService
 
 		LoggerFactory.setDefaultConfig({
 			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',

@@ -2,6 +2,7 @@ import 'dotenv/config'
 
 import { serve } from '@hono/node-server'
 import { trpcServer } from '@hono/trpc-server'
+import * as Sentry from '@sentry/node'
 import { cors } from 'hono/cors'
 import { serve as inngestServe } from 'inngest/hono'
 
@@ -31,6 +32,17 @@ import {
 } from './lib/middleware/performance.js'
 import { appRouter } from './routers/index.js'
 import { createRestAPI } from './routes/rest-api.js'
+
+Sentry.init({
+	dsn: 'https://af6b20a8261b4d4981f0283f26d7795c@bugsink.smedrec.qzz.io/1',
+
+	// Alternatively, use `process.env.npm_package_version` for a dynamic release version
+	// if your build tool supports it.
+	release: 'smart-logs@0.1.0',
+
+	integrations: [],
+	tracesSampleRate: 0,
+})
 
 // Configuration manager
 let configManager: ConfigurationManager | undefined = undefined
