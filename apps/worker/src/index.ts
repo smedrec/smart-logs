@@ -61,7 +61,7 @@ LoggerFactory.setDefaultConfig({
 	otplConfig: {
 		endpoint: 'http://localhost:5080/api/default/default/_json',
 		headers: {
-			Authorization: 'Basic am9zZWFudGNvcmRlaXJvQGdtYWlsLmNvbTpST3pVRnROWHVkZFdTeGZF',
+			Authorization: process.env.OTLP_AUTH_HEADER || '',
 		},
 	},
 })
@@ -667,7 +667,10 @@ async function main() {
 				)
 			}
 
-			logger.error(`❌ Failed to process audit event: ${err.message} (${totalTime.toFixed(2)}ms)`)
+			logger.error(
+				`❌ Failed to process audit event: ${err.message} (${totalTime.toFixed(2)}ms)`,
+				err
+			)
 			throw err // Re-throw to trigger retry mechanism
 		} finally {
 			tracer!.finishSpan(span)
