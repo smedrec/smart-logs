@@ -18,6 +18,7 @@ import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle
 import { auditIntegrityLog, auditLog } from '@repo/audit-db'
 
 import type { HonoEnv } from '@/lib/hono/context'
+import type { AuditLogEvent } from '@repo/audit'
 
 // Zod schemas for request/response validation
 const AuditEventSchema = z.object({
@@ -543,26 +544,42 @@ export function createAuditAPI(): OpenAPIHono<HonoEnv> {
 
 			const dbEvent = events[0]
 
-			// Perform integrity verification using crypto service methods
-			const auditEvent: any = {
-				...dbEvent,
-				ttl: dbEvent.ttl || undefined,
-				principalId: dbEvent.principalId || undefined,
-				organizationId: dbEvent.organizationId || undefined,
-				targetResourceType: dbEvent.targetResourceType || undefined,
-				targetResourceId: dbEvent.targetResourceId || undefined,
-				outcomeDescription: dbEvent.outcomeDescription || undefined,
-				hash: dbEvent.hash || undefined,
-				correlationId: dbEvent.correlationId || undefined,
-				dataClassification: dbEvent.dataClassification || 'INTERNAL',
-				retentionPolicy: dbEvent.retentionPolicy || 'standard',
+			if (!dbEvent.hash) {
+				throw new ApiError({
+					code: 'PRECONDITION_FAILED',
+					message: 'Audit event do not have a hash',
+				})
 			}
 
-			const isValid = dbEvent.hash ? audit.verifyEventHash(auditEvent, dbEvent.hash) : false
+			// Perform integrity verification using crypto service methods
+			// Only include fields that are used in hash calculation (critical fields)
+			const auditEvent: any = {
+				timestamp: dbEvent.timestamp,
+				action: dbEvent.action,
+				status: dbEvent.status,
+				principalId: dbEvent.principalId || null,
+				organizationId: dbEvent.organizationId || null,
+				targetResourceType: dbEvent.targetResourceType || null,
+				targetResourceId: dbEvent.targetResourceId || null,
+				outcomeDescription: dbEvent.outcomeDescription || null,
+			}
+
+			const isValid = audit.verifyEventHash(auditEvent, dbEvent.hash)
+			const computedHash = audit.generateEventHash(auditEvent)
+
+			// Add debug logging for hash verification issues
+			logger.info(`Hash verification debug for event ${id}`, {
+				originalHash: dbEvent.hash,
+				computedHash,
+				isValid,
+				auditEventFields: auditEvent,
+				dbEventKeys: dbEvent,
+			})
+
 			const verificationResult = {
 				verified: isValid,
-				originalHash: dbEvent.hash ?? undefined,
-				computedHash: dbEvent.hash ? audit.generateEventHash(auditEvent) : undefined,
+				originalHash: dbEvent.hash,
+				computedHash,
 				algorithm: dbEvent.hashAlgorithm || 'SHA-256',
 			}
 

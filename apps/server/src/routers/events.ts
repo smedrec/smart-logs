@@ -527,19 +527,16 @@ export const eventsRouter = {
 			}
 
 			// Perform integrity verification using crypto service methods
-			// Convert database event to AuditLogEvent format for crypto operations
+			// Only include fields that are used in hash calculation (critical fields)
 			const auditEvent: any = {
-				...event[0],
-				ttl: event[0].ttl || undefined,
-				principalId: event[0].principalId || undefined,
-				organizationId: event[0].organizationId || undefined,
-				targetResourceType: event[0].targetResourceType || undefined,
-				targetResourceId: event[0].targetResourceId || undefined,
-				outcomeDescription: event[0].outcomeDescription || undefined,
-				hash: event[0].hash || undefined,
-				correlationId: event[0].correlationId || undefined,
-				dataClassification: event[0].dataClassification || 'INTERNAL',
-				retentionPolicy: event[0].retentionPolicy || 'standard',
+				timestamp: event[0].timestamp,
+				action: event[0].action,
+				status: event[0].status,
+				principalId: event[0].principalId || null,
+				organizationId: event[0].organizationId || null,
+				targetResourceType: event[0].targetResourceType || null,
+				targetResourceId: event[0].targetResourceId || null,
+				outcomeDescription: event[0].outcomeDescription || null,
 			}
 
 			const isValid = event[0].hash ? audit.verifyEventHash(auditEvent, event[0].hash) : false

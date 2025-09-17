@@ -439,7 +439,7 @@ export class Audit {
 
 		// Generate signature if requested
 		if (options.generateSignature) {
-			const signature = this.generateEventSignature(event)
+			const signature = await this.generateEventSignature(event)
 			event = { ...event, signature }
 		}
 

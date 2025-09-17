@@ -99,7 +99,7 @@ export class CryptoService implements CryptographicService {
 		// Create deterministic string representation
 		const dataToHash = this.createDeterministicString(criticalFields)
 
-		// Generate SHA-256 hash
+		// Generate SHA-256 hash using Node.js crypto for hex format (backward compatibility)
 		return createHash('sha256').update(dataToHash, 'utf8').digest('hex')
 	}
 
