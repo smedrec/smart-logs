@@ -15,12 +15,12 @@
 
 ## Update Summary
 **Changes Made**   
-- Added comprehensive structured logging documentation with OTLP integration
-- Enhanced authentication section with KMS encryption support
-- Updated error handling with improved retry logic details
-- Added new integration patterns for server and worker services
-- Expanded practical examples with real-world usage scenarios
-- Updated troubleshooting guide with new error cases
+- Updated documentation to reflect replacement of ConsoleLogger with StructuredLogger system
+- Enhanced structured logging section with new configuration options and implementation details
+- Added information about LoggerFactory and request correlation features
+- Updated code examples to reflect new structured logging API
+- Improved error handling and retry logic documentation
+- Added performance timing and metrics logging capabilities
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -180,10 +180,13 @@ The enhanced logging system integrates structured logging with OTLP export capab
 - **Field Structuring**: Typed fields with proper serialization
 - **Batch Processing**: Same batching mechanism as traces
 - **Compression**: Payload compression for large log entries
+- **Performance Timing**: Built-in support for measuring operation duration
+
+The new StructuredLogger system replaces the previous ConsoleLogger implementation, providing enhanced features for observability.
 
 **Section sources**
+- [logging.ts](file://packages/logs/src/logging.ts#L0-L619)
 - [otpl.ts](file://packages/logs/src/otpl.ts#L0-L165)
-- [logging.ts](file://packages/logs/src/logging.ts#L448-L495)
 
 ## API Interfaces
 The OTLP Observability Configuration exposes a well-defined API interface for integration with the audit system.
@@ -399,17 +402,24 @@ The decorator pattern automatically creates spans for method execution, reducing
 
 ### Structured Logging
 ```typescript
-import { OTPLLogger } from '@repo/logs'
+import { StructuredLogger, LoggerFactory } from '@repo/logs'
 
-const logger = new OTPLLogger(
+// Create a structured logger with OTLP configuration
+const logger = LoggerFactory.createLogger(
   { 
     environment: 'production',
     application: 'audit-system',
     module: 'event-processing'
   },
   {
-    exporterType: 'otlp',
-    exporterEndpoint: process.env.OTLP_ENDPOINT
+    level: 'info',
+    outputs: ['console', 'otpl'],
+    otplConfig: {
+      endpoint: process.env.OTLP_ENDPOINT,
+      headers: {
+        'Authorization': `Bearer ${process.env.OTLP_API_KEY}`
+      }
+    }
   }
 )
 
@@ -425,11 +435,23 @@ logger.error('Processing failed', {
   errorType: 'DatabaseTimeout',
   durationMs: 5000
 })
+
+// Create child logger with additional context
+const requestLogger = logger.child({
+  requestId: 'req-7890',
+  userId: 'user-67890'
+})
+
+requestLogger.startTiming()
+// Process request
+const duration = requestLogger.endTiming()
+requestLogger.info('Request completed', { duration })
 ```
 
 **Section sources**
 - [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L115-L171)
-- [otpl.ts](file://packages/logs/src/otpl.ts#L38-L87)
+- [logging.ts](file://packages/logs/src/logging.ts#L0-L619)
+- [otpl.ts](file://packages/logs/src/otpl.ts#L0-L165)
 
 ## Troubleshooting Guide
 This section provides guidance for diagnosing and resolving common issues with OTLP configuration.

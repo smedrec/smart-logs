@@ -2,14 +2,14 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit to integrate LoggerFactory from @repo/logs and implement secret detection*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit to integrate LoggerFactory from @repo/logs, add Redis connection retry logic, and initialize Sentry*
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts) - *Refactored to use StructuredLogger and LoggerFactory*
 - [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts) - *Updated to use enhanced structured logging*
 - [logging.ts](file://packages\logs\src\logging.ts) - *Contains LoggerFactory implementation for enhanced structured logging*
 - [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation with batch processing*
 - [interface.ts](file://packages\logs\src\interface.ts) - *Logger interface and LoggingConfig definition*
 - [log.ts](file://packages\logs\src\log.ts) - *Log class and schema definitions*
-- [Dockerfile](file://apps\worker\Dockerfile) - *Updated for observability changes*
+- [Dockerfile](file://apps\worker\Dockerfile) - *Updated for observability changes and OTLP endpoint fixes*
 - [package.json](file://apps\worker\package.json) - *Updated with new observability dependencies*
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated to use OTLP exporter and fix auth header usage*
 - [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *Documentation for OTLP configuration*
@@ -20,9 +20,11 @@
 - Updated worker initialization to use LoggerFactory from @repo/logs package for enhanced structured logging across all components
 - Integrated new logging system with OTLP export capabilities and batch processing in archival services
 - Added detection and handling of internal secret exposure within worker process
+- Added Redis connection retry logic to improve resilience during startup
+- Integrated Sentry for error tracking and monitoring
+- Fixed Dockerfile and OTLP endpoint configuration issues
 - Updated documentation to reflect the new LoggerFactory-based logging architecture
 - Added new section on internal secret detection and handling
-- Updated architecture overview and component analysis to reflect logging changes in archival services
 - Enhanced troubleshooting guide with logging-specific issues and secret detection scenarios
 - Removed outdated references to ConsoleLogger in documentation
 - Updated diagram sources to reflect actual code changes
@@ -102,6 +104,7 @@ The Worker Service's functionality is driven by several core components:
 - **StructuredLogger**: Enhanced structured logging implementation with OTLP export capabilities.
 - **ArchivalService**: Manages data archival and retention policies with enhanced logging.
 - **SecretDetector**: Detects and handles internal secret exposure within the worker process.
+- **Sentry**: Error tracking and monitoring service for production issues.
 
 These components are orchestrated through dependency injection and support pluggable handlers for extensibility.
 
@@ -129,6 +132,7 @@ SMTP[(Email Service)]
 KMS[(Key Management Service)]
 OTLP[(OTLP Endpoint)]
 S3[(S3 Configuration)]
+Sentry[(Error Tracking)]
 end
 subgraph "Worker Service"
 direction TB
@@ -141,6 +145,7 @@ Crypto[CryptoService]
 Logger[StructuredLogger]
 Archival[ArchivalService]
 SecretDetector[SecretDetector]
+SentryClient[Sentry]
 end
 S3 --> Inngest
 MQ --> Inngest
@@ -161,6 +166,8 @@ Archival --> DB
 Archival --> Logger
 Inngest --> SecretDetector
 SecretDetector --> Logger
+Inngest --> SentryClient
+SentryClient --> Sentry
 ```
 
 **Diagram sources**
@@ -443,6 +450,60 @@ end
 - [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
 - [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts#L1-L200)
 
+### Redis Connection Retry Implementation
+The worker now implements retry logic for Redis connections during startup, enhancing resilience in environments with transient network issues or delayed Redis availability.
+
+```mermaid
+sequenceDiagram
+participant Worker as Worker Service
+participant Redis as Redis Connection
+participant Retry as executeWithRetry
+Worker->>Retry : executeWithRetry(getSharedRedisConnectionWithConfig)
+Retry->>Redis : Attempt connection
+alt Connection Success
+Redis-->>Retry : Success result
+Retry-->>Worker : Redis connection established
+else Connection Failure
+Redis-->>Retry : Connection error
+Retry->>Retry : Wait with exponential backoff
+Retry->>Redis : Retry connection
+end
+Worker->>Worker : Continue initialization
+```
+
+**Diagram sources**
+- [index.ts](file://apps\worker\src\index.ts#L403-L438)
+- [connection.ts](file://packages\redis-client\src\connection.ts#L48-L119)
+- [index.ts](file://packages\redis-client\src\index.ts)
+
+**Section sources**
+- [index.ts](file://apps\worker\src\index.ts#L403-L438)
+- [connection.ts](file://packages\redis-client\src\connection.ts#L48-L119)
+
+### Sentry Integration
+The worker service now integrates with Sentry for comprehensive error tracking and monitoring, providing detailed insights into production issues and performance problems.
+
+```mermaid
+sequenceDiagram
+participant Worker as Worker Service
+participant Sentry as Sentry Client
+participant SentryServer as Sentry Server
+Worker->>Sentry : Sentry.init()
+Sentry->>SentryServer : Establish connection
+Worker->>Sentry : Capture error
+Sentry->>Sentry : Create event with context
+Sentry->>SentryServer : Send error event
+SentryServer-->>Sentry : Acknowledge receipt
+Sentry-->>Worker : Error reported
+```
+
+**Diagram sources**
+- [index.ts](file://apps\worker\src\index.ts#L50-L58)
+- [package.json](file://apps\worker\package.json)
+
+**Section sources**
+- [index.ts](file://apps\worker\src\index.ts#L50-L58)
+
 ## Dependency Analysis
 The Worker Service has a layered dependency structure:
 
@@ -462,6 +523,7 @@ Logs --> Pino[pino]
 Logs --> PinoElastic[pino-elasticsearch]
 Audit --> Archival[@repo/audit/src/archival]
 Archival --> Logs[@repo/logs]
+Worker --> Sentry[@sentry/node]
 ```
 
 All shared packages are managed via the monorepo's `pnpm-workspace.yaml`, ensuring version consistency and efficient development.
@@ -489,6 +551,8 @@ The worker is optimized for high-throughput, low-latency processing:
 - **OTLP Export**: Implements batch processing with configurable batch size (default 100 spans) and timeout (5 seconds) to optimize network efficiency.
 - **Archival Processing**: Uses batch processing and compression for efficient data archiving with integrity verification.
 - **Secret Detection**: Implements efficient scanning of environment variables and configuration without impacting performance.
+- **Redis Connection**: Implements retry logic with exponential backoff for resilient connection establishment.
+- **Error Tracking**: Integrates Sentry for comprehensive error monitoring and performance insights.
 
 The system is horizontally scalable via Kubernetes, with each worker instance maintaining independent state while sharing Redis and PostgreSQL backends.
 
@@ -507,6 +571,9 @@ Common issues and their resolutions:
 - **LoggerFactory Configuration Issues**: Ensure default configuration is set before creating loggers. Verify that output types (console, otpl) are correctly specified in the configuration.
 - **Internal Secret Detection**: If secret detection alerts are triggered, immediately audit configuration and environment variables for sensitive information. Ensure secrets are properly managed through secure storage systems.
 - **Archival Service Errors**: Verify that the database connection is stable and that the archive table schema matches the expected structure. Check that compression algorithms are supported and properly configured.
+- **Redis Connection Failures**: Check Redis server availability and network connectivity. Verify Redis configuration in the S3 configuration file. Ensure Redis credentials are correct.
+- **Sentry Integration Issues**: Verify that the Sentry DSN is correctly configured in the code. Check network connectivity to the Sentry server. Ensure that the release version is properly set.
+- **Configuration Manager Errors**: Verify that the CONFIG_PATH environment variable points to a valid S3 location. Check S3 bucket permissions and network connectivity. Ensure the configuration file is valid JSON.
 
 **Section sources**
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L500-L600)
@@ -518,6 +585,7 @@ Common issues and their resolutions:
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts#L1-L799)
 - [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts#L1-L229)
 - [index.ts](file://apps\worker\src\index.ts#L1-L784)
+- [connection.ts](file://packages\redis-client\src\connection.ts#L48-L119)
 
 ## Conclusion
 The Worker Service is a robust, scalable background processor designed for real-time compliance and security monitoring. Its modular architecture, deep observability, and resilience patterns make it well-suited for mission-critical audit processing.
@@ -531,5 +599,7 @@ The logging system has been enhanced with the LoggerFactory from `@repo/logs`, p
 The archival services have been updated to use the enhanced structured logging system, ensuring consistent logging across all data archiving operations. This change improves traceability and debugging capabilities for archival processes.
 
 A new internal secret detection mechanism has been implemented to prevent accidental leakage of sensitive information, enhancing the overall security posture of the worker service.
+
+The service now includes Redis connection retry logic, improving resilience during startup in environments with transient network issues. Additionally, Sentry has been integrated for comprehensive error tracking and monitoring, providing valuable insights into production issues.
 
 Future enhancements could include ML-based anomaly detection, integration with SIEM systems, and enhanced cryptographic features such as digital signatures and certificate-based authentication. The codebase demonstrates strong separation of concerns, extensive testing, and clear extensibility points through pluggable alert handlers and metrics collectors.

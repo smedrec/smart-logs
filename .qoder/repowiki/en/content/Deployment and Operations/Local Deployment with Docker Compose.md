@@ -2,15 +2,25 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [docker-compose.yml](file://apps/server/docker-compose.yml)
-- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
-- [docker-build.sh](file://apps/server/scripts/docker-build.sh)
-- [Dockerfile](file://apps/server/Dockerfile)
-- [Dockerfile.dev](file://apps/server/Dockerfile.dev)
-- [README.Docker.md](file://apps/server/README.Docker.md)
-- [secret.yaml](file://apps/server/k8s/secret.yaml)
-- [manager.ts](file://packages/audit/src/config/manager.ts)
+- [docker-compose.yml](file://apps/server/docker-compose.yml) - *Updated with service dependencies and network configuration*
+- [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml) - *Production configuration with security hardening*
+- [docker-build.sh](file://apps/server/scripts/docker-build.sh) - *Script for building and managing Docker images*
+- [Dockerfile](file://apps/server/Dockerfile) - *Production Dockerfile*
+- [Dockerfile.dev](file://apps/server/Dockerfile.dev) - *Development Dockerfile with hot reloading*
+- [README.Docker.md](file://apps/server/README.Docker.md) - *Supplementary Docker documentation*
+- [secret.yaml](file://apps/server/k8s/secret.yaml) - *Kubernetes secret management example*
+- [manager.ts](file://packages/audit/src/config/manager.ts) - *Configuration manager with sensitive data handling*
+- [pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml) - *Added read replica configuration*
+- [worker/src/index.ts](file://apps/worker/src/index.ts) - *OTLP endpoint configuration for observability*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added documentation for PostgreSQL read replica configuration in Docker Compose
+- Updated observability section with OTLP endpoint configuration details
+- Enhanced troubleshooting section with new scenarios related to read replicas and OTLP connectivity
+- Updated service dependency diagrams to reflect new architecture
+- Added environment variable references for OTLP configuration
 
 ## Table of Contents
 1. [Local Deployment with Docker Compose](#local-deployment-with-docker-compose)
@@ -76,8 +86,21 @@ Each service joins this network through the `networks` directive, enabling secur
 
 Security is enhanced by using the `security_opt` directive with `no-new-privileges:true`, preventing containers from gaining additional privileges beyond those of the host system.
 
+For applications requiring read scaling, the pgvector Docker Compose configuration demonstrates a primary-replica setup:
+
+```mermaid
+graph LR
+P[Primary Database] --> |WAL Replication| R[Replica Database]
+A[Application] --> |Read/Write| P
+A --> |Read Only| R
+```
+
+**Diagram sources**
+- [pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml#L1-L75)
+
 **Section sources**
 - [docker-compose.yml](file://apps/server/docker-compose.yml#L15-L94)
+- [pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml#L1-L75)
 
 ## Volume Mounting for Development
 
@@ -284,11 +307,20 @@ data:
 
 The documentation recommends using external secret management systems like HashiCorp Vault or cloud provider secret managers for production deployments to enhance security.
 
+For observability, OTLP endpoints are configured through environment variables:
+
+```yaml
+environment:
+  - OTLP_ENDPOINT=http://openobserve:5080/api/default/default/_json
+  - OTLP_AUTH_HEADER=Authorization: Basic ${OTLP_BASIC_AUTH}
+```
+
 **Section sources**
 - [docker-compose.yml](file://apps/server/docker-compose.yml#L20-L24)
 - [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml#L18-L24)
 - [manager.ts](file://packages/audit/src/config/manager.ts#L331-L384)
 - [secret.yaml](file://apps/server/k8s/secret.yaml#L0-L18)
+- [worker/src/index.ts](file://apps/worker/src/index.ts#L74-L76)
 
 ## Common Troubleshooting Scenarios
 
@@ -343,10 +375,39 @@ When code changes don't reflect in the container:
 3. Ensure the development server is configured for hot reloading
 4. Restart the container if changes are not detected
 
+### Read Replica Synchronization Issues
+When using the pgvector read replica configuration:
+1. Check replication status:
+   ```bash
+   docker-compose exec postgres-replica pg_isready -U ${POSTGRES_USER}
+   ```
+2. Verify WAL settings in the primary container:
+   ```bash
+   docker-compose exec pgvector-primary postgres -c wal_level=logical
+   ```
+3. Check replication user permissions and password consistency
+
+### OTLP Endpoint Connectivity Issues
+When observability data fails to export:
+1. Verify OTLP endpoint URL:
+   ```bash
+   docker-compose exec audit-server curl -v ${OTLP_ENDPOINT}
+   ```
+2. Check authentication headers:
+   ```bash
+   echo "OTLP_AUTH_HEADER: ${OTLP_AUTH_HEADER}"
+   ```
+3. Test connectivity to the observability backend:
+   ```bash
+   docker-compose exec audit-server nc -zv openobserve 5080
+   ```
+
 **Section sources**
 - [docker-compose.yml](file://apps/server/docker-compose.yml#L26-L35)
 - [docker-compose.yml](file://apps/server/docker-compose.yml#L65-L71)
 - [docker-compose.yml](file://apps/server/docker-compose.yml#L85-L91)
+- [pgvector/docker-compose.yml](file://docker/pgvector/docker-compose.yml#L1-L75)
+- [worker/src/index.ts](file://apps/worker/src/index.ts#L74-L76)
 
 ## Service Scaling, Logging, and Container Commands
 

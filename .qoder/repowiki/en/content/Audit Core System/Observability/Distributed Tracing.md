@@ -7,6 +7,7 @@
 - [tracer.test.ts](file://packages\audit\src\observability\__tests__\tracer.test.ts) - *Updated test coverage for OTLP functionality*
 - [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *New documentation for OTLP configuration*
 - [crypto.ts](file://packages\audit\src\crypto.ts) - *KMS encryption support for trace data*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Updated to use structured logging format and share context with metrics collection system*
 </cite>
 
 ## Update Summary
@@ -16,6 +17,7 @@
 - Removed outdated console exporter references
 - Enhanced performance analysis section with batch processing and compression details
 - Updated diagram to reflect current export workflow with security features
+- Updated logging integration to use StructuredLogger system for shared context with metrics collection
 
 ## Table of Contents
 1. [Introduction](#introduction)

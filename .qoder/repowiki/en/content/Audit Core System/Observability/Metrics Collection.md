@@ -2,12 +2,13 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts) - *Updated with enhanced OTLP exporter and KMS encryption*
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Enhanced OTLP exporter with batch processing and authentication*
-- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated ObservabilityConfig interface*
-- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *OTLP configuration guide*
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Monitoring service implementation*
-- [otpl.ts](file://packages/logs/src/otpl.ts) - *OTLP logging implementation*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Updated with enhanced OTLP exporter and KMS encryption*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Enhanced OTLP exporter with batch processing and authentication*
+- [types.ts](file://packages\audit\src\observability\types.ts) - *Updated ObservabilityConfig interface*
+- [otpl-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *OTLP configuration guide*
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts) - *Monitoring service implementation*
+- [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation*
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts) - *Updated with structured logging integration*
 </cite>
 
 ## Update Summary
@@ -18,6 +19,8 @@
 - Updated configuration options to include OTLP-specific settings
 - Added new diagram for OTLP export workflow
 - Updated test validation section to reflect new export capabilities
+- Integrated structured logging system into metrics collection framework
+- Updated metrics collector implementations to support enhanced logging capabilities
 
 ## Table of Contents
 1. [Metrics Collection System Overview](#metrics-collection-system-overview)
@@ -36,8 +39,8 @@ The Metrics Collection system is a comprehensive observability framework designe
 The metrics collection system serves as the foundation for monitoring service health, enabling teams to establish baselines, detect anomalies, and set up proactive alerting. It integrates seamlessly with the broader monitoring ecosystem, providing data for dashboards, alerting systems, and compliance reporting. Recent updates have enhanced the system with KMS encryption and an improved OTLP exporter with robust batch processing and error handling capabilities.
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L50) - *Updated in recent commit*
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L50)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L50) - *Updated in recent commit*
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L50)
 
 ## Core Metrics Collector Implementation
 
@@ -88,10 +91,10 @@ EnhancedMetricsCollector <|.. RedisEnhancedMetricsCollector : implements
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L25-L200) - *Updated in recent commit*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L25-L200) - *Updated in recent commit*
 
 **Section sources**
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L200) - *Updated in recent commit*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L200) - *Updated in recent commit*
 
 ## Metric Types and Structure
 
@@ -134,12 +137,12 @@ Monitoring-->>Application : Promise resolved
 ```
 
 **Diagram sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1100-L1200)
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts#L1-L50)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1100-L1200)
+- [monitoring-types.ts](file://packages\audit\src\monitor\monitoring-types.ts#L1-L50)
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1100-L1200)
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts#L1-L100)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1100-L1200)
+- [monitoring-types.ts](file://packages\audit\src\monitor\monitoring-types.ts#L1-L100)
 
 ## Tagging and Dimensional Analysis
 
@@ -180,7 +183,7 @@ This dimensional approach enables powerful analytical capabilities, such as:
 - Analyzing trends for specific metric types
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1105-L1158)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1105-L1158)
 
 ## Integration with Monitoring Systems
 
@@ -227,8 +230,8 @@ end
 ```
 
 **Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L304-L406) - *Enhanced OTLP exporter with batch processing*
-- [otpl.ts](file://packages/logs/src/otpl.ts#L84-L129) - *OTLP logging with error handling*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L304-L406) - *Enhanced OTLP exporter with batch processing*
+- [otpl.ts](file://packages\logs\src\otpl.ts#L84-L129) - *OTLP logging with error handling*
 
 ### Export Formats
 The system supports multiple export formats to accommodate different monitoring backends:
@@ -275,8 +278,8 @@ X --> External[External Monitoring System]
 ```
 
 **Diagram sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L268-L302)
-- [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts#L308-L360)
+- [types.ts](file://packages\audit\src\observability\types.ts#L268-L302)
+- [metrics-api.ts](file://apps\server\src\routes\metrics-api.ts#L308-L360)
 
 ### API Integration
 The system exposes metrics through REST API endpoints, enabling integration with external monitoring tools and dashboards.
@@ -299,14 +302,14 @@ API-->>Client : JSON response with metrics
 ```
 
 **Diagram sources**
-- [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts#L308-L360)
-- [metrics.ts](file://apps/server/src/routers/metrics.ts#L1-L38)
+- [metrics-api.ts](file://apps\server\src\routes\metrics-api.ts#L308-L360)
+- [metrics.ts](file://apps\server\src\routers\metrics.ts#L1-L38)
 
 **Section sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L268-L302)
-- [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts#L308-L360)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L264-L358) - *OTLP export implementation*
-- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *OTLP configuration guide*
+- [types.ts](file://packages\audit\src\observability\types.ts#L268-L302)
+- [metrics-api.ts](file://apps\server\src\routes\metrics-api.ts#L308-L360)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L264-L358) - *OTLP export implementation*
+- [otpl-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *OTLP configuration guide*
 
 ## Configuration Options
 
@@ -387,9 +390,9 @@ export interface ObservabilityConfig {
 - **Error Handling**: Automatic exponential backoff with up to 3 retry attempts and respect for `Retry-After` headers
 
 **Section sources**
-- [types.ts](file://packages/audit/src/observability/types.ts#L268-L302)
-- [index.ts](file://packages/audit/src/observability/index.ts#L48-L69)
-- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L1-L282) - *OTLP configuration details*
+- [types.ts](file://packages\audit\src\observability\types.ts#L268-L302)
+- [index.ts](file://packages\audit\src\observability\index.ts#L48-L69)
+- [otpl-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md#L1-L282) - *OTLP configuration details*
 
 ## Testing and Validation
 
@@ -450,8 +453,8 @@ The tests validate that:
 - OTLP export functionality handles authentication, batching, and error scenarios correctly
 
 **Section sources**
-- [metrics-collector.test.ts](file://packages/audit/src/observability/__tests__/metrics-collector.test.ts#L1-L200)
-- [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts#L1-L150) - *OTLP exporter tests*
+- [metrics-collector.test.ts](file://packages\audit\src\observability\__tests__\metrics-collector.test.ts#L1-L200)
+- [tracer.test.ts](file://packages\audit\src\observability\__tests__\tracer.test.ts#L1-L150) - *OTLP exporter tests*
 
 ## Best Practices for Monitoring and Alerting
 
@@ -520,6 +523,6 @@ P --> F
 ```
 
 **Section sources**
-- [index.ts](file://packages/audit/src/observability/index.ts#L59-L68)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L535-L582)
-- [otpl-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L245-L282) - *Best practices for OTLP configuration*
+- [index.ts](file://packages\audit\src\observability\index.ts#L59-L68)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L535-L582)
+- [otpl-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md#L245-L282) - *Best practices for OTLP configuration*

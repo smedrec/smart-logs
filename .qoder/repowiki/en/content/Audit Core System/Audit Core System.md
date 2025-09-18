@@ -2,28 +2,31 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [audit.ts](file://packages/audit/src/audit.ts) - *Updated in recent commit*
-- [types.ts](file://packages/audit/src/types.ts) - *Updated in recent commit*
-- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated in recent commit*
-- [config/types.ts](file://packages/audit/src/config/types.ts)
-- [validation.ts](file://packages/audit/src/validation.ts)
-- [config/manager.ts](file://packages/audit/src/config/manager.ts)
-- [event/event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
-- [event/event-types.ts](file://packages/audit/src/event/event-types.ts)
-- [index.ts](file://packages/audit/src/index.ts)
-- [audit.md](file://apps/docs/src/content/docs/audit/audit.md)
-- [examples.md](file://apps/docs/src/content/docs/audit/examples.md)
-- [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added in recent commit*
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
-- [README.md](file://packages/audit/README.md) - *Updated with link to detailed documentation*
-- [docs/README.md](file://packages/audit/docs/README.md) - *Updated with comprehensive documentation structure*
-- [api-reference/audit-class.md](file://packages/audit/docs/api-reference/audit-class.md) - *Updated with detailed API reference*
-- [api-reference/event-types.md](file://packages/audit/docs/api-reference/event-types.md) - *Updated with comprehensive event types*
-- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated with OTLP exporter implementation*
-- [config/types.ts](file://packages/audit/src/config/types.ts) - *Updated with KMS encryption options*
-- [config/manager.ts](file://packages/audit/src/config/manager.ts) - *Updated with KMS integration*
-- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts) - *KMS client implementation*
+- [audit.ts](file://packages\audit\src\audit.ts) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\types.ts) - *Updated in recent commit*
+- [crypto.ts](file://packages\audit\src\crypto.ts) - *Updated in recent commit*
+- [config/types.ts](file://packages\audit\src\config\types.ts)
+- [validation.ts](file://packages\audit\src\validation.ts)
+- [config/manager.ts](file://packages\audit\src\config\manager.ts)
+- [event/event-categorization.ts](file://packages\audit\src\event\event-categorization.ts)
+- [event/event-types.ts](file://packages\audit\src\event\event-types.ts)
+- [index.ts](file://packages\audit\src\index.ts)
+- [audit.md](file://apps\docs\src\content\docs\audit\audit.md)
+- [examples.md](file://apps\docs\src\content\docs\audit\examples.md)
+- [api-reference.md](file://apps\docs\src\content\docs\audit\api-reference.md)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Added in recent commit*
+- [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts) - *Added in recent commit*
+- [README.md](file://packages\audit\README.md) - *Updated with link to detailed documentation*
+- [docs/README.md](file://packages\audit\docs\README.md) - *Updated with comprehensive documentation structure*
+- [api-reference/audit-class.md](file://packages\audit\docs\api-reference\audit-class.md) - *Updated with detailed API reference*
+- [api-reference/event-types.md](file://packages\audit\docs\api-reference\event-types.md) - *Updated with comprehensive event types*
+- [observability/tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated with OTLP exporter implementation*
+- [config/types.ts](file://packages\audit\src\config\types.ts) - *Updated with KMS encryption options*
+- [config/manager.ts](file://packages\audit\src\config\manager.ts) - *Updated with KMS integration*
+- [infisical-kms/client.ts](file://packages\infisical-kms\src\client.ts) - *KMS client implementation*
+- [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts) - *Updated with optimized queries and organization priority*
+- [lib/hono/init.ts](file://apps\server\src\lib\hono\init.ts) - *Updated with database preset handler and Sentry initialization*
+- [index.ts](file://apps\server\src\index.ts) - *Updated with configuration manager initialization*
 </cite>
 
 ## Update Summary
@@ -43,11 +46,15 @@
 - Added comprehensive details about KMS integration and error handling
 - Replaced legacy ConsoleLogger with StructuredLogger and integrated LoggerFactory for consistent, factory-based logging across the system
 - Enhanced observability with structured logging, performance metrics, and error tracking capabilities
+- Integrated DatabasePresetHandler with optimized queries and organization priority
+- Added Sentry initialization for error monitoring and reporting
+- Updated server initialization to include configuration manager and enhanced service initialization
 
 **List of new sections added**
 - Observability and OTLP Exporter Configuration
 - KMS Encryption in Configuration Management
 - Structured Logging Implementation
+- Database Preset Handler with Organization Priority
 
 **List of deprecated/removed sections**
 - None
@@ -61,6 +68,9 @@
 - Added sources for KMS encryption configuration
 - Added source for Infisical KMS client implementation
 - Added sources for StructuredLogger and LoggerFactory implementations
+- Added sources for DatabasePresetHandler with optimized queries
+- Added sources for Sentry initialization in server startup
+- Added sources for enhanced service initialization in init.ts
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -80,6 +90,7 @@
 15. [Observability and OTLP Exporter Configuration](#observability-and-otlp-exporter-configuration)
 16. [KMS Encryption in Configuration Management](#kms-encryption-in-configuration-management)
 17. [Structured Logging Implementation](#structured-logging-implementation)
+18. [Database Preset Handler with Organization Priority](#database-preset-handler-with-organization-priority)
 
 ## Introduction
 
@@ -88,8 +99,8 @@ The Audit Core System serves as the central engine for audit event processing, v
 This documentation provides a comprehensive overview of the Audit Core System, detailing its architecture, implementation, and usage patterns. The system is designed with healthcare compliance in mind, supporting HIPAA and GDPR requirements while maintaining high performance and reliability.
 
 **Section sources**
-- [audit.md](file://apps/docs/src/content/docs/audit/audit.md)
-- [docs/README.md](file://packages/audit/docs/README.md)
+- [audit.md](file://apps\docs\src\content\docs\audit\audit.md)
+- [docs/README.md](file://packages\audit\docs\README.md)
 
 ## Core Components
 
@@ -108,44 +119,48 @@ A --> G[Plugin System]
 A --> H[GDPR Compliance]
 A --> I[Observability Tracer]
 A --> J[Structured Logger]
-B --> K[File Storage]
-B --> L[S3 Storage]
-B --> M[KMS Encryption]
-C --> N[Validation Rules]
-D --> O[SHA-256 Hashing]
-D --> P[HMAC-SHA256 Signatures]
-E --> Q[BullMQ Queue]
-E --> R[Redis]
-E --> S[Circuit Breaker]
-E --> T[Dead Letter Queue]
-G --> U[Middleware Plugins]
-G --> V[Storage Plugins]
-G --> W[Auth Plugins]
-H --> X[Data Pseudonymization]
-H --> Y[Retention Policies]
-H --> Z[Data Export]
-I --> AA[OTLP Exporter]
-I --> AB[Batch Processing]
-I --> AC[Error Handling]
-J --> AD[Performance Logging]
-J --> AE[Error Tracking]
-J --> AF[Metrics Collection]
+A --> K[Database Preset Handler]
+B --> L[File Storage]
+B --> M[S3 Storage]
+B --> N[KMS Encryption]
+C --> O[Validation Rules]
+D --> P[SHA-256 Hashing]
+D --> Q[HMAC-SHA256 Signatures]
+E --> R[BullMQ Queue]
+E --> S[Redis]
+E --> T[Circuit Breaker]
+E --> U[Dead Letter Queue]
+G --> V[Middleware Plugins]
+G --> W[Storage Plugins]
+G --> X[Auth Plugins]
+H --> Y[Data Pseudonymization]
+H --> Z[Retention Policies]
+H --> AA[Data Export]
+I --> AB[OTLP Exporter]
+I --> AC[Batch Processing]
+I --> AD[Error Handling]
+J --> AE[Performance Logging]
+J --> AF[Error Tracking]
+J --> AG[Metrics Collection]
+K --> AH[Optimized Database Queries]
+K --> AI[Organization Priority]
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [config/manager.ts](file://packages/audit/src/config/manager.ts)
-- [validation.ts](file://packages/audit/src/validation.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
-- [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [logging.ts](file://packages/logs/src/logging.ts)
-- [loggerFactory.ts](file://packages/logs/src/logging.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [config/manager.ts](file://packages\audit\src\config\manager.ts)
+- [validation.ts](file://packages\audit\src\validation.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [queue/reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts)
+- [gdpr/gdpr-compliance.ts](file://c:\Users\josea\Documents\WORK\smedrec\smart-los\packages\audit\src\gdpr\gdpr-compliance.ts)
+- [observability/tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [logging.ts](file://packages\logs\src\logging.ts)
+- [loggerFactory.ts](file://packages\logs\src\logging.ts)
+- [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts)
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [index.ts](file://packages/audit/src/index.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [index.ts](file://packages\audit\src\index.ts)
 
 ## Audit Event Structure
 
@@ -188,8 +203,8 @@ The event structure includes both mandatory and optional fields. The mandatory f
 Data classification is a critical aspect of the event structure, with predefined levels including 'PUBLIC', 'INTERNAL', 'CONFIDENTIAL', and 'PHI' (Protected Health Information). This classification enables appropriate handling and retention policies based on the sensitivity of the information.
 
 **Section sources**
-- [types.ts](file://packages/audit/src/types.ts)
-- [api-reference/event-types.md](file://packages/audit/docs/api-reference/event-types.md)
+- [types.ts](file://packages\audit\src\types.ts)
+- [api-reference/event-types.md](file://packages\audit\docs\api-reference\event-types.md)
 
 ## Event Ingestion Pipeline
 
@@ -225,13 +240,13 @@ end
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [validation.ts](file://packages/audit/src/validation.ts)
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [validation.ts](file://packages\audit\src\validation.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [queue/reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts)
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
 
 ## Validation and Sanitization
 
@@ -253,7 +268,7 @@ style End fill:#bbf,stroke:#333
 ```
 
 **Diagram sources**
-- [validation.ts](file://packages/audit/src/validation.ts)
+- [validation.ts](file://packages\audit\src\validation.ts)
 
 The validation process checks several aspects of the audit event:
 
@@ -266,8 +281,8 @@ The validation process checks several aspects of the audit event:
 The default validation configuration includes rules such as a maximum string length of 10,000 characters, allowed data classifications, required fields, maximum custom field depth of 3, and allowed event versions.
 
 **Section sources**
-- [validation.ts](file://packages/audit/src/validation.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [validation.ts](file://packages\audit\src\validation.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
 
 ## Event Categorization
 
@@ -297,7 +312,7 @@ EventCategorization --> ActionCategories : returns
 ```
 
 **Diagram sources**
-- [event/event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
+- [event/event-categorization.ts](file://packages\audit\src\event\event-categorization.ts)
 
 The system defines several action categories:
 
@@ -318,9 +333,9 @@ The `validateCategorizedEvent` function performs category-specific validation an
 The system also provides factory functions in `event-types.ts` for creating properly structured events with recommended defaults, including automatic timestamp generation and appropriate data classification defaults (e.g., PHI for FHIR events).
 
 **Section sources**
-- [event/event-categorization.ts](file://packages/audit/src/event/event-categorization.ts)
-- [event/event-types.ts](file://packages/audit/src/event/event-types.ts)
-- [types.ts](file://packages/audit/src/types.ts)
+- [event/event-categorization.ts](file://packages\audit\src\event\event-categorization.ts)
+- [event/event-types.ts](file://packages\audit\src\event\event-types.ts)
+- [types.ts](file://packages\audit\src\types.ts)
 
 ## Configuration Management
 
@@ -374,8 +389,8 @@ ConfigurationManager --> AuditConfig : manages
 ```
 
 **Diagram sources**
-- [config/manager.ts](file://packages/audit/src/config/manager.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [config/manager.ts](file://packages\audit\src\config\manager.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
 
 The configuration manager supports multiple storage types ('s3' or 'file') and provides features such as:
 
@@ -388,9 +403,9 @@ The configuration manager supports multiple storage types ('s3' or 'file') and p
 The validation schema enforces strict rules for each configuration field, including required status, data types, value ranges, regular expression patterns, and enumerated values.
 
 **Section sources**
-- [config/manager.ts](file://packages/audit/src/config/manager.ts)
-- [config/validator.ts](file://packages/audit/src/config/validator.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [config/manager.ts](file://packages\audit\src\config\manager.ts)
+- [config/validator.ts](file://packages\audit\src\config\validator.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
 
 ## Cryptographic Security
 
@@ -420,8 +435,8 @@ CryptoService --|> CryptographicService
 ```
 
 **Diagram sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [types.ts](file://packages/audit/src/types.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [types.ts](file://packages\audit\src\types.ts)
 
 The cryptographic service performs the following operations:
 
@@ -437,9 +452,9 @@ The `CryptoService` class has been extended with new asynchronous methods for ev
 The new `sha256` method generates a base64-encoded SHA-256 hash from a string or Uint8Array input. This method uses the Web Crypto API's `crypto.subtle.digest` function for hashing and implements RFC4648 base64 encoding through the `b64` helper method. This enhancement provides additional cryptographic utility for scenarios requiring base64-encoded hashes rather than hexadecimal representations.
 
 **Section sources**
-- [crypto.ts](file://packages/audit/src/crypto.ts)
-- [types.ts](file://packages/audit/src/types.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [types.ts](file://packages\audit\src\types.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
 
 ## Reliable Event Processing
 
@@ -493,9 +508,9 @@ ReliableEventProcessor --> Worker : creates
 ```
 
 **Diagram sources**
-- [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
-- [queue/circuit-breaker.ts](file://packages/audit/src/queue/circuit-breaker.ts)
-- [queue/dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
+- [queue/reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts)
+- [queue/circuit-breaker.ts](file://packages\audit\src\queue\circuit-breaker.ts)
+- [queue/dead-letter-queue.ts](file://packages\audit\src\queue\dead-letter-queue.ts)
 
 The reliable processing system incorporates several key components:
 
@@ -508,9 +523,9 @@ The reliable processing system incorporates several key components:
 The processor configuration includes settings for concurrency, retry policies, circuit breaker thresholds, and dead letter queue behavior, allowing fine-tuning for different performance and reliability requirements.
 
 **Section sources**
-- [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
-- [queue/circuit-breaker.ts](file://packages/audit/src/queue/circuit-breaker.ts)
-- [queue/dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
+- [queue/reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts)
+- [queue/circuit-breaker.ts](file://packages\audit\src\queue\circuit-breaker.ts)
+- [queue/dead-letter-queue.ts](file://packages\audit\src\queue\dead-letter-queue.ts)
 
 ## Integration Patterns
 
@@ -531,8 +546,8 @@ The integration with external systems follows a consistent pattern:
 This decoupled architecture allows for scalability and resilience, as the event producers and consumers operate independently.
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [index.ts](file://packages/audit/src/index.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [index.ts](file://packages\audit\src\index.ts)
 
 ## Usage Examples
 
@@ -631,8 +646,8 @@ await auditService.log({
 ```
 
 **Section sources**
-- [examples.md](file://apps/docs/src/content/docs/audit/examples.md)
-- [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md)
+- [examples.md](file://apps\docs\src\content\docs\audit\examples.md)
+- [api-reference.md](file://apps\docs\src\content\docs\audit\api-reference.md)
 
 ## Performance and Scalability
 
@@ -654,9 +669,9 @@ Scalability patterns include:
 The system's performance can be monitored through various metrics, including processing latency, queue depth, success/failure rates, and system resource utilization.
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [queue/reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [queue/reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
 
 ## GDPR Compliance and Pseudonymization
 
@@ -733,8 +748,8 @@ GDPRComplianceService --> ArchivalResult
 ```
 
 **Diagram sources**
-- [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [gdpr/gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
+- [gdpr/gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [gdpr/gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts)
 
 Key GDPR compliance features include:
 
@@ -747,9 +762,9 @@ Key GDPR compliance features include:
 The system uses Infisical KMS for secure storage of pseudonymization mappings, ensuring that original identifiers are encrypted and only accessible through proper authorization. The `pseudonymizeUserData` method replaces all instances of a principal ID with a deterministic pseudonym, maintaining referential integrity across audit records while protecting personal data.
 
 **Section sources**
-- [gdpr/gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
-- [gdpr/gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [gdpr/gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [gdpr/gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
 
 ## Plugin Architecture
 
@@ -810,8 +825,8 @@ CompliancePlugin --> MiddlewarePlugin : implements
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
 
 The plugin system supports three main plugin types:
 
@@ -829,9 +844,9 @@ The system includes several built-in plugin implementations:
 Plugins are configured through the `AuditConfig` object and can be dynamically loaded at runtime. The plugin system follows the Open/Closed Principle, allowing new functionality to be added without modifying existing code.
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
-- [config/manager.ts](file://packages/audit/src/config/manager.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
+- [config/manager.ts](file://packages\audit\src\config\manager.ts)
 
 ## Observability and OTLP Exporter Configuration
 
@@ -903,8 +918,8 @@ AuditTracer --> Span : creates
 ```
 
 **Diagram sources**
-- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [observability/types.ts](file://packages/audit/src/observability/types.ts)
+- [observability/tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [observability/types.ts](file://packages\audit\src\observability\types.ts)
 
 The OTLP exporter provides several key features:
 
@@ -935,9 +950,9 @@ const config = {
 Supported platforms include Grafana Tempo, DataDog, OpenObserve, Honeycomb, New Relic, and AWS X-Ray (via OTEL Collector). The migration from previous exporters is seamless, requiring only a change in the exporter type and endpoint configuration.
 
 **Section sources**
-- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
-- [observability/types.ts](file://packages/audit/src/observability/types.ts)
-- [docs/observability/otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md)
+- [observability/tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [observability/types.ts](file://packages\audit\src\observability\types.ts)
+- [docs/observability/otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md)
 
 ## KMS Encryption in Configuration Management
 
@@ -983,9 +998,9 @@ InfisicalKmsClient --> KMSConfig : config
 ```
 
 **Diagram sources**
-- [config/manager.ts](file://packages/audit/src/config/manager.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
-- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts)
+- [config/manager.ts](file://packages\audit\src\config\manager.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
+- [infisical-kms/client.ts](file://packages\infisical-kms\src\client.ts)
 
 The KMS encryption feature provides:
 
@@ -1019,10 +1034,10 @@ The system automatically detects whether to use local encryption or KMS based on
 The `InfisicalKmsClient` class provides a robust interface for interacting with the Infisical KMS API. It supports encryption, decryption, signing, and verification operations with comprehensive error handling. The client implements retry logic with exponential backoff and handles different authentication methods. It also provides type-safe interfaces for all operations, ensuring type safety throughout the encryption workflow.
 
 **Section sources**
-- [config/manager.ts](file://packages/audit/src/config/manager.ts)
-- [config/types.ts](file://packages/audit/src/config/types.ts)
-- [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts)
-- [infisical-kms/types.ts](file://packages/infisical-kms/src/types.ts)
+- [config/manager.ts](file://packages\audit\src\config\manager.ts)
+- [config/types.ts](file://packages\audit\src\config\types.ts)
+- [infisical-kms/client.ts](file://packages\infisical-kms\src\client.ts)
+- [infisical-kms/types.ts](file://packages\infisical-kms\src\types.ts)
 
 ## Structured Logging Implementation
 
@@ -1094,8 +1109,8 @@ StructuredLogger --> OTPLConfig : uses
 ```
 
 **Diagram sources**
-- [logging.ts](file://packages/logs/src/logging.ts)
-- [audit.ts](file://packages/audit/src/audit.ts)
+- [logging.ts](file://packages\logs\src\logging.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
 
 The structured logging system provides several key features:
 
@@ -1215,6 +1230,71 @@ private async outputToOtpl(logEntry: LogEntry): Promise<void> {
 ```
 
 **Section sources**
-- [logging.ts](file://packages/logs/src/logging.ts)
-- [audit.ts](file://packages/audit/src/audit.ts)
-- [observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
+- [logging.ts](file://packages\logs\src\logging.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
+- [observability/tracer.ts](file://packages\audit\src\observability\tracer.ts)
+
+## Database Preset Handler with Organization Priority
+
+The DatabasePresetHandler has been enhanced with optimized queries and organization priority handling, allowing for more efficient and flexible preset management. This component enables organizations to define custom audit event configurations that take precedence over default presets.
+
+```mermaid
+classDiagram
+class DatabasePresetHandler {
+-client : EnhancedAuditDatabaseClient
++getPresets(organizationId? : string) : Promise~(AuditPreset & { id? : string })[]~
++getPreset(name : string, organizationId? : string) : Promise~(AuditPreset & { id? : string }) | null~
++getDefaultPresets() : Promise~(AuditPreset & { id? : string })[]~
++getDefaultPreset(name : string) : Promise~(AuditPreset & { id? : string }) | null~
++createPreset(preset : AuditPreset & { createdBy : string }) : Promise~AuditPreset & { id? : string }~
++updatePreset(preset : AuditPreset & { id : string; updatedBy : string }) : Promise~AuditPreset & { id? : string }~
++deletePreset(name : string, organizationId : string) : Promise~{ success : true }~
++mapDatabasePresetToPreset(dbPreset : any) : AuditPreset & { id? : string }
+}
+class AuditPreset {
++name : string
++description? : string
++organizationId : string
++action : string
++dataClassification : DataClassification
++requiredFields : string[]
++defaultValues? : Record~string, any~
++validation? : Partial~ValidationConfig~
+}
+class EnhancedAuditDatabaseClient {
++executeOptimizedQuery(query : Function, options : { cacheKey : string }) : Promise~any~
++getDatabase() : NodePgDatabase
++getEnhancedClientInstance() : EnhancedAuditDatabaseClient
+}
+DatabasePresetHandler --> EnhancedAuditDatabaseClient : uses
+DatabasePresetHandler --> AuditPreset : returns
+```
+
+**Diagram sources**
+- [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts)
+- [index.ts](file://packages\audit\src\index.ts)
+
+The enhanced DatabasePresetHandler provides several key improvements:
+
+- **Organization Priority**: Organization-specific presets take precedence over default presets with the same name
+- **Optimized Queries**: Single optimized queries fetch both organization and default presets with priority sorting
+- **Caching**: Query results are cached using cache keys based on organization ID and preset name
+- **Merged Results**: Presets are merged with organization presets overwriting defaults
+- **Database Integration**: Uses the EnhancedAuditDatabaseClient for efficient database operations
+
+The handler implements a priority-based merging strategy where organization-specific presets override default presets with the same name. This is achieved through a SQL query that assigns priority values (1 for organization presets, 0 for defaults) and sorts by name and priority in descending order.
+
+Key methods include:
+
+- **getPresets**: Retrieves all presets for an organization with default fallbacks, giving priority to organization-specific presets
+- **getPreset**: Gets a specific preset by name with organization priority and default fallback
+- **createPreset**: Creates or updates a preset with conflict resolution
+- **updatePreset**: Updates an existing preset
+- **deletePreset**: Removes a preset for a specific organization
+
+The handler is integrated into the server initialization process through the init.ts file, where it's instantiated with the audit database instance and made available to the Audit class for preset-based event enrichment.
+
+**Section sources**
+- [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts)
+- [lib/hono/init.ts](file://apps\server\src\lib\hono\init.ts)
+- [index.ts](file://apps\server\src\index.ts)

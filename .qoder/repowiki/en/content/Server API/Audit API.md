@@ -2,7 +2,9 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts) - *Updated in recent commit*
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts) - *Updated in recent commit*
+- [events.ts](file://apps\server\src\routers\events.ts) - *Updated in recent commit*
+- [crypto.ts](file://packages\audit\src\crypto.ts) - *Updated in recent commit*
 - [rest-api.ts](file://apps/server/src/routes/rest-api.ts) - *Added BearerAuth security scheme*
 - [auth.ts](file://apps/server/src/lib/middleware/auth.ts) - *Authentication and authorization logic*
 - [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts) - *Rate limiting implementation*
@@ -17,6 +19,10 @@
 - Enhanced authentication methods section with updated code examples
 - Updated request examples to show proper Bearer token usage
 - Added OpenAPI security schemes documentation
+- Updated integrity verification process to restrict fields used in hash calculation
+- Modified verification logic to handle null values explicitly
+- Updated cryptographic service to use async signature generation
+- Fixed documentation for verification endpoint to reflect actual behavior
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,7 +42,7 @@ The Audit API provides a comprehensive RESTful interface for creating, retrievin
 The API is designed around REST principles with predictable resource-oriented URLs, proper HTTP verbs, and status codes. All requests and responses are JSON-based, and the API supports filtering, pagination, and sorting for efficient data retrieval. The system ensures data integrity through cryptographic hashing and provides specialized endpoints for GDPR compliance operations.
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L1-L50)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L1-L50)
 
 ## Authentication and Authorization
 The Audit API implements a comprehensive authentication and authorization system using JWT tokens and role-based access control. All endpoints require valid authentication unless explicitly documented otherwise.
@@ -243,7 +249,7 @@ Creates a new audit event with the provided data.
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L50-L100)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L50-L100)
 
 ### Query Audit Events
 Retrieves audit events with optional filtering, pagination, and sorting.
@@ -301,7 +307,7 @@ Retrieves audit events with optional filtering, pagination, and sorting.
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L100-L150)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L100-L150)
 
 ### Get Audit Event by ID
 Retrieves a specific audit event by its ID.
@@ -336,7 +342,7 @@ Retrieves a specific audit event by its ID.
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L150-L200)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L150-L200)
 
 ### Verify Audit Event Integrity
 Verifies the cryptographic integrity of an audit event.
@@ -366,7 +372,8 @@ Verifies the cryptographic integrity of an audit event.
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L200-L250)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L200-L250)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L1-L384)
 
 ### Bulk Create Audit Events
 Creates multiple audit events in a single request for batch processing.
@@ -423,7 +430,7 @@ Creates multiple audit events in a single request for batch processing.
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L800-L850)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L800-L850)
 
 ### GDPR Data Export
 Exports all audit data for a specific user in the requested format for GDPR compliance.
@@ -470,7 +477,7 @@ Exports all audit data for a specific user in the requested format for GDPR comp
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L600-L650)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L600-L650)
 
 ### GDPR Pseudonymize
 Pseudonymizes all audit data for a specific user while maintaining referential integrity.
@@ -500,7 +507,7 @@ Pseudonymizes all audit data for a specific user while maintaining referential i
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L700-L750)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L700-L750)
 
 ## Data Validation and Schemas
 The Audit API uses Zod for comprehensive data validation, ensuring that all incoming and outgoing data conforms to defined schemas.
@@ -625,7 +632,7 @@ The API returns specific error codes in the response body:
 | INTERNAL_SERVER_ERROR | 500 | An unexpected error occurred on the server |
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L1-L50)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L1-L50)
 - [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L1-L400)
 
 ## Request and Response Examples
@@ -696,7 +703,7 @@ curl -X POST https://api.example.com/v1/events/bulk \
 ```
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L50-L250)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L50-L250)
 
 ## Caching and Performance
 The Audit API implements caching strategies to improve performance and reduce database load.
@@ -745,10 +752,10 @@ end
 ```
 
 **Diagram sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L300-L400)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L300-L400)
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L250-L400)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L250-L400)
 
 ## GDPR Compliance
 The Audit API provides specialized endpoints to support GDPR compliance requirements, including data export and pseudonymization.
@@ -772,4 +779,4 @@ All audit events include metadata that supports compliance with GDPR processing 
 - **Storage limitation**: Events are retained according to defined retention policies
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L600-L750)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L600-L750)

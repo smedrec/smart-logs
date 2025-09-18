@@ -21,16 +21,22 @@
 - [docker/infisical/docker-compose.prod.yml](file://docker\infisical\docker-compose.prod.yml) - *Added in recent commit*
 - [docker/inngest/docker-compose.yml](file://docker\inngest\docker-compose.yml) - *Added in recent commit*
 - [docker/openobserve/docker-compose.yml](file://docker\openobserve\docker-compose.yml) - *Added in recent commit*
-- [docker/pgvector/docker-compose.yml](file://docker\pgvector\docker-compose.yml) - *Added in recent commit*
+- [docker/pgvector/docker-compose.yml](file://docker\pgvector\docker-compose.yml) - *Updated in recent commit*
+- [apps/worker/Dockerfile](file://apps\worker\Dockerfile) - *Updated in recent commit*
+- [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts) - *OTLP configuration*
+- [packages/audit/docs/observability/otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *OTLP documentation*
+- [packages/logs/src/otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logger implementation*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on Infrastructure Services with Docker Compose configurations
-- Updated Local Deployment section to include new infrastructure services
-- Enhanced Table of Contents to reflect new content
-- Added references to new Docker Compose files for infrastructure services
-- Updated Section sources to include newly added infrastructure service files
+- Added new section on Audit Database Read Replicas with updated Docker Compose configuration
+- Updated Infrastructure Services section with read replica support for PGVector
+- Enhanced Local Deployment section to include read replica configuration
+- Added new section on OTLP Endpoint Configuration for observability
+- Updated Container Configuration to reflect worker Dockerfile changes
+- Added references to OTLP-related source files in document sources
+- Updated Section sources to include newly modified files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -45,6 +51,8 @@
 10. [Monitoring and Logging](#monitoring-and-logging)
 11. [Backup and Disaster Recovery](#backup-and-disaster-recovery)
 12. [Sample Deployment Scenarios](#sample-deployment-scenarios)
+13. [Audit Database Read Replicas](#audit-database-read-replicas)
+14. [OTLP Endpoint Configuration](#otlp-endpoint-configuration)
 
 ## Introduction
 
@@ -443,27 +451,59 @@ PGVector provides vector database capabilities for advanced analytics. The confi
 services:
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: pgvector
+    container_name: pgvector-primary
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator_pass}
     ports:
       - '25432:5432'
     volumes:
-      - pgvector:/var/lib/postgresql/data
-    command: postgres -c shared_preload_libraries='pg_stat_statements' -c wal_level=logical
+      - pgvector_primary:/var/lib/postgresql/data
+      - ./init-primary.sql:/docker-entrypoint-initdb.d/init-primary.sql
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf
+    command: postgres -c shared_preload_libraries='pg_stat_statements' -c wal_level=logical -c max_wal_senders=3 -c max_replication_slots=3 -c hot_standby=on
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${AUDIT_DB}']
       interval: 10s
       timeout: 5s
       retries: 5
+
+  postgres-replica:
+    image: pgvector/pgvector:pg17
+    container_name: pgvector-replica
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGUSER: ${POSTGRES_USER}
+      POSTGRES_PRIMARY_HOST: postgres
+      POSTGRES_PRIMARY_PORT: 5432
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator_pass}
+    ports:
+      - '25433:5432'
+    volumes:
+      - pgvector_replica:/var/lib/postgresql/data
+      - ./init-replica.sh:/docker-entrypoint-initdb.d/init-replica.sh
+    command: postgres -c shared_preload_libraries='pg_stat_statements' -c hot_standby=on -c max_standby_streaming_delay=30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   electric:
     image: docker.io/electricsql/electric:latest
     container_name: electric
     restart: always
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${AUDIT_DB}?sslmode=disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-replica:5432/${AUDIT_DB}?sslmode=disable
       ELECTRIC_INSECURE: true
     depends_on:
       postgres:
@@ -475,7 +515,9 @@ networks:
     name: nginx-proxy-manager_default
 
 volumes:
-  pgvector:
+  pgvector_primary:
+    driver: local
+  pgvector_replica:
     driver: local
 ```
 
@@ -914,3 +956,148 @@ curl http://localhost:3000/api/endpoint
 - [scripts/docker-build.sh](file://apps\server\scripts\docker-build.sh)
 - [scripts/k8s-deploy.sh](file://apps\server\scripts\k8s-deploy.sh)
 - [README.Docker.md](file://apps\server\README.Docker.md)
+
+## Audit Database Read Replicas
+
+The audit database now supports read replicas for improved performance and scalability. This configuration allows read operations to be distributed across multiple database instances while maintaining a single primary for write operations.
+
+### Read Replica Architecture
+
+The read replica setup follows a master-slave replication pattern:
+
+```mermaid
+graph TD
+A[Application] --> B{Load Balancer}
+B --> C[Primary Database<br/>Write Operations]
+B --> D[Replica Database 1<br/>Read Operations]
+B --> E[Replica Database 2<br/>Read Operations]
+C --> |WAL Replication| D
+C --> |WAL Replication| E
+style C fill:#F44336,stroke:#D32F2F
+style D fill:#4CAF50,stroke:#388E3C
+style E fill:#4CAF50,stroke:#388E3C
+style A fill:#2196F3,stroke:#1976D2
+```
+
+**Diagram sources**
+- [docker/pgvector/docker-compose.yml](file://docker\pgvector\docker-compose.yml)
+
+### Configuration Details
+
+The read replica configuration includes:
+
+- **Primary instance**: Handles all write operations and transaction logging
+- **Replica instances**: Handle read operations with asynchronous replication
+- **WAL-based replication**: Write-Ahead Logging for reliable data replication
+- **Connection routing**: Application routes writes to primary, reads to replicas
+
+The Docker Compose configuration defines both primary and replica services:
+
+```yaml
+services:
+  postgres:
+    # Primary database instance
+    container_name: pgvector-primary
+    environment:
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator_pass}
+    command: postgres -c wal_level=logical -c max_wal_senders=3 -c max_replication_slots=3
+    # ... other configuration
+
+  postgres-replica:
+    # Read replica instance
+    container_name: pgvector-replica
+    environment:
+      POSTGRES_PRIMARY_HOST: postgres
+      POSTGRES_PRIMARY_PORT: 5432
+    command: postgres -c hot_standby=on -c max_standby_streaming_delay=30s
+    # ... other configuration
+```
+
+**Section sources**
+- [docker/pgvector/docker-compose.yml](file://docker\pgvector\docker-compose.yml)
+- [docker/pgvector/init-primary.sql](file://docker\pgvector\init-primary.sql)
+- [docker/pgvector/init-replica.sh](file://docker\pgvector\init-replica.sh)
+
+## OTLP Endpoint Configuration
+
+The worker service has been updated to support OTLP (OpenTelemetry Protocol) endpoints for observability and monitoring. This enables centralized collection of logs, metrics, and traces.
+
+### Worker Dockerfile Updates
+
+The worker Dockerfile has been fixed to properly configure OTLP endpoints:
+
+```dockerfile
+# Stage 4: Development server
+FROM base AS dev
+WORKDIR /app
+
+# Copy built artifacts and necessary files
+COPY --from=build /app /app
+COPY apps/worker/src ./apps/worker/src
+
+# Set the working directory for the app
+WORKDIR /app/apps/worker
+
+# Expose ports for healthcheck
+EXPOSE 5600
+
+# Set environment variables
+ENV NODE_ENV=development
+ENV OTLP_ENDPOINT=${OTLP_ENDPOINT}
+ENV OTLP_AUTH_HEADER=${OTLP_AUTH_HEADER}
+
+# Command to run the development server
+CMD ["npm", "run", "dev"]
+```
+
+**Section sources**
+- [apps/worker/Dockerfile](file://apps\worker\Dockerfile)
+- [docker-compose.yml](file://docker-compose.yml)
+
+### OTLP Configuration Options
+
+The OTLP configuration supports multiple authentication methods:
+
+- **API Key Authentication**: Using `OTLP_API_KEY` environment variable
+- **Custom Header Authentication**: Using `OTLP_AUTH_HEADER` environment variable
+- **Batch Processing**: Automatic batching of logs and traces
+- **Retry Mechanism**: Exponential backoff for failed exports
+
+```yaml
+# docker-compose.yml
+services:
+  audit:
+    environment:
+      - OTLP_ENDPOINT=${OTLP_ENDPOINT}
+      - OTLP_AUTH_HEADER=${OTLP_AUTH_HEADER}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:${AUDIT_WORKER_PORT}/healthz']
+```
+
+### Supported OTLP Backends
+
+The system supports various OTLP-compatible backends:
+
+- **OpenObserve**: For open-source observability
+- **Grafana Tempo**: For distributed tracing
+- **DataDog**: For comprehensive monitoring
+- **Honeycomb**: For high-cardinality data analysis
+
+Configuration example for OpenObserve:
+
+```typescript
+const config = {
+  enabled: true,
+  serviceName: 'audit-system',
+  sampleRate: 0.1,
+  exporterType: 'otlp' as const,
+  exporterEndpoint: 'https://your-org.observe.com/api/default/traces'
+}
+// OTLP_AUTH_HEADER="Authorization: Basic base64(username:password)"
+```
+
+**Section sources**
+- [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts)
+- [packages/audit/docs/observability/otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md)
+- [packages/logs/src/otpl.ts](file://packages\logs\src\otpl.ts)

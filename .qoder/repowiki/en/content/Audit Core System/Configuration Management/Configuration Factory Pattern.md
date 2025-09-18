@@ -19,6 +19,7 @@
 - Confirmed configuration factory implementation unchanged despite documentation relocation
 - Integrated new logging configuration details from recent refactoring of ConsoleLogger to StructuredLogger
 - Added information about OTLP endpoint configuration and authentication headers
+- Updated logging configuration section to reflect StructuredLogger integration with performance timing and metrics collection
 
 ## Table of Contents
 1. [Introduction](#introduction)

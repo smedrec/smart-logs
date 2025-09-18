@@ -2,17 +2,32 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [PERFORMANCE_OPTIMIZATION.md](file://packages/audit-db/PERFORMANCE_OPTIMIZATION.md)
-- [performance-monitoring.ts](file://packages/audit-db/src/db/performance-monitoring.ts)
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
-- [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
-- [cache-factory.js](file://packages/audit-db/src/cache/cache-factory.js)
-- [query-cache.js](file://packages/audit-db/src/cache/query-cache.js)
-- [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
-- [performance-cli.ts](file://packages/audit-db/src/performance-cli.ts)
+- [PERFORMANCE_OPTIMIZATION.md](file://packages/audit-db/PERFORMANCE_OPTIMIZATION.md) - *Updated with new query optimization features*
+- [performance-monitoring.ts](file://packages/audit-db/src/db/performance-monitoring.ts) - *Updated with enhanced monitoring capabilities*
+- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts) - *Updated with new partitioning features*
+- [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts) - *Updated with connection pooling enhancements*
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts) - *Updated with new optimization features*
+- [cache-factory.ts](file://packages/audit-db/src/cache/cache-factory.ts) - *Updated with new caching features*
+- [query-cache.ts](file://packages/audit-db/src/cache/query-cache.ts) - *Updated with new caching features*
+- [redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts) - *Updated with new caching features*
+- [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated with new schema features*
+- [performance-cli.ts](file://packages/audit-db/src/performance-cli.ts) - *Updated with new CLI features*
+- [audit.ts](file://packages/audit/src/audit.ts) - *Updated with new audit features*
+- [init.ts](file://apps/server/src/lib/hono/init.ts) - *Updated with new initialization features*
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts) - *Updated with new preset handling features*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added documentation for new merged query implementation in DatabasePresetHandler
+- Updated Query Performance Monitoring section with new organization priority features
+- Enhanced Integrated Performance Optimization Client section with new priority-based handling
+- Added new section on Optimized Preset Queries with organization priority
+- Updated configuration examples to reflect new priority-based query patterns
+- Added performance implications of new merged query implementation
+- Updated code examples to show new query optimization patterns
+- Maintained all existing performance optimization documentation
+- Updated source references to include new and modified files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -25,6 +40,7 @@
 8. [CLI Interface for Performance Management](#cli-interface-for-performance-management)
 9. [Performance Benchmarks and Improvements](#performance-benchmarks-and-improvements)
 10. [Scalability and Capacity Planning](#scalability-and-capacity-planning)
+11. [Optimized Preset Queries with Organization Priority](#optimized-preset-queries-with-organization-priority)
 
 ## Introduction
 
@@ -964,3 +980,189 @@ The system is designed to support future enhancements for improved scalability a
 
 **Section sources**
 - [PERFORMANCE_OPTIMIZATION.md](file://packages/audit-db/PERFORMANCE_OPTIMIZATION.md#L1-L355)
+
+## Optimized Preset Queries with Organization Priority
+
+The DatabasePresetHandler has been enhanced with optimized query implementation and priority-based preset handling to improve performance and ensure organization-specific presets take precedence over defaults.
+
+### Merged Query Implementation
+
+The new implementation uses a single optimized query to retrieve both organization-specific and default presets, reducing database round trips and improving performance.
+
+```mermaid
+classDiagram
+class DatabasePresetHandler {
++getPresets(organizationId?) : Promise~(AuditPreset & { id? : string })[]~
++getPreset(name, organizationId?) : Promise~(AuditPreset & { id? : string }) | null~
++getDefaultPresets() : Promise~(AuditPreset & { id? : string })[]~
++getDefaultPreset(name) : Promise~(AuditPreset & { id? : string }) | null~
++createPreset(preset) : Promise~AuditPreset & { id? : string }~
++updatePreset(preset) : Promise~AuditPreset & { id? : string }~
++deletePreset(name, organizationId) : Promise~{ success : true }~
++mergePresetsWithPriority(rows) : (AuditPreset & { id? : string })[]~
++mapDatabasePresetToPreset(dbPreset) : AuditPreset & { id? : string }~
+}
+class EnhancedAuditDatabaseClient {
++executeOptimizedQuery(queryFn, options) : Promise~T~
++getDatabase() : PostgresJsDatabase~typeof schema~
+}
+DatabasePresetHandler --> EnhancedAuditDatabaseClient : "uses"
+```
+
+**Diagram sources**
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts#L1-L284)
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts#L1-L655)
+
+**Section sources**
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts#L1-L284)
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts#L1-L655)
+
+### Priority-Based Preset Handling
+
+The system implements priority-based handling where organization-specific presets take precedence over default presets with the same name. This is achieved through a CASE statement in the SQL query that assigns priority to organization-specific presets.
+
+```typescript
+async getPresets(organizationId?: string): Promise<(AuditPreset & { id?: string })[]> {
+    const orgId = organizationId || '*'
+
+    // If no organization specified, just return default presets
+    if (orgId === '*') {
+        return this.getDefaultPresets()
+    }
+
+    try {
+        // Fetch both organization and default presets in a single optimized query
+        const result = await this.client.executeOptimizedQuery(
+            (db) =>
+                db.execute(sql`
+                    SELECT *,
+                                CASE WHEN organization_id = ${orgId} THEN 1 ELSE 0 END as priority
+                    FROM audit_preset
+                    WHERE organization_id IN (${orgId}, '*')
+                    ORDER BY name, priority DESC
+                `),
+            { cacheKey: `get_merged_presets_${orgId}` }
+        )
+
+        const rows = result || []
+
+        // Merge presets: organization presets take priority over defaults
+        return this.mergePresetsWithPriority(rows)
+    } catch (error) {
+        throw new Error(`Failed to retrieve presets. ${error}`)
+    }
+}
+```
+
+**Section sources**
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts#L1-L284)
+
+### Performance Implications
+
+The new implementation provides several performance benefits:
+
+- **Reduced database round trips**: Single query retrieves both organization and default presets
+- **Improved query performance**: Optimized SQL with proper indexing on organization_id and name
+- **Efficient caching**: Cache key includes organization ID for proper cache invalidation
+- **Reduced memory usage**: No need to store duplicate presets in memory
+
+The system uses the EnhancedAuditDatabaseClient's executeOptimizedQuery method which combines connection pooling with query caching, further improving performance.
+
+```typescript
+async getPreset(
+    name: string,
+    organizationId?: string
+): Promise<(AuditPreset & { id?: string }) | null> {
+    const orgId = organizationId || '*'
+
+    // If requesting default preset, get it directly
+    if (orgId === '*') {
+        return this.getDefaultPreset(name)
+    }
+
+    try {
+        // Single query to get both organization and default preset with priority
+        const result = await this.client.executeOptimizedQuery(
+            (db) =>
+                db.execute(sql`
+                    SELECT *,
+                                CASE WHEN organization_id = ${orgId} THEN 1 ELSE 0 END as priority
+                    FROM audit_preset
+                    WHERE name = ${name}
+                    AND organization_id IN (${orgId}, '*')
+                    ORDER BY priority DESC
+                    LIMIT 1
+                `),
+            { cacheKey: `get_preset_${name}_${orgId}` }
+        )
+
+        const rows = result || []
+        if (rows.length === 0) {
+            return null
+        }
+
+        return this.mapDatabasePresetToPreset(rows[0])
+    } catch (error) {
+        throw new Error(`Failed to retrieve preset by name. ${error}`)
+    }
+}
+```
+
+**Section sources**
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts#L1-L284)
+
+### Usage Patterns
+
+The optimized preset handling should be used in the following patterns:
+
+#### Getting Organization-Specific Presets
+
+```typescript
+// Get all presets for an organization
+const presets = await presetHandler.getPresets('org-123')
+
+// Get a specific preset for an organization
+const preset = await presetHandler.getPreset('authentication', 'org-123')
+```
+
+#### Getting Default Presets
+
+```typescript
+// Get all default presets (no organization ID)
+const defaultPresets = await presetHandler.getPresets()
+
+// Get a specific default preset
+const defaultPreset = await presetHandler.getPreset('system')
+```
+
+#### Creating and Updating Presets
+
+```typescript
+// Create a new organization-specific preset
+await presetHandler.createPreset({
+    name: 'custom-auth',
+    description: 'Custom authentication preset',
+    organizationId: 'org-123',
+    action: 'auth.login',
+    dataClassification: 'INTERNAL',
+    createdBy: 'admin-user'
+})
+
+// Update an existing preset
+await presetHandler.updatePreset({
+    name: 'authentication',
+    description: 'Updated authentication preset',
+    organizationId: 'org-123',
+    action: 'auth.login',
+    dataClassification: 'INTERNAL',
+    id: 'preset-456',
+    updatedBy: 'admin-user'
+})
+```
+
+The system ensures that organization-specific presets always take precedence over default presets with the same name, providing a flexible and performant preset management system.
+
+**Section sources**
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts#L1-L284)
+- [audit.ts](file://packages/audit/src/audit.ts#L1-L910)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L402)

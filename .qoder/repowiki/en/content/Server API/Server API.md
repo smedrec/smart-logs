@@ -2,38 +2,39 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts) - *Updated in recent commit*
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts)
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts)
-- [health-api.ts](file://apps/server/src/routes/health-api.ts)
-- [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts)
-- [observability-api.ts](file://apps/server/src/routes/observability-api.ts) - *Updated with KMS encryption and OTLP exporter*
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts)
-- [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts)
-- [openapi_responses.ts](file://apps/server/src/lib/errors/openapi_responses.ts)
-- [http.ts](file://apps/server/src/lib/errors/http.ts)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts) - *Updated in recent commit*
-- [organization-api.ts](file://apps/server/src/routes/organization-api.ts) - *Added organization role management*
-- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added organization_role table*
-- [init.ts](file://apps/server/src/lib/hono/init.ts) - *Updated in recent commit*
-- [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts) - *Updated in recent commit*
-- [types.ts](file://packages/infisical-kms/src/types.ts) - *KMS configuration types*
-- [client.ts](file://packages/infisical-kms/src/client.ts) - *KMS client implementation*
-- [crypto.ts](file://packages/audit/src/crypto.ts) - *Event signing with KMS*
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *OTLP exporter with KMS*
-- [logging.ts](file://packages/logs/src/logging.ts) - *Structured logging with OTLP*
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts) - *Updated in recent commit*
+- [events.ts](file://apps\server\src\routers\events.ts) - *Updated in recent commit*
+- [audit.ts](file://packages\audit\src\audit.ts) - *Audit service implementation*
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
+- [health-api.ts](file://apps\server\src\routes\health-api.ts)
+- [metrics-api.ts](file://apps\server\src\routes\metrics-api.ts)
+- [observability-api.ts](file://apps\server\src\routes\observability-api.ts)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
+- [api-version.ts](file://apps\server\src\lib\middleware\api-version.ts)
+- [openapi_responses.ts](file://apps\server\src\lib\errors\openapi_responses.ts)
+- [http.ts](file://apps\server\src\lib\errors\http.ts)
+- [alerts.ts](file://apps\server\src\routers\alerts.ts)
+- [organization-api.ts](file://apps\server\src\routes\organization-api.ts)
+- [0005_fluffy_donald_blake.sql](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql)
+- [init.ts](file://apps\server\src\lib\hono\init.ts)
+- [error-handling.ts](file://apps\server\src\lib\middleware\error-handling.ts)
+- [types.ts](file://packages\infisical-kms\src\types.ts)
+- [client.ts](file://packages\infisical-kms\src\client.ts)
+- [crypto.ts](file://packages\audit\src\crypto.ts)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts)
+- [logging.ts](file://packages\logs\src\logging.ts)
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on KMS Integration and Enhanced OTLP Exporter
-- Updated Observability API section with new KMS encryption and OTLP exporter details
-- Added configuration details for KMS encryption and OTLP authentication
-- Updated Enhanced Structured Logging System with KMS integration
-- Added new request examples for encrypted observability endpoints
-- Enhanced error handling documentation with KMS-related error scenarios
-- Updated Section sources and Referenced Files to include new files
+- Updated Audit Events API section with enhanced field restriction for integrity verification
+- Added debug logging details for hash verification process
+- Updated Verify Audit Event endpoint documentation to reflect field restriction changes
+- Added information about critical fields used in hash calculation
+- Enhanced error handling documentation with verification-specific error scenarios
+- Updated Section sources to include newly analyzed files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -66,7 +67,7 @@ The API is organized into logical modules accessible under different path prefix
 All endpoints are versioned and documented via Swagger UI at `/docs`, with machine-readable OpenAPI specification available at `/openapi.json`.
 
 **Section sources**
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L1-L329)
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts#L1-L329)
 
 ## API Versioning
 The API supports versioning through the `Accept-Version` header. The current implementation supports only version `1.0.0`, which is also the default version used when no version header is provided.
@@ -93,7 +94,7 @@ The API versioning middleware is configured with the following parameters:
 If a requested version is not supported, the server returns a 400 Bad Request response. Since there are no deprecated versions, deprecation warnings are not currently issued.
 
 **Section sources**
-- [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts#L1-L351)
+- [api-version.ts](file://apps\server\src\lib\middleware\api-version.ts#L1-L351)
 
 ## Authentication and Access Control
 The API implements robust authentication and role-based access control to ensure secure access to resources.
@@ -119,8 +120,8 @@ The security schemes are defined in the OpenAPI specification as:
 The OpenAPI specification includes all three security schemes, and endpoints can require one or more of these authentication methods. The `BearerAuth` scheme was recently added to support token-based authentication in addition to cookie-based authentication.
 
 **Section sources**
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L180-L243)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L1-L765)
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts#L180-L243)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts#L1-L765)
 
 ### Access Control Rules
 The API implements a multi-layered access control system:
@@ -146,9 +147,9 @@ O --> Q[Return Response]
 ```
 
 **Diagram sources**
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L1-L765)
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L241-L288)
-- [organization-api.ts](file://apps/server/src/routes/organization-api.ts#L1-L222)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts#L1-L765)
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts#L241-L288)
+- [organization-api.ts](file://apps\server\src\routes\organization-api.ts#L1-L222)
 
 ### Role-Based Access Control
 The `requireRole` middleware enforces role-based permissions. Currently, admin access is required for system metrics and observability endpoints.
@@ -157,8 +158,8 @@ The `requireRole` middleware enforces role-based permissions. Currently, admin a
 The `requireOrganizationAccess` middleware ensures users can only access data for their organization, providing data isolation between organizations.
 
 **Section sources**
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L1-L765)
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L241-L288)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts#L1-L765)
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts#L241-L288)
 
 ## Rate Limiting
 The API implements rate limiting to prevent abuse and ensure fair usage across all endpoints.
@@ -206,11 +207,11 @@ end
 ```
 
 **Diagram sources**
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L1-L487)
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L210-L213)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts#L1-L487)
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts#L210-L213)
 
 **Section sources**
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L1-L487)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts#L1-L487)
 
 ## Error Handling
 The API uses a consistent error response format across all endpoints to facilitate client error handling.
@@ -246,15 +247,15 @@ A9[503] --> B9[SERVICE_UNAVAILABLE]
 ```
 
 **Diagram sources**
-- [http.ts](file://apps/server/src/lib/errors/http.ts#L1-L314)
-- [openapi_responses.ts](file://apps/server/src/lib/errors/openapi_responses.ts#L1-L91)
+- [http.ts](file://apps\server\src\lib\errors\http.ts#L1-L314)
+- [openapi_responses.ts](file://apps\server\src\lib\errors\openapi_responses.ts#L1-L91)
 
 The error handling middleware automatically converts exceptions to the appropriate error response format and logs errors for monitoring and debugging. The system now uses a unified error handling approach with enhanced context enrichment, capturing detailed information about each request including user ID, session ID, organization ID, endpoint, method, user agent, IP address, and metadata.
 
 **Section sources**
-- [http.ts](file://apps/server/src/lib/errors/http.ts#L1-L314)
-- [openapi_responses.ts](file://apps/server/src/lib/errors/openapi_responses.ts#L1-L91)
-- [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts#L1-L372)
+- [http.ts](file://apps\server\src\lib\errors\http.ts#L1-L314)
+- [openapi_responses.ts](file://apps\server\src\lib\errors\openapi_responses.ts#L1-L91)
+- [error-handling.ts](file://apps\server\src\lib\middleware\error-handling.ts#L1-L372)
 
 ## Pagination
 List endpoints support pagination to handle large datasets efficiently.
@@ -281,7 +282,7 @@ Paginated responses include metadata about the result set:
 This approach allows clients to navigate through large result sets without overwhelming the server or network.
 
 **Section sources**
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L124-L131)
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts#L124-L131)
 
 ## Audit Events API
 The Audit Events API provides endpoints for creating, querying, and verifying audit events.
@@ -352,16 +353,36 @@ Retrieves a specific audit event by ID.
 **Response**: `200 OK` with the requested event or `404 Not Found`.
 
 ### Verify Audit Event
-Verifies the integrity of an audit event.
+Verifies the integrity of an audit event with enhanced field restriction for cryptographic verification.
 
 **Endpoint**: `POST /events/{id}/verify`  
 **Authentication**: Required  
 **Permissions**: Verification access
 
+**Implementation Details**:
+The verification process now restricts the fields used in hash calculation to critical fields only, ensuring consistent integrity checks. The following fields are included in the hash calculation:
+- `timestamp`
+- `action`
+- `status`
+- `principalId`
+- `organizationId`
+- `targetResourceType`
+- `targetResourceId`
+- `outcomeDescription`
+
+**Debug Logging**:
+The system includes enhanced debug logging for verification issues, capturing:
+- Original and computed hashes
+- Verification status
+- Audit event fields used in hash calculation
+- Database event keys for comparison
+
 **Response**: `200 OK` with verification results including hash comparison.
 
 **Section sources**
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L0-L199)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L0-L199)
+- [events.ts](file://apps\server\src\routers\events.ts#L0-L1357)
+- [audit.ts](file://packages\audit\src\audit.ts#L300-L302)
 
 ## Compliance API
 The Compliance API provides endpoints for generating compliance reports and managing compliance configurations.
@@ -419,7 +440,7 @@ Verify the integrity of audit trails for compliance purposes.
 **Permissions**: Admin or compliance officer
 
 **Section sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L199)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts#L0-L199)
 
 ## Health Check API
 The Health Check API provides endpoints for monitoring system health and readiness.
@@ -483,7 +504,7 @@ Kubernetes liveness probe to determine if the service should be restarted.
 **Response**: `200 OK` when alive, `503 Service Unavailable` when dead
 
 **Section sources**
-- [health-api.ts](file://apps/server/src/routes/health-api.ts#L0-L199)
+- [health-api.ts](file://apps\server\src\routes\health-api.ts#L0-L199)
 
 ## Metrics API
 The Metrics API provides access to system and audit metrics.
@@ -543,7 +564,7 @@ Endpoints for managing system alerts.
 - `POST /alerts/{id}/resolve`: Resolve an alert
 
 **Section sources**
-- [metrics-api.ts](file://apps/server/src/routes/metrics-api.ts#L0-L199)
+- [metrics-api.ts](file://apps\server\src\routes\metrics-api.ts#L0-L199)
 
 ## Observability API
 The Observability API provides comprehensive monitoring and analytics capabilities.
@@ -588,7 +609,7 @@ Returns detailed information about performance bottlenecks including:
 - Recommendations for improvement
 
 **Section sources**
-- [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L0-L199)
+- [observability-api.ts](file://apps\server\src\routes\observability-api.ts#L0-L199)
 
 ## Organization Role Management API
 The Organization Role Management API provides endpoints for creating and managing organization-specific roles with associated permissions.
@@ -641,8 +662,8 @@ CREATE TABLE "organization_role" (
 The table includes a composite primary key of organization_id and name, with a foreign key constraint to the organization table and indexes on both organization_id and name for efficient querying.
 
 **Section sources**
-- [organization-api.ts](file://apps/server/src/routes/organization-api.ts#L1-L222)
-- [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
+- [organization-api.ts](file://apps\server\src\routes\organization-api.ts#L1-L222)
+- [0005_fluffy_donald_blake.sql](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql#L1-L11)
 
 ## Enhanced Structured Logging System
 The server implements an enhanced structured logging system for comprehensive monitoring, debugging, and auditing.
@@ -738,9 +759,9 @@ Server->>Client : Process request
 ```
 
 **Section sources**
-- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
-- [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts#L1-L372)
-- [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
+- [init.ts](file://apps\server\src\lib\hono\init.ts#L1-L400)
+- [error-handling.ts](file://apps\server\src\lib\middleware\error-handling.ts#L1-L372)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
 
 ## KMS Integration and Enhanced OTLP Exporter
 The system now integrates KMS encryption with the OTLP exporter for enhanced security and observability.
@@ -763,9 +784,9 @@ The KMS client is initialized during server startup and used for:
 - Secure credential management
 
 **Section sources**
-- [client.ts](file://packages/infisical-kms/src/client.ts#L1-L73)
-- [types.ts](file://packages/infisical-kms/src/types.ts#L1-L50)
-- [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
+- [client.ts](file://packages\infisical-kms\src\client.ts#L1-L73)
+- [types.ts](file://packages\infisical-kms\src\types.ts#L1-L50)
+- [init.ts](file://apps\server\src\lib\hono\init.ts#L1-L400)
 
 ### Enhanced OTLP Exporter
 The OTLP exporter has been enhanced with KMS integration and improved reliability features.
@@ -804,9 +825,9 @@ The exporter supports multiple authentication methods:
 - **Timeout-based Flushing**: Batches flushed every 5 seconds
 
 **Section sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L304-L537)
-- [crypto.ts](file://packages/audit/src/crypto.ts#L127-L174)
-- [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L1-L400)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L304-L537)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L127-L174)
+- [observability-api.ts](file://apps\server\src\routes\observability-api.ts#L1-L400)
 
 ### Integration with Observability
 The enhanced OTLP exporter integrates with the observability API to provide secure, reliable telemetry data.
@@ -833,8 +854,8 @@ The system handles KMS and OTLP errors with appropriate fallbacks:
 - **Authentication Failure**: Logs error and continues with reduced security
 
 **Diagram sources**
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L304-L537)
-- [crypto.ts](file://packages/audit/src/crypto.ts#L127-L174)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L304-L537)
+- [crypto.ts](file://packages\audit\src\crypto.ts#L127-L174)
 
 ## Request and Response Examples
 This section provides practical examples of API usage.
@@ -943,7 +964,7 @@ curl -X POST https://api.smedrec.com/api/v1/organization/role \
 ```
 
 **Section sources**
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts#L1-L329)
-- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L0-L199)
-- [health-api.ts](file://apps/server/src/routes/health-api.ts#L0-L199)
-- [organization-api.ts](file://apps/server/src/routes/organization-api.ts#L1-L222)
+- [rest-api.ts](file://apps\server\src\routes\rest-api.ts#L1-L329)
+- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L0-L199)
+- [health-api.ts](file://apps\server\src\routes\health-api.ts#L0-L199)
+- [organization-api.ts](file://apps\server\src\routes\organization-api.ts#L1-L222)

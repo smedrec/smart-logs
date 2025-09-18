@@ -3,6 +3,7 @@
 <cite>
 **Referenced Files in This Document**   
 - [types.ts](file://packages\audit\src\config\types.ts) - *Updated in recent commit*
+- [factory.ts](file://packages\audit\src\config\factory.ts) - *Modified in recent commit*
 - [manager.ts](file://packages\audit\src\config\manager.ts) - *Modified in recent commit*
 - [integration.ts](file://packages\audit\src\config\integration.ts) - *Modified in recent commit*
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts) - *Unchanged*
@@ -22,9 +23,10 @@
 
 ## Update Summary
 **Changes Made**   
-- Updated Logging Configuration section with new structured logging implementation and LoggerFactory
-- Added documentation for StructuredLogger class and its methods
-- Enhanced OTLP Exporter section with updated logging configuration details
+- Added comprehensive documentation for the new StructuredLogger system and LoggerFactory
+- Updated Logging Configuration section with detailed information about structured logging, context propagation, and output configuration
+- Enhanced OTLP Exporter section with updated configuration details and error handling mechanisms
+- Added new section for LoggerFactory and its role in consistent logger creation
 - Updated source tracking annotations to reflect new logging implementation files
 - Added documentation for logging configuration defaults and factory patterns
 - Integrated new logging implementation into the core documentation
@@ -43,6 +45,8 @@
 11. [Configuration Change Tracking](#configuration-change-tracking)
 12. [KMS Integration](#kms-integration)
 13. [OTLP Exporter](#otlp-exporter)
+14. [Structured Logging System](#structured-logging-system)
+15. [LoggerFactory](#loggerfactory)
 
 ## Introduction
 The Configuration Schema and Types system provides a comprehensive, type-safe framework for managing audit system configuration across environments. Built with TypeScript, the system enforces compile-time validation, supports IDE autocompletion, and enables runtime safety through comprehensive validation. The configuration schema is structured hierarchically, covering database connections, retention policies, compliance requirements (GDPR/HIPAA), integration endpoints, monitoring thresholds, and plugin extensions. This documentation details every configuration option, type hierarchy, and integration point, providing guidance for both standard and custom deployments.
@@ -757,3 +761,226 @@ end
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts#L304-L452)
 - [otpl.ts](file://packages\logs\src\otpl.ts#L129-L165)
 - [types.ts](file://packages\audit\src\config\types.ts#L488-L555)
+
+## Structured Logging System
+
+The structured logging system provides comprehensive logging capabilities with contextual information, performance metrics, and error tracking. The system replaces the previous ConsoleLogger with a more robust StructuredLogger implementation that supports multiple output types and advanced features.
+
+### StructuredLogger Class
+The StructuredLogger class provides a comprehensive interface for logging with context, performance tracking, and error handling. It supports multiple output types including console, file, Redis, and OTLP.
+
+```mermaid
+classDiagram
+class StructuredLogger {
++config : LoggerConfig
++baseContext : LogContext
++performanceStart? : [number, number]
++child(context : LogContext) : StructuredLogger
++startTiming() : void
++endTiming() : number | undefined
++debug(message : string, metadata? : Record<string, any>, context? : LogContext) : void
++info(message : string, metadata? : Record<string, any>, context? : LogContext) : void
++warn(message : string, metadata? : Record<string, any>, context? : LogContext) : void
++error(message : string, error? : Error | string, metadata? : Record<string, any>, context? : LogContext) : void
++logRequestStart(method : string, path : string, context : LogContext, metadata? : Record<string, any>) : void
++logRequestEnd(method : string, path : string, statusCode : number, context : LogContext, metadata? : Record<string, any>) : void
++logDatabaseOperation(operation : string, table : string, duration : number, context : LogContext, metadata? : Record<string, any>) : void
++logAuthEvent(event : 'login' | 'logout' | 'token_refresh' | 'auth_failure', userId? : string, context? : LogContext, metadata? : Record<string, any>) : void
++logSecurityEvent(event : string, severity : 'low' | 'medium' | 'high' | 'critical', context : LogContext, metadata? : Record<string, any>) : void
++logPerformanceMetrics(operation : string, metrics : Record<string, number>, context : LogContext, metadata? : Record<string, any>) : void
++log(level : 'debug' | 'info' | 'warn' | 'error', message : string, metadata? : Record<string, any>, context? : LogContext) : void
++shouldLog(level : 'debug' | 'info' | 'warn' | 'error') : boolean
++extractErrorInfo(error? : Error | string) : any
++generateCorrelationId() : string
++output(logEntry : LogEntry) : void
++outputToConsole(logEntry : LogEntry) : void
++outputToOtpl(logEntry : LogEntry) : Promise<void>
++outputToFile(logEntry : LogEntry) : void
++outputToRedis(logEntry : LogEntry) : void
++compressPayload(data : string) : Promise<{ data : string, encoding : string } | null>
+}
+class LoggerConfig {
++level : 'debug' | 'info' | 'warn' | 'error'
++enablePerformanceLogging : boolean
++enableErrorTracking : boolean
++enableMetrics : boolean
++format : 'json' | 'pretty'
++outputs : ('console' | 'file' | 'redis' | 'otpl')[]
++redisConfig? : RedisConfig
++fileConfig? : FileConfig
++otplConfig? : OTPLConfig
+}
+class LogContext {
++requestId? : string
++userId? : string
++sessionId? : string
++organizationId? : string
++endpoint? : string
++method? : string
++userAgent? : string
++ip? : string
++correlationId? : string
++traceId? : string
++spanId? : string
++service? : string
+}
+class LogEntry {
++timestamp : string
++level : 'debug' | 'info' | 'warn' | 'error'
++message : string
++context : LogContext
++metadata? : Record<string, any>
++duration? : number
++error? : ErrorInfo
++performance? : PerformanceInfo
+}
+class ErrorInfo {
++name : string
++message : string
++stack? : string
++code? : string
+}
+class PerformanceInfo {
++memoryUsage : NodeJS.MemoryUsage
++cpuUsage : NodeJS.CpuUsage
+}
+class RedisConfig {
++key : string
++maxEntries : number
++ttl : number
+}
+class FileConfig {
++path : string
++maxSize : number
++maxFiles : number
+}
+class OTPLConfig {
++endpoint : string
++headers? : Record<string, string>
+}
+StructuredLogger --> LoggerConfig : "uses"
+StructuredLogger --> LogContext : "uses"
+StructuredLogger --> LogEntry : "creates"
+StructuredLogger --> ErrorInfo : "creates"
+StructuredLogger --> PerformanceInfo : "creates"
+```
+
+**Section sources**
+- [logging.ts](file://packages\logs\src\logging.ts#L73-L548)
+
+### Logging Configuration
+The logging configuration has been enhanced to support structured logging with multiple output types and advanced features. The configuration includes options for log level, format, retention, and export settings.
+
+```typescript
+interface LoggerConfig {
+	/** Log level */
+	level: 'debug' | 'info' | 'warn' | 'error'
+	
+	/** Enable performance logging */
+	enablePerformanceLogging: boolean
+	
+	/** Enable error tracking */
+	enableErrorTracking: boolean
+	
+	/** Enable metrics collection */
+	enableMetrics: boolean
+	
+	/** Log format */
+	format: 'json' | 'pretty'
+	
+	/** Output destinations */
+	outputs: ('console' | 'file' | 'redis' | 'otpl')[]
+	
+	/** OTLP exporter configuration */
+	otplConfig?: {
+		/** OTLP endpoint URL */
+		endpoint: string
+		
+		/** Additional headers for OTLP requests */
+		headers?: Record<string, string>
+	}
+}
+```
+
+**Section sources**
+- [types.ts](file://packages\audit\src\config\types.ts#L430-L475)
+- [logging.ts](file://packages\logs\src\logging.ts#L0-L619)
+
+## LoggerFactory
+
+The LoggerFactory provides a centralized way to create and manage logger instances with consistent configuration and context. It simplifies logger creation and ensures consistent logging practices across the application.
+
+### LoggerFactory Implementation
+The LoggerFactory class provides static methods for creating logger instances with predefined configurations and contexts. It supports creating general loggers, request loggers, and service loggers with appropriate context.
+
+```mermaid
+classDiagram
+class LoggerFactory {
++defaultConfig : LoggerConfig
++setDefaultConfig(config : Partial<LoggerConfig>) : void
++createLogger(context : LogContext = {}, config? : Partial<LoggerConfig>) : StructuredLogger
++createRequestLogger(requestId : string, method : string, path : string, additionalContext : LogContext = {}) : StructuredLogger
++createServiceLogger(service : string, additionalContext : LogContext = {}) : StructuredLogger
+}
+class StructuredLogger {
++config : LoggerConfig
++baseContext : LogContext
+}
+class LogContext {
++requestId? : string
++userId? : string
++sessionId? : string
++organizationId? : string
++endpoint? : string
++method? : string
++userAgent? : string
++ip? : string
++correlationId? : string
++traceId? : string
++spanId? : string
++service? : string
+}
+LoggerFactory --> StructuredLogger : "creates"
+LoggerFactory --> LogContext : "uses"
+```
+
+**Section sources**
+- [logging.ts](file://packages\logs\src\logging.ts#L550-L619)
+
+### Factory Usage Patterns
+The LoggerFactory provides several convenience methods for creating specialized loggers:
+
+```typescript
+// Create a general logger with context
+const logger = LoggerFactory.createLogger({
+	organizationId: 'org-123',
+	userId: 'user-456'
+})
+
+// Create a request-specific logger
+const requestLogger = LoggerFactory.createRequestLogger(
+	'req-789',
+	'GET',
+	'/api/v1/users',
+	{ organizationId: 'org-123' }
+)
+
+// Create a service-specific logger
+const serviceLogger = LoggerFactory.createServiceLogger(
+	'audit-service',
+	{ organizationId: 'org-123' }
+)
+
+// Set default configuration for all loggers
+LoggerFactory.setDefaultConfig({
+	level: 'info',
+	format: 'json',
+	outputs: ['console', 'otpl'],
+	otplConfig: {
+		endpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318/v1/traces'
+	}
+})
+```
+
+**Section sources**
+- [logging.ts](file://packages\logs\src\logging.ts#L550-L619)

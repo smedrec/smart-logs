@@ -11,14 +11,17 @@
 - [authz.ts](file://packages\auth\src\permissions.ts) - *Added in recent commit*
 - [redis-query-cache.ts](file://packages\audit-db\src\cache\redis-query-cache.ts) - *Updated in recent commit*
 - [cache-factory.ts](file://packages\audit-db\src\cache\cache-factory.ts) - *Updated in recent commit*
+- [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts) - *Updated in recent commit*
+- [docker-compose.yml](file://docker\pgvector\docker-compose.yml) - *Updated in recent commit*
+- [init-primary.sql](file://docker\pgvector\init-primary.sql) - *Added in recent commit*
 </cite>
 
 ## Update Summary
-- Added new section on Redis caching for authorization and role management
-- Updated query caching strategy section to include permission caching details
-- Enhanced organization role management section with caching implementation details
-- Added cache configuration details for authorization layer
-- Updated section sources to reflect new and modified files related to caching
+- Added new section on read replicas and structured logging in EnhancedAuditDatabaseClient
+- Updated architecture overview to include read replica configuration
+- Enhanced connection pool configuration section with read replica details
+- Added structured logging implementation details to EnhancedAuditDatabaseClient
+- Updated section sources to reflect new and modified files related to read replicas and logging
 
 ## Table of Contents
 1. [Introduction](#introduction)

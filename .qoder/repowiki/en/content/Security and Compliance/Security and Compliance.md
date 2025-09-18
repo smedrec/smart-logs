@@ -11,6 +11,9 @@
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Updated in recent commit*
 - [types.ts](file://packages/audit/src/config/types.ts) - *Added KMS encryption support*
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *OTLP exporter with auth headers*
+- [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated in recent commit*
+- [audit-api.ts](file://apps/server/src/routes/audit-api.ts) - *Updated in recent commit*
+- [audit-events.ts](file://apps/server/src/lib/graphql/resolvers/audit-events.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
@@ -25,6 +28,9 @@
 - Added new class diagram for AuthorizationService and role management
 - Added new section on OTLP observability exporter with authentication support
 - Integrated KMS encryption configuration details into security measures
+- Updated integrity verification section to reflect restricted field hashing and improved verification logic
+- Added new flowchart for integrity verification process with debug logging
+- Updated security measures section with enhanced hash verification details
 - Maintained existing structure while incorporating new pseudonymization features
 
 ## Table of Contents
@@ -355,6 +361,28 @@ interface SecurityConfig {
 **Section sources**
 - [types.ts](file://packages/audit/src/config/types.ts#L430-L475)
 - [client.ts](file://packages/infisical-kms/src/client.ts)
+
+### Enhanced Integrity Verification
+The system has been updated to restrict the fields used in hash calculation for improved security and integrity verification. The verification process now includes precondition checks and enhanced debug logging to identify verification issues.
+
+```mermaid
+flowchart TD
+A([Verify Event]) --> B["extractCriticalFields(event)"]
+B --> C["Create deterministic string"]
+C --> D["Generate SHA-256 hash"]
+D --> E["Compare with stored hash"]
+E --> F{"Hash Match?"}
+F --> |Yes| G["Return true"]
+F --> |No| H["Log verification failure"]
+H --> I["Return false"]
+I --> J["Log to auditIntegrityLog"]
+J --> K["Generate alert if needed"]
+```
+
+**Section sources**
+- [crypto.ts](file://packages/audit/src/crypto.ts#L89-L128)
+- [audit-api.ts](file://apps/server/src/routes/audit-api.ts#L700-L799)
+- [audit-events.ts](file://apps/server/src/lib/graphql/resolvers/audit-events.ts#L450-L537)
 
 ## Compliance Reporting and Data Export
 

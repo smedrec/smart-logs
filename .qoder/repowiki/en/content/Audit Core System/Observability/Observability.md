@@ -3,7 +3,7 @@
 <cite>
 **Referenced Files in This Document**   
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Updated in recent commit to enable OTLP exporter and integrate structured logging*
-- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts) - *Updated in recent commit to use StructuredLogger and LoggerFactory*
+- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts) - *Updated in recent commit to use StructuredLogger and LoggerFactory*
 - [dashboard.ts](file://packages/audit/src/observability/dashboard.ts) - *Updated in recent commit to support KMS encryption and enhanced OTLP exporter*
 - [types.ts](file://packages/audit/src/observability/types.ts) - *Updated to support OTLP configuration and structured logging*
 - [index.ts](file://apps/worker/src/index.ts) - *Updated to configure OTLP endpoint*

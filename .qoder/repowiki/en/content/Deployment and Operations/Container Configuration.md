@@ -13,7 +13,20 @@
 - [Dockerfile](file://apps/server/Dockerfile)
 - [docker-compose.prod.yml](file://apps/server/docker-compose.prod.yml)
 - [README.Docker.md](file://apps/server/README.Docker.md)
+- [apps/worker/Dockerfile](file://apps/worker/Dockerfile) - *Updated in recent commit*
+- [packages/audit/src/observability/tracer.ts](file://packages/audit/src/observability/tracer.ts) - *OTLP configuration*
+- [packages/logs/src/otpl.ts](file://packages/logs/src/otpl.ts) - *OTLP logging implementation*
+- [packages/audit/src/config/types.ts](file://packages/audit/src/config/types.ts) - *Logging configuration types*
+- [packages/audit/docs/observability/otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *OTLP configuration guide*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated Docker image build process section to reflect Node.js 22 upgrade and worker Dockerfile changes
+- Added OTLP endpoint configuration section for observability
+- Updated security best practices with new OTLP authentication methods
+- Enhanced performance tuning section with OTLP batch processing details
+- Added new diagram for OTLP data flow
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -25,10 +38,11 @@
 7. [Container Networking Setup](#container-networking-setup)
 8. [Security Best Practices](#security-best-practices)
 9. [Performance Tuning and Resource Limits](#performance-tuning-and-resource-limits)
-10. [Conclusion](#conclusion)
+10. [OTLP Endpoint Configuration](#otlp-endpoint-configuration)
+11. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides comprehensive architectural documentation for the container configuration of the SMEDREC Audit Server. It details the Docker image build process, NGINX reverse proxy setup, Redis configuration, environment variable management, health checks, container networking, security practices, and performance optimization strategies. The system is designed for both development and production environments with a focus on reliability, security, and scalability.
+This document provides comprehensive architectural documentation for the container configuration of the SMEDREC Audit Server. It details the Docker image build process, NGINX reverse proxy setup, Redis configuration, environment variable management, health checks, container networking, security practices, performance optimization strategies, and OTLP endpoint configuration. The system is designed for both development and production environments with a focus on reliability, security, and scalability.
 
 ## Docker Image Build Process
 
@@ -40,7 +54,7 @@ A[Base Stage] --> B[Dependencies Stage]
 B --> C[Builder Stage]
 C --> D[Runner Stage]
 subgraph "Base Stage"
-A1["node:18-alpine"]
+A1["node:22-alpine"]
 A2["Security updates"]
 A3["Non-root user setup"]
 end
@@ -78,15 +92,17 @@ D --> D4
 **Diagram sources**
 - [Dockerfile](file://apps/server/Dockerfile)
 - [README.Docker.md](file://apps/server/README.Docker.md)
+- [apps/worker/Dockerfile](file://apps/worker/Dockerfile) - *Updated in recent commit*
 
 **Section sources**
 - [Dockerfile](file://apps/server/Dockerfile)
+- [apps/worker/Dockerfile](file://apps/worker/Dockerfile) - *Updated in recent commit*
 - [docker-build.sh](file://apps/server/scripts/docker-build.sh)
 - [README.Docker.md](file://apps/server/README.Docker.md)
 
 ### Multi-Stage Builds
 The multi-stage build process consists of four stages:
-1. **Base Stage**: Uses `node:18-alpine` as the base image, applies security updates, and sets up a non-root user (UID 1001).
+1. **Base Stage**: Uses `node:22-alpine` as the base image, applies security updates, and sets up a non-root user (UID 1001).
 2. **Dependencies Stage**: Installs pnpm package manager, copies package manifests, and installs all dependencies.
 3. **Builder Stage**: Copies the complete source code, builds the application using the build script, and compiles all workspace packages.
 4. **Runner Stage**: Uses a minimal Alpine Linux image, copies only the necessary built artifacts from previous stages, and sets up the runtime environment.
@@ -100,7 +116,7 @@ The build process implements several layer optimization techniques:
 - **Layer Reuse**: By ordering Dockerfile instructions from least to most frequently changing, the build maximizes layer cache reuse.
 
 ### Base Image Selection
-The production base image is `node:18-alpine`, chosen for its minimal size and reduced attack surface. The Alpine Linux distribution provides a small footprint (approximately 5MB) and includes only essential packages, enhancing security and reducing download times.
+The production base image is `node:22-alpine`, chosen for its minimal size and reduced attack surface. The Alpine Linux distribution provides a small footprint (approximately 5MB) and includes only essential packages, enhancing security and reducing download times.
 
 ## NGINX Reverse Proxy Configuration
 
@@ -541,7 +557,7 @@ securityContext:
 
 ### Minimal Package Installation
 The production image is minimized to reduce the attack surface:
-- Base image: `node:18-alpine` (minimal footprint)
+- Base image: `node:22-alpine` (minimal footprint)
 - Only essential packages installed
 - Development dependencies excluded from production image
 - Multi-stage builds ensure only necessary files are included
@@ -636,11 +652,132 @@ Kubernetes resource limits prevent any single pod from consuming excessive resou
 - **Optimize logging**: Use appropriate log levels and avoid logging sensitive data
 - **Monitor metrics**: Expose Prometheus metrics for monitoring key performance indicators
 
+## OTLP Endpoint Configuration
+
+The OTLP (OpenTelemetry Protocol) HTTP exporter is configured to send distributed traces and logs to observability platforms for monitoring and analysis.
+
+```mermaid
+graph TD
+A[Application] --> B[OTLP Exporter]
+B --> C[Batch Processing]
+C --> D[Authentication]
+D --> E[OTLP Endpoint]
+subgraph "OTLP Exporter"
+C1["Batch size: 100 spans"]
+C2["Flush interval: 5s"]
+C3["Exponential backoff"]
+end
+subgraph "Authentication"
+D1["Bearer token"]
+D2["Custom headers"]
+D3["API key"]
+end
+subgraph "OTLP Endpoint"
+E1["Jaeger"]
+E2["Grafana Tempo"]
+E3["DataDog"]
+E4["OpenObserve"]
+E5["Honeycomb"]
+end
+A --> B
+B --> C
+C --> D
+D --> E
+```
+
+**Diagram sources**
+- [packages/audit/src/observability/tracer.ts](file://packages/audit/src/observability/tracer.ts) - *OTLP configuration*
+- [packages/logs/src/otpl.ts](file://packages/logs/src/otpl.ts) - *OTLP logging implementation*
+- [packages/audit/src/config/types.ts](file://packages/audit/src/config/types.ts) - *Logging configuration types*
+
+**Section sources**
+- [packages/audit/src/observability/tracer.ts](file://packages/audit/src/observability/tracer.ts)
+- [packages/logs/src/otpl.ts](file://packages/logs/src/otpl.ts)
+- [packages/audit/src/config/types.ts](file://packages/audit/src/config/types.ts)
+- [packages/audit/docs/observability/otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md)
+
+### OTLP Configuration
+The OTLP exporter is configured through environment variables and configuration files:
+
+**Environment Variables**
+- `OTLP_ENDPOINT`: OTLP HTTP endpoint URL (required)
+- `OTLP_API_KEY`: API key for Bearer token authentication (optional)
+- `OTLP_AUTH_HEADER`: Custom authentication header (optional)
+- `OTLP_LOG_LEVEL`: Logging level for OTLP operations (optional)
+
+**Configuration Options**
+- `exporterType: 'otlp'`: Enables OTLP exporter
+- `exporterEndpoint`: Specifies the OTLP endpoint URL
+- `exporterHeaders`: Additional headers for authentication
+- `sampleRate`: Sampling rate for traces (0.01-1.0)
+
+### Authentication Methods
+The OTLP exporter supports multiple authentication methods:
+
+**Bearer Token Authentication**
+```bash
+OTLP_API_KEY=your-api-key-here
+```
+
+**Custom Header Authentication**
+```bash
+OTLP_AUTH_HEADER="Authorization: Bearer your-token"
+OTLP_AUTH_HEADER="X-API-Key: your-api-key"
+OTLP_AUTH_HEADER="Authorization: Basic base64credentials"
+```
+
+### Batch Processing
+The OTLP exporter implements batch processing for efficient transmission:
+
+**Batch Configuration**
+- `BATCH_SIZE = 100`: Maximum number of spans per batch
+- `BATCH_TIMEOUT_MS = 5000`: Flush interval in milliseconds
+- Automatic flushing when batch reaches maximum size
+- Immediate flushing for large payloads
+
+**Error Handling**
+- Exponential backoff for retry attempts
+- Rate limiting handling with `Retry-After` headers
+- Circuit breaking for client errors (4xx)
+- Network resilience with up to 3 retry attempts
+
+### Supported Platforms
+The OTLP exporter supports integration with various observability platforms:
+
+**Tracing Platforms**
+- Jaeger (with OTLP endpoint)
+- Grafana Tempo
+- DataDog
+- AWS X-Ray (via OTEL Collector)
+- Honeycomb
+- Lightstep
+- OpenObserve
+
+**Configuration Examples**
+```typescript
+// Jaeger
+exporterEndpoint: 'http://jaeger-collector:14268/api/traces'
+
+// Grafana Tempo
+exporterEndpoint: 'https://tempo-us-central1.grafana.net/tempo/v1/traces'
+
+// DataDog
+exporterEndpoint: 'https://trace.agent.datadoghq.com/v1/traces'
+
+// OpenObserve
+exporterEndpoint: 'https://your-org.observe.com/api/default/traces'
+
+// Honeycomb
+exporterEndpoint: 'https://api.honeycomb.io/v1/traces/your-dataset'
+```
+
 ## Conclusion
 The container configuration for the SMEDREC Audit Server demonstrates a comprehensive approach to modern application deployment. The multi-stage Docker build process creates optimized images with minimal attack surface. The NGINX reverse proxy provides secure routing, load balancing, and SSL termination. Redis is configured for optimal performance and reliability in both development and production environments.
 
 Environment variable injection through ConfigMaps and Secrets ensures secure configuration management. Comprehensive health checks and readiness probes enable reliable service operation and automatic recovery from failures. The container networking setup follows best practices for service isolation and external access.
 
 Security is prioritized throughout the configuration with non-root user execution, minimal package installation, vulnerability scanning, and multiple layers of protection. Performance tuning and resource limits ensure the application runs efficiently under various load conditions.
+
+The new OTLP endpoint configuration enables comprehensive observability by sending distributed traces and logs to various monitoring platforms. This integration provides valuable insights into system performance, error tracking, and operational metrics.
 
 This configuration provides a solid foundation for a reliable, secure, and scalable audit server that can handle the demands of a production environment while maintaining high availability and performance.

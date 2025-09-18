@@ -2,7 +2,7 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts) - *Updated in recent commit*
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
@@ -11,16 +11,19 @@
 - [permissions.ts](file://packages/auth/src/permissions.ts) - *Updated in recent commit*
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
 - [auth.ts](file://apps/server/src/lib/graphql/auth.ts) - *Updated in recent commit*
+- [logging.ts](file://packages/logs/src/logging.ts) - *Added in recent commit*
+- [docker-compose.yml](file://docker-compose.yml) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on Redis Caching Strategy for Authorization and Role Management
-- Updated Introduction to reflect Redis caching implementation details
-- Enhanced Organization Role Management and Authorization Service section with caching mechanisms
-- Added new class diagram for Redis caching in authorization layer
+- Added new section on Read Replica Configuration and Implementation
+- Updated Introduction to include structured logging and read replica support
+- Enhanced Enhanced Client Analysis section with logging capabilities
+- Added new class diagram for read replica configuration
 - Updated Section sources and Diagram sources for new content
-- Removed outdated references and updated file annotations
+- Added documentation for structured logging implementation in security context
+- Updated project structure diagram to reflect new components
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,10 +37,10 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides a comprehensive analysis of the security and access control mechanisms implemented in the smart-logs repository. The system is designed to ensure robust database security, enforce strict access policies, and maintain compliance with data protection regulations. The architecture incorporates encryption at rest, secure connection handling, authentication protocols, tenant isolation, and comprehensive audit trail generation. The enhanced client plays a central role in enforcing access policies, preventing injection attacks through parameterized queries, and managing secure database operations. Recent updates have enhanced the alert persistence system by integrating the EnhancedAuditDb client and configuration management, improving the security and reliability of monitoring operations. Additionally, the system now includes organization role management with Redis caching and PostgreSQL persistence, providing fine-grained access control for multi-tenant environments. The authorization service has been updated with Redis caching for both role definitions and permission checks, significantly improving performance while maintaining data consistency.
+This document provides a comprehensive analysis of the security and access control mechanisms implemented in the smart-logs repository. The system is designed to ensure robust database security, enforce strict access policies, and maintain compliance with data protection regulations. The architecture incorporates encryption at rest, secure connection handling, authentication protocols, tenant isolation, and comprehensive audit trail generation. The enhanced client plays a central role in enforcing access policies, preventing injection attacks through parameterized queries, and managing secure database operations. Recent updates have enhanced the alert persistence system by integrating the EnhancedAuditDb client and configuration management, improving the security and reliability of monitoring operations. Additionally, the system now includes organization role management with Redis caching and PostgreSQL persistence, providing fine-grained access control for multi-tenant environments. The authorization service has been updated with Redis caching for both role definitions and permission checks, significantly improving performance while maintaining data consistency. The latest updates introduce read replica support for improved database scalability and availability, along with structured logging capabilities for enhanced security monitoring and troubleshooting. The structured logging implementation provides comprehensive audit trails for all database operations, supporting security investigations and compliance requirements.
 
 ## Project Structure
-The repository follows a monorepo structure with multiple applications and packages organized under the `apps` and `packages` directories. The core security components are primarily located in the `packages` directory, specifically within `audit-db`, `audit`, and `auth`. The `apps` directory contains various application implementations including web, native, server, and documentation. The structure supports modular development with clear separation of concerns, enabling independent development and deployment of security-critical components.
+The repository follows a monorepo structure with multiple applications and packages organized under the `apps` and `packages` directories. The core security components are primarily located in the `packages` directory, specifically within `audit-db`, `audit`, and `auth`. The `apps` directory contains various application implementations including web, native, server, and documentation. The structure supports modular development with clear separation of concerns, enabling independent development and deployment of security-critical components. The recent addition of read replica configuration in the docker-compose files and enhanced logging capabilities in the logs package extends the security architecture with improved scalability and monitoring features.
 
 ```mermaid
 graph TB
@@ -58,6 +61,7 @@ auth["packages/auth"]
 cli["packages/cli"]
 redisClient["packages/redis-client"]
 sendMail["packages/send-mail"]
+logs["packages/logs"]
 end
 docs --> auditDb
 inngest --> audit
@@ -67,16 +71,19 @@ worker --> audit
 audit --> auditDb
 auditDb --> auth
 auditDb --> redisClient
+auditDb --> logs
 ```
 
 **Diagram sources**
 - [package.json](file://package.json)
+- [docker-compose.yml](file://docker-compose.yml)
 
 **Section sources**
 - [package.json](file://package.json)
+- [docker-compose.yml](file://docker-compose.yml)
 
 ## Core Components
-The security architecture is built around several core components that work together to provide comprehensive database security and access control. The enhanced database client serves as the primary interface for secure database operations, integrating connection pooling, query caching, and performance monitoring. The audit database package provides the foundation for secure data storage with tenant isolation and compliance features. The configuration manager handles encryption at rest for sensitive configuration data, while the authentication package manages user access and permissions. The DatabaseAlertHandler component has been updated to use the EnhancedAuditDb client, ensuring that all alert persistence operations benefit from the same security and performance features as other database operations. The Authorization Service has been enhanced with organization role management, providing Redis caching and PostgreSQL persistence for role definitions and permissions. The Redis caching strategy for authorization data ensures low-latency access to role and permission information while maintaining consistency with the PostgreSQL database.
+The security architecture is built around several core components that work together to provide comprehensive database security and access control. The enhanced database client serves as the primary interface for secure database operations, integrating connection pooling, query caching, performance monitoring, and now read replica support. The audit database package provides the foundation for secure data storage with tenant isolation and compliance features. The configuration manager handles encryption at rest for sensitive configuration data, while the authentication package manages user access and permissions. The DatabaseAlertHandler component has been updated to use the EnhancedAuditDb client, ensuring that all alert persistence operations benefit from the same security and performance features as other database operations. The Authorization Service has been enhanced with organization role management, providing Redis caching and PostgreSQL persistence for role definitions and permissions. The Redis caching strategy for authorization data ensures low-latency access to role and permission information while maintaining consistency with the PostgreSQL database. The new structured logging implementation provides comprehensive audit trails for all security-related operations, supporting compliance and incident investigation.
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
@@ -84,9 +91,10 @@ The security architecture is built around several core components that work toge
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 - [permissions.ts](file://packages/auth/src/permissions.ts)
+- [logging.ts](file://packages/logs/src/logging.ts)
 
 ## Architecture Overview
-The security architecture implements a multi-layered approach to database security and access control. At the foundation is encryption at rest for sensitive data, complemented by secure connection handling with SSL/TLS support. The enhanced client enforces access policies and prevents injection attacks through parameterized queries. Tenant isolation is achieved through organizational identifiers in database tables, ensuring data separation between different organizations. Row-level security considerations are addressed through comprehensive audit trails and cryptographic integrity verification. The authorization layer has been enhanced with organization role management, providing fine-grained access control with Redis caching for performance. The Redis caching strategy for authorization data includes caching of role definitions and permission checks, with appropriate cache invalidation mechanisms to maintain data consistency.
+The security architecture implements a multi-layered approach to database security and access control. At the foundation is encryption at rest for sensitive data, complemented by secure connection handling with SSL/TLS support. The enhanced client enforces access policies and prevents injection attacks through parameterized queries. Tenant isolation is achieved through organizational identifiers in database tables, ensuring data separation between different organizations. Row-level security considerations are addressed through comprehensive audit trails and cryptographic integrity verification. The authorization layer has been enhanced with organization role management, providing fine-grained access control with Redis caching for performance. The Redis caching strategy for authorization data includes caching of role definitions and permission checks, with appropriate cache invalidation mechanisms to maintain data consistency. The latest updates introduce read replica support for database scalability and high availability, with the enhanced client automatically routing read queries to replicas and write queries to the primary database. Structured logging capabilities provide comprehensive audit trails for all security-related operations, supporting compliance and incident investigation.
 
 ```mermaid
 graph TD
@@ -104,12 +112,17 @@ Pool["Connection Pool"]
 Cache["Query Cache"]
 Partition["Partitioning"]
 Monitoring["Performance Monitoring"]
+Replica["Read Replica Support"]
 end
 subgraph "Compliance"
 GDPR["GDPR Compliance"]
 HIPAA["HIPAA Support"]
 Retention["Retention Policies"]
 Archival["Archival System"]
+end
+subgraph "Monitoring"
+Structured["Structured Logging"]
+OTLP["OTLP Export"]
 end
 Encryption --> Client
 Connection --> Pool
@@ -120,6 +133,7 @@ Client --> Pool
 Pool --> Cache
 Pool --> Partition
 Pool --> Monitoring
+Pool --> Replica
 Client --> GDPR
 Client --> HIPAA
 Client --> Retention
@@ -127,6 +141,8 @@ Client --> Archival
 Access --> Authorization
 Authorization --> Redis["Redis Cache"]
 Authorization --> PostgreSQL["PostgreSQL Persistence"]
+Client --> Structured
+Structured --> OTLP
 ```
 
 **Diagram sources**
@@ -134,11 +150,13 @@ Authorization --> PostgreSQL["PostgreSQL Persistence"]
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [permissions.ts](file://packages/auth/src/permissions.ts)
+- [logging.ts](file://packages/logs/src/logging.ts)
+- [docker-compose.yml](file://docker-compose.yml)
 
 ## Detailed Component Analysis
 
 ### Enhanced Client Analysis
-The enhanced client is the central component for enforcing security policies and preventing injection attacks. It provides a comprehensive interface for secure database operations, integrating multiple security and performance features. The client uses parameterized queries through the Drizzle ORM and postgres.js driver, which automatically handle proper escaping and prevent SQL injection attacks. All database interactions are routed through this client, ensuring consistent security enforcement across the application.
+The enhanced client is the central component for enforcing security policies and preventing injection attacks. It provides a comprehensive interface for secure database operations, integrating multiple security and performance features. The client uses parameterized queries through the Drizzle ORM and postgres.js driver, which automatically handle proper escaping and prevent SQL injection attacks. All database interactions are routed through this client, ensuring consistent security enforcement across the application. The latest update enhances the client with structured logging capabilities, providing comprehensive audit trails for all database operations. The client automatically logs security events, performance metrics, and error information with contextual data for troubleshooting and compliance.
 
 ```mermaid
 classDiagram
@@ -150,6 +168,7 @@ class EnhancedAuditDatabaseClient {
 -performanceMonitor : DatabasePerformanceMonitor
 -partitionScheduler : PartitionMaintenanceScheduler
 -performanceReportInterval : NodeJS.Timeout
+-logger : StructuredLogger
 +getDatabase() : PostgresJsDatabase
 +executeOptimizedQuery(queryFn, options) : Promise~T~
 +executeMonitoredQuery(queryFn, queryName, options) : Promise~T~
@@ -182,18 +201,32 @@ class EnhancedConnectionPool {
 +resetStats() : void
 +close() : Promise~void~
 }
+class StructuredLogger {
++config : LoggerConfig
++baseContext : LogContext
++performanceStart : [number, number]
++log(level, message, metadata, context) : void
++info(message, metadata, context) : void
++warn(message, metadata, context) : void
++error(message, error, metadata, context) : void
++logSecurityEvent(event, severity, context, metadata) : void
++logPerformanceMetrics(operation, metrics, context, metadata) : void
+}
 EnhancedAuditDatabaseClient --> EnhancedDatabaseClient : "uses"
 EnhancedDatabaseClient --> EnhancedConnectionPool : "uses"
 EnhancedAuditDatabaseClient --> DatabasePartitionManager : "uses"
 EnhancedAuditDatabaseClient --> DatabasePerformanceMonitor : "uses"
+EnhancedAuditDatabaseClient --> StructuredLogger : "uses"
 ```
 
 **Diagram sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
+- [logging.ts](file://packages/logs/src/logging.ts)
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [logging.ts](file://packages/logs/src/logging.ts)
 
 ### Encryption at Rest Implementation
 The system implements encryption at rest for sensitive configuration data using industry-standard cryptographic algorithms. The configuration manager handles the encryption and decryption of configuration files, supporting both local file storage and S3 storage. The implementation uses AES-256-GCM or PBKDF2-based encryption with configurable key derivation functions, providing strong protection for sensitive data when stored on disk or in cloud storage.
@@ -442,6 +475,60 @@ AuthorizationService --> PostgreSQL : "persists"
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts)
 - [auth.ts](file://apps/server/src/lib/graphql/auth.ts)
 
+### Read Replica Configuration and Implementation
+The system has been enhanced with read replica support to improve database scalability and availability. The enhanced client automatically routes read queries to replica databases while directing write operations to the primary database. This configuration improves performance by distributing read load across multiple replicas and provides high availability through automatic failover capabilities. The implementation uses PostgreSQL streaming replication with a dedicated replication user and base backup setup. The enhanced client includes health check mechanisms to monitor replica status and lag tolerance to ensure data consistency.
+
+```mermaid
+classDiagram
+class ReadReplicaConfiguration {
+-primaryHost : string
+-primaryPort : number
+-replicaHosts : string[]
+-replicationUser : string
+-replicationPassword : string
+-loadBalancingStrategy : string
+-healthCheckInterval : number
+-healthCheckTimeout : number
+-lagToleranceMs : number
+-automaticFailover : boolean
++configureReplication() : Promise~void~
++setupReplica() : Promise~void~
++checkReplicaHealth() : Promise~HealthStatus~
++getAvailableReplicas() : string[]
++routeQuery(queryType) : string
+}
+class ReplicationUser {
++username : string
++password : string
++permissions : string[]
++createUser() : Promise~void~
++grantPermissions() : Promise~void~
+}
+class BaseBackupManager {
++sourceHost : string
++targetDirectory : string
++backupMethod : string
++createBaseBackup() : Promise~void~
++verifyBackupIntegrity() : Promise~boolean~
++restoreFromBackup() : Promise~void~
+}
+ReadReplicaConfiguration --> ReplicationUser : "uses"
+ReadReplicaConfiguration --> BaseBackupManager : "uses"
+ReadReplicaConfiguration --> EnhancedAuditDatabaseClient : "configures"
+```
+
+**Diagram sources**
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [init-primary.sql](file://docker/pgvector/init-primary.sql)
+- [init-replica.sh](file://docker/pgvector/init-replica.sh)
+- [docker-compose.yml](file://docker-compose.yml)
+
+**Section sources**
+- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
+- [init-primary.sql](file://docker/pgvector/init-primary.sql)
+- [init-replica.sh](file://docker/pgvector/init-replica.sh)
+- [docker-compose.yml](file://docker-compose.yml)
+
 ### Redis Caching Strategy for Authorization and Role Management
 The authorization system implements a comprehensive Redis caching strategy to optimize performance while maintaining data consistency. The caching layer stores both role definitions and permission checks, with specific cache prefixes and retention policies. The implementation uses a cache-aside pattern where the application first checks Redis for role and permission data before falling back to the PostgreSQL database. When data is retrieved from the database, it is stored in Redis with an appropriate TTL. The system includes cache invalidation mechanisms for both role updates and user-specific permission changes, ensuring data consistency across the distributed system.
 
@@ -484,7 +571,7 @@ RedisCachingStrategy --> Redis : "stores"
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts)
 
 ## Dependency Analysis
-The security components have well-defined dependencies that ensure proper isolation and modular. The enhanced client depends on the connection pool, partition manager, and performance monitor, creating a layered architecture. The connection pool depends on the postgres.js driver and Drizzle ORM for database interactions. The configuration manager depends on Node.js crypto modules for encryption operations. These dependencies are managed through the monorepo structure, allowing for independent versioning and testing of security-critical components.
+The security components have well-defined dependencies that ensure proper isolation and modular. The enhanced client depends on the connection pool, partition manager, performance monitor, and structured logger, creating a layered architecture. The connection pool depends on the postgres.js driver and Drizzle ORM for database interactions. The configuration manager depends on Node.js crypto modules for encryption operations. These dependencies are managed through the monorepo structure, allowing for independent versioning and testing of security-critical components. The addition of read replica support introduces dependencies on PostgreSQL replication features and shell scripting for replica initialization.
 
 ```mermaid
 graph TD
@@ -492,6 +579,7 @@ EnhancedClient["EnhancedAuditDatabaseClient"] --> ConnectionPool["EnhancedConnec
 EnhancedClient --> PartitionManager["DatabasePartitionManager"]
 EnhancedClient --> PerformanceMonitor["DatabasePerformanceMonitor"]
 EnhancedClient --> CacheFactory["createQueryCache"]
+EnhancedClient --> StructuredLogger["StructuredLogger"]
 ConnectionPool --> PostgresJs["postgres.js"]
 ConnectionPool --> Drizzle["drizzle-orm"]
 PartitionManager --> Drizzle
@@ -504,6 +592,8 @@ AuthPackage --> RedisClient["redis-client"]
 EnhancedClient --> AuthPackage
 AuthorizationService["AuthorizationService"] --> Redis["Redis Cache"]
 AuthorizationService --> PostgreSQL["PostgreSQL"]
+EnhancedClient --> ReadReplica["Read Replica Configuration"]
+ReadReplica --> PostgreSQL
 ```
 
 **Diagram sources**
@@ -512,28 +602,32 @@ AuthorizationService --> PostgreSQL["PostgreSQL"]
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [permissions.ts](file://packages/auth/src/permissions.ts)
+- [logging.ts](file://packages/logs/src/logging.ts)
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [permissions.ts](file://packages/auth/src/permissions.ts)
+- [logging.ts](file://packages/logs/src/logging.ts)
 
 ## Performance Considerations
-The security implementation balances robust protection with performance optimization. The enhanced client incorporates query caching to reduce database load while maintaining security. Connection pooling minimizes connection overhead and improves response times. The system includes comprehensive performance monitoring with automatic reporting and optimization recommendations. These features ensure that security measures do not unduly impact system performance, maintaining responsiveness even under heavy load. The Redis caching strategy for authorization data significantly reduces database queries for permission checks, improving overall system performance.
+The security implementation balances robust protection with performance optimization. The enhanced client incorporates query caching to reduce database load while maintaining security. Connection pooling minimizes connection overhead and improves response times. The system includes comprehensive performance monitoring with automatic reporting and optimization recommendations. These features ensure that security measures do not unduly impact system performance, maintaining responsiveness even under heavy load. The Redis caching strategy for authorization data significantly reduces database queries for permission checks, improving overall system performance. The addition of read replicas further enhances performance by distributing read operations across multiple database instances, reducing load on the primary database and improving query response times.
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 
 ## Troubleshooting Guide
-When encountering security-related issues, first verify the configuration of the enhanced client and connection pool. Check that SSL settings are properly configured for production deployments. Ensure that the Redis connection is available for query caching. Verify that encryption keys are properly set in environment variables. Monitor the performance reports for any anomalies in connection acquisition times or cache hit ratios. For tenant isolation issues, confirm that organization IDs are correctly set in queries and that row-level security policies are properly enforced. For authorization issues, check that roles are properly defined in both Redis cache and PostgreSQL database, and that permission inheritance is correctly configured. Verify that the Redis cache is properly invalidated when roles are updated and that the cache retention period is appropriate for the security requirements.
+When encountering security-related issues, first verify the configuration of the enhanced client and connection pool. Check that SSL settings are properly configured for production deployments. Ensure that the Redis connection is available for query caching. Verify that encryption keys are properly set in environment variables. Monitor the performance reports for any anomalies in connection acquisition times or cache hit ratios. For tenant isolation issues, confirm that organization IDs are correctly set in queries and that row-level security policies are properly enforced. For authorization issues, check that roles are properly defined in both Redis cache and PostgreSQL database, and that permission inheritance is correctly configured. Verify that the Redis cache is properly invalidated when roles are updated and that the cache retention period is appropriate for the security requirements. For read replica issues, verify that the replication user has proper permissions, check replica health status, and ensure that network connectivity between primary and replica instances is stable. Monitor replication lag and adjust the lag tolerance configuration if necessary.
 
 **Section sources**
 - [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts)
 - [connection-pool.ts](file://packages/audit-db/src/db/connection-pool.ts)
 - [manager.ts](file://packages/audit/src/config/manager.ts)
 - [permissions.ts](file://packages/auth/src/permissions.ts)
+- [init-primary.sql](file://docker/pgvector/init-primary.sql)
+- [init-replica.sh](file://docker/pgvector/init-replica.sh)
 
 ## Conclusion
-The security and access control implementation in the smart-logs repository provides a comprehensive solution for protecting sensitive audit data. The architecture combines encryption at rest, secure connection handling, and robust tenant isolation to ensure data confidentiality and integrity. The enhanced client serves as a central security enforcement point, preventing injection attacks through parameterized queries and providing comprehensive audit trail generation. The system is designed to comply with data protection regulations while maintaining high performance through connection pooling and query caching. The recent addition of organization role management with Redis caching and PostgreSQL persistence provides fine-grained access control for multi-tenant environments. The Redis caching strategy for authorization data ensures low-latency access to permission information while maintaining data consistency. This implementation provides a solid foundation for secure audit logging in multi-tenant environments.
+The security and access control implementation in the smart-logs repository provides a comprehensive solution for protecting sensitive audit data. The architecture combines encryption at rest, secure connection handling, and robust tenant isolation to ensure data confidentiality and integrity. The enhanced client serves as a central security enforcement point, preventing injection attacks through parameterized queries and providing comprehensive audit trail generation. The system is designed to comply with data protection regulations while maintaining high performance through connection pooling and query caching. The recent addition of organization role management with Redis caching and PostgreSQL persistence provides fine-grained access control for multi-tenant environments. The Redis caching strategy for authorization data ensures low-latency access to permission information while maintaining data consistency. The latest updates introduce read replica support for improved database scalability and availability, along with structured logging capabilities for enhanced security monitoring and troubleshooting. This implementation provides a solid foundation for secure audit logging in multi-tenant environments.
