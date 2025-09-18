@@ -14,7 +14,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - S3_BUCKET=${S3_BUCKET}
       - LOG_LEVEL=${LOG_LEVEL}
-      - TLP_ENDPOINT=${TLP_ENDPOINT}
+      - OTLP_ENDPOINT=${OTLP_ENDPOINT}
       - OTLP_AUTH_HEADER=${OTLP_AUTH_HEADER}
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:${AUDIT_WORKER_PORT}/healthz']

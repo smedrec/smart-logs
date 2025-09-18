@@ -20,6 +20,7 @@ import {
 	DEFAULT_OBSERVABILITY_CONFIG,
 	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 	ErrorHandler,
+	executeWithRetry,
 	HealthCheckService,
 	MonitoringService,
 	PerformanceTimer,
@@ -405,11 +406,23 @@ async function main() {
 	try {
 		if (!connection) {
 			logger.info('🔗 Connecting to Redis...')
-			connection = getSharedRedisConnectionWithConfig(config.redis)
+			const retryResult = await executeWithRetry<Redis>(async () =>
+				getSharedRedisConnectionWithConfig(config.redis)
+			)
+			if (!retryResult.success) {
+				const err =
+					retryResult.error instanceof Error ? retryResult.error : new Error('Unknown error')
+				logger.error('🔴 Halting worker start due to redis connection failure.', err, {
+					attempts: retryResult.attempts,
+					totalDuration: retryResult.totalDuration,
+				})
+				throw err
+			}
+
+			connection = retryResult.result as Redis
 		}
 	} catch (error) {
 		// TODO: Optionally, implement retry logic here or ensure process exits.
-		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 		const err = error instanceof Error ? error : new Error('Unknown error')
 		logger.error('🔴 Halting worker start due to redis connection failure.', err)
 		throw err
@@ -421,13 +434,13 @@ async function main() {
 	// Events 'connect' and 'error' are handled within the shared client.
 	// We can add listeners here too, but it might be redundant if the shared client's logging is sufficient.
 	// For example, if specific actions for this worker are needed on 'error':
-	connection.on('error', (err) => {
+	/**connection.on('error', (err) => {
 		logger.error(
 			'🔴 Redis connection error impacting BullMQ worker:',
 			err instanceof Error ? err : new Error('Unknown error')
 		)
 		// Consider if process should exit or if client's reconnection logic is sufficient.
-	})
+	})**/
 
 	// 2. Initialize database connection
 	if (!auditDbService) {

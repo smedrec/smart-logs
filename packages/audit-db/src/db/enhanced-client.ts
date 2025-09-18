@@ -1,5 +1,7 @@
 import { createHash } from 'crypto'
 
+import { LoggerFactory, StructuredLogger } from '@repo/logs'
+
 import { EnhancedDatabaseClient } from './connection-pool.js'
 import { DatabasePartitionManager, PartitionMaintenanceScheduler } from './partitioning.js'
 import { DatabasePerformanceMonitor } from './performance-monitoring.js'
@@ -89,11 +91,32 @@ export class EnhancedAuditDatabaseClient {
 	private performanceMonitor: DatabasePerformanceMonitor
 	private partitionScheduler?: PartitionMaintenanceScheduler
 	private performanceReportInterval?: NodeJS.Timeout
+	private logger: StructuredLogger
 
 	constructor(
 		private connection: RedisType,
 		private config: EnhancedClientConfig
 	) {
+		// Initialize Structured Logger
+		LoggerFactory.setDefaultConfig({
+			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+			enablePerformanceLogging: true,
+			enableErrorTracking: true,
+			enableMetrics: false,
+			format: 'json',
+			outputs: ['otpl'],
+			otplConfig: {
+				endpoint: 'http://localhost:5080/api/default/default/_json',
+				headers: {
+					Authorization: process.env.OTLP_AUTH_HEADER || '',
+				},
+			},
+		})
+
+		this.logger = LoggerFactory.createLogger({
+			service: '@repo/audit-db - EnhancedAuditDatabaseClient',
+		})
+
 		// Initialize enhanced database client with connection pooling and caching
 		this.client = new EnhancedDatabaseClient(config.connectionPool, config.queryCacheFactory)
 
@@ -118,7 +141,7 @@ export class EnhancedAuditDatabaseClient {
 			// Enable performance monitoring
 			if (this.config.monitoring.enabled) {
 				await this.performanceMonitor.enableMonitoring()
-				console.log('Performance monitoring enabled')
+				this.logger.info('Performance monitoring enabled')
 			}
 
 			// Setup partitioning
@@ -131,10 +154,12 @@ export class EnhancedAuditDatabaseClient {
 				this.setupPerformanceReporting()
 			}
 
-			console.log('Enhanced audit database client initialized successfully')
+			this.logger.info('Enhanced audit database client initialized successfully')
 		} catch (error) {
-			console.error('Failed to initialize enhanced database client:', error)
-			throw error
+			let err =
+				error instanceof Error ? error : new Error('Failed to initialize enhanced database client')
+			this.logger.error('Failed to initialize enhanced database client:', err)
+			throw err
 		}
 	}
 
@@ -162,7 +187,7 @@ export class EnhancedAuditDatabaseClient {
 				autoDropPartitions: true,
 			})
 			this.partitionScheduler.start()
-			console.log('Automatic partition maintenance enabled')
+			this.logger.info('Automatic partition maintenance enabled')
 		}
 	}
 
@@ -177,7 +202,10 @@ export class EnhancedAuditDatabaseClient {
 				const report = await this.generatePerformanceReport()
 				this.handlePerformanceReport(report)
 			} catch (error) {
-				console.error('Failed to generate performance report:', error)
+				this.logger.error(
+					'Failed to generate performance report:',
+					error instanceof Error ? error : new Error('Failed to generate performance report')
+				)
 			}
 		}, reportInterval)
 	}
@@ -271,13 +299,14 @@ export class EnhancedAuditDatabaseClient {
 					resolved: false,
 				}*/
 				//this.monitor.sendExternalAlert(alert)
-				console.warn(`Slow query detected: ${queryName} took ${executionTime}ms`)
+				this.logger.warn(`Slow query detected: ${queryName} took ${executionTime}ms`)
 			}
 
 			return result
 		} catch (error) {
-			console.error(`Query failed: ${queryName}`, error)
-			throw error
+			const err = error instanceof Error ? error : new Error(`Query failed: ${queryName}`)
+			this.logger.error(`Query failed: ${queryName}`, err)
+			throw err
 		}
 	}
 
@@ -371,22 +400,27 @@ export class EnhancedAuditDatabaseClient {
 		try {
 			// Clear cache if hit ratio is very low
 			if (report.queryCache.hitRatio < 10 && report.queryCache.totalSizeMB > 50) {
-				console.log('Low cache hit ratio detected, clearing cache')
+				this.logger.warn('Low cache hit ratio detected, clearing cache')
 				this.client['queryCache'].clear()
 			}
 
 			// Run maintenance if there are many slow queries
 			if (report.performance.slowQueries > 10) {
-				console.log('High number of slow queries detected, running maintenance')
+				this.logger.warn('High number of slow queries detected, running maintenance')
 				await this.performanceMonitor.runMaintenance()
 			}
 
 			// Suggest index creation for frequently slow queries
 			if (report.performance.suggestions.length > 0) {
-				console.log('Performance suggestions available:', report.performance.suggestions)
+				this.logger.warn('Performance suggestions available:', {
+					suggestions: report.performance.suggestions,
+				})
 			}
 		} catch (error) {
-			console.error('Auto-optimization failed:', error)
+			this.logger.error(
+				'Auto-optimization failed:',
+				error instanceof Error ? error : new Error('Auto-optimization failed')
+			)
 		}
 	}
 
@@ -428,7 +462,7 @@ export class EnhancedAuditDatabaseClient {
 
 		// Log alerts
 		if (alerts.length > 0) {
-			console.warn('Performance Alerts:', alerts)
+			this.logger.warn('Performance Alerts:', { alerts: alerts })
 		}
 	}
 
@@ -441,7 +475,10 @@ export class EnhancedAuditDatabaseClient {
 			const key = `queries:${Date.now()}`
 			await this.storeMetric(key, metrics, 3600) // 1 hour TTL
 		} catch (error) {
-			console.error('Failed to store query metrics:', error)
+			this.logger.error(
+				'Failed to store query metrics:',
+				error instanceof Error ? error : new Error('Failed to store query metrics')
+			)
 		}
 	}
 
@@ -459,10 +496,14 @@ export class EnhancedAuditDatabaseClient {
 				await this.connection.setex(fullKey, this.retentionPeriod, serialized)
 			}
 		} catch (error) {
-			console.error('Failed to store metric', {
-				key,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			})
+			this.logger.error(
+				'Failed to store metric',
+				error instanceof Error ? error : 'Unknown error',
+				{
+					key,
+					error: error instanceof Error ? error.message : 'Unknown error',
+				}
+			)
 		}
 	}
 
@@ -484,7 +525,7 @@ export class EnhancedAuditDatabaseClient {
 			reason: string
 		}>
 	}> {
-		console.log('Starting comprehensive database optimization...')
+		this.logger.info('Starting comprehensive database optimization...')
 
 		const [partitionStats, maintenanceResults, configOptimization] = await Promise.all([
 			this.partitionManager.analyzePartitionPerformance(),
@@ -494,7 +535,7 @@ export class EnhancedAuditDatabaseClient {
 
 		const indexSuggestions = await this.performanceMonitor.suggestMissingIndexes()
 
-		console.log('Database optimization completed')
+		this.logger.info('Database optimization completed')
 
 		return {
 			partitionOptimization: partitionStats.recommendations,
@@ -574,7 +615,7 @@ export class EnhancedAuditDatabaseClient {
 	 * Close all connections and cleanup
 	 */
 	async close(): Promise<void> {
-		console.log('Shutting down enhanced database client...')
+		this.logger.info('Shutting down enhanced database client...')
 
 		// Stop schedulers
 		if (this.partitionScheduler) {
@@ -591,7 +632,7 @@ export class EnhancedAuditDatabaseClient {
 		// Close client connections
 		await this.client.close()
 
-		console.log('Enhanced database client shutdown complete')
+		this.logger.info('Enhanced database client shutdown complete')
 	}
 }
 
