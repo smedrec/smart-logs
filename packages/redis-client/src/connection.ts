@@ -130,15 +130,12 @@ export function getSharedRedisConnectionWithConfig(redisConfig: RedisConfig): Re
 		// Note: ioredis handles reconnections automatically.
 		// The 'error' event will fire for failed reconnection attempts.
 	} catch (error) {
-		let err: Error
+		const err =
+			error instanceof Error
+				? error
+				: new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
 		// This typically catches synchronous errors during Redis instantiation (e.g., invalid options)
 		// or immediate connection failures if ioredis is configured to throw them.
-		if (error instanceof Error) {
-			err = new Error(
-				`[RedisClient] Failed to initialize Redis connection. Error: ${error.message}`
-			)
-		}
-		err = new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
 		const message = error instanceof Error ? error.message : 'Unknown error'
 		logger.error(`Failed to create Redis instance: ${message}`, err)
 		redisConnection = null // Ensure connection is null if creation failed
@@ -217,15 +214,13 @@ export function getSharedRedisConnection(options?: RedisOptions): RedisInstanceT
 		// Note: ioredis handles reconnections automatically.
 		// The 'error' event will fire for failed reconnection attempts.
 	} catch (error) {
-		let err: Error
+		const err =
+			error instanceof Error
+				? error
+				: new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
 		// This typically catches synchronous errors during Redis instantiation (e.g., invalid options)
 		// or immediate connection failures if ioredis is configured to throw them.
-		if (error instanceof Error) {
-			err = new Error(
-				`[RedisClient] Failed to initialize Redis connection. Error: ${error.message}`
-			)
-		}
-		err = new Error('[RedisClient] Failed to initialize Redis connection due to an unknown error.')
+
 		const message = error instanceof Error ? error.message : 'Unknown error'
 		logger.error(`Failed to create Redis instance: ${message}`, err)
 		redisConnection = null // Ensure connection is null if creation failed
@@ -248,12 +243,9 @@ export async function closeSharedRedisConnection(): Promise<void> {
 		try {
 			await redisConnection.quit()
 			logger.info('Shared Redis connection closed gracefully.')
-		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Unknown error'
-			logger.error(
-				`Error during Redis quit command: ${message}`,
-				err instanceof Error ? err : new Error('Unknown error')
-			)
+		} catch (error) {
+			const err = error instanceof Error ? error : new Error('Unknown error')
+			logger.error(`Error during Redis quit command: ${err.message}`, err)
 			// Fallback to disconnect if quit fails
 			redisConnection.disconnect()
 			logger.info('Shared Redis connection disconnected forcefully.')

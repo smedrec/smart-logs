@@ -118,6 +118,9 @@ export const sendEmail = inngest.createFunction(
 				action: `${action}.get-email-provider`,
 				status: 'failure',
 				outcomeDescription: `Mailer send error: Mailer connection error for Email service`,
+				inngestEvent: {
+					...event,
+				},
 			})
 			throw error
 		}
@@ -134,6 +137,9 @@ export const sendEmail = inngest.createFunction(
 					action: `${action}.send`,
 					status: 'success',
 					outcomeDescription: 'Email sent successfully using Mailer!',
+					inngestEvent: {
+						...event,
+					},
 				})
 			} catch (error) {
 				await audit.log({
@@ -142,6 +148,9 @@ export const sendEmail = inngest.createFunction(
 					action: `${action}.send`,
 					status: 'failure',
 					outcomeDescription: `Mailer send error: ${error}`,
+					inngestEvent: {
+						...event,
+					},
 				})
 				throw error
 			}

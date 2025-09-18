@@ -84,10 +84,12 @@ export const cleanupResolvedAlerts = inngest.createFunction(
 		} catch (e) {
 			// 5️⃣ If there's an error, we can log it and handle it gracefully
 			const message = e instanceof Error ? e.message : 'Unknown error'
-			logger.error(
-				`Failed to cleanup resolved alerts for organization ${organization_id}: ${message}`
-			)
 			const err = e instanceof Error ? e : new Error(message)
+			logger.error(
+				`Failed to cleanup resolved alerts for organization ${organization_id}: ${message}`,
+				err
+			)
+
 			await error.handleError(
 				err,
 				{

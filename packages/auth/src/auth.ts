@@ -315,7 +315,7 @@ class Auth {
 	 * Provides access to the database instance for database operations.
 	 * @returns The database instance typed with the ReturnType<typeof initDrizzle>['db'] schema.
 	 */
-	public getDrizzleInstance(): ReturnType<typeof initDrizzle>['db'] {
+	public getDrizzleInstance(): AuthDrizzleDb {
 		return this.db
 	}
 
