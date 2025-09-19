@@ -20,6 +20,7 @@
 		"@hono/node-server": "1.19.2",
 		"@repo/audit": "workspace:*",
 		"@repo/audit-db": "workspace:*",
+		"@repo/infisical-kms": "workspace:*",
 		"@repo/logs": "workspace:*",
 		"@repo/redis-client": "workspace:*",
 		"@sentry/node": "^10.12.0",

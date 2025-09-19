@@ -5,24 +5,30 @@ import * as Sentry from '@sentry/node'
 import { Hono } from 'hono'
 
 import {
+	Audit,
 	AuditBottleneckAnalyzer,
+	AuditLogEvent,
 	AuditMonitoringDashboard,
 	// Observability imports
 	AuditTracer,
 	CircuitBreakerHealthCheck,
 	ConfigurationManager,
 	ConsoleAlertHandler,
+	createDatabasePresetHandler,
 	CryptoService,
 	DatabaseAlertHandler,
 	DatabaseErrorLogger,
 	DatabaseHealthCheck,
+	DatabasePresetHandler,
 	DEFAULT_DASHBOARD_CONFIG,
 	DEFAULT_OBSERVABILITY_CONFIG,
 	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 	ErrorHandler,
 	executeWithRetry,
+	GDPRComplianceService,
 	HealthCheckService,
 	MonitoringService,
+	ObservabilityConfig,
 	PerformanceTimer,
 	ProcessingHealthCheck,
 	QueueHealthCheck,
@@ -30,6 +36,7 @@ import {
 	RedisHealthCheck,
 	RedisMetricsCollector,
 	ReliableEventProcessor,
+	ReliableProcessorConfig,
 	trace,
 } from '@repo/audit'
 import {
@@ -38,6 +45,7 @@ import {
 	errorAggregation,
 	errorLog,
 } from '@repo/audit-db'
+import { InfisicalKmsClient } from '@repo/infisical-kms'
 import { LoggerFactory } from '@repo/logs'
 import {
 	closeSharedRedisConnection,
@@ -47,7 +55,6 @@ import {
 } from '@repo/redis-client'
 
 import type { LogLevel } from 'workers-tagged-logger'
-import type { AuditLogEvent, ObservabilityConfig, ReliableProcessorConfig } from '@repo/audit'
 
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
 
@@ -92,7 +99,15 @@ let connection: Redis | undefined = undefined
 // Using configuration manager
 let auditDbService: EnhancedAuditDb | undefined = undefined
 
+let presetDatabaseHandler: DatabasePresetHandler | undefined = undefined
+
+let audit: Audit | undefined = undefined
+
 let cryptoService: CryptoService | undefined = undefined
+
+let kms: InfisicalKmsClient | undefined = undefined
+
+let gdprComplianceService: GDPRComplianceService | undefined = undefined
 
 // Reliable event processor instance
 let reliableProcessor: ReliableEventProcessor<AuditLogEvent> | undefined = undefined
@@ -461,10 +476,28 @@ async function main() {
 
 	const db = auditDbService.getDrizzleInstance()
 
+	if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(auditDbService)
+
+	if (!audit) audit = new Audit(config, presetDatabaseHandler, connection)
+
 	if (!cryptoService) {
 		cryptoService = new CryptoService(config.security)
 	}
 
+	if (!kms)
+		kms = new InfisicalKmsClient({
+			baseUrl: config.security.kms.baseUrl,
+			encryptionKey: config.security.kms.encryptionKey,
+			signingKey: config.security.kms.signingKey,
+			accessToken: config.security.kms.accessToken,
+		})
+
+	if (!gdprComplianceService)
+		gdprComplianceService = new GDPRComplianceService(
+			auditDbService.getEnhancedClientInstance(),
+			audit,
+			kms
+		)
 	// 4. Initialize error handling services
 	if (!databaseErrorLogger) {
 		databaseErrorLogger = new DatabaseErrorLogger(db, errorLog, errorAggregation)
@@ -520,6 +553,7 @@ async function main() {
 
 	// 6. Define the reliable event processor with monitoring integration
 	const processAuditEvent = async (eventData: AuditLogEvent): Promise<void> => {
+		let pseudonymizedData: AuditLogEvent | undefined = undefined
 		const performanceTimer = new PerformanceTimer()
 		const span = tracer!.startSpan('process_audit_event')
 
@@ -559,6 +593,15 @@ async function main() {
 				span.log('info', 'Hash processing completed', { hashingTime })
 			}
 
+			// Pseudonymization phase
+			const pseudonymizationTimer = new PerformanceTimer()
+			span.log('info', 'Starting pseudonymization')
+
+			pseudonymizedData = await gdprComplianceService!.pseudonymizeEvent(eventData)
+
+			const pseudonymizationTime = pseudonymizationTimer.stop()
+			span.log('info', 'Pseudonymization completed', { pseudonymizationTime })
+
 			// Storage phase
 			const storageTimer = new PerformanceTimer()
 			span.log('info', 'Starting database storage')
@@ -583,9 +626,9 @@ async function main() {
 				processingLatency,
 				archivedAt,
 				...additionalDetails // Captures all other properties including practitioner-specific fields
-			} = eventData
+			} = pseudonymizedData
 
-			const latency = eventData.processingLatency || 0
+			const latency = pseudonymizedData.processingLatency || 0
 			// This will throw an error if database operation fails, which will be caught by the retry mechanism
 			await db.insert(auditLogTableSchema).values({
 				timestamp, // This comes from the event, should be an ISO string
@@ -619,6 +662,7 @@ async function main() {
 				eventProcessingTime: totalTime,
 				eventValidationTime: validationTime,
 				eventHashingTime: hashingTime,
+				eventPseudonymizationTime: pseudonymizationTime,
 				eventStorageTime: storageTime,
 			})
 
@@ -629,10 +673,11 @@ async function main() {
 				duration: totalTime,
 				success: true,
 				metadata: {
-					action: eventData.action,
-					organizationId: eventData.organizationId,
+					action: pseudonymizedData.action,
+					organizationId: pseudonymizedData.organizationId,
 					validationTime,
 					hashingTime,
+					pseudonymizationTime,
 					storageTime,
 				},
 				timestamp: new Date().toISOString(),
@@ -646,6 +691,8 @@ async function main() {
 		} catch (error) {
 			const totalTime = performanceTimer.stop()
 			const err = error instanceof Error ? error : new Error(String(error))
+			if (!pseudonymizedData)
+				pseudonymizedData = await gdprComplianceService?.pseudonymizeEvent(eventData)
 
 			span.setStatus('ERROR', err.message)
 			span.log('error', 'Event processing failed', {
@@ -676,12 +723,12 @@ async function main() {
 					err,
 					{
 						correlationId: eventData.correlationId,
-						userId: eventData.principalId,
+						userId: pseudonymizedData?.principalId,
 						sessionId: eventData.sessionContext?.sessionId,
 						metadata: {
 							action: eventData.action,
 							targetResourceType: eventData.targetResourceType,
-							targetResourceId: eventData.targetResourceId,
+							targetResourceId: pseudonymizedData?.targetResourceId,
 							eventData: eventData,
 							traceId: span.traceId,
 							spanId: span.spanId,
@@ -778,6 +825,19 @@ async function main() {
 	const server = serve({
 		fetch: app.fetch,
 		port: config.worker.port,
+	})
+
+	// System startup
+	audit.logSystem({
+		action: 'startup',
+		status: 'success',
+		component: 'worker-server',
+		outcomeDescription: 'Worker server started successfully',
+		systemContext: {
+			version: '0.1.0',
+			environment: configManager.getEnvironment(),
+			nodeVersion: process.version,
+		},
 	})
 
 	logger.info(`👂 Healthcheck server listening on port ${config.worker.port}`)

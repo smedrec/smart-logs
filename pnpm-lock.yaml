@@ -512,6 +512,9 @@ importers:
       '@repo/audit-db':
         specifier: workspace:*
         version: link:../../packages/audit-db
+      '@repo/infisical-kms':
+        specifier: workspace:*
+        version: link:../../packages/infisical-kms
       '@repo/logs':
         specifier: workspace:*
         version: link:../../packages/logs

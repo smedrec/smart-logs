@@ -67,6 +67,7 @@ export interface PerformanceMetrics {
 	eventProcessingTime: number
 	eventValidationTime: number
 	eventHashingTime: number
+	eventPseudonymizationTime: number
 	eventStorageTime: number
 
 	// Queue metrics

@@ -648,12 +648,14 @@ export const pseudonymMapping = pgTable(
 		timestamp: timestamp('timestamp', { withTimezone: true, mode: 'string' }).notNull(),
 		pseudonymId: text('pseudonym_id').notNull(),
 		originalId: text('original_id').notNull(),
+		strategy: varchar('strategy', { length: 20 }).notNull(),
 	},
 	(table) => {
 		return [
 			index('pseudonym_mapping_timestamp_idx').on(table.timestamp),
 			index('pseudonym_mapping_pseudonym_id_idx').on(table.pseudonymId),
-			index('pseudonym_mapping_original_id_idx').on(table.originalId),
+			uniqueIndex('pseudonym_mapping_original_id_idx').on(table.originalId),
+			index('pseudonym_mapping_strategy_idx').on(table.strategy),
 		]
 	}
 )

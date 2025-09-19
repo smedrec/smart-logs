@@ -4,6 +4,7 @@ import { and, eq, gte, isNotNull, lte, sql } from 'drizzle-orm'
 import { auditLog, auditRetentionPolicy, pseudonymMapping } from '@repo/audit-db'
 import * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import { InfisicalKmsClient } from '@repo/infisical-kms'
+import { LoggerFactory, StructuredLogger } from '@repo/logs'
 
 import { Audit } from '../audit.js'
 
@@ -119,6 +120,7 @@ export interface ArchivalResult {
  */
 export class GDPRComplianceService {
 	private db: PostgresJsDatabase<typeof auditSchema>
+	private logger: StructuredLogger
 
 	constructor(
 		private client: EnhancedAuditDatabaseClient,
@@ -126,6 +128,26 @@ export class GDPRComplianceService {
 		private kms: InfisicalKmsClient
 	) {
 		this.db = this.client.getDatabase()
+
+		// Initialize Structured Logger
+		LoggerFactory.setDefaultConfig({
+			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+			enablePerformanceLogging: true,
+			enableErrorTracking: true,
+			enableMetrics: false,
+			format: 'json',
+			outputs: ['otpl'],
+			otplConfig: {
+				endpoint: 'http://localhost:5080/api/default/default/_json',
+				headers: {
+					Authorization: process.env.OTLP_AUTH_HEADER || '',
+				},
+			},
+		})
+
+		this.logger = LoggerFactory.createLogger({
+			service: '@repo/audit - GDPRComplianceService',
+		})
 	}
 
 	/**
@@ -222,6 +244,93 @@ export class GDPRComplianceService {
 	}
 
 	/**
+	 * Get or create pseudonym ID for a principal ID (Requirement 4.2)
+	 * Implements GDPR Article 17 - Right to erasure with audit trail preservation
+	 */
+	async pseudonymId(
+		principalId: string,
+		strategy: PseudonymizationStrategy = 'hash'
+	): Promise<string> {
+		let encryptedOriginalId: string | undefined = undefined
+		try {
+			const { ciphertext } = await this.kms.encrypt(principalId)
+			encryptedOriginalId = ciphertext
+		} catch (error) {
+			this.logger.error(
+				'Error encrypting original ID',
+				error instanceof Error ? error : new Error('Error encrypting original ID')
+			)
+			throw error
+		}
+		try {
+			const existingMapping = await this.client.executeOptimizedQuery(
+				(db) =>
+					db
+						.select()
+						.from(pseudonymMapping)
+						.where(eq(pseudonymMapping.originalId, encryptedOriginalId))
+						.limit(1),
+				{ cacheKey: `check_existing_pseudonym_${encryptedOriginalId}` }
+			)
+
+			if (existingMapping.length > 0) {
+				// Pseudonym already exists, return existing pseudonym
+				return existingMapping[0].pseudonymId
+			}
+		} catch (error) {
+			this.logger.error(
+				'Error checking existing pseudonym',
+				error instanceof Error ? error : new Error('Error checking existing pseudonym')
+			)
+			throw error
+		}
+		// Generate pseudonym ID
+		const pseudonymId = this.generatePseudonymId(principalId, strategy)
+
+		try {
+			const insert = await this.db
+				.insert(pseudonymMapping)
+				.values({
+					timestamp: new Date().toISOString(),
+					pseudonymId,
+					originalId: encryptedOriginalId,
+					strategy: strategy,
+				})
+				.onConflictDoNothing()
+		} catch (error) {
+			this.logger.error(
+				'Error inserting pseudonym mapping',
+				error instanceof Error ? error : new Error('Error inserting pseudonym mapping')
+			)
+			throw error
+		}
+
+		return pseudonymId
+	}
+
+	async pseudonymizeEvent(event: AuditLogEvent): Promise<AuditLogEvent> {
+		const startWithToAvoid = ['pseudo', 'pseudonymized', 'system', 'security', 'integrity']
+
+		if (
+			event.principalId &&
+			!startWithToAvoid.some((prefix) => event.principalId?.startsWith(prefix))
+		) {
+			const pseudonymId = await this.pseudonymId(event.principalId)
+			event.principalId = pseudonymId
+		}
+
+		if (
+			event.targetResourceId &&
+			!startWithToAvoid.some((prefix) => event.targetResourceId?.startsWith(prefix))
+		) {
+			const pseudonymId = await this.pseudonymId(event.targetResourceId)
+			event.targetResourceId = pseudonymId
+		}
+
+		return event
+	}
+
+	/**
 	 * Pseudonymize user data while maintaining referential integrity (Requirement 4.2)
 	 * Implements GDPR Article 17 - Right to erasure with audit trail preservation
 	 */
@@ -230,28 +339,35 @@ export class GDPRComplianceService {
 		strategy: PseudonymizationStrategy = 'hash',
 		requestedBy: string
 	): Promise<{ pseudonymId: string; recordsAffected: number }> {
-		// Generate pseudonym ID
-		const pseudonymId = this.generatePseudonymId(principalId, strategy)
-
-		// Store mapping for referential integrity
-		//this.pseudonymMappings.set(principalId, pseudonymId)
-		// TODO: process possible errors
-		const encryptedOriginalId = await this.kms.encrypt(principalId)
-		await this.db.insert(pseudonymMapping).values({
-			timestamp: new Date().toISOString(),
-			pseudonymId,
-			originalId: encryptedOriginalId.ciphertext,
-		})
-
+		let pseudonymId: string
+		let records: number = 0
+		try {
+			pseudonymId = await this.pseudonymId(principalId, strategy)
+		} catch (error) {
+			this.logger.error(
+				'Error pseudonymizing user data',
+				error instanceof Error ? error : new Error('Error pseudonymizing user data')
+			)
+			throw error
+		}
 		// Update audit logs with pseudonymized ID
-		const updateResult = await this.db
-			.update(auditLog)
-			.set({
-				principalId: pseudonymId,
-				// Mark as pseudonymized in details
-				details: sql`COALESCE(${auditLog.details}, '{}') || '{"pseudonymized": true, "pseudonymizedAt": "${new Date().toISOString()}"}'::jsonb`,
-			})
-			.where(eq(auditLog.principalId, principalId))
+		try {
+			const updateResult = await this.db
+				.update(auditLog)
+				.set({
+					principalId: pseudonymId,
+					// Mark as pseudonymized in details
+					details: sql`COALESCE(${auditLog.details}, '{}') || '{"pseudonymized": true, "pseudonymizedAt": "${new Date().toISOString()}"}'::jsonb`,
+				})
+				.where(eq(auditLog.principalId, principalId))
+			records = (updateResult as any).rowCount || 0
+		} catch (error) {
+			this.logger.error(
+				'Error updating audit logs',
+				error instanceof Error ? error : new Error('Error updating audit logs')
+			)
+			throw error
+		}
 
 		// Log the pseudonymization activity
 		await this.logGDPRActivity({
@@ -260,21 +376,19 @@ export class GDPRComplianceService {
 			action: 'gdpr.data.pseudonymize',
 			status: 'success',
 			targetResourceType: 'AuditLog',
-			targetResourceId: principalId,
-			outcomeDescription: `User data pseudonymized for ${principalId}`,
+			targetResourceId: pseudonymId,
+			outcomeDescription: `User data pseudonymized`,
 			dataClassification: 'PHI',
 			retentionPolicy: 'gdpr_compliance',
 			details: {
-				originalId: principalId,
-				pseudonymId,
 				strategy,
-				recordsAffected: (updateResult as any).rowCount || 0,
+				recordsAffected: records,
 			},
 		})
 
 		return {
 			pseudonymId,
-			recordsAffected: (updateResult as any).rowCount || 0,
+			recordsAffected: records,
 		}
 	}
 
@@ -523,12 +637,18 @@ export class GDPRComplianceService {
 				const decryptedOriginalId = await this.kms.decrypt(encryptedOrigialId)
 				return decryptedOriginalId.plaintext
 			} catch (error) {
-				console.error('Error decrypting pseudonym mapping:', error)
+				this.logger.error(
+					'Error decrypting pseudonym mapping:',
+					error instanceof Error ? error : new Error('Error decrypting pseudonym mapping')
+				)
 				return undefined
 			}
 		}
 
-		console.error('No pseudonym mapping found for ID:', pseudonymId)
+		this.logger.error(
+			`No pseudonym mapping found for ID: ${pseudonymId}`,
+			'No pseudonym mapping found'
+		)
 		return undefined
 	}
 

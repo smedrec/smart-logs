@@ -50,6 +50,20 @@
       "when": 1757820225581,
       "tag": "0006_silly_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1758224456052,
+      "tag": "0007_keen_ego",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1758225267905,
+      "tag": "0008_swift_black_panther",
+      "breakpoints": true
     }
   ]
 }
