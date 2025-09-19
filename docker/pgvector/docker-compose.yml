@@ -1,13 +1,22 @@
+x-postgres-common: &postgres-common
+  image: pgvector/pgvector:pg17
+  restart: always
+  healthcheck:
+    test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+    interval: 10s
+    timeout: 5s
+    retries: 5
 services:
   postgres:
-    image: pgvector/pgvector:pg17
+    <<: *postgres-common
     container_name: pgvector-primary
-    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_REPLICATION_USER: replicator
-      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator_pass}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
+      PGUSER: ${POSTGRES_USER}
+      PGDATA: /var/lib/postgresql/data
     ports:
       - '25432:5432'
     volumes:
@@ -15,16 +24,10 @@ services:
       - ./init-primary.sql:/docker-entrypoint-initdb.d/init-primary.sql
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf
     command: postgres -c shared_preload_libraries='pg_stat_statements' -c wal_level=logical -c max_wal_senders=3 -c max_replication_slots=3 -c hot_standby=on
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${AUDIT_DB}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   postgres-replica:
-    image: pgvector/pgvector:pg17
+    <<: *postgres-common
     container_name: pgvector-replica
-    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -33,6 +36,7 @@ services:
       POSTGRES_PRIMARY_PORT: 5432
       POSTGRES_REPLICATION_USER: replicator
       POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator_pass}
+      PGDATA: /var/lib/postgresql/data
     ports:
       - '25433:5432'
     volumes:
@@ -42,18 +46,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   electric:
     image: docker.io/electricsql/electric:latest
     container_name: electric
     restart: always
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-replica:5432/${AUDIT_DB}?sslmode=disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${AUDIT_DB}?sslmode=disable
       # Not suitable for production. Only use insecure mode in development or if you've otherwise secured the Electric API.
       # See https://electric-sql.com/docs/guides/security
       ELECTRIC_INSECURE: true

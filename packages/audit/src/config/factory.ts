@@ -64,7 +64,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			replication: {
 				enabled: false,
 				readReplicas: [
-					process.env.AUDIT_DB_READ_REPLICA1_URL || 'postgresql://localhost:5432/audit_dev',
+					process.env.AUDIT_DB_READ_REPLICA_URL || 'postgresql://localhost:5432/audit_dev',
 				],
 				routingStrategy: 'round-robin',
 				fallbackToMaster: true,

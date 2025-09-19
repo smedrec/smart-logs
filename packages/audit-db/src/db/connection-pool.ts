@@ -266,8 +266,12 @@ export class EnhancedDatabaseClient {
 	private cacheConfig: CacheFactoryConfig
 	private cleanupInterval: NodeJS.Timeout | null = null
 
-	constructor(poolConfig: ConnectionPoolConfig, cacheConfig: CacheFactoryConfig) {
-		this.connectionPool = new EnhancedConnectionPool(poolConfig)
+	constructor(
+		poolConfig: ConnectionPoolConfig,
+		cacheConfig: CacheFactoryConfig,
+		replicationConfig: ReplicationConfig
+	) {
+		this.connectionPool = new EnhancedConnectionPool(poolConfig, replicationConfig)
 		this.queryCache = createQueryCache(cacheConfig)
 		this.cacheConfig = cacheConfig
 

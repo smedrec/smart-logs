@@ -15,7 +15,7 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   rm -rf "$PGDATA"/*
   
   # Create base backup from primary
-  pg_basebackup -h "$POSTGRES_PRIMARY_HOST" -p "$POSTGRES_PRIMARY_PORT" -U "$POSTGRES_REPLICATION_USER" -D "$PGDATA" -Fp -Xs -P -R
+  PGPASSWORD="$POSTGRES_REPLICATION_PASSWORD" pg_basebackup -h "$POSTGRES_PRIMARY_HOST" -p "$POSTGRES_PRIMARY_PORT" -U "$POSTGRES_REPLICATION_USER" -D "$PGDATA" -Fp -Xs -P -R -W
   
   # Set proper permissions
   chmod 700 "$PGDATA"

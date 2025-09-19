@@ -121,7 +121,11 @@ export class EnhancedAuditDatabaseClient {
 		})
 
 		// Initialize enhanced database client with connection pooling and caching
-		this.client = new EnhancedDatabaseClient(config.connectionPool, config.queryCacheFactory)
+		this.client = new EnhancedDatabaseClient(
+			config.connectionPool,
+			config.queryCacheFactory,
+			config.replication
+		)
 
 		// Initialize partition manager
 		this.partitionManager = new DatabasePartitionManager(this.client.getDatabase())
