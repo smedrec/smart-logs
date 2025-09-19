@@ -7,16 +7,17 @@
 - [manager.ts](file://packages/audit/src/config/manager.ts) - *Updated in recent commit*
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Added in recent commit*
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts) - *Added in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section for Plugin Configuration Validation
-- Added new section for GDPR Pseudonymization Configuration
-- Updated Compliance Settings Rules to include pseudonymization strategy validation
-- Added new custom validator functions for plugin and GDPR configurations
+- Added new section for OTLP Exporter Configuration Validation
+- Added new section for Structured Logging Configuration Validation
+- Updated Logging Configuration Rules to include OTLP and structured logging settings
+- Added new custom validator functions for OTLP endpoint and headers
 - Updated section sources to reflect new and modified files
-- Enhanced troubleshooting section with new GDPR-related errors
+- Enhanced troubleshooting section with new OTLP-related errors
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,7 +31,7 @@
 9. [Troubleshooting Common Validation Errors](#troubleshooting-common-validation-errors)
 
 ## Introduction
-The Configuration Validation system ensures the integrity and correctness of the audit system's configuration before initialization. This document details the validation pipeline, rules for each configuration section, error reporting mechanisms, and how validation failures prevent system startup. The system uses a custom validation framework with comprehensive rules for database URLs, retention periods, compliance settings, integration credentials, plugin configurations, and GDPR pseudonymization settings. While Zod is used elsewhere in the repository for API request validation, this configuration system implements its own schema-based validation approach.
+The Configuration Validation system ensures the integrity and correctness of the audit system's configuration before initialization. This document details the validation pipeline, rules for each configuration section, error reporting mechanisms, and how validation failures prevent system startup. The system uses a custom validation framework with comprehensive rules for database URLs, retention periods, compliance settings, integration credentials, plugin configurations, GDPR pseudonymization settings, OTLP exporter configuration, and structured logging. While Zod is used elsewhere in the repository for API request validation, this configuration system implements its own schema-based validation approach.
 
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts)
@@ -287,6 +288,55 @@ GDPR pseudonymization configuration validation ensures proper data privacy and c
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L50-L100)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L10-L50)
 
+### OTLP Exporter Configuration Rules
+OTLP exporter configuration validation ensures proper observability integration with monitoring systems.
+
+**:validationSchema['logging.exporterType']**
+- **required**: true
+- **type**: 'string'
+- **enum**: ['console', 'jaeger', 'zipkin', 'otlp']
+
+**:validationSchema['logging.exporterEndpoint']**
+- **required**: true when exporterType is 'otlp'
+- **type**: 'string'
+- **custom**: Validates URL format for OTLP endpoint
+
+**:validationSchema['logging.exporterHeaders']**
+- **required**: false
+- **type**: 'object'
+- **custom**: Validates header names and values are strings
+
+**Section sources**
+- [validator.ts](file://packages/audit/src/config/validator.ts#L400-L420)
+- [types.ts](file://packages/audit/src/config/types.ts#L480-L500)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L862-L895)
+
+### Structured Logging Configuration Rules
+Structured logging configuration validation ensures proper log formatting and correlation.
+
+**:validationSchema['logging.structured']**
+- **required**: true
+- **type**: 'boolean'
+
+**:validationSchema['logging.format']**
+- **required**: true
+- **type**: 'string'
+- **enum**: ['json', 'text']
+
+**:validationSchema['logging.enableCorrelationIds']**
+- **required**: true
+- **type**: 'boolean'
+
+**:validationSchema['logging.level']**
+- **required**: true
+- **type**: 'string'
+- **enum**: ['debug', 'info', 'warn', 'error']
+
+**Section sources**
+- [validator.ts](file://packages/audit/src/config/validator.ts#L370-L390)
+- [types.ts](file://packages/audit/src/config/types.ts#L480-L500)
+- [logging.ts](file://packages/logs/src/logging.ts#L56-L115)
+
 ## Error Reporting and Startup Prevention
 
 ### Error Reporting Mechanism
@@ -453,9 +503,35 @@ custom: (value, config) => {
 }
 ```
 
+**:validationSchema['logging.exporterEndpoint']**
+```typescript
+custom: (value, config) => {
+	if (config.logging.exporterType === 'otlp' && (!value || !value.startsWith('http'))) {
+		return 'OTLP exporter endpoint is required and must be a valid HTTP/HTTPS URL'
+	}
+	return true
+}
+```
+
+**:validationSchema['logging.exporterHeaders']**
+```typescript
+custom: (value) => {
+	if (value && typeof value === 'object') {
+		for (const [key, val] of Object.entries(value)) {
+			if (typeof key !== 'string' || typeof val !== 'string') {
+				return 'Exporter headers must have string keys and values'
+			}
+		}
+		return true
+	}
+	return 'Exporter headers must be an object with string keys and values'
+}
+```
+
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts#L130-L150)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L500-L550)
+- [factory.ts](file://packages/audit/src/config/factory.ts#L862-L895)
 
 ## Environment-Specific Rule Enforcement
 
@@ -500,6 +576,7 @@ The validation system applies different rules based on the environment configura
 - **security.encryptionKey required when security.enableLogEncryption is true**: Prevents encryption without a key
 - **compliance.reportingSchedule.recipients not empty when reporting enabled**: Ensures reports have recipients
 - **compliance.pseudonymization.kms.keyId required when compliance.pseudonymization.kms.enabled is true**: Ensures KMS configuration is complete
+- **logging.exporterEndpoint required when logging.exporterType is 'otlp'**: Ensures OTLP endpoint is configured
 
 **Section sources**
 - [validator.ts](file://packages/audit/src/config/validator.ts#L555-L630)
@@ -546,6 +623,7 @@ The system masks sensitive information in logs and debugging output:
 - **Webhook authorization headers**: Replaced with '***MASKED***'
 - **Pseudonymization salts**: Replaced with '***MASKED***'
 - **KMS credentials**: Replaced with '***MASKED***'
+- **OTLP exporter headers**: Replaced with '***MASKED***'
 
 The `sanitizeConfig()` method removes sensitive information from configuration objects before logging or debugging, while the `maskSensitiveUrl()` method specifically handles URL masking.
 
@@ -643,6 +721,17 @@ This approach ensures that only the relevant configuration changes are validated
 - **Solution**: Use one of the supported strategies: 'hash', 'token', or 'encryption'
 - **Note**: 'hash' provides deterministic pseudonymization, 'token' provides random pseudonymization, and 'encryption' provides reversible pseudonymization
 
-**Section sources**
-- [validator.ts](file://packages/audit/src/config/validator.ts#L555-L630)
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L500-L550)
+**:Error: "OTLP exporter endpoint is required and must be a valid HTTP/HTTPS URL"**
+- **Cause**: OTLP exporter is configured but no valid endpoint is provided
+- **Solution**: Set logging.exporterEndpoint to a valid HTTP/HTTPS URL
+- **Example**: `http://otel-collector:4318/v1/traces` or `https://otel.example.com/v1/metrics`
+
+**:Error: "Exporter headers must have string keys and values"**
+- **Cause**: OTLP exporter headers contain non-string keys or values
+- **Solution**: Ensure all header keys and values are strings
+- **Example**: `{ "Authorization": "Bearer token123", "Content-Type": "application/json" }`
+
+**:Error: "logging.exporterType must be one of: console, jaeger, zipkin, otlp"**
+- **Cause**: Invalid exporter type specified
+- **Solution**: Use one of the supported exporter types: 'console', 'jaeger', 'zipkin', or 'otlp'
+- **Note**: 'otlp' is recommended for production environments with observability backends

@@ -9,6 +9,8 @@
 - [0004_mixed_roughhouse.sql](file://packages/audit-db/drizzle/migrations/0004_mixed_roughhouse.sql)
 - [0005_marvelous_christian_walker.sql](file://packages/audit-db/drizzle/migrations/0005_marvelous_christian_walker.sql) - *Added run_id field for report executions*
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added pseudonym mapping table for GDPR compliance*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added strategy column to pseudonym_mapping table*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Converted original_id index to unique constraint*
 - [convert-to-partitioned.sql](file://packages/audit-db/src/db/migrations/convert-to-partitioned.sql)
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
 - [setup-partitions.ts](file://packages/audit-db/src/db/setup-partitions.ts)
@@ -24,13 +26,12 @@
 
 ## Update Summary
 **Changes Made**   
-- Added new section on organization role management migration with comprehensive implementation details
-- Updated migration workflow section to include role-based access control changes and Redis caching integration
-- Added new diagram showing organization role data flow with Redis cache interaction
-- Enhanced best practices section with role management considerations and permission hierarchy
-- Updated structure of migration files section to include the new organization_role table and its constraints
-- Added detailed implementation examples for organization creation, member management, and role assignment
-- Integrated Redis caching strategy for permission lookups and user role management
+- Added new section on pseudonymization strategy implementation with comprehensive details
+- Updated GDPR pseudonymization migration section to include strategy column and unique constraint changes
+- Enhanced structure of migration files section to include the new strategy column and unique index on original_id
+- Updated data flow diagram to show pseudonymization strategy selection process
+- Added detailed implementation examples for pseudonymization strategy handling
+- Integrated pseudonymization strategy validation and error handling in code examples
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -95,6 +96,8 @@ Subsequent migrations apply incremental changes. For example:
 - `0004_mixed_roughhouse.sql` drops a foreign key constraint from `audit_integrity_log`
 - `0005_marvelous_christian_walker.sql` adds `run_id` field to `report_executions` and `scheduled_reports`
 - `0006_silly_tyger_tiger.sql` adds the `pseudonym_mapping` table for GDPR compliance
+- `0007_keen_ego.sql` adds the `strategy` column to `pseudonym_mapping` table
+- `0008_swift_black_panther.sql` converts the `original_id` index to a unique constraint
 - `0005_fluffy_donald_blake.sql` adds the `organization_role` table for role-based access control with Redis caching
 
 Each migration file follows a consistent pattern:
@@ -128,6 +131,8 @@ organization_role ||--o{ organization : "defines permissions per organization"
 - [0004_mixed_roughhouse.sql](file://packages/audit-db/drizzle/migrations/0004_mixed_roughhouse.sql#L1)
 - [0005_marvelous_christian_walker.sql](file://packages/audit-db/drizzle/migrations/0005_marvelous_christian_walker.sql#L1-L2)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql#L1)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql#L1-L2)
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
 
 ## Migration Execution Process
@@ -309,6 +314,8 @@ When implementing GDPR-related migrations:
 - Maintain referential integrity for audit trails
 - Implement proper access controls for reverse mapping
 - Document data protection impact assessments
+- Add strategy column to track pseudonymization method used
+- Ensure original_id has unique constraint to prevent duplicate mappings
 
 ### Role Management
 When implementing role-based access control migrations:
@@ -323,6 +330,8 @@ When implementing role-based access control migrations:
 - [0001_aberrant_natasha_romanoff.sql](file://packages/audit-db/drizzle/migrations/0001_aberrant_natasha_romanoff.sql#L1)
 - [0003_easy_prowler.sql](file://packages/audit-db/drizzle/migrations/0003_easy_prowler.sql#L1-L5)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql#L1)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql#L1-L2)
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql#L1-L11)
 - [permissions.ts](file://packages/auth/src/permissions.ts#L1-L53)
 
@@ -418,7 +427,7 @@ A --> G
 
 ## GDPR Pseudonymization Migration
 
-The system implements GDPR-compliant pseudonymization through a dedicated migration and supporting infrastructure. The `0006_silly_tyger_tiger.sql` migration introduces the `pseudonym_mapping` table to maintain referential integrity while protecting personal data.
+The system implements GDPR-compliant pseudonymization through a dedicated migration and supporting infrastructure. The `0006_silly_tyger_tiger.sql` migration introduces the `pseudonym_mapping` table to maintain referential integrity while protecting personal data. Subsequent migrations `0007_keen_ego.sql` and `0008_swift_black_panther.sql` enhance this implementation with strategy tracking and data integrity constraints.
 
 ### Migration Details
 The `pseudonym_mapping` table structure:
@@ -426,34 +435,143 @@ The `pseudonym_mapping` table structure:
 - `timestamp`: Timestamp of mapping creation
 - `pseudonym_id`: Text field storing the pseudonymized identifier
 - `original_id`: Text field storing the encrypted original identifier
+- `strategy`: Varchar(20) field storing the pseudonymization strategy used
 
-The migration creates three indexes for efficient lookups:
+The migration creates four indexes for efficient lookups:
 - `pseudonym_mapping_timestamp_idx` on timestamp
 - `pseudonym_mapping_pseudonym_id_idx` on pseudonym_id
-- `pseudonym_mapping_original_id_idx` on original_id
+- `pseudonym_mapping_original_id_idx` on original_id (unique)
+- `pseudonym_mapping_strategy_idx` on strategy
+
+### Implementation Details
+The pseudonymization system is implemented with the following components:
+
+**Pseudonymization Strategy Handling**
+```typescript
+/**
+ * Pseudonymization strategy options
+ */
+export type PseudonymizationStrategy = 'hash' | 'token' | 'encryption'
+
+/**
+ * Generate pseudonym ID using specified strategy
+ */
+private generatePseudonymId(originalId: string, strategy: PseudonymizationStrategy): string {
+    switch (strategy) {
+        case 'hash':
+            return `pseudo-${createHash('sha256')
+                .update(originalId + process.env.PSEUDONYM_SALT || 'default-salt')
+                .digest('hex')
+                .substring(0, 16)}`
+        case 'token':
+            return `pseudo-${randomBytes(16).toString('hex')}`
+        case 'encryption':
+            return `pseudo-enc-${Buffer.from(originalId)
+                .toString('base64')
+                .replace(/[^a-zA-Z0-9]/g, '')
+                .substring(0, 16)}`
+        default:
+            throw new Error(`Unsupported pseudonymization strategy: ${strategy}`)
+    }
+}
+```
+
+**Pseudonymization with Strategy Validation**
+```typescript
+async pseudonymId(
+    principalId: string,
+    strategy: PseudonymizationStrategy = 'hash'
+): Promise<string> {
+    let encryptedOriginalId: string | undefined = undefined
+    try {
+        const { ciphertext } = await this.kms.encrypt(principalId)
+        encryptedOriginalId = ciphertext
+    } catch (error) {
+        this.logger.error(
+            'Error encrypting original ID',
+            error instanceof Error ? error : new Error('Error encrypting original ID')
+        )
+        throw error
+    }
+    
+    try {
+        const existingMapping = await this.client.executeOptimizedQuery(
+            (db) =>
+                db
+                    .select()
+                    .from(pseudonymMapping)
+                    .where(eq(pseudonymMapping.originalId, encryptedOriginalId))
+                    .limit(1),
+            { cacheKey: `check_existing_pseudonym_${encryptedOriginalId}` }
+        )
+
+        if (existingMapping.length > 0) {
+            // Pseudonym already exists, return existing pseudonym
+            return existingMapping[0].pseudonymId
+        }
+    } catch (error) {
+        this.logger.error(
+            'Error checking existing pseudonym',
+            error instanceof Error ? error : new Error('Error checking existing pseudonym')
+        )
+        throw error
+    }
+    
+    // Generate pseudonym ID
+    const pseudonymId = this.generatePseudonymId(principalId, strategy)
+
+    try {
+        const insert = await this.db
+            .insert(pseudonymMapping)
+            .values({
+                timestamp: new Date().toISOString(),
+                pseudonymId,
+                originalId: encryptedOriginalId,
+                strategy: strategy,
+            })
+            .onConflictDoNothing()
+    } catch (error) {
+        this.logger.error(
+            'Error inserting pseudonym mapping',
+            error instanceof Error ? error : new Error('Error inserting pseudonym mapping')
+        )
+        throw error
+    }
+
+    return pseudonymId
+}
+```
 
 ### Data Flow
 ```mermaid
 flowchart LR
 A["Original User ID"] --> B["GDPR Compliance Service"]
-B --> C["Generate Pseudonym"]
-C --> D["Encrypt Original ID"]
-D --> E["Store in pseudonym_mapping"]
-E --> F["Update audit_log with pseudonym"]
-F --> G["Maintain Audit Trail"]
-G --> H["Preserve Referential Integrity"]
-B --> I["Support Multiple Strategies"]
-I --> J["Hash-based Pseudonymization"]
-I --> K["Token-based Pseudonymization"]
-I --> L["Encryption-based Pseudonymization"]
+B --> C["Select Pseudonymization Strategy"]
+C --> D["Hash-based"]
+C --> E["Token-based"]
+C --> F["Encryption-based"]
+D --> G["Generate Hashed Pseudonym"]
+E --> H["Generate Random Token"]
+F --> I["Generate Encrypted Pseudonym"]
+G --> J["Encrypt Original ID"]
+H --> J
+I --> J
+J --> K["Store in pseudonym_mapping with strategy"]
+K --> L["Update audit_log with pseudonym"]
+L --> M["Maintain Audit Trail"]
+M --> N["Preserve Referential Integrity"]
 ```
 
 **Diagram sources**
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql#L1)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql#L1-L2)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L234-L275)
 
 **Section sources**
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql#L1-L9)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql#L1)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql#L1-L2)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L234-L275)
 - [gdpr-utils.test.ts](file://packages/audit/src/__tests__/gdpr-utils.test.ts#L0-L37)
 

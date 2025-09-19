@@ -8,18 +8,21 @@
 - [manager.ts](file://packages\audit\src\config\manager.ts) - *Updated in recent commit*
 - [configuration.md](file://packages\audit\docs\getting-started\configuration.md) - *Documentation moved to centralized site*
 - [logging.ts](file://packages\logs\src\logging.ts) - *Introduced StructuredLogger and LoggerFactory*
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts) - *Added in recent commit*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated document sources to reflect the centralized documentation structure
-- Added note about documentation migration to comprehensive site
-- Verified all code examples and configuration details remain accurate
-- Maintained complete source tracking for all referenced files
-- Confirmed configuration factory implementation unchanged despite documentation relocation
-- Integrated new logging configuration details from recent refactoring of ConsoleLogger to StructuredLogger
-- Added information about OTLP endpoint configuration and authentication headers
-- Updated logging configuration section to reflect StructuredLogger integration with performance timing and metrics collection
+- Added new section on Database Preset Handler integration with the Configuration Factory
+- Updated Configuration Factory Overview to include preset handler injection
+- Added new diagram showing factory integration with preset handler
+- Updated Factory Creation Workflow to include preset handler initialization
+- Added new section on Dependency Injection with Preset Handler
+- Updated Factory Usage Examples to include preset handler integration
+- Added new code example for preset handler creation
+- Updated section sources to include new files
+- Added diagram sources for new architectural diagrams
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -33,6 +36,7 @@
 9. [Advanced Configuration Patterns](#advanced-configuration-patterns)
 10. [Error Handling and Validation](#error-handling-and-validation)
 11. [Extension Points and Customization](#extension-points-and-customization)
+12. [Database Preset Handler Integration](#database-preset-handler-integration)
 
 ## Introduction
 The Configuration Factory Pattern in the audit system provides a robust mechanism for creating and managing environment-specific configurations with proper defaults, validation, and dependency injection. This document details the implementation of the factory pattern, its integration with the configuration manager and validator, and practical usage patterns for initializing audit systems across different deployment scenarios.
@@ -70,20 +74,30 @@ class ConfigValidator {
 +validateConfiguration(config : AuditConfig) : Promise<void>
 +validatePartialConfiguration(partial : Partial<AuditConfig>, base : AuditConfig) : Promise<void>
 }
+class DatabasePresetHandler {
++getPresets(organizationId? : string) : Promise<(AuditPreset & { id? : string })[]>
++getPreset(name : string, organizationId? : string) : Promise<(AuditPreset & { id? : string }) | null>
++createPreset(preset : AuditPreset & { createdBy : string }) : Promise<AuditPreset & { id? : string }>
++updatePreset(preset : AuditPreset & { id : string; updatedBy : string }) : Promise<AuditPreset & { id? : string }>
++deletePreset(name : string, organizationId : string) : Promise<{ success : true }>
+}
 ConfigurationFactory --> ConfigurationManager : "integrates with"
 ConfigurationFactory --> ConfigValidator : "uses for validation"
 ConfigurationManager --> ConfigValidator : "delegates validation"
+ConfigurationFactory --> DatabasePresetHandler : "creates and injects"
 ```
 
 **Diagram sources**
 - [factory.ts](file://packages\audit\src\config\factory.ts#L1-L799)
 - [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
 - [validator.ts](file://packages\audit\src\config\validator.ts#L1-L658)
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
 
 **Section sources**
 - [factory.ts](file://packages\audit\src\config\factory.ts#L1-L799)
 - [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
 - [validator.ts](file://packages\audit\src\config\validator.ts#L1-L658)
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
 
 ## Core Configuration Types
 The configuration system is built around the `AuditConfig` interface, which defines the complete structure of the audit system configuration. The interface includes nested configurations for various system components, ensuring type safety and comprehensive documentation.
@@ -191,6 +205,7 @@ participant User as "Application Code"
 participant Factory as "ConfigurationFactory"
 participant Validator as "ConfigValidator"
 participant Manager as "ConfigurationManager"
+participant PresetHandler as "DatabasePresetHandler"
 User->>Factory : createConfigForEnvironment(env)
 alt Development Environment
 Factory->>Factory : createDevelopmentConfig()
@@ -215,7 +230,9 @@ alt Validation Failed
 Factory-->>User : Throw validation error
 else Validation Passed
 Factory-->>User : Return validated config
-User->>Manager : initializeConfig(config)
+User->>PresetHandler : createDatabasePresetHandler(auditDbInstance)
+PresetHandler-->>User : Return preset handler
+User->>Manager : initializeConfig(config, presetHandler)
 Manager->>Validator : validateConfiguration(config)
 Manager->>Manager : Load configuration
 Manager->>Manager : Start hot reloading (if enabled)
@@ -227,11 +244,13 @@ end
 - [factory.ts](file://packages\audit\src\config\factory.ts#L1-L799)
 - [validator.ts](file://packages\audit\src\config\validator.ts#L1-L658)
 - [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
 
 **Section sources**
 - [factory.ts](file://packages\audit\src\config\factory.ts#L1-L799)
 - [validator.ts](file://packages\audit\src\config\validator.ts#L1-L658)
 - [manager.ts](file://packages\audit\src\config\manager.ts#L1-L938)
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
 
 ## Environment-Specific Configuration Profiles
 The factory provides four distinct configuration profiles tailored to different deployment scenarios: development, staging, production, and test. Each profile inherits from the previous one, creating a hierarchy of increasing strictness and optimization.
@@ -859,3 +878,136 @@ container.bind<MonitoringService>('MonitoringService').toDynamicValue((context) 
 **Section sources**
 - [factory.ts](file://packages\audit\src\config\factory.ts#L1-L799)
 - [index.ts](file://packages\audit\src\index.ts#L1-L73)
+
+## Database Preset Handler Integration
+The Configuration Factory Pattern now integrates with the DatabasePresetHandler to provide database-backed preset management for audit configurations. This integration allows the factory to create and inject preset handlers that retrieve configuration presets from the database with organization-specific overrides and default fallbacks.
+
+### DatabasePresetHandler Implementation
+The DatabasePresetHandler class implements the PresetHandler interface and provides methods for managing audit presets stored in the database. It uses the EnhancedAuditDatabaseClient to execute optimized queries with caching for improved performance.
+
+```mermaid
+classDiagram
+class DatabasePresetHandler {
++getPresets(organizationId? : string) : Promise<(AuditPreset & { id? : string })[]>
++getPreset(name : string, organizationId? : string) : Promise<(AuditPreset & { id? : string }) | null>
++createPreset(preset : AuditPreset & { createdBy : string }) : Promise<AuditPreset & { id? : string }>
++updatePreset(preset : AuditPreset & { id : string; updatedBy : string }) : Promise<AuditPreset & { id? : string }>
++deletePreset(name : string, organizationId : string) : Promise<{ success : true }>
+}
+class PresetHandler {
+<<interface>>
++getPresets(organizationId? : string) : Promise<(AuditPreset & { id? : string })[]>
++getPreset(name : string, organizationId? : string) : Promise<(AuditPreset & { id? : string }) | null>
++createPreset(preset : AuditPreset & { createdBy : string }) : Promise<AuditPreset & { id? : string }>
++updatePreset(preset : AuditPreset & { id : string; updatedBy : string }) : Promise<AuditPreset & { id? : string }>
++deletePreset(name : string, organizationId : string) : Promise<{ success : true }>
+}
+class EnhancedAuditDatabaseClient {
++executeOptimizedQuery(query : Function, options? : QueryOptions) : Promise<any>
++getDatabase() : PostgresJsDatabase
++getEnhancedClientInstance() : EnhancedAuditDatabaseClient
+}
+DatabasePresetHandler --> PresetHandler : "implements"
+DatabasePresetHandler --> EnhancedAuditDatabaseClient : "uses"
+```
+
+**Diagram sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
+
+### Factory Integration with Preset Handler
+The configuration factory pattern now includes integration with the DatabasePresetHandler through the createDatabasePresetHandler factory function. This function creates a new instance of DatabasePresetHandler using an EnhancedAuditDb instance, allowing the audit system to access database-stored presets during initialization.
+
+```typescript
+/**
+ * Factory function to create DatabasePresetHandler
+ */
+export function createDatabasePresetHandler(
+	auditDbInstance: EnhancedAuditDb
+): DatabasePresetHandler {
+	return new DatabasePresetHandler(auditDbInstance)
+}
+```
+
+The integration is demonstrated in the worker's index.ts file, where the preset handler is created and injected into the Audit service:
+
+```typescript
+// From apps/worker/src/index.ts
+if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(auditDbService)
+
+if (!audit) audit = new Audit(config, presetDatabaseHandler, connection)
+```
+
+This pattern allows for dependency injection of the preset handler while maintaining separation of concerns between configuration management and preset retrieval.
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L275-L284)
+- [index.ts](file://apps\worker\src\index.ts#L300-L310)
+
+### Preset Retrieval Workflow
+The DatabasePresetHandler implements a sophisticated workflow for retrieving presets with organization-specific overrides and default fallbacks. When retrieving presets, it executes a single optimized query that fetches both organization-specific presets and default presets, then merges them with organization presets taking priority.
+
+```mermaid
+sequenceDiagram
+participant Client as "Audit Service"
+participant Handler as "DatabasePresetHandler"
+participant Client as "EnhancedAuditDatabaseClient"
+participant DB as "PostgreSQL"
+Client->>Handler : getPresets(orgId)
+Handler->>Client : executeOptimizedQuery()
+Client->>DB : SELECT * FROM audit_preset WHERE organization_id IN (orgId, '*')
+DB-->>Client : Return rows with priority
+Client-->>Handler : Query result
+Handler->>Handler : mergePresetsWithPriority(rows)
+Handler-->>Client : Return merged presets
+Note over Handler,DB : Single query with priority sorting<br/>ensures organization presets override defaults
+```
+
+The handler uses a CASE statement in the SQL query to assign priority to organization-specific presets, ensuring they take precedence over default presets with the same name:
+
+```typescript
+const result = await this.client.executeOptimizedQuery(
+	(db) =>
+		db.execute(sql`
+			SELECT *,
+					 CASE WHEN organization_id = ${orgId} THEN 1 ELSE 0 END as priority
+			FROM audit_preset
+			WHERE organization_id IN (${orgId}, '*')
+			ORDER BY name, priority DESC
+		`),
+	{ cacheKey: `get_merged_presets_${orgId}` }
+)
+```
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L30-L60)
+
+### Dependency Injection Pattern
+The integration between the Configuration Factory and DatabasePresetHandler follows a dependency injection pattern where the factory-created configuration is used to initialize services that depend on both the configuration and the preset handler.
+
+```typescript
+// Example of complete initialization workflow
+async function initializeAuditSystem() {
+	// 1. Create configuration using factory
+	const config = createConfigForEnvironment(process.env.NODE_ENV || 'development')
+	
+	// 2. Initialize database connection
+	const auditDbInstance = new EnhancedAuditDb(connection, config.enhancedClient)
+	
+	// 3. Create preset handler using factory function
+	const presetHandler = createDatabasePresetHandler(auditDbInstance)
+	
+	// 4. Initialize audit service with configuration and preset handler
+	const audit = new Audit(config, presetHandler, connection)
+	
+	return audit
+}
+```
+
+This pattern ensures that the Audit service receives both the environment-specific configuration from the factory and the database-backed preset handler, enabling comprehensive audit event processing with customizable presets.
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L275-L284)
+- [factory.ts](file://packages\audit\src\config\factory.ts#L702-L725)

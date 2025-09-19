@@ -14,14 +14,16 @@
 - [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts) - *Updated in recent commit*
 - [docker-compose.yml](file://docker\pgvector\docker-compose.yml) - *Updated in recent commit*
 - [init-primary.sql](file://docker\pgvector\init-primary.sql) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages\audit-db\drizzle\migrations\0007_keen_ego.sql) - *Updated in recent commit*
+- [0008_swift_black_panther.sql](file://packages\audit-db\drizzle\migrations\0008_swift_black_panther.sql) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
-- Added new section on read replicas and structured logging in EnhancedAuditDatabaseClient
-- Updated architecture overview to include read replica configuration
-- Enhanced connection pool configuration section with read replica details
-- Added structured logging implementation details to EnhancedAuditDatabaseClient
-- Updated section sources to reflect new and modified files related to read replicas and logging
+- Added new section on pseudonymization strategy and unique index for original ID in pseudonym_mapping table
+- Updated GDPR Pseudonymization and Compliance section to include new strategy field and unique constraint
+- Enhanced pseudonym_mapping data model with strategy field and unique index on originalId
+- Updated section sources to reflect new and modified migration files related to pseudonymization
+- Added details about index creation and constraint changes in migration files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -104,6 +106,7 @@ varchar expected_hash
 audit_retention_policy {
 integer id PK
 varchar policy_name
+varchar organization_id
 integer retention_days
 integer archive_after_days
 integer delete_after_days
@@ -256,6 +259,7 @@ integer id PK
 timestamp timestamp
 text pseudonym_id
 text original_id
+varchar strategy
 }
 organization_role {
 varchar organization_id PK
@@ -345,13 +349,14 @@ Stores persistent alert records with multi-organizational support.
 - **updatedAt**: timestamp - Last update timestamp
 
 #### pseudonym_mapping
-Stores encrypted pseudonym-to-original ID mappings for GDPR compliance.
+Stores encrypted pseudonym-to-original ID mappings for GDPR compliance with pseudonymization strategy tracking.
 
 **Fields:**
 - **id**: serial - Primary key
 - **timestamp**: timestamp with time zone - Creation timestamp
 - **pseudonymId**: text - Pseudonymized identifier
-- **originalId**: text - Encrypted original identifier
+- **originalId**: text - Encrypted original identifier (unique constraint)
+- **strategy**: varchar(20) - Pseudonymization strategy used ('hash', 'token', 'encryption')
 
 #### organization_role
 Stores role definitions and permissions for organizational access control.
@@ -830,7 +835,9 @@ drizzle/migrations/
 ├── 0003_easy_prowler.sql
 ├── 0004_mixed_roughhouse.sql
 ├── 0005_marvelous_christian_walker.sql
-└── 0006_silly_tyger_tiger.sql
+├── 0006_silly_tyger_tiger.sql
+├── 0007_keen_ego.sql
+└── 0008_swift_black_panther.sql
 ```
 
 Each migration file contains the SQL statements needed to upgrade the database schema, along with a corresponding rollback section.
@@ -1101,10 +1108,14 @@ style RC fill:#bbf,stroke:#333
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 - [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts)
 - [pseudonym_mapping](file://packages\audit-db\drizzle\migrations\0006_silly_tyger_tiger.sql)
+- [0007_keen_ego.sql](file://packages\audit-db\drizzle\migrations\0007_keen_ego.sql)
+- [0008_swift_black_panther.sql](file://packages\audit-db\drizzle\migrations\0008_swift_black_panther.sql)
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 - [pseudonymMapping](file://packages\audit-db\src\db\schema.ts)
+- [0007_keen_ego.sql](file://packages\audit-db\drizzle\migrations\0007_keen_ego.sql)
+- [0008_swift_black_panther.sql](file://packages\audit-db\drizzle\migrations\0008_swift_black_panther.sql)
 
 ### GDPRComplianceService Class
 
@@ -1146,7 +1157,8 @@ The pseudonym_mapping table stores the following fields:
 - **id**: serial - Primary key
 - **timestamp**: timestamp with time zone - Creation timestamp
 - **pseudonymId**: text - Pseudonymized identifier
-- **originalId**: text - Encrypted original identifier
+- **originalId**: text - Encrypted original identifier (unique constraint)
+- **strategy**: varchar(20) - Pseudonymization strategy used ('hash', 'token', 'encryption')
 
 ### Pseudonymization Strategies
 
@@ -1207,6 +1219,30 @@ The GDPRComplianceService supports several key usage patterns:
 4. **Retention policy enforcement**: Automatically archive and delete data based on retention policies
 5. **Authorized investigation**: Retrieve original identifiers for compliance investigations with proper authorization
 6. **Compliance reporting**: Generate reports for regulatory audits and compliance verification
+
+### Migration Details
+
+The pseudonymization system has been enhanced with two new migration files:
+
+**Migration 0007_keen_ego.sql:**
+```sql
+ALTER TABLE "pseudonym_mapping" ADD COLUMN "strategy" varchar(20) NOT NULL;
+CREATE INDEX "pseudonym_mapping_strategy_idx" ON "pseudonym_mapping" USING btree ("strategy");
+```
+
+This migration adds a new `strategy` column to track the pseudonymization method used and creates an index for efficient querying by strategy.
+
+**Migration 0008_swift_black_panther.sql:**
+```sql
+DROP INDEX "pseudonym_mapping_original_id_idx";
+CREATE UNIQUE INDEX "pseudonym_mapping_original_id_idx" ON "pseudonym_mapping" USING btree ("original_id");
+```
+
+This migration replaces the existing index on `original_id` with a unique constraint to prevent duplicate original identifiers in the pseudonym mapping table, ensuring data integrity.
+
+**Section sources**
+- [0007_keen_ego.sql](file://packages\audit-db\drizzle\migrations\0007_keen_ego.sql)
+- [0008_swift_black_panther.sql](file://packages\audit-db\drizzle\migrations\0008_swift_black_panther.sql)
 
 ## Organization Role Management
 
@@ -1351,7 +1387,7 @@ Key strengths of the system include:
 - **Maintainability**: Automated maintenance tasks and comprehensive monitoring reduce operational overhead.
 - **Extensibility**: The modular architecture and Drizzle ORM integration make it easy to evolve the schema as requirements change.
 - **Alert Persistence**: The new DatabaseAlertHandler provides reliable, persistent storage of alerts with multi-organizational support and comprehensive querying capabilities.
-- **GDPR Compliance**: The GDPRComplianceService and pseudonym_mapping table provide robust support for data subject rights and privacy-by-design principles.
+- **GDPR Compliance**: The GDPRComplianceService and pseudonym_mapping table provide robust support for data subject rights and privacy-by-design principles, now enhanced with strategy tracking and unique constraints.
 - **Organization Role Management**: The AuthorizationService and organization_role table provide fine-grained access control with Redis caching and PostgreSQL persistence.
 
 The system is well-positioned to serve as the foundation for audit and compliance capabilities across various domains, with particular strength in healthcare applications requiring HIPAA compliance. By following the documented patterns and best practices, organizations can ensure their audit data is secure, reliable, and available when needed.

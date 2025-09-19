@@ -8,6 +8,7 @@
 - [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *New documentation for OTLP configuration*
 - [crypto.ts](file://packages\audit\src\crypto.ts) - *KMS encryption support for trace data*
 - [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Updated to use structured logging format and share context with metrics collection system*
+- [index.ts](file://apps\worker\src\index.ts) - *Integrated database preset handler and structured logging system*
 </cite>
 
 ## Update Summary
@@ -18,6 +19,8 @@
 - Enhanced performance analysis section with batch processing and compression details
 - Updated diagram to reflect current export workflow with security features
 - Updated logging integration to use StructuredLogger system for shared context with metrics collection
+- Added integration with database preset handler for enhanced context tagging
+- Updated trace context preservation examples to reflect structured logging integration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,7 +32,7 @@
 7. [Trace Data Interpretation and Correlation](#trace-data-interpretation-and-correlation)
 
 ## Introduction
-The Distributed Tracing system in the audit event processing workflow provides end-to-end visibility across microservices, enabling comprehensive monitoring of audit events from creation to archival. This documentation details the implementation of the tracer module, which creates and propagates trace IDs, span contexts, and parent-child relationships throughout the system. The tracing infrastructure supports integration with external Application Performance Monitoring (APM) tools through OpenTelemetry standards, with a focus on OTLP (OpenTelemetry Protocol) as the primary export mechanism. The system captures detailed performance metrics, error information, and execution context, which can be used to identify bottlenecks, debug complex failures, and measure latency across distributed components.
+The Distributed Tracing system in the audit event processing workflow provides end-to-end visibility across microservices, enabling comprehensive monitoring of audit events from creation to archival. This documentation details the implementation of the tracer module, which creates and propagates trace IDs, span contexts, and parent-child relationships throughout the system. The tracing infrastructure supports integration with external Application Performance Monitoring (APM) tools through OpenTelemetry standards, with a focus on OTLP (OpenTelemetry Protocol) as the primary export mechanism. The system captures detailed performance metrics, error information, and execution context, which can be used to identify bottlenecks, debug complex failures, and measure latency across distributed components. Recent updates have integrated the tracing system with the database preset handler and structured logging system to enhance context tagging and correlation.
 
 ## Core Tracing Components
 

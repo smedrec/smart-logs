@@ -25,6 +25,9 @@
 - [crypto.ts](file://packages\audit\src\crypto.ts)
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts)
 - [logging.ts](file://packages\logs\src\logging.ts)
+- [cleanup-old-alerts.ts](file://apps\server\src\lib\inngest\functions\alerts\cleanup-old-alerts.ts) - *Updated in recent commit*
+- [sendEmail.ts](file://apps\server\src\lib\inngest\functions\emails\sendEmail.ts) - *Updated in recent commit*
+- [connection.ts](file://packages\redis-client\src\connection.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
@@ -35,6 +38,8 @@
 - Added information about critical fields used in hash calculation
 - Enhanced error handling documentation with verification-specific error scenarios
 - Updated Section sources to include newly analyzed files
+- Added Redis connection error handling and logging improvements from recent commits
+- Updated error handling documentation to reflect enhanced logging practices in Inngest functions
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -250,12 +255,14 @@ A9[503] --> B9[SERVICE_UNAVAILABLE]
 - [http.ts](file://apps\server\src\lib\errors\http.ts#L1-L314)
 - [openapi_responses.ts](file://apps\server\src\lib\errors\openapi_responses.ts#L1-L91)
 
-The error handling middleware automatically converts exceptions to the appropriate error response format and logs errors for monitoring and debugging. The system now uses a unified error handling approach with enhanced context enrichment, capturing detailed information about each request including user ID, session ID, organization ID, endpoint, method, user agent, IP address, and metadata.
+The error handling middleware automatically converts exceptions to the appropriate error response format and logs errors for monitoring and debugging. The system now uses a unified error handling approach with enhanced context enrichment, capturing detailed information about each request including user ID, session ID, organization ID, endpoint, method, user agent, IP address, and metadata. Recent updates have improved error handling in Inngest functions, particularly in the alerts cleanup and email sending workflows, with enhanced error logging and context inclusion.
 
 **Section sources**
 - [http.ts](file://apps\server\src\lib\errors\http.ts#L1-L314)
 - [openapi_responses.ts](file://apps\server\src\lib\errors\openapi_responses.ts#L1-L91)
 - [error-handling.ts](file://apps\server\src\lib\middleware\error-handling.ts#L1-L372)
+- [cleanup-old-alerts.ts](file://apps\server\src\lib\inngest\functions\alerts\cleanup-old-alerts.ts#L1-L111)
+- [sendEmail.ts](file://apps\server\src\lib\inngest\functions\emails\sendEmail.ts#L1-L165)
 
 ## Pagination
 List endpoints support pagination to handle large datasets efficiently.

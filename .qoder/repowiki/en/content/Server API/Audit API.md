@@ -10,6 +10,9 @@
 - [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts) - *Rate limiting implementation*
 - [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts) - *API versioning logic*
 - [event-types.ts](file://packages/audit/src/event/event-types.ts) - *Event categorization and types*
+- [cleanup-old-alerts.ts](file://apps/server/src/lib/inngest/functions/alerts/cleanup-old-alerts.ts) - *Updated in commit 587556c*
+- [sendEmail.ts](file://apps/server/src/lib/inngest/functions/emails/sendEmail.ts) - *Updated in commit 587556c*
+- [connection.ts](file://packages/redis-client/src/connection.ts) - *Updated error handling and logging*
 </cite>
 
 ## Update Summary
@@ -23,6 +26,8 @@
 - Modified verification logic to handle null values explicitly
 - Updated cryptographic service to use async signature generation
 - Fixed documentation for verification endpoint to reflect actual behavior
+- Enhanced error handling and logging for Redis connections with improved Inngest event context
+- Updated Redis client connection status monitoring and error reporting
 
 ## Table of Contents
 1. [Introduction](#introduction)

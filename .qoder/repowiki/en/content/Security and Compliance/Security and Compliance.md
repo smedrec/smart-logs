@@ -6,6 +6,8 @@
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Updated in recent commit*
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added strategy column to pseudonym mapping*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Made original_id index unique*
 - [client.ts](file://packages/infisical-kms/src/client.ts) - *KMS integration for pseudonymization*
 - [permissions.ts](file://packages/auth/src/permissions.ts) - *Updated in recent commit*
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Updated in recent commit*
@@ -31,6 +33,9 @@
 - Updated integrity verification section to reflect restricted field hashing and improved verification logic
 - Added new flowchart for integrity verification process with debug logging
 - Updated security measures section with enhanced hash verification details
+- Added new section on pseudonymization of audit events
+- Updated pseudonymization strategies section with database schema changes
+- Added documentation for unique constraint on original_id in pseudonym mapping table
 - Maintained existing structure while incorporating new pseudonymization features
 
 ## Table of Contents
@@ -114,6 +119,8 @@ AuditDatabase --> PseudonymizationMapping : "contains"
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L100-L150)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L643-L658)
 - [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql)
 - [client.ts](file://packages/infisical-kms/src/client.ts)
 
 ### Pseudonymization Strategies
@@ -147,12 +154,41 @@ case 'encryption':
     timestamp: new Date().toISOString(),
     pseudonymId,
     originalId: encryptedOriginalId.ciphertext,
+    strategy: 'encryption'
   })
 ```
+
+The pseudonym_mapping table now includes a strategy column to track which pseudonymization method was used for each mapping. This allows for strategy-specific processing and auditing of pseudonymization activities.
 
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L524-L572)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L4-L25)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql)
+
+### Pseudonymization of Audit Events
+The system now supports direct pseudonymization of audit events through the pseudonymizeEvent method, which automatically processes principalId and targetResourceId fields.
+
+```mermaid
+sequenceDiagram
+participant System as "Application"
+participant GDPRService as "GDPRComplianceService"
+participant Event as "AuditLogEvent"
+System->>Event : Create audit event with PII
+System->>GDPRService : pseudonymizeEvent(event)
+GDPRService->>GDPRService : Check principalId for pseudonymization
+GDPRService->>GDPRService : Check targetResourceId for pseudonymization
+GDPRService->>GDPRService : Skip system identifiers
+GDPRService->>GDPRService : Generate pseudonym IDs
+GDPRService->>GDPRService : Update event with pseudonymized IDs
+GDPRService-->>System : Return pseudonymized event
+Note over GDPRService : Prevents storage of PII<br/>in audit logs while maintaining<br/>referential integrity
+```
+
+This feature is particularly useful in high-throughput scenarios where events are processed through worker queues, as it ensures personal data is pseudonymized before persistent storage.
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L319-L361)
+- [index.ts](file://apps/worker/src/index.ts#L586-L630)
 
 ### Consent Tracking Implementation
 The system tracks consent through the `gdprContext` field in audit events, which captures legal basis, processing purpose, and data categories.
@@ -507,6 +543,8 @@ async deleteUserDataWithAuditTrail(
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L380-L470)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L643-L658)
 - [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql)
 
 ### Issue: Ensuring Data Minimization in Audit Logs
 **Problem**: Collecting excessive data in audit logs violates GDPR's data minimization principle.

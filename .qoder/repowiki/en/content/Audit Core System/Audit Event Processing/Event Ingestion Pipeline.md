@@ -12,14 +12,16 @@
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Added in recent commit*
 - [README.md](file://packages/audit/README.md) - *Replaced with link to detailed docs*
 - [audit-class.md](file://packages/audit/docs/api-reference/audit-class.md) - *Updated in recent commit*
+- [index.ts](file://apps/worker/src/index.ts) - *Updated with pseudonymization phase*
 </cite>
 
 ## Update Summary
-- Updated documentation structure to reflect centralized documentation site
-- Replaced README content with redirect to comprehensive documentation
-- Added references to new documentation structure and organization
-- Updated source tracking to reflect current file locations and documentation flow
-- Maintained all technical content about event ingestion pipeline while updating structural references
+- Added detailed documentation for the pseudonymization phase in the event ingestion flow
+- Updated ingestion flow overview to include pseudonymization as a distinct processing stage
+- Enhanced metadata enrichment section with pseudonymization details
+- Added new section on pseudonymization error handling and performance metrics
+- Updated diagram sources to include worker implementation details
+- Maintained all existing technical content about event ingestion pipeline while updating structural references
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -27,13 +29,14 @@
 3. [Ingestion Flow Overview](#ingestion-flow-overview)
 4. [Schema Validation with Zod](#schema-validation-with-zod)
 5. [Metadata Enrichment Process](#metadata-enrichment-process)
-6. [Error Handling and Response](#error-handling-and-response)
-7. [Validation Performance Considerations](#validation-performance-considerations)
-8. [Common Ingestion Issues and Solutions](#common-ingestion-issues-and-solutions)
-9. [Best Practices for Event Producers](#best-practices-for-event-producers)
-10. [GDPR Compliance and Pseudonymization](#gdpr-compliance-and-pseudonymization)
-11. [Plugin Architecture](#plugin-architecture)
-12. [Conclusion](#conclusion)
+6. [Pseudonymization Phase](#pseudonymization-phase)
+7. [Error Handling and Response](#error-handling-and-response)
+8. [Validation Performance Considerations](#validation-performance-considerations)
+9. [Common Ingestion Issues and Solutions](#common-ingestion-issues-and-solutions)
+10. [Best Practices for Event Producers](#best-practices-for-event-producers)
+11. [GDPR Compliance and Pseudonymization](#gdpr-compliance-and-pseudonymization)
+12. [Plugin Architecture](#plugin-architecture)
+13. [Conclusion](#conclusion)
 
 ## Introduction
 
@@ -157,19 +160,21 @@ D --> E{"Validation Passed?"}
 E --> |Yes| F["Cryptographic Processing"]
 E --> |No| G["Structured Error Response"]
 F --> H["Plugin Processing"]
-H --> I["Queue Submission"]
-I --> J["BullMQ Redis Queue"]
-J --> K["Worker Processing"]
+H --> I["Pseudonymization"]
+I --> J["Queue Submission"]
+J --> K["BullMQ Redis Queue"]
+K --> L["Worker Processing"]
 style A fill:#f9f,stroke:#333
-style J fill:#bbf,stroke:#333
+style K fill:#bbf,stroke:#333
 ```
 
-The updated ingestion flow now includes a plugin processing stage that allows for middleware, storage, and authentication extensions. This plugin architecture enables extensibility for custom compliance requirements, additional security checks, and integration with external systems.
+The updated ingestion flow now includes a dedicated pseudonymization phase that transforms personally identifiable information (PII) before storage. This phase is executed after plugin processing and before queue submission, ensuring that sensitive data is protected according to GDPR requirements. The plugin architecture enables extensibility for custom compliance requirements, additional security checks, and integration with external systems.
 
 **Diagram sources**
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md#L20-L100)
 - [validation.ts](file://packages/audit/src/validation.ts#L100-L200)
 - [audit.ts](file://packages/audit/src/audit.ts#L500-L600)
+- [index.ts](file://apps/worker/src/index.ts#L554-L749)
 
 **Section sources**
 - [api-reference.md](file://apps/docs/src/content/docs/audit/api-reference.md#L20-L100)
@@ -274,6 +279,71 @@ These can be enabled via the `options` parameter in the `log()` method.
 
 **Section sources**
 - [validation.ts](file://packages/audit/src/validation.ts#L500-L600)
+
+## Pseudonymization Phase
+
+The pseudonymization phase is a critical GDPR compliance step that transforms personally identifiable information (PII) into pseudonyms before storage. This process maintains referential integrity while protecting individual privacy.
+
+### Pseudonymization Process
+
+The `pseudonymizeEvent` method in `GDPRComplianceService` processes the event:
+
+```typescript
+async pseudonymizeEvent(event: AuditLogEvent): Promise<AuditLogEvent> {
+  const startWithToAvoid = ['pseudo', 'pseudonymized', 'system', 'security', 'integrity']
+
+  if (
+    event.principalId &&
+    !startWithToAvoid.some((prefix) => event.principalId?.startsWith(prefix))
+  ) {
+    const pseudonymId = await this.pseudonymId(event.principalId)
+    event.principalId = pseudonymId
+  }
+
+  if (
+    event.targetResourceId &&
+    !startWithToAvoid.some((prefix) => event.targetResourceId?.startsWith(prefix))
+  ) {
+    const pseudonymId = await this.pseudonymId(event.targetResourceId)
+    event.targetResourceId = pseudonymId
+  }
+
+  return event
+}
+```
+
+### Pseudonym ID Generation
+
+The system generates pseudonym IDs using secure methods:
+
+**:hash-based**
+- Uses SHA-256 hashing with salt
+- Creates deterministic pseudonyms
+- Preserves referential integrity
+
+**:token-based**
+- Generates random tokens
+- Provides stronger privacy protection
+- Requires secure mapping storage
+
+### Secure Mapping Storage
+
+Pseudonym mappings are securely stored in the database with KMS encryption:
+
+```sql
+CREATE TABLE "pseudonym_mapping" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"timestamp" timestamp with time zone NOT NULL,
+	"pseudonym_id" text NOT NULL,
+	"original_id" text NOT NULL
+);
+```
+
+The original IDs are encrypted using Infisical KMS before storage, ensuring that only authorized processes can re-identify individuals.
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L310-L330)
+- [index.ts](file://apps/worker/src/index.ts#L554-L749)
 
 ## Error Handling and Response
 

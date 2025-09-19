@@ -114,9 +114,12 @@ export interface EnhancedClientConfig {
 	connectionPool: ConnectionPoolConfig
 	/** Query cache configuration */
 	queryCacheFactory: CacheFactoryConfig
+	/** Replication configuration */
+	replication: ReplicationConfig
 	/** Partition management configuration */
 	partitioning: {
 		enabled: boolean
+		tables: string[]
 		strategy: 'range' | 'hash' | 'list'
 		interval: 'monthly' | 'quarterly' | 'yearly'
 		retentionDays: number
@@ -153,6 +156,13 @@ export interface ConnectionPoolConfig {
 	retryDelay: number
 	/** Enable SSL */
 	ssl: boolean
+}
+
+export interface ReplicationConfig {
+	enabled: boolean
+	readReplicas?: string[]
+	routingStrategy?: 'round-robin'
+	fallbackToMaster?: boolean
 }
 
 export type CacheType = 'local' | 'redis' | 'hybrid'

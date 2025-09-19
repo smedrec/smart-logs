@@ -2,22 +2,28 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [audit.ts](file://packages/audit/src/audit.ts) - *Updated in recent commit*
-- [log.ts](file://packages/logs/src/log.ts)
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [audit-client.ts](file://apps/web/src/lib/audit-client.ts)
-- [observability-api.ts](file://apps/server/src/routes/observability-api.ts)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [enhanced-client.md](file://packages/audit-db/docs/api-reference/enhanced-client.md)
-- [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md)
-- [logging-example.ts](file://packages/audit-client/src/examples/logging-example.ts)
-- [monitoring.md](file://apps/worker/docs/tutorials/monitoring.md)
-- [index.ts](file://packages/logs/src/index.ts) - *Refactored in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
-- [logging.ts](file://packages/logs/src/logging.ts) - *Updated with StructuredLogger in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
-- [otpl.ts](file://packages/logs/src/otpl.ts) - *Enhanced with KMS and OTLP features in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts) - *Integrated with KMS and OTLP exporter in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
-- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md) - *Added OTLP configuration guide in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [audit.ts](file://packages\audit\src\audit.ts) - *Updated in recent commit*
+- [log.ts](file://packages\logs\src\log.ts)
+- [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+- [audit-client.ts](file://apps\web\src\lib\audit-client.ts)
+- [observability-api.ts](file://apps\server\src\routes\observability-api.ts)
+- [alerts.ts](file://apps\server\src\routers\alerts.ts)
+- [enhanced-client.md](file://packages\audit-db\docs\api-reference\enhanced-client.md)
+- [REDIS_CACHE_GUIDE.md](file://packages\audit-db\REDIS_CACHE_GUIDE.md)
+- [logging-example.ts](file://packages\audit-client\src\examples\logging-example.ts)
+- [monitoring.md](file://apps\worker\docs\tutorials\monitoring.md)
+- [index.ts](file://packages\logs\src\index.ts) - *Refactored in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [logging.ts](file://packages\logs\src\logging.ts) - *Updated with StructuredLogger in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [otpl.ts](file://packages\logs\src\otpl.ts) - *Enhanced with KMS and OTLP features in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Integrated with KMS and OTLP exporter in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *Added OTLP configuration guide in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [index.ts](file://packages\audit\src\index.ts) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts) - *Added in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts) - *Added in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [types.ts](file://packages\audit\src\observability\types.ts) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
 </cite>
 
 ## Update Summary
@@ -26,6 +32,8 @@
 - Added documentation for KMS encryption integration and enhanced OTLP exporter with structured logging
 - Updated application logging integration section to reflect new structured logging approach
 - Added new section on OTLP Exporter Configuration
+- Added comprehensive documentation for Database Preset Handler and its integration with audit system
+- Updated observability components to reflect enhanced tracing and metrics collection capabilities
 - Updated referenced files to include new and modified files
 
 ## Table of Contents
@@ -81,9 +89,9 @@ Audit --> Logs
 The OpenObserve system comprises several core components that work together to provide comprehensive logging and observability. The audit core package handles event processing and compliance management, while the audit client provides application-level integration. The audit database package manages data storage with advanced caching capabilities, and the logging utilities package standardizes log formats across the system. The server application exposes REST and GraphQL APIs for data ingestion and querying, while the worker application handles background processing and monitoring tasks.
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L100)
-- [logs](file://packages/logs)
-- [audit-client](file://packages/audit-client)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L100)
+- [logs](file://packages\logs)
+- [audit-client](file://packages\audit-client)
 
 ## Architecture Overview
 OpenObserve follows a distributed architecture with multiple entry points for log ingestion and various processing layers for data transformation, storage, and analysis. The system is designed to handle high-volume log data while maintaining low latency for querying and alerting operations.
@@ -111,10 +119,10 @@ style M fill:#9cf,stroke:#333
 ```
 
 **Diagram sources**
-- [server](file://apps/server)
-- [worker](file://apps/worker)
-- [audit](file://packages/audit)
-- [audit-db](file://packages/audit-db)
+- [server](file://apps\server)
+- [worker](file://apps\worker)
+- [audit](file://packages\audit)
+- [audit-db](file://packages\audit-db)
 
 ## Detailed Component Analysis
 
@@ -140,13 +148,13 @@ style ReturnError fill:#f96,stroke:#333
 ```
 
 **Diagram sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L150-L300)
-- [log.ts](file://packages/logs/src/log.ts#L1-L50)
-- [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L20-L80)
+- [audit.ts](file://packages\audit\src\audit.ts#L150-L300)
+- [log.ts](file://packages\logs\src\log.ts#L1-L50)
+- [observability-api.ts](file://apps\server\src\routes\observability-api.ts#L20-L80)
 
 **Section sources**
-- [audit.ts](file://packages/audit/src/audit.ts#L1-L400)
-- [log.ts](file://packages/logs/src/log.ts#L1-L60)
+- [audit.ts](file://packages\audit\src\audit.ts#L1-L400)
+- [log.ts](file://packages\logs\src\log.ts#L1-L60)
 
 ### Data Retention Policies
 OpenObserve implements sophisticated data retention policies based on data classification and regulatory requirements. The system supports different retention periods for various data classifications (PUBLIC, INTERNAL, CONFIDENTIAL, PHI) and provides automated archiving and deletion workflows.
@@ -174,12 +182,12 @@ end note
 ```
 
 **Diagram sources**
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L150-L250)
-- [audit-db](file://packages/audit-db)
+- [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts#L150-L250)
+- [audit-db](file://packages\audit-db)
 
 **Section sources**
-- [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts#L1-L300)
-- [audit-db](file://packages/audit-db)
+- [gdpr-utils.ts](file://packages\audit\src\gdpr\gdpr-utils.ts#L1-L300)
+- [audit-db](file://packages\audit-db)
 
 ### Querying Interface
 The querying interface in OpenObserve provides both programmatic and user-friendly access to log data. It supports structured queries through REST and GraphQL APIs, with advanced filtering, sorting, and aggregation capabilities. The interface is optimized for performance through intelligent caching and indexing strategies.
@@ -200,12 +208,12 @@ style D fill:#69f,stroke:#333
 ```
 
 **Diagram sources**
-- [enhanced-client.md](file://packages/audit-db/docs/api-reference/enhanced-client.md#L1-L100)
-- [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md#L1-L150)
+- [enhanced-client.md](file://packages\audit-db\docs\api-reference\enhanced-client.md#L1-L100)
+- [REDIS_CACHE_GUIDE.md](file://packages\audit-db\REDIS_CACHE_GUIDE.md#L1-L150)
 
 **Section sources**
-- [enhanced-client.md](file://packages/audit-db/docs/api-reference/enhanced-client.md#L1-L150)
-- [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md#L1-L200)
+- [enhanced-client.md](file://packages\audit-db\docs\api-reference\enhanced-client.md#L1-L150)
+- [REDIS_CACHE_GUIDE.md](file://packages\audit-db\REDIS_CACHE_GUIDE.md#L1-L200)
 
 ### Application Logging Integration
 OpenObserve has been updated to use a structured logging approach with the new StructuredLogger and LoggerFactory classes. The integration now supports enhanced context, performance metrics, and multiple output destinations including OTLP.
@@ -233,14 +241,14 @@ Note over Logger,Transport : Configurable flush interval<br/>and batch size with
 ```
 
 **Diagram sources**
-- [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
-- [index.ts](file://packages/logs/src/index.ts#L1-L3)
-- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165)
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620)
+- [index.ts](file://packages\logs\src\index.ts#L1-L3)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L165)
 
 **Section sources**
-- [logging.ts](file://packages/logs/src/logging.ts#L1-L620) - *Updated in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
-- [index.ts](file://packages/logs/src/index.ts#L1-L3) - *Updated in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
-- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [logging.ts](file://packages\logs\src\logging.ts#L1-L620) - *Updated in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [index.ts](file://packages\logs\src\index.ts#L1-L3) - *Updated in commit b3e1bbbbb94dd38669309f15bf50eaca5e2c3693*
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L165) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
 
 ### OTLP Exporter Configuration
 The OpenObserve system now includes an enhanced OTLP (OpenTelemetry Protocol) exporter for sending logs and traces to observability platforms. This feature integrates KMS encryption and supports multiple OTLP-compatible backends.
@@ -257,7 +265,6 @@ F --> G[Add KMS Encryption]
 G --> H[Add Authentication Headers]
 H --> I[Exponential Backoff]
 I --> J[Retry on Failure]
-J --> K[Success]
 J --> |Max Retries| L[Log Error]
 K --> M[Log Success]
 style C fill:#69f,stroke:#333
@@ -267,14 +274,68 @@ style L fill:#f96,stroke:#333
 ```
 
 **Diagram sources**
-- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165)
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677)
-- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L1-L283)
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L165)
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L677)
+- [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md#L1-L283)
 
 **Section sources**
-- [otpl.ts](file://packages/logs/src/otpl.ts#L1-L165) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
-- [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
-- [otlp-configuration.md](file://packages/audit/docs/observability/otlp-configuration.md#L1-L283) - *Added in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [otpl.ts](file://packages\logs\src\otpl.ts#L1-L165) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L677) - *Updated in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+- [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md#L1-L283) - *Added in commit 437f4502e77146ee0ef1b9762251df91232bc6f4*
+
+### Database Preset Handler
+The Database Preset Handler provides a mechanism for managing and retrieving audit event configurations from the database. It supports organization-specific presets with fallback to default presets, enabling consistent audit configurations across different organizational units.
+
+```mermaid
+flowchart TD
+A[Application] --> B{Get Preset}
+B --> C[Database Preset Handler]
+C --> D{Organization ID?}
+D --> |Yes| E[Query with Org Priority]
+D --> |No| F[Return Default Presets]
+E --> G[Merge Results]
+G --> H[Return Preset]
+F --> H
+H --> I[Use in Audit Event]
+style C fill:#f96,stroke:#333
+style H fill:#9f9,stroke:#333
+```
+
+**Diagram sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts#L1-L17)
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284) - *Added in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts#L1-L17) - *Added in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [index.ts](file://packages\audit\src\index.ts#L1-L74) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+
+### Enhanced Observability Components
+OpenObserve's observability components have been enhanced with improved tracing and metrics collection capabilities. The system now provides comprehensive performance monitoring, distributed tracing, and dashboard integration for real-time system insights.
+
+```mermaid
+flowchart TD
+A[Application] --> B[Tracer]
+B --> C[Span Creation]
+C --> D[Metrics Collection]
+D --> E[Performance Monitoring]
+E --> F[Dashboard]
+F --> G[Alerting]
+G --> H[Notification]
+style B fill:#69f,stroke:#333
+style D fill:#f96,stroke:#333
+style F fill:#6f9,stroke:#333
+```
+
+**Diagram sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L677)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L603)
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L305)
+
+**Section sources**
+- [tracer.ts](file://packages\audit\src\observability\tracer.ts#L1-L677) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L603) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L305) - *Updated in commit d5f1f3c58192ad2c174f0262e1b9f2c60a32e111*
 
 ### Alerting Setup
 The alerting system in OpenObserve monitors log data for specific patterns and conditions, generating alerts when predefined thresholds are exceeded. The system supports multiple notification channels and severity levels, with deduplication and cooldown mechanisms to prevent alert storms.
@@ -299,13 +360,13 @@ style G fill:#999,stroke:#333
 ```
 
 **Diagram sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L400-L600)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts#L1-L50)
-- [monitoring.md](file://apps/worker/docs/tutorials/monitoring.md#L1-L100)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L400-L600)
+- [alerts.ts](file://apps\server\src\routers\alerts.ts#L1-L50)
+- [monitoring.md](file://apps\worker\docs\tutorials\monitoring.md#L1-L100)
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L700)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts#L1-L100)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L700)
+- [alerts.ts](file://apps\server\src\routers\alerts.ts#L1-L100)
 
 ## Dependency Analysis
 The OpenObserve system has a well-defined dependency structure with clear boundaries between components. The core dependencies include the audit package as the central processing engine, the audit-db package for data storage with Redis caching, and the audit-client package for application integration. The system relies on external services for message queuing, notification delivery, and monitoring.
@@ -344,16 +405,16 @@ style Web fill:#9cf,stroke:#333
 OpenObserve incorporates several performance optimization strategies to handle high-volume log data efficiently. These include multi-level caching (hybrid Redis and local cache), batch processing of events, connection pooling for database operations, and asynchronous processing for non-critical operations. The system is designed to scale horizontally, with stateless server components that can be deployed across multiple instances.
 
 **Section sources**
-- [REDIS_CACHE_GUIDE.md](file://packages/audit-db/REDIS_CACHE_GUIDE.md#L1-L300)
-- [audit-db](file://packages/audit-db)
-- [performance.test.ts](file://packages/audit/src/__tests__/performance.test.ts)
+- [REDIS_CACHE_GUIDE.md](file://packages\audit-db\REDIS_CACHE_GUIDE.md#L1-L300)
+- [audit-db](file://packages\audit-db)
+- [performance.test.ts](file://packages\audit\src\__tests__\performance.test.ts)
 
 ## Troubleshooting Guide
 When encountering issues with OpenObserve, consider checking the following areas: network connectivity between components, Redis and PostgreSQL availability, proper configuration of the audit client, and sufficient system resources. Common issues include cache misconfiguration, database connection limits, and alert notification delivery failures. The system provides comprehensive monitoring metrics that can help diagnose performance bottlenecks and error conditions.
 
 **Section sources**
-- [error-handling.test.ts](file://packages/audit/src/__tests__/error-handling.test.ts#L1-L50)
-- [monitoring-integration.test.ts](file://apps/worker/src/__tests__/monitoring-integration.test.ts#L1-L30)
+- [error-handling.test.ts](file://packages\audit\src\__tests__\error-handling.test.ts#L1-L50)
+- [monitoring-integration.test.ts](file://apps\worker\src\__tests__\monitoring-integration.test.ts#L1-L30)
 
 ## Conclusion
 OpenObserve provides a comprehensive solution for logging and observability with robust features for log ingestion, data retention management, querying, and alerting. The system's modular architecture allows for flexible deployment and scaling, while its compliance-focused design ensures adherence to regulatory requirements. By following the integration patterns and best practices outlined in this documentation, organizations can effectively implement OpenObserve to gain valuable insights into their systems while maintaining data governance and security standards.

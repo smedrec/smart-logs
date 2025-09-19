@@ -18,15 +18,18 @@
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
 - [permissions.ts](file://packages/auth/src/permissions.ts) - *Contains permission definitions and role logic*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section for organization_role table to document role-based access control features
-- Updated Data Model Diagram to include new organization_role table and its relationships
-- Added sample data entry for organization_role table
-- Updated Data Validation and Business Logic section to include role management and permission system details
-- Enhanced source tracking with new and updated files related to organization role management
+- Added new section for pseudonym_mapping table to document GDPR pseudonymization strategy and unique index changes
+- Updated Data Model Diagram to include new 'strategy' column in pseudonym_mapping table and updated index type
+- Enhanced pseudonym_mapping field definitions with new 'strategy' column details
+- Updated Constraints and Indexes section to reflect the unique index on original_id
+- Added new sources for migration files 0007_keen_ego.sql and 0008_swift_black_panther.sql
+- Updated Data Validation and Business Logic section to include pseudonymization strategy details
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -93,8 +96,8 @@ The audit database schema consists of several key components that work together 
 - **audit_presets**: Stores predefined logging configurations for consistent event patterns
 - **alerts**: Manages alerting based on audit event patterns and anomalies
 - **scheduled_reports**: Handles configuration for automated compliance reporting
-- **pseudonym_mapping**: New table for GDPR pseudonymization mapping (added in recent update)
-- **organization_role**: New table for role-based access control with permissions (added in recent update)
+- **pseudonym_mapping**: Table for GDPR pseudonymization mapping with strategy and unique constraints (updated in recent update)
+- **organization_role**: Table for role-based access control with permissions (added in recent update)
 
 The schema implements partitioning on the audit_log table by timestamp to optimize query performance and storage management. This allows efficient querying of recent data while maintaining historical records.
 
@@ -103,6 +106,8 @@ The schema implements partitioning on the audit_log table by timestamp to optimi
 - [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*
 
 ## Architecture Overview
 
@@ -130,6 +135,8 @@ N["organization_role"] --> D
 - [migration-utils.ts](file://packages/audit-db/src/migration-utils.ts)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*
 
 ## Detailed Component Analysis
 
@@ -190,7 +197,7 @@ class audit_integrity_log {
 
 ### Pseudonym Mapping Analysis
 
-The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilities by maintaining a secure mapping between original identifiers and pseudonymized identifiers.
+The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilities by maintaining a secure mapping between original identifiers and pseudonymized identifiers with strategy specification.
 
 ```mermaid
 classDiagram
@@ -199,11 +206,13 @@ class pseudonym_mapping {
 +timestamp : timestamp with time zone
 +pseudonym_id : text
 +original_id : text
++strategy : varchar(20)
 }
 ```
 
 **Diagram sources**
-- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts)
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts)
 
@@ -332,6 +341,7 @@ serial id PK
 timestamp with time zone timestamp
 text pseudonym_id
 text original_id
+varchar(20) strategy
 }
 organization_role {
 varchar(50) organization_id PK
@@ -355,6 +365,8 @@ audit_log }|--|| organization_role : "organization role management"
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*
 
 ## Entity Relationship Details
 
@@ -579,25 +591,29 @@ The scheduled_reports table handles configuration for automated compliance repor
 
 ### pseudonym_mapping Table
 
-The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilities by securely maintaining the mapping between original identifiers and their pseudonymized counterparts. This enables data subject rights fulfillment while preserving referential integrity in audit logs.
+The pseudonym_mapping table provides GDPR-compliant pseudonymization capabilities by securely maintaining the mapping between original identifiers and their pseudonymized counterparts. This enables data subject rights fulfillment while preserving referential integrity in audit logs. The table now includes a strategy column to specify the pseudonymization method used and a unique constraint on original_id to prevent duplicate mappings.
 
 **Field Definitions:**
 - **id**: Serial primary key, auto-incrementing identifier
 - **timestamp**: Timestamp when the pseudonymization mapping was created
 - **pseudonym_id**: The pseudonymized identifier used in place of the original ID
 - **original_id**: The encrypted original identifier, stored securely for authorized reversal
+- **strategy**: The pseudonymization strategy used (hash, token, encryption)
 
 **Constraints:**
 - Primary Key: id
-- Not Null Constraints: timestamp, pseudonym_id, original_id
+- Not Null Constraints: timestamp, pseudonym_id, original_id, strategy
+- Unique Constraint: original_id (ensures each original ID has only one pseudonym mapping)
 
 **Indexes:**
 - pseudonym_mapping_timestamp_idx: B-tree index on timestamp for temporal analysis of pseudonymization activities
 - pseudonym_mapping_pseudonym_id_idx: B-tree index on pseudonym_id for efficient lookup of pseudonymized IDs
-- pseudonym_mapping_original_id_idx: B-tree index on original_id for efficient lookup of original IDs
+- pseudonym_mapping_original_id_idx: B-tree unique index on original_id for efficient lookup and prevention of duplicate mappings
+- pseudonym_mapping_strategy_idx: B-tree index on strategy for querying by pseudonymization method
 
 **Section sources**
-- [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*
 - [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated in recent commit*
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 
@@ -792,7 +808,8 @@ The organization_role table provides role-based access control by defining roles
   "id": 101,
   "timestamp": "2024-01-16T08:30:00.000Z",
   "pseudonym_id": "pseudo-a1b2c3d4e5f67890",
-  "original_id": "encrypted:user-123:salt123"
+  "original_id": "encrypted:user-123:salt123",
+  "strategy": "hash"
 }
 ```
 
@@ -841,6 +858,8 @@ The organization_role table provides role-based access control by defining roles
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated in recent commit*
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*
 
 ## Constraints and Indexes
 
@@ -865,6 +884,7 @@ The audit database schema implements comprehensive constraints and indexes to en
 ### Unique Constraints
 - audit_retention_policy.policy_name: Ensures policy names are unique
 - audit_presets.name: Ensures preset names are unique
+- pseudonym_mapping.original_id: Ensures each original ID has only one pseudonym mapping (added in recent update)
 - organization_role: Composite primary key ensures unique role names within each organization
 
 ### Check Constraints
@@ -915,7 +935,8 @@ The schema includes numerous indexes to optimize common query patterns:
 **pseudonym_mapping Indexes:**
 - pseudonym_mapping_timestamp_idx: B-tree index on timestamp for temporal analysis of pseudonymization activities
 - pseudonym_mapping_pseudonym_id_idx: B-tree index on pseudonym_id for efficient lookup of pseudonymized IDs
-- pseudonym_mapping_original_id_idx: B-tree index on original_id for efficient lookup of original IDs
+- pseudonym_mapping_original_id_idx: B-tree unique index on original_id for efficient lookup and prevention of duplicate mappings
+- pseudonym_mapping_strategy_idx: B-tree index on strategy for querying by pseudonymization method
 
 **organization_role Indexes:**
 - organization_role_organization_id_idx: B-tree index on organization_id for organization-based queries
@@ -926,6 +947,8 @@ The schema includes numerous indexes to optimize common query patterns:
 - [0003_snapshot.json](file://packages/audit-db/drizzle/migrations/meta/0003_snapshot.json)
 - [0006_silly_tyger_tiger.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Added in recent commit*
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*
 
 ## Data Validation and Business Logic
 
@@ -973,6 +996,8 @@ The system implements GDPR-compliant pseudonymization through the pseudonym_mapp
 - Pseudonymization supports multiple strategies: deterministic hashing, random tokens, and encryption
 - Authorized personnel can reverse the mapping for compliance investigations
 - The system maintains referential integrity while protecting data subject privacy
+- The pseudonym_mapping table now includes a strategy column to specify the pseudonymization method used
+- A unique constraint on original_id prevents duplicate mappings and ensures data integrity
 
 ### Role-Based Access Control
 The system implements role-based access control through the organization_role table:
@@ -1007,3 +1032,5 @@ These features collectively ensure that the audit system meets requirements for 
 - [0005_fluffy_donald_blake.sql](file://packages/auth/drizzle/0005_fluffy_donald_blake.sql) - *Added in recent commit*
 - [authz.ts](file://packages/auth/src/db/schema/authz.ts) - *Added in recent commit*
 - [permissions.ts](file://packages/auth/src/permissions.ts) - *Contains permission definitions and role logic*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added in recent commit*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Added in recent commit*

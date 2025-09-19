@@ -61,8 +61,17 @@ export function createDevelopmentConfig(): AuditConfig {
 					serializationFormat: 'json' as const,
 				},
 			},
+			replication: {
+				enabled: false,
+				readReplicas: [
+					process.env.AUDIT_DB_READ_REPLICA1_URL || 'postgresql://localhost:5432/audit_dev',
+				],
+				routingStrategy: 'round-robin',
+				fallbackToMaster: true,
+			},
 			partitioning: {
 				enabled: true,
+				tables: ['audit_log', 'error_log'],
 				strategy: 'range',
 				interval: 'monthly',
 				retentionDays: 2555, // 7 years

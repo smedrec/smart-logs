@@ -37,6 +37,13 @@ export interface ConnectionPoolConfig {
 	ssl: boolean
 }
 
+export interface ReplicationConfig {
+	enabled: boolean
+	readReplicas?: string[]
+	routingStrategy?: 'round-robin'
+	fallbackToMaster?: boolean
+}
+
 export interface ConnectionPoolStats {
 	totalConnections: number
 	activeConnections: number
@@ -59,7 +66,10 @@ export class EnhancedConnectionPool {
 	private connectionTimes: number[] = []
 	private acquisitionTimes: number[] = []
 
-	constructor(private config: ConnectionPoolConfig) {
+	constructor(
+		private config: ConnectionPoolConfig,
+		private replication: ReplicationConfig = { enabled: false }
+	) {
 		this.client = postgres(config.url, {
 			max: config.maxConnections,
 			idle_timeout: Math.floor(config.idleTimeout / 1000), // postgres.js expects seconds
@@ -69,13 +79,18 @@ export class EnhancedConnectionPool {
 				undefined: null, // Transform undefined to null for PostgreSQL
 			},
 			onnotice: (notice) => {
-				console.log('PostgreSQL notice:', notice)
+				console.log('Primary PostgreSQL notice:', notice)
 			},
 			debug: process.env.NODE_ENV === 'development',
 			ssl: config.ssl,
 		})
 
-		this.db = drizzle(this.client, { schema })
+		if (this.replication.enabled) {
+			// TODO: implement clients for read replicas
+			// this.db = withReplicas(primaryDb, [read1, read2])
+		} else {
+			this.db = drizzle(this.client, { schema })
+		}
 
 		this.stats = {
 			totalConnections: 0,

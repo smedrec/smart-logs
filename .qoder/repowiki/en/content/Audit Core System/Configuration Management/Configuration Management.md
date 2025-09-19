@@ -13,16 +13,19 @@
 - [infisical-kms/src/client.ts](file://packages\infisical-kms\src\client.ts) - *Added in recent commit for KMS integration*
 - [infisical-kms/src/types.ts](file://packages\infisical-kms\src\types.ts) - *Added in recent commit for KMS configuration*
 - [logging.ts](file://packages\logs\src\logging.ts) - *Introduced StructuredLogger and LoggerFactory*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated to use ConfigurationManager and DatabasePresetHandler*
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts) - *Added in recent commit for database preset handling*
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts) - *Added in recent commit for preset type definitions*
+- [audit-preset.ts](file://packages\audit\src\preset\audit-preset.ts) - *Added in recent commit for audit preset interface*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on Structured Logging Configuration to document the replacement of ConsoleLogger with StructuredLogger
-- Updated Configuration Schema and Options to include new logging configuration fields and defaults
-- Updated Environment-Specific Configuration to reflect updated logging defaults in factory functions
-- Added references to logging.ts file in relevant sections
-- Updated Configuration Initialization Patterns to show LoggerFactory usage
-- Maintained all existing documentation while enhancing logging-related content
+- Added new section on Preset Configuration System to document the DatabasePresetHandler and its integration with the configuration system
+- Updated Configuration Initialization Patterns to include usage of createDatabasePresetHandler factory function
+- Updated Integration with Subsystems to include preset system integration
+- Added references to new preset-related files in relevant sections
+- Maintained all existing documentation while enhancing content related to preset configuration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -41,6 +44,7 @@
 14. [GDPR Pseudonymization Configuration](#gdpr-pseudonymization-configuration)
 15. [KMS Encryption Integration](#kms-encryption-integration)
 16. [Structured Logging Configuration](#structured-logging-configuration)
+17. [Preset Configuration System](#preset-configuration-system)
 
 ## Introduction
 The Configuration Management system provides a comprehensive solution for managing application settings across different environments. It supports hierarchical configuration loading, environment-specific overrides, runtime reconfiguration, and secure storage. The system is designed to handle complex configuration needs for audit logging, database connections, retention policies, compliance requirements, and integration endpoints. This document details the design and implementation of the Config Manager class, its integration with various subsystems, and best practices for configuration management.
@@ -384,6 +388,7 @@ ConfigurationManager --> Database
 ConfigurationManager --> Redis
 ConfigurationManager --> Security
 ConfigurationManager --> PluginSystem
+ConfigurationManager --> PresetSystem
 subgraph Archival
 A1[Archive Configuration]
 A2[Compression Settings]
@@ -408,10 +413,17 @@ P2[Dependency Management]
 P3[Lifecycle Hooks]
 P4[Configuration Validation]
 end
+subgraph PresetSystem
+PR1[Preset Configuration]
+PR2[Organization Presets]
+PR3[Default Presets]
+PR4[Priority Merging]
+end
 ConfigurationManager --> A1
 ConfigurationManager --> M1
 ConfigurationManager --> G1
 ConfigurationManager --> P1
+ConfigurationManager --> PR1
 ConfigurationManager --> Database
 ConfigurationManager --> Redis
 ConfigurationManager --> Security
@@ -637,7 +649,7 @@ ConfigManager-->>App : configuration loaded
 The KMS integration is configured through the `secureStorageConfig.kms` object in the configuration, which includes the following properties:
 
 - **enabled**: Boolean flag to enable KMS encryption
-- **encryptionKey**: KMS encryption key ID
+- **encryptionKey**: KMS encryption key ID  
 - **signingKey**: KMS signing key ID  
 - **accessToken**: KMS access token for authentication
 - **baseUrl**: Base URL for the KMS service
@@ -728,3 +740,57 @@ The LoggerFactory provides a consistent way to create loggers with default confi
 - [factory.ts](file://packages\audit\src\config\factory.ts#L0-L751)
 - [logging.ts](file://packages\logs\src\logging.ts#L0-L585)
 - [manager.ts](file://packages\audit\src\config\manager.ts#L0-L874)
+
+## Preset Configuration System
+
+The configuration system now includes a comprehensive preset management system that allows for organization-specific configurations with default fallbacks. The DatabasePresetHandler provides a factory-based approach to managing audit presets stored in the database.
+
+```mermaid
+classDiagram
+class PresetHandler {
++getPresets(organizationId? : string) : Promise~(AuditPreset & { id? : string })[]~
++getPreset(name : string, organizationId? : string) : Promise~(AuditPreset & { id? : string }) | null~
++createPreset(preset : AuditPreset & { createdBy : string }) : Promise~AuditPreset & { id? : string }~
++updatePreset(preset : AuditPreset & { id : string; updatedBy : string }) : Promise~AuditPreset & { id? : string }~
++deletePreset(name : string, organizationId : string) : Promise~{ success : true }~
+}
+class DatabasePresetHandler {
+-client : EnhancedAuditDatabaseClient
++constructor(auditDbInstance : EnhancedAuditDb)
++getPresets(organizationId? : string) : Promise~(AuditPreset & { id? : string })[]~
++getPreset(name : string, organizationId? : string) : Promise~(AuditPreset & { id? : string }) | null~
++createPreset(preset : AuditPreset & { createdBy : string }) : Promise~AuditPreset & { id? : string }~
++updatePreset(preset : AuditPreset & { id : string; updatedBy : string }) : Promise~AuditPreset & { id? : string }~
++deletePreset(name : string, organizationId : string) : Promise~{ success : true }~
++mapDatabasePresetToPreset(dbPreset : any) : AuditPreset & { id? : string }
+}
+class AuditPreset {
++name : string
++description? : string
++organizationId : string
++action : string
++dataClassification : DataClassification
++requiredFields : string[]
++defaultValues? : Record~string, any~
++validation? : Partial~ValidationConfig~
+}
+class createDatabasePresetHandler {
++createDatabasePresetHandler(auditDbInstance : EnhancedAuditDb) : DatabasePresetHandler
+}
+PresetHandler <|-- DatabasePresetHandler : "implements"
+DatabasePresetHandler --> EnhancedAuditDb : "uses"
+DatabasePresetHandler --> AuditPreset : "manages"
+createDatabasePresetHandler --> DatabasePresetHandler : "creates"
+```
+
+The preset system is designed to handle organization-specific configurations with priority over default presets. When retrieving presets, organization-specific presets take precedence over default ones with the same name. The system uses a single optimized query to fetch both organization and default presets, then merges them with organization presets having priority.
+
+The DatabasePresetHandler is initialized with an EnhancedAuditDb instance and provides methods for CRUD operations on presets. It uses the enhanced client's executeOptimizedQuery method with caching to improve performance. The handler supports creating, updating, and deleting presets, as well as retrieving them by name or organization.
+
+The factory function `createDatabasePresetHandler` provides a clean way to instantiate the handler, promoting dependency injection and testability. This pattern is used in the worker initialization to create the preset handler and pass it to the Audit service.
+
+**Section sources**
+- [index.ts](file://apps\worker\src\index.ts#L40-L45)
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L0-L284)
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts#L0-L17)
+- [audit-preset.ts](file://packages\audit\src\preset\audit-preset.ts#L0-L15)

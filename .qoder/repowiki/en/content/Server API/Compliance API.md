@@ -2,12 +2,19 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
-- [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts#L0-L100)
-- [compliance.ts](file://apps/server/src/routers/compliance.ts#L0-L291)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts) - *Updated in recent commit*
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Updated in recent commit*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect the implementation of pseudonymization in GDPR compliance workflows
+- Added details about pseudonymization logic and its integration into audit event processing
+- Enhanced description of GDPR data subject rights implementation
+- Updated architecture overview to include pseudonymization phase in event processing pipeline
+- Added new sequence diagram showing pseudonymization workflow
+- Updated dependency analysis to include KMS integration for pseudonym mapping encryption
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,6 +37,7 @@ Key features include:
 - Management of scheduled compliance reports
 - Integrity verification of audit events
 - Support for data classification and filtering
+- Implementation of GDPR-compliant pseudonymization for data subject rights
 - Integration with authentication and rate limiting systems
 
 The API follows a modular design with clear separation of concerns, using middleware for authentication, rate limiting, and error handling. It is designed to be secure, scalable, and compliant with industry standards.
@@ -49,6 +57,7 @@ subgraph "Packages"
 E[packages/audit] --> F[compliance-reporting.ts]
 E --> G[data-export.ts]
 E --> H[scheduled-reporting.ts]
+E --> I[gdpr-compliance.ts]
 P[packages/auth] --> Q[auth.ts]
 R[packages/redis-client] --> S[connection.ts]
 end
@@ -58,13 +67,12 @@ D --> R
 ```
 
 **Diagram sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
-- [compliance.ts](file://apps/server/src/routers/compliance.ts#L0-L291)
-- [packages/audit/src/report/compliance-reporting.ts]
-- [packages/audit/src/report/data-export.ts]
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
+- [compliance.ts](file://apps\server\src\routers\compliance.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 **Section sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
 
 ## Core Components
 
@@ -75,15 +83,17 @@ The Compliance API consists of several key components that work together to prov
 - **auth.ts**: Authentication middleware with JWT and API key support
 - **rate-limit.ts**: Rate limiting middleware with Redis integration
 - **api-version.ts**: API versioning middleware
+- **gdpr-compliance.ts**: GDPR compliance service with pseudonymization capabilities
 
 These components are orchestrated through a middleware pipeline that handles authentication, rate limiting, request validation, and error handling before routing to the appropriate handler.
 
 The API uses Zod for request and response validation, ensuring type safety and data integrity. It also integrates with a logging and audit system to track all API interactions for security and compliance purposes.
 
 **Section sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ## Architecture Overview
 
@@ -114,10 +124,10 @@ Service --> Tracing
 ```
 
 **Diagram sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
-- [api-version.ts](file://apps/server/src/lib/middleware/api-version.ts#L0-L100)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
+- [api-version.ts](file://apps\server\src\lib\middleware\api-version.ts)
 
 ## Detailed Component Analysis
 
@@ -182,10 +192,10 @@ ComplianceReportSchema <|-- GDPRComplianceReportSchema
 ```
 
 **Diagram sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
 
 **Section sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
 
 ### Authentication and Authorization
 
@@ -224,10 +234,10 @@ end
 ```
 
 **Diagram sources**
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
 
 **Section sources**
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
 
 ### Rate Limiting Implementation
 
@@ -252,10 +262,47 @@ ReturnResponse --> End
 ```
 
 **Diagram sources**
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
 
 **Section sources**
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
+
+### GDPR Pseudonymization Implementation
+
+The updated GDPR compliance service now includes pseudonymization capabilities to support data subject rights while maintaining audit trail integrity.
+
+#### Pseudonymization Workflow
+
+```mermaid
+sequenceDiagram
+participant Client
+participant API
+participant GDPRService
+participant KMS
+participant Database
+Client->>API : Submit GDPR request (access, erasure, etc.)
+API->>GDPRService : Process request
+GDPRService->>GDPRService : Check if pseudonym exists
+alt Pseudonym exists
+GDPRService-->>GDPRService : Use existing pseudonym
+else No pseudonym
+GDPRService->>KMS : Encrypt original ID
+KMS-->>GDPRService : Return encrypted ID
+GDPRService->>Database : Store pseudonym mapping
+Database-->>GDPRService : Confirmation
+end
+GDPRService->>Database : Update audit events with pseudonym
+Database-->>GDPRService : Records updated
+GDPRService->>API : Return pseudonymized data
+API-->>Client : Return response with pseudonymized data
+```
+
+**Diagram sources**
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [index.ts](file://apps\worker\src\index.ts)
+
+**Section sources**
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ## Dependency Analysis
 
@@ -273,27 +320,31 @@ A --> H[Auth Service]
 A --> I[Audit Service]
 A --> J[Error Service]
 A --> K[Logging Service]
-B --> L[TypeScript]
-C --> L
-D --> L
-E --> L
-F --> M[Redis Client]
-G --> N[Drizzle ORM]
-H --> O[JWT]
-I --> P[Event Bus]
-J --> Q[Error Tracking]
-K --> R[Structured Logging]
+A --> L[KMS Service]
+B --> M[TypeScript]
+C --> M
+D --> M
+E --> M
+F --> N[Redis Client]
+G --> O[Drizzle ORM]
+H --> P[JWT]
+I --> Q[Event Bus]
+J --> R[Error Tracking]
+K --> S[Structured Logging]
+L --> T[Encryption]
 ```
 
 **Diagram sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 **Section sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ## Performance Considerations
 
@@ -305,6 +356,7 @@ The Compliance API is designed with performance in mind, using several optimizat
 - **Connection Pooling**: Uses connection pooling for database and Redis connections
 - **Request Batching**: Supports batch operations where applicable
 - **Compression**: Supports response compression for large data exports
+- **Pseudonymization Caching**: Caches pseudonym mappings to avoid repeated KMS calls
 
 The API also implements adaptive rate limiting that applies different limits based on endpoint type:
 - Authentication endpoints: 5 requests per 15 minutes per IP
@@ -338,12 +390,18 @@ Common issues and their solutions:
 - **Format Errors**: Verify supported formats (JSON, CSV, PDF, XML)
 - **Delivery Failures**: Check webhook URLs or storage locations
 
+### GDPR Pseudonymization Issues
+- **Pseudonymization Failures**: Check KMS connectivity and encryption keys
+- **Missing Pseudonym Mappings**: Verify pseudonym mapping table is accessible
+- **Performance Degradation**: Monitor KMS call frequency and implement caching
+
 Logs and audit trails are available for troubleshooting, with detailed information about each request and response.
 
 **Section sources**
-- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L1066)
-- [auth.ts](file://apps/server/src/lib/middleware/auth.ts#L0-L764)
-- [rate-limit.ts](file://apps/server/src/lib/middleware/rate-limit.ts#L0-L486)
+- [compliance-api.ts](file://apps\server\src\routes\compliance-api.ts)
+- [auth.ts](file://apps\server\src\lib\middleware\auth.ts)
+- [rate-limit.ts](file://apps\server\src\lib\middleware\rate-limit.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ## Conclusion
 
@@ -355,5 +413,6 @@ Key strengths include:
 - Scalable architecture with Redis-based rate limiting
 - Comprehensive error handling and logging
 - Type-safe API definitions with OpenAPI and Zod
+- GDPR-compliant pseudonymization to support data subject rights while preserving audit integrity
 
 The API is production-ready and follows best practices for RESTful design, security, and performance. It can be extended to support additional compliance standards or integrated with other systems as needed.

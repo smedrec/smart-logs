@@ -2,10 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L0-L611)
-- [types.ts](file://packages/audit/src/observability/types.ts#L0-L302)
-- [bottleneck-analyzer.test.ts](file://packages/audit/src/observability/__tests__/bottleneck-analyzer.test.ts#L0-L305)
+- [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts) - *Updated in recent commit with enhanced performance metrics*
+- [types.ts](file://packages/audit/src/observability/types.ts) - *Updated with new performance metrics*
+- [bottleneck-analyzer.test.ts](file://packages/audit/src/observability/__tests__/bottleneck-analyzer.test.ts) - *Updated test cases*
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts) - *Integrated with bottleneck analysis system*
+- [index.ts](file://apps/worker/src/index.ts) - *Updated with structured logging integration*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated bottleneck detection algorithms to incorporate enhanced performance metrics from database preset handler integration
+- Added new performance metrics for event pseudonymization time tracking
+- Updated recommendation generation system to include database preset optimization suggestions
+- Enhanced test cases to validate integration with structured logging system
+- Updated analysis report interpretation to include new severity thresholds
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -76,9 +86,6 @@ class ProfilingSession {
 BottleneckAnalyzer <|-- AuditBottleneckAnalyzer
 ```
 
-**Diagram sources**
-- [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L16-L611)
-
 **Section sources**
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L16-L611)
 
@@ -118,7 +125,7 @@ Medium --> End
 Low --> End
 ```
 
-**Diagram sources**
+**Section sources**
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L480-L495)
 
 ### Statistical Anomaly Detection
@@ -147,9 +154,6 @@ CreateAnalysis --> ReturnAnalysis["Return BottleneckAnalysis"]
 NotBottleneck --> ReturnNull["Return null"]
 ```
 
-**Diagram sources**
-- [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L400-L479)
-
 **Section sources**
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L400-L479)
 
@@ -166,6 +170,7 @@ class PerformanceMetrics {
 +eventProcessingTime : number
 +eventValidationTime : number
 +eventHashingTime : number
++eventPseudonymizationTime : number
 +eventStorageTime : number
 +queueWaitTime : number
 +queueProcessingTime : number
@@ -212,7 +217,7 @@ AuditBottleneckAnalyzer --> BottleneckAnalysis : "produces"
 AuditBottleneckAnalyzer --> AuditOperationMetrics : "processes"
 ```
 
-**Diagram sources**
+**Section sources**
 - [types.ts](file://packages/audit/src/observability/types.ts#L64-L157)
 
 ### Operation Statistics Calculation
@@ -283,7 +288,7 @@ Correlation-->>Analyzer : Return correlated analysis
 Analyzer-->>System : Generate comprehensive report
 ```
 
-**Diagram sources**
+**Section sources**
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L234-L320)
 
 ### Resource Saturation Detection
@@ -351,7 +356,7 @@ RedisRecommend --> Return
 EventRecommend --> Return
 ```
 
-**Diagram sources**
+**Section sources**
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L282-L320)
 
 ### Component-Specific Recommendations
@@ -444,7 +449,7 @@ class TestResults {
 SimulatedIssues --> TestResults : "produces"
 ```
 
-**Diagram sources**
+**Section sources**
 - [bottleneck-analyzer.test.ts](file://packages/audit/src/observability/__tests__/bottleneck-analyzer.test.ts#L0-L305)
 
 ### Key Test Scenarios
@@ -594,7 +599,7 @@ Verify --> Monitor["Monitor performance after changes"]
 Monitor --> Loop["Continue monitoring for new issues"]
 ```
 
-**Diagram sources**
+**Section sources**
 - [bottleneck-analyzer.ts](file://packages/audit/src/observability/bottleneck-analyzer.ts#L120-L145)
 
 ### Impact-Based Prioritization

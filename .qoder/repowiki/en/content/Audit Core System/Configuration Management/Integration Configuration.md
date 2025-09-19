@@ -7,6 +7,8 @@
 - [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts) - *Configuration type definitions*
 - [packages/audit/src/config/manager.ts](file://packages\audit\src\config\manager.ts) - *Configuration manager implementation*
 - [packages/audit/src/config/integration.ts](file://packages\audit\src\config\integration.ts) - *Configuration integration service*
+- [apps/worker/src/index.ts](file://apps\worker\src\index.ts) - *Integrated database preset handler and structured logging*
+- [packages/audit/src/preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts) - *Database preset handler implementation*
 </cite>
 
 ## Update Summary
@@ -16,6 +18,8 @@
 - Enhanced sections with specific code examples and implementation details
 - Updated source references to reflect the current file structure and content
 - Added new sections on configuration management, validation, and security
+- Integrated documentation for database preset handler and structured logging system
+- Added information about KMS client setup and Redis connection parameter validation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -361,8 +365,14 @@ const DEFAULT_HOT_RELOADABLE_FIELDS = [
 	'monitoring.metricsInterval',
 	'monitoring.alertThresholds.errorRate',
 	'monitoring.alertThresholds.processingLatency',
+	'monitoring.alertThresholds.queueDepth',
 	'monitoring.healthCheckInterval',
 	'retry.maxRetries',
+	'retry.baseDelay',
+	'retry.maxDelay',
+	'circuitBreaker.failureThreshold',
+	'circuitBreaker.recoveryTimeout',
+	'deadLetter.alertThreshold',
 	'logging.level',
 	'compliance.reportingSchedule.enabled',
 	'compliance.reportingSchedule.frequency',
@@ -394,6 +404,78 @@ export interface SecureStorageConfig {
 
 **Section sources**
 - [packages/audit/src/config/types.ts](file://packages\audit\src\config\types.ts#L370-L395)
+
+### Database Preset Handler Integration
+The system now integrates a database preset handler that manages audit presets stored in the database. This handler provides CRUD operations for presets and integrates with the configuration system.
+
+```typescript
+/**
+ * Database preset handler implementation
+ */
+export class DatabasePresetHandler implements PresetHandler {
+	private client: EnhancedAuditDatabaseClient
+	constructor(auditDbInstance: EnhancedAuditDb) {
+		this.client = auditDbInstance.getEnhancedClientInstance()
+	}
+
+	/**
+	 * Get all presets for an organization with default fallbacks
+	 * Organization presets take priority over defaults with the same name
+	 */
+	async getPresets(organizationId?: string): Promise<(AuditPreset & { id?: string })[]> {
+		const orgId = organizationId || '*'
+
+		// If no organization specified, just return default presets
+		if (orgId === '*') {
+			return this.getDefaultPresets()
+		}
+
+		try {
+			// Fetch both organization and default presets in a single optimized query
+			const result = await this.client.executeOptimizedQuery(
+				(db) =>
+					db.execute(sql`
+						SELECT *,
+								 CASE WHEN organization_id = ${orgId} THEN 1 ELSE 0 END as priority
+						FROM audit_preset
+						WHERE organization_id IN (${orgId}, '*')
+						ORDER BY name, priority DESC
+					`),
+				{ cacheKey: `get_merged_presets_${orgId}` }
+			)
+
+			const rows = result || []
+
+			// Merge presets: organization presets take priority over defaults
+			return this.mergePresetsWithPriority(rows)
+		} catch (error) {
+			throw new Error(`Failed to retrieve presets. ${error}`)
+		}
+	}
+}
+```
+
+**Section sources**
+- [packages/audit/src/preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L15-L85)
+- [apps/worker/src/index.ts](file://apps/worker/src/index.ts#L15-L30)
+
+### KMS Client Configuration
+The configuration system now includes KMS client setup for secure key management:
+
+```typescript
+// KMS configuration in worker initialization
+if (!kms)
+	kms = new InfisicalKmsClient({
+		baseUrl: config.security.kms.baseUrl,
+		encryptionKey: config.security.kms.encryptionKey,
+		signingKey: config.security.kms.signingKey,
+		accessToken: config.security.kms.accessToken,
+	})
+```
+
+**Section sources**
+- [apps/worker/src/index.ts](file://apps/worker/src/index.ts#L250-L258)
+- [packages/audit/src/config/types.ts](file://packages/audit/src/config/types.ts#L250-L275)
 
 ## Performance Considerations
 The integration configuration includes several performance optimization features, including connection pooling, query caching, and database-level performance tuning. These features work together to ensure the system can handle high loads efficiently while maintaining low latency.

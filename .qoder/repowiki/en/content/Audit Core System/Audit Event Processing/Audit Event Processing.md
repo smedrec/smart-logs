@@ -11,6 +11,7 @@
 - [reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts) - *Updated in recent commit*
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Added in recent commit*
 - [PLUGIN_ARCHITECTURE.md](file://packages\audit-client\docs\PLUGIN_ARCHITECTURE.md) - *Added in recent commit*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
@@ -23,6 +24,7 @@
 - Added best practices for compliance validation and event enrichment
 - Integrated plugin architecture documentation for middleware, storage, and authentication extensions
 - Added comprehensive GDPR pseudonymization implementation details
+- Added new pseudonymization phase in event processing pipeline
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -648,6 +650,44 @@ async deleteUserDataWithAuditTrail(
 
 Compliance-critical audit records (login attempts, data exports, etc.) are preserved through pseudonymization rather than deletion.
 
+### Pseudonymization Phase in Event Processing
+The worker's event processing pipeline now includes a dedicated pseudonymization phase that runs before storage. This phase ensures that sensitive identifiers are pseudonymized while maintaining referential integrity across related events.
+
+```mermaid
+sequenceDiagram
+participant Client as "Application Client"
+participant Audit as "Audit Service"
+participant Validator as "Validation Layer"
+participant Categorizer as "Categorization Engine"
+participant Pseudonymizer as "Pseudonymization Service"
+participant Queue as "Reliable Event Queue"
+participant Worker as "Processing Worker"
+participant Storage as "Persistent Storage"
+Client->>Audit : log(event)
+Audit->>Validator : validateAndSanitizeAuditEvent()
+Validator-->>Audit : Validated Event
+Audit->>Categorizer : getActionCategory()
+Categorizer-->>Audit : Event Category
+Audit->>Queue : addEvent(event)
+Queue->>Worker : Process Job
+Worker->>Pseudonymizer : pseudonymizeEvent()
+Pseudonymizer-->>Worker : Pseudonymized Event
+Worker->>Storage : Persist Event
+Storage-->>Worker : Confirmation
+```
+
+**Diagram sources**
+- [index.ts](file://apps\worker\src\index.ts#L586-L630)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L319-L361)
+
+The pseudonymization phase:
+1. Runs after validation and categorization but before storage
+2. Uses the `GDPRComplianceService.pseudonymizeEvent()` method
+3. Processes both `principalId` and `targetResourceId` fields
+4. Skips already pseudonymized identifiers to prevent double-pseudonymization
+5. Integrates with KMS for secure encryption of original identifiers
+6. Maintains referential integrity through the pseudonym mapping table
+
 **Section sources**   
-- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L1-L698)
-- [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L783-L828)
+- [index.ts](file://apps\worker\src\index.ts#L586-L670)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L120-L816)

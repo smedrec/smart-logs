@@ -2,9 +2,10 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated with persistent pseudonym mapping and error logging*
-- [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Added pseudonym_mapping table for GDPR compliance*
-- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql) - *Migration for pseudonym mapping table*
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts) - *Updated with pseudonymizeEvent method and pseudonymization strategy migration*
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql) - *Added strategy column and index to pseudonym_mapping table*
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql) - *Changed original_id index to unique constraint*
+- [schema.ts](file://packages/audit-db/src/db/schema.ts) - *Updated pseudonym_mapping table schema*
 - [types.ts](file://packages/audit/src/types.ts#L1-L286)
 - [gdpr-utils.ts](file://packages/audit/src/gdpr/gdpr-utils.ts) - *Enhanced with new GDPR utilities*
 - [infisical-kms.ts](file://packages/infisical-kms/src/client.ts) - *KMS integration for pseudonym mapping encryption*
@@ -12,13 +13,13 @@
 
 ## Update Summary
 **Changes Made**   
-- Updated documentation to reflect persistent pseudonym mapping implementation using pseudonym_mapping table
-- Added KMS integration details for secure storage of pseudonym mappings
-- Enhanced error handling documentation with new console.error logging for missing mappings
-- Updated pseudonymization workflow to reflect database-backed storage instead of in-memory
-- Added documentation for new pseudonym_mapping database table and schema
-- Updated architecture diagrams to show persistent storage integration
-- Revised data flow descriptions for pseudonymization and erasure workflows
+- Added new `pseudonymizeEvent` method for real-time event pseudonymization
+- Updated pseudonymization strategy implementation with database-backed storage
+- Enhanced pseudonym_mapping table with strategy column and improved indexing
+- Added unique constraint on original_id for data integrity
+- Updated documentation to reflect new pseudonymization workflow and database schema changes
+- Added new sequence diagram for pseudonymizeEvent workflow
+- Updated core components diagram to include new pseudonymizeEvent method
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -62,6 +63,7 @@ class GDPRComplianceService {
 +deleteUserDataWithAuditTrail(principalId, requestedBy, preserveComplianceAudits)
 +getPseudonymMapping(originalId)
 +getOriginalId(pseudonymId)
++pseudonymizeEvent(event)
 }
 class GDPRDataExportRequest {
 +principalId : string
@@ -120,6 +122,7 @@ class PseudonymMapping {
 +timestamp : string
 +pseudonymId : string
 +originalId : string
++strategy : PseudonymizationStrategy
 }
 GDPRComplianceService --> GDPRDataExportRequest : "processes"
 GDPRComplianceService --> GDPRDataExport : "returns"
@@ -133,7 +136,8 @@ PseudonymMapping --> InfisicalKmsClient : "encrypted storage"
 **Diagram sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L1-L686)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L650-L677)
-- [pseudonym_mapping.sql](file://packages/audit-db/drizzle/migrations/0006_silly_tyger_tiger.sql)
+- [0007_keen_ego.sql](file://packages/audit-db/drizzle/migrations/0007_keen_ego.sql)
+- [0008_swift_black_panther.sql](file://packages/audit-db/drizzle/migrations/0008_swift_black_panther.sql)
 - [infisical-kms.ts](file://packages/infisical-kms/src/client.ts)
 
 **Section sources**
@@ -342,6 +346,29 @@ The pseudonymization process:
 
 The hash strategy uses a salt (from environment variables or a default) to prevent rainbow table attacks, making it more secure than simple hashing. The pseudonym mapping is now stored persistently in the pseudonym_mapping table with encryption of the original ID via KMS.
 
+### Real-time Event Pseudonymization
+
+The new `pseudonymizeEvent` method enables real-time pseudonymization of audit events before they are stored:
+
+```mermaid
+sequenceDiagram
+participant Producer as "Event Producer"
+participant Service as "GDPRComplianceService"
+participant DB as "Audit Database"
+Producer->>Service : Create AuditLogEvent
+Service->>Service : Check if pseudonymization needed
+Service->>Service : Apply pseudonymizeEvent
+Service->>DB : Store pseudonymized event
+DB-->>Service : Confirmation
+Service-->>Producer : Event stored
+Note over Service,DB : Real-time pseudonymization ensures<br/>privacy from the moment of creation
+```
+
+**Diagram sources**
+- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L310-L330)
+
+The `pseudonymizeEvent` method automatically pseudonymizes principalId and targetResourceId fields in audit events, with safeguards to avoid re-pseudonymizing already pseudonymized IDs. The method checks for prefixes like 'pseudo', 'pseudonymized', 'system', 'security', and 'integrity' to determine if pseudonymization should be applied.
+
 **Section sources**
 - [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L150-L250)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L650-L677)
@@ -441,7 +468,7 @@ The key integration points are:
 - **Audit**: The core audit service for logging events with cryptographic integrity
 - **auditLog table**: The PostgreSQL table storing audit events with compliance indexes
 - **auditRetentionPolicy table**: Configuration for data lifecycle management
-- **pseudonymMapping table**: Persistent storage for pseudonym-to-original ID mappings
+- **pseudonymMapping table**: Persistent storage for pseudonym-to-original ID mappings with strategy column
 - **InfisicalKmsClient**: Key Management Service for encrypting sensitive mapping data
 
 The service is designed to be consumed through the GraphQL API, which exposes GDPR operations to the frontend applications.

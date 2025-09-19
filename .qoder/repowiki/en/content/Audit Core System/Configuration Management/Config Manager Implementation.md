@@ -7,6 +7,8 @@
 - [validator.ts](file://packages/audit/src/config/validator.ts) - *Updated in recent commit*
 - [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts) - *KMS client implementation*
 - [infisical-kms/types.ts](file://packages/infisical-kms/src/types.ts) - *KMS configuration types*
+- [index.ts](file://apps/worker/src/index.ts) - *Updated with worker initialization using ConfigurationManager*
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts) - *Added for database preset handling*
 </cite>
 
 ## Update Summary
@@ -17,6 +19,8 @@
 - Updated Core Architecture diagram to include KMS client relationship
 - Added new code examples for KMS configuration and usage
 - Updated Factory Pattern Integration section with secure storage configuration
+- Added documentation for worker initialization lifecycle using ConfigurationManager
+- Integrated database preset handler usage in worker initialization
 - Maintained all existing technical content about the Config Manager implementation
 - Updated source references to maintain accuracy with recent changes
 
@@ -35,10 +39,10 @@
 12. [Code Examples](#code-examples)
 
 ## Introduction
-The ConfigurationManager class provides a comprehensive solution for centralized configuration management in the audit system. It enables loading configuration from multiple sources, handling hierarchical overrides, ensuring thread-safe access, and supporting runtime reconfiguration through event-driven architecture. This document details the implementation, covering its role in the system architecture, internal state management, change detection mechanisms, and integration patterns with other components. Recent updates have added KMS (Key Management Service) integration for enhanced security of configuration data.
+The ConfigurationManager class provides a comprehensive solution for centralized configuration management in the audit system. It enables loading configuration from multiple sources, handling hierarchical overrides, ensuring thread-safe access, and supporting runtime reconfiguration through event-driven architecture. This document details the implementation, covering its role in the system architecture, internal state management, change detection mechanisms, and integration patterns with other components. Recent updates have added KMS (Key Management Service) integration for enhanced security of configuration data and expanded its role in worker initialization with dependency injection patterns.
 
 ## Core Architecture
-The ConfigurationManager implements a centralized configuration management system that serves as the single source of truth for application settings. It extends Node.js's EventEmitter class, enabling an event-driven architecture for configuration changes. The system now includes integration with Infisical KMS for secure encryption and decryption of configuration data.
+The ConfigurationManager implements a centralized configuration management system that serves as the single source of truth for application settings. It extends Node.js's EventEmitter class, enabling an event-driven architecture for configuration changes. The system now includes integration with Infisical KMS for secure encryption and decryption of configuration data. The ConfigurationManager is now central to worker initialization, replacing previous ad-hoc configuration loading with a managed lifecycle and dependency injection pattern.
 
 ```mermaid
 classDiagram
@@ -460,7 +464,7 @@ async getChangeHistory(limit?: number): Promise<ConfigChangeEvent[]> {
 - [manager.ts](file://packages/audit/src/config/manager.ts#L237-L290)
 
 ## Initialization Lifecycle
-The ConfigurationManager follows a well-defined initialization lifecycle that ensures proper setup before use.
+The ConfigurationManager follows a well-defined initialization lifecycle that ensures proper setup before use. The system now serves as the central component for worker initialization, managing the lifecycle of various services and their dependencies.
 
 ### Initialization Sequence
 ```mermaid
@@ -502,9 +506,11 @@ Client-->>Client : Configuration Ready
 
 **Diagram sources**
 - [manager.ts](file://packages/audit/src/config/manager.ts#L80-L130)
+- [index.ts](file://apps/worker/src/index.ts#L0-L873)
 
 **Section sources**
 - [manager.ts](file://packages/audit/src/config/manager.ts#L80-L130)
+- [index.ts](file://apps/worker/src/index.ts#L0-L873)
 
 ## Error Handling
 The configuration manager implements comprehensive error handling for various failure scenarios.
@@ -846,3 +852,4 @@ await configManager.updateConfig('database.url', 'postgresql://new-host:5432/aud
 **Section sources**
 - [manager.ts](file://packages/audit/src/config/manager.ts#L133-L197)
 - [infisical-kms/client.ts](file://packages/infisical-kms/src/client.ts#L15-L145)
+- [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts#L11-L273)

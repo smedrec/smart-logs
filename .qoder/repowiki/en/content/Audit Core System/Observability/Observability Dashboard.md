@@ -2,21 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [dashboard.ts](file://packages\audit\src\observability\dashboard.ts) - *Updated in recent commit with KMS encryption and OTLP exporter integration*
-- [types.ts](file://packages\audit\src\observability\types.ts) - *Updated with structured logging support*
-- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Enhanced with encryption capabilities*
-- [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated with KMS integration*
-- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts) - *Updated to test encrypted data handling*
-- [infisical-kms](file://packages\infisical-kms) - *New KMS integration for encryption*
+- [dashboard.ts](file://packages\audit\src\observability\dashboard.ts) - *Updated in recent commit with database preset handler and structured logging integration*
+- [types.ts](file://packages\audit\src\observability\types.ts) - *Updated with bottleneck analysis support*
+- [bottleneck-analyzer.ts](file://packages\audit\src\observability\bottleneck-analyzer.ts) - *New bottleneck analysis component added*
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Enhanced with operation metrics collection*
+- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts) - *Updated to test bottleneck analysis integration*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated documentation to reflect KMS encryption integration for OTLP data
-- Added information about structured logging and enhanced telemetry export
-- Updated architecture overview to include encryption layer
-- Enhanced security considerations for encrypted data handling
-- Updated test examples to reflect encrypted data validation
+- Updated documentation to reflect integration of bottleneck analyzer and database preset handler
+- Added information about performance profiling and bottleneck detection
+- Enhanced architecture overview to include bottleneck analysis component
+- Updated test examples to reflect bottleneck analysis validation
+- Added new section on bottleneck analysis and performance profiling
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,7 +28,7 @@
 8. [Performance and Caching](#performance-and-caching)
 9. [Testing and Validation](#testing-and-validation)
 10. [Architecture Overview](#architecture-overview)
-11. [Security and Encryption](#security-and-encryption)
+11. [Bottleneck Analysis and Performance Profiling](#bottleneck-analysis-and-performance-profiling)
 
 ## Introduction
 The Observability Dashboard provides a unified view for monitoring system performance, health, and security across the audit system. It aggregates metrics, traces, and health status from various components into a comprehensive interface that enables real-time monitoring and historical analysis. The dashboard serves as a central hub for system administrators and operations teams to identify issues, track performance trends, and respond to security incidents.
@@ -44,11 +43,11 @@ The dashboard integrates data from multiple sources including real-time metrics 
 The Observability Dashboard consumes data from three primary sources: real-time metrics streams, trace repositories, and health check endpoints. These sources provide comprehensive coverage of system performance, reliability, and security.
 
 ### Real-time Metrics Streams
-The dashboard receives real-time metrics through Redis-based collectors that capture various performance indicators. The `RedisMetricsCollector` class implements the `MetricsCollector` interface to record events, processing latency, errors, queue depth, and other key metrics.
+The dashboard receives real-time metrics through Redis-based collectors that capture various performance indicators. The `RedisEnhancedMetricsCollector` class implements the `EnhancedMetricsCollector` interface to record events, processing latency, errors, queue depth, and other key metrics.
 
 ```mermaid
 flowchart TD
-A["Audit Events"] --> B["RedisMetricsCollector"]
+A["Audit Events"] --> B["RedisEnhancedMetricsCollector"]
 B --> C["recordEvent()"]
 B --> D["recordProcessingLatency()"]
 B --> E["recordError()"]
@@ -59,7 +58,7 @@ H --> I["Observability Dashboard"]
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L1-L386)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
 
 ### Trace Repositories
 Distributed tracing data is collected through the observability system, which captures trace context, spans, and span logs. The `Span` interface defines the structure for trace data, including operation names, timestamps, duration, tags, and logs.
@@ -175,12 +174,12 @@ CircuitBreakerHealthCheck --> ComponentHealth : "returns"
 The dashboard aggregates metrics through a multi-layered collection system that captures both basic and enhanced metrics from various system components.
 
 ### Basic Metrics Collection
-The `RedisMetricsCollector` class implements the `MetricsCollector` interface to collect fundamental metrics such as events processed, processing latency, queue depth, and error rates. These metrics are stored in Redis with a 24-hour retention period.
+The `RedisEnhancedMetricsCollector` class implements the `EnhancedMetricsCollector` interface to collect fundamental metrics such as events processed, processing latency, queue depth, and error rates. These metrics are stored in Redis with a configurable retention period.
 
 ```mermaid
 sequenceDiagram
 participant Event as "Audit Event"
-participant Collector as "RedisMetricsCollector"
+participant Collector as "RedisEnhancedMetricsCollector"
 participant Redis as "Redis Storage"
 Event->>Collector : processEvent()
 Collector->>Collector : recordEvent()
@@ -197,7 +196,7 @@ Collector-->>Event : Processing Complete
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L1-L386)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
 
 ### Enhanced Metrics Collection
 The `RedisEnhancedMetricsCollector` class extends basic metrics collection with additional capabilities for performance metrics, system metrics, operation metrics, and time series data. This collector integrates with the monitoring service to provide comprehensive observability data.
@@ -254,7 +253,7 @@ RedisEnhancedMetricsCollector --> PerformanceTimer : "uses"
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
 
 ## Health Status Monitoring
 The health monitoring system provides real-time status information for all critical components of the audit system. The `HealthCheckService` coordinates multiple health check implementations to provide a comprehensive view of system health.
@@ -376,7 +375,7 @@ API-->>Dashboard : JSON response
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
 
 ## Visualization Components
 The dashboard provides several visualization components to display system performance, error trends, and service dependencies.
@@ -466,7 +465,7 @@ await this.connection.expire(key, this.config.retentionPeriod)
 ```
 
 **Section sources**
-- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
 
 ### Time Series Data Optimization
 Time series data is stored in Redis using sorted sets (ZSET) with timestamps as scores. This allows efficient range queries and automatic cleanup of expired data.
@@ -480,7 +479,7 @@ await this.connection.zremrangebyscore(key, 0, cutoffTime)
 ```
 
 **Section sources**
-- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
 
 ### Periodic Data Collection
 The system performs periodic collection of system metrics to reduce the overhead of on-demand calculations.
@@ -513,7 +512,7 @@ private startPeriodicCollection(): void {
 ```
 
 **Section sources**
-- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
 
 ## Testing and Validation
 The dashboard's data aggregation logic and display formatting are validated through comprehensive unit tests.
@@ -548,7 +547,7 @@ Test-->>Test : Assert expectations
 ```
 
 **Diagram sources**
-- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts#L1-L454)
+- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts#L1-L453)
 
 ### Test Coverage
 The tests validate various aspects of the dashboard functionality:
@@ -560,7 +559,7 @@ The tests validate various aspects of the dashboard functionality:
 - **Error Conditions**: Tests verify proper handling of missing or invalid data
 
 **Section sources**
-- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts#L1-L454)
+- [dashboard.test.ts](file://packages\audit\src\observability\__tests__\dashboard.test.ts#L1-L453)
 
 ## Architecture Overview
 The Observability Dashboard architecture consists of multiple interconnected components that work together to provide comprehensive system monitoring.
@@ -583,9 +582,10 @@ H[Redis]
 end
 subgraph "Aggregation Layer"
 I[Dashboard Metrics Aggregation]
+J[Bottleneck Analyzer]
 end
 subgraph "Presentation Layer"
-J[Observability Dashboard]
+K[Observability Dashboard]
 end
 A --> D
 B --> E
@@ -595,15 +595,17 @@ E --> H
 F --> H
 G --> H
 H --> I
-I --> J
+H --> J
+I --> K
+J --> K
 G --> E
 F --> E
 D --> E
 ```
 
 **Diagram sources**
-- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L1-L386)
-- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L601)
+- [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L602)
+- [bottleneck-analyzer.ts](file://packages\audit\src\observability\bottleneck-analyzer.ts#L1-L611)
 - [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L491)
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L1399)
 
@@ -611,82 +613,144 @@ The architecture follows a layered approach with clear separation of concerns. D
 
 This design enables the dashboard to provide real-time insights while maintaining good performance through caching and periodic data collection. The modular architecture allows for easy extension with additional data sources and visualization components.
 
-## Security and Encryption
-The Observability Dashboard has been enhanced with KMS encryption and secure data handling capabilities to protect sensitive telemetry data.
+## Bottleneck Analysis and Performance Profiling
+The Observability Dashboard has been enhanced with a bottleneck analyzer and performance profiling system to identify performance issues and optimize system performance.
 
-### KMS Integration
-The dashboard now integrates with Infisical KMS for encryption of OTLP data and structured logs. The `InfisicalKmsClient` handles encryption and decryption operations using secure key management.
+### Bottleneck Analyzer Integration
+The dashboard now integrates with the `AuditBottleneckAnalyzer` to identify performance bottlenecks in the audit system. The analyzer examines operation metrics to detect components with high latency, error rates, or resource usage.
 
 ```mermaid
 sequenceDiagram
 participant Dashboard as "Observability Dashboard"
-participant KMS as "Infisical KMS"
-participant Storage as "Redis Storage"
-Dashboard->>KMS : encrypt(OTLP data)
-KMS-->>Dashboard : Encrypted data
-Dashboard->>Storage : Store encrypted data
-Storage-->>Dashboard : Retrieve encrypted data
-Dashboard->>KMS : decrypt(data)
-KMS-->>Dashboard : Decrypted data
-Dashboard->>UI : Display data
+participant Analyzer as "Bottleneck Analyzer"
+participant Collector as "Metrics Collector"
+participant Redis as "Redis Storage"
+Dashboard->>Analyzer : analyzePerformance()
+Analyzer->>Collector : getOperationMetrics()
+Collector->>Redis : HGETALL operations
+Redis-->>Collector : Operation data
+Collector-->>Analyzer : OperationMetrics[]
+Analyzer->>Analyzer : calculateOperationStats()
+Analyzer->>Analyzer : analyzeOperationStats()
+Analyzer-->>Dashboard : BottleneckAnalysis[]
+Dashboard->>UI : Display bottlenecks
 ```
 
 **Diagram sources**
-- [infisical-kms](file://packages\infisical-kms\src\client.ts#L1-L73)
+- [bottleneck-analyzer.ts](file://packages\audit\src\observability\bottleneck-analyzer.ts#L1-L611)
 - [dashboard.ts](file://packages\audit\src\observability\dashboard.ts#L1-L600)
 
-### Encrypted Data Handling
-All OTLP data and structured logs are encrypted before storage and decrypted only when needed for display. The encryption process uses AES-256 with keys managed by the KMS service.
+### Performance Profiling
+The system provides detailed performance profiling capabilities through the `profileOperation` method, which captures execution time, call stack, and resource usage during operation execution.
 
 ```typescript
-// Example encryption flow in dashboard.ts
-async getDashboardData(): Promise<DashboardData> {
-  const cacheKey = 'dashboard-data'
-  const cached = this.getFromCache(cacheKey)
-  if (cached) return cached
-
-  // Retrieve encrypted data from storage
-  const encryptedData = await this.storage.getEncrypted('dashboard-data')
+// Example profiling flow in bottleneck-analyzer.ts
+async profileOperation<T>(operationName: string, operation: () => Promise<T>): Promise<T> {
+  const sessionId = generateSessionId()
+  const startTime = performance.now()
   
-  // Decrypt using KMS
-  const decryptedData = await this.kms.decrypt(encryptedData)
+  // Start resource monitoring
+  const resourceSnapshot = takeResourceSnapshot()
   
-  // Process and format for display
-  const dashboardData = this.processData(decryptedData)
-  
-  // Cache decrypted data temporarily
-  this.setCache(cacheKey, dashboardData)
-  return dashboardData
+  try {
+    // Execute the operation
+    const result = await operation()
+    
+    // Calculate duration and generate profiling result
+    const duration = performance.now() - startTime
+    const profilingResult = generateProfilingResult(sessionId, duration, resourceSnapshot)
+    
+    // Store result for analysis
+    this.profilingResults.push(profilingResult)
+    
+    return result
+  } catch (error) {
+    // Handle errors and still capture profiling data
+    const duration = performance.now() - startTime
+    const profilingResult = generateProfilingResult(sessionId, duration, resourceSnapshot)
+    profilingResult.breakdown['error'] = { /* error details */ }
+    this.profilingResults.push(profilingResult)
+    
+    throw error
+  }
 }
 ```
 
 **Section sources**
-- [dashboard.ts](file://packages\audit\src\observability\dashboard.ts#L1-L600)
-- [infisical-kms](file://packages\infisical-kms\src\client.ts#L1-L73)
+- [bottleneck-analyzer.ts](file://packages\audit\src\observability\bottleneck-analyzer.ts#L1-L611)
 
-### Security Considerations
-The encryption implementation follows security best practices:
-
-- **Key Management**: Encryption keys are rotated automatically every 30 days with a 7-day grace period
-- **Data Protection**: All sensitive telemetry data is encrypted at rest and in transit
-- **Access Control**: Only authorized components can access the KMS service
-- **Audit Logging**: All encryption/decryption operations are logged for security auditing
+### Bottleneck Detection
+The bottleneck analyzer uses multiple criteria to identify performance issues, including average processing time, error rate, and percentile thresholds.
 
 ```json
 {
-  "security": {
-    "keyRotation": {
-      "enabled": true,
-      "rotationIntervalDays": 30,
-      "gracePeriodDays": 7,
-      "automaticRotation": true
+  "thresholds": {
+    "eventProcessing": {
+      "warning": 100,
+      "critical": 500
+    },
+    "eventValidation": {
+      "warning": 50,
+      "critical": 200
+    },
+    "eventHashing": {
+      "warning": 10,
+      "critical": 50
+    },
+    "eventStorage": {
+      "warning": 200,
+      "critical": 1000
     }
   }
 }
 ```
 
 **Section sources**
-- [infisical-kms](file://packages\infisical-kms\src\client.ts#L1-L73)
-- [security-best-practices.md](file://packages\audit\docs\guides\security-best-practices.md#L108-L130)
+- [bottleneck-analyzer.ts](file://packages\audit\src\observability\bottleneck-analyzer.ts#L1-L611)
 
-The integration of KMS encryption ensures that sensitive observability data remains protected while maintaining the dashboard's functionality for system monitoring and analysis.
+### Recommendations Engine
+The bottleneck analyzer generates actionable recommendations based on the type and severity of identified bottlenecks.
+
+```mermaid
+flowchart TD
+A["Identify Bottleneck"] --> B{"Component Type?"}
+B --> |Database| C["Add indexes, optimize queries, connection pooling"]
+B --> |Queue| D["Increase worker concurrency, optimize processing"]
+B --> |Redis| E["Implement pipelining, connection pooling"]
+B --> |Event Processing| F["Optimize pipeline, implement async processing"]
+B --> |Validation| G["Cache schemas, optimize validation logic"]
+C --> H["Generate Recommendations"]
+D --> H
+E --> H
+F --> H
+G --> H
+H --> I["Return to Dashboard"]
+```
+
+**Diagram sources**
+- [bottleneck-analyzer.ts](file://packages\audit\src\observability\bottleneck-analyzer.ts#L1-L611)
+
+### Security Considerations
+The bottleneck analysis system follows security best practices:
+
+- **Data Protection**: All profiling data is stored in Redis with appropriate access controls
+- **Resource Limits**: Profiling sessions are limited in duration and frequency to prevent resource exhaustion
+- **Access Control**: Only authorized components can initiate performance profiling
+- **Audit Logging**: All profiling operations are logged for security auditing
+
+```json
+{
+  "profiling": {
+    "enabled": true,
+    "sampleRate": 0.1,
+    "maxProfiles": 100,
+    "profileDuration": 30000
+  }
+}
+```
+
+**Section sources**
+- [bottleneck-analyzer.ts](file://packages\audit\src\observability\bottleneck-analyzer.ts#L1-L611)
+- [types.ts](file://packages\audit\src\observability\types.ts#L1-L304)
+
+The integration of the bottleneck analyzer ensures that performance issues are proactively identified and addressed, maintaining optimal system performance while providing actionable insights for optimization.

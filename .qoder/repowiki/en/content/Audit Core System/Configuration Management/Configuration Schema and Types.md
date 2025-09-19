@@ -19,6 +19,8 @@
 - [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation*
 - [logging.ts](file://packages\logs\src\logging.ts) - *Structured logging implementation*
 - [types.ts](file://packages\logs\src\interface.ts) - *Logging interface definitions*
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts) - *Database preset handler implementation*
+- [index.ts](file://apps\worker\src\index.ts) - *Worker initialization with structured logging*
 </cite>
 
 ## Update Summary
@@ -30,6 +32,7 @@
 - Updated source tracking annotations to reflect new logging implementation files
 - Added documentation for logging configuration defaults and factory patterns
 - Integrated new logging implementation into the core documentation
+- Added documentation for database preset handler integration and its role in configuration management
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -47,6 +50,7 @@
 13. [OTLP Exporter](#otlp-exporter)
 14. [Structured Logging System](#structured-logging-system)
 15. [LoggerFactory](#loggerfactory)
+16. [Database Preset Handler](#database-preset-handler)
 
 ## Introduction
 The Configuration Schema and Types system provides a comprehensive, type-safe framework for managing audit system configuration across environments. Built with TypeScript, the system enforces compile-time validation, supports IDE autocompletion, and enables runtime safety through comprehensive validation. The configuration schema is structured hierarchically, covering database connections, retention policies, compliance requirements (GDPR/HIPAA), integration endpoints, monitoring thresholds, and plugin extensions. This documentation details every configuration option, type hierarchy, and integration point, providing guidance for both standard and custom deployments.
@@ -984,3 +988,121 @@ LoggerFactory.setDefaultConfig({
 
 **Section sources**
 - [logging.ts](file://packages\logs\src\logging.ts#L550-L619)
+
+## Database Preset Handler
+
+The DatabasePresetHandler provides a database-backed implementation for managing audit presets, allowing organizations to store and retrieve configuration presets from a persistent data store. This implementation enables centralized management of audit configurations across multiple services and environments.
+
+### DatabasePresetHandler Implementation
+The DatabasePresetHandler class implements the PresetHandler interface, providing CRUD operations for audit presets stored in the database. It leverages the EnhancedAuditDatabaseClient for optimized queries with caching.
+
+```mermaid
+classDiagram
+class DatabasePresetHandler {
++client : EnhancedAuditDatabaseClient
++getPresets(organizationId? : string) : Promise<(AuditPreset & { id? : string })[]>
++getPreset(name : string, organizationId? : string) : Promise<(AuditPreset & { id? : string }) | null>
++createPreset(preset : AuditPreset & { createdBy : string }) : Promise<AuditPreset & { id? : string }>
++updatePreset(preset : AuditPreset & { id : string, updatedBy : string }) : Promise<AuditPreset & { id? : string }>
++deletePreset(name : string, organizationId : string) : Promise<{ success : true }>
++mapDatabasePresetToPreset(dbPreset : any) : AuditPreset & { id? : string }
+}
+class PresetHandler {
++getPresets(organizationId?) : Promise<(AuditPreset & { id? : string })[]>
++getPreset(name, organizationId?) : Promise<(AuditPreset & { id? : string }) | null>
++createPreset(preset) : Promise<AuditPreset & { id? : string }>
++updatePreset(preset) : Promise<AuditPreset & { id? : string }>
++deletePreset(name, organizationId) : Promise<{ success : true }>
+}
+class EnhancedAuditDatabaseClient {
++executeOptimizedQuery(query : Function, options? : { cacheKey : string, cacheTTL? : number }) : Promise<any>
++getDatabase() : Database
+}
+DatabasePresetHandler --> PresetHandler : "implements"
+DatabasePresetHandler --> EnhancedAuditDatabaseClient : "uses"
+```
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L1-L284)
+
+### Preset Retrieval with Priority
+The DatabasePresetHandler implements a priority-based retrieval system where organization-specific presets take precedence over default presets with the same name. This allows organizations to override default configurations while maintaining a consistent baseline.
+
+```mermaid
+sequenceDiagram
+participant Client as "Client"
+participant Handler as "DatabasePresetHandler"
+participant DB as "Database"
+Client->>Handler : getPreset("login", "org-123")
+Handler->>DB : Execute query with priority
+DB-->>Handler : Return results sorted by priority
+Handler->>Handler : Map database record to AuditPreset
+Handler-->>Client : Return preset with organization-specific values
+```
+
+**Diagram sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L50-L100)
+
+### Preset Creation and Update
+The DatabasePresetHandler uses upsert operations to create or update presets, ensuring that the database remains consistent and preventing duplicate entries.
+
+```typescript
+async createPreset(preset: AuditPreset & { createdBy: string }): Promise<AuditPreset & { id?: string }> {
+	const db = this.client.getDatabase()
+	try {
+		const result = await db.execute(sql`
+			INSERT INTO audit_preset (
+				name, description, organization_id, action, data_classification, required_fields, default_values, validation, created_by
+			) VALUES (
+				${preset.name}, ${preset.description}, ${preset.organizationId}, ${preset.action}, ${preset.dataClassification}, ${JSON.stringify(preset.requiredFields)}, ${JSON.stringify(preset.defaultValues)}, ${preset.validation ? JSON.stringify(preset.validation) : null}, ${preset.createdBy}
+			)
+			ON CONFLICT (name, organization_id) DO UPDATE SET
+				description = EXCLUDED.description,
+				action = EXCLUDED.action,
+				data_classification = EXCLUDED.data_classification,
+				required_fields = EXCLUDED.required_fields,
+				default_values = EXCLUDED.default_values,
+				validation = EXCLUDED.validation,
+				updated_at = NOW(),
+				updated_by = EXCLUDED.created_by
+			RETURNING *
+		`)
+
+		const rows = result || []
+		if (rows.length === 0) {
+			throw new Error('Preset already exists or failed to insert')
+		}
+		return this.mapDatabasePresetToPreset(rows[0])
+	} catch (error) {
+		throw new Error(`Failed to create preset: ${error}`)
+	}
+}
+```
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L150-L200)
+
+### Factory Pattern Integration
+The DatabasePresetHandler is integrated with a factory pattern through the createDatabasePresetHandler function, which simplifies instantiation and ensures consistent initialization.
+
+```typescript
+/**
+ * Factory function to create DatabasePresetHandler
+ */
+export function createDatabasePresetHandler(
+	auditDbInstance: EnhancedAuditDb
+): DatabasePresetHandler {
+	return new DatabasePresetHandler(auditDbInstance)
+}
+```
+
+This factory function is used in the worker initialization to create the preset handler:
+
+```typescript
+// In apps/worker/src/index.ts
+if (!presetDatabaseHandler) presetDatabaseHandler = createDatabasePresetHandler(auditDbService)
+```
+
+**Section sources**
+- [database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts#L270-L284)
+- [index.ts](file://apps\worker\src\index.ts#L150-L155)

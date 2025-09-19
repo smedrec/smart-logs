@@ -9,6 +9,7 @@
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts) - *Monitoring service implementation*
 - [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation*
 - [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts) - *Updated with structured logging integration*
+- [preset-types.ts](file://packages\audit\src\preset\preset-types.ts) - *Database preset handler integration*
 </cite>
 
 ## Update Summary
@@ -21,6 +22,7 @@
 - Updated test validation section to reflect new export capabilities
 - Integrated structured logging system into metrics collection framework
 - Updated metrics collector implementations to support enhanced logging capabilities
+- Added documentation for database preset handler integration and detailed phase timing metrics
 
 ## Table of Contents
 1. [Metrics Collection System Overview](#metrics-collection-system-overview)
@@ -36,7 +38,7 @@
 
 The Metrics Collection system is a comprehensive observability framework designed to capture key performance indicators across the audit pipeline. It provides real-time monitoring of event throughput, processing latency, error rates, and system resource utilization. The system is built around two primary implementations: the basic `RedisMetricsCollector` for core monitoring needs and the enhanced `RedisEnhancedMetricsCollector` for comprehensive observability.
 
-The metrics collection system serves as the foundation for monitoring service health, enabling teams to establish baselines, detect anomalies, and set up proactive alerting. It integrates seamlessly with the broader monitoring ecosystem, providing data for dashboards, alerting systems, and compliance reporting. Recent updates have enhanced the system with KMS encryption and an improved OTLP exporter with robust batch processing and error handling capabilities.
+The metrics collection system serves as the foundation for monitoring service health, enabling teams to establish baselines, detect anomalies, and set up proactive alerting. It integrates seamlessly with the broader monitoring ecosystem, providing data for dashboards, alerting systems, and compliance reporting. Recent updates have enhanced the system with KMS encryption and an improved OTLP exporter with robust batch processing and error handling capabilities. The system now records detailed timing for validation, hashing, pseudonymization, and storage phases, providing granular insights into audit pipeline performance.
 
 **Section sources**
 - [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L50) - *Updated in recent commit*

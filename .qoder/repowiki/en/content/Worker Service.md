@@ -2,7 +2,7 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit to integrate LoggerFactory from @repo/logs, add Redis connection retry logic, and initialize Sentry*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated in recent commit to integrate LoggerFactory from @repo/logs, add Redis connection retry logic, initialize Sentry, and add pseudonymization phase*
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts) - *Refactored to use StructuredLogger and LoggerFactory*
 - [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts) - *Updated to use enhanced structured logging*
 - [logging.ts](file://packages\logs\src\logging.ts) - *Contains LoggerFactory implementation for enhanced structured logging*
@@ -13,6 +13,7 @@
 - [package.json](file://apps\worker\package.json) - *Updated with new observability dependencies*
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated to use OTLP exporter and fix auth header usage*
 - [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *Documentation for OTLP configuration*
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Contains GDPR compliance service with pseudonymization functionality*
 </cite>
 
 ## Update Summary
@@ -28,6 +29,12 @@
 - Enhanced troubleshooting guide with logging-specific issues and secret detection scenarios
 - Removed outdated references to ConsoleLogger in documentation
 - Updated diagram sources to reflect actual code changes
+- Added pseudonymization phase to event processing workflow
+- Integrated GDPRComplianceService for data privacy requirements
+- Updated architecture overview to include pseudonymization phase
+- Added detailed analysis of pseudonymization implementation
+- Updated performance considerations to include pseudonymization metrics
+- Enhanced troubleshooting guide with pseudonymization-related issues
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -57,6 +64,7 @@ Key directories:
 - `packages/audit/src/queue`: Reliable message processing and circuit breaker logic
 - `packages/audit/src/crypto`: Cryptographic integrity verification for audit events
 - `packages/audit/src/archival`: Data archival and retention policy management
+- `packages/audit/src/gdpr`: GDPR compliance features including pseudonymization
 
 The worker uses TypeScript, follows a monorepo structure managed by pnpm, and relies on shared configuration from `packages/typescript-config`.
 
@@ -67,18 +75,22 @@ A --> C[Observability System]
 A --> D[Queue Processor]
 A --> E[CryptoService]
 A --> F[Archival Service]
+A --> G[GDPR Compliance]
 B --> E
-B --> G[Metrics Collector]
-B --> H[Alert Handlers]
-C --> I[Distributed Tracing]
-C --> J[Performance Dashboard]
-D --> K[Circuit Breaker]
-D --> L[Dead Letter Queue]
-E --> M[Hash Verification]
-F --> N[Data Archival]
-F --> O[Retention Policies]
-G --> P[Redis]
-H --> Q[PostgreSQL]
+B --> H[Metrics Collector]
+B --> I[Alert Handlers]
+C --> J[Distributed Tracing]
+C --> K[Performance Dashboard]
+D --> L[Circuit Breaker]
+D --> M[Dead Letter Queue]
+E --> N[Hash Verification]
+F --> O[Data Archival]
+F --> P[Retention Policies]
+G --> Q[Pseudonymization]
+G --> R[Data Export]
+G --> S[Retention Policies]
+H --> Q[(Redis)]
+I --> R[(PostgreSQL)]
 ```
 
 **Diagram sources**
@@ -87,11 +99,13 @@ H --> Q[PostgreSQL]
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts)
 - [crypto.ts](file://packages\audit\src\crypto.ts)
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 **Section sources**
 - [index.ts](file://apps\worker\src\index.ts)
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ## Core Components
 The Worker Service's functionality is driven by several core components:
@@ -105,6 +119,7 @@ The Worker Service's functionality is driven by several core components:
 - **ArchivalService**: Manages data archival and retention policies with enhanced logging.
 - **SecretDetector**: Detects and handles internal secret exposure within the worker process.
 - **Sentry**: Error tracking and monitoring service for production issues.
+- **GDPRComplianceService**: Implements GDPR requirements including data pseudonymization, export, and retention policies.
 
 These components are orchestrated through dependency injection and support pluggable handlers for extensibility.
 
@@ -116,11 +131,12 @@ These components are orchestrated through dependency injection and support plugg
 - [logging.ts](file://packages\logs\src\logging.ts)
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
 - [index.ts](file://apps\worker\src\index.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ## Architecture Overview
 The Worker Service follows an event-driven, microservices-inspired architecture. It consumes audit log events from a message queue (via Inngest), processes them for compliance and security monitoring, and emits alerts and metrics.
 
-The system is designed with resilience in mind, incorporating circuit breakers, retry mechanisms, and dead-letter queues for fault tolerance. Observability is first-class, with support for distributed tracing via OTLP, performance metrics, and health checks. Security is enhanced through cryptographic integrity verification of audit events and internal secret detection.
+The system is designed with resilience in mind, incorporating circuit breakers, retry mechanisms, and dead-letter queues for fault tolerance. Observability is first-class, with support for distributed tracing via OTLP, performance metrics, and health checks. Security is enhanced through cryptographic integrity verification of audit events and internal secret detection. Privacy compliance is ensured through GDPR-compliant pseudonymization of personal data.
 
 ```mermaid
 graph LR
@@ -146,6 +162,7 @@ Logger[StructuredLogger]
 Archival[ArchivalService]
 SecretDetector[SecretDetector]
 SentryClient[Sentry]
+GDPR[GDPRComplianceService]
 end
 S3 --> Inngest
 MQ --> Inngest
@@ -168,6 +185,10 @@ Inngest --> SecretDetector
 SecretDetector --> Logger
 Inngest --> SentryClient
 SentryClient --> Sentry
+Inngest --> GDPR
+GDPR --> DB
+GDPR --> KMS
+GDPR --> Logger
 ```
 
 **Diagram sources**
@@ -179,6 +200,7 @@ SentryClient --> Sentry
 - [logging.ts](file://packages\logs\src\logging.ts)
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
 - [index.ts](file://apps\worker\src\index.ts)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
 
 ## Detailed Component Analysis
 
@@ -504,6 +526,43 @@ Sentry-->>Worker : Error reported
 **Section sources**
 - [index.ts](file://apps\worker\src\index.ts#L50-L58)
 
+### Pseudonymization Implementation
+The worker now includes a dedicated pseudonymization phase in the event processing workflow, implementing GDPR compliance requirements for data privacy. The `GDPRComplianceService` handles pseudonymization of personal data while maintaining referential integrity.
+
+```mermaid
+sequenceDiagram
+participant Event as Audit Event
+participant Worker as Worker Service
+participant GDPR as GDPRComplianceService
+participant KMS as Key Management Service
+participant Logger as StructuredLogger
+participant DB as PostgreSQL
+Event->>Worker : processEvent()
+Worker->>GDPR : pseudonymizeEvent()
+GDPR->>GDPR : check if principalId needs pseudonymization
+alt Needs Pseudonymization
+GDPR->>GDPR : generate pseudonymId
+GDPR->>KMS : encrypt original ID
+KMS-->>GDPR : encrypted ID
+GDPR->>DB : store pseudonym mapping
+DB-->>GDPR : success
+GDPR->>Event : replace principalId with pseudonymId
+else Already Pseudonymized
+GDPR-->>Event : return event unchanged
+end
+GDPR-->>Worker : pseudonymized event
+Worker->>Worker : continue processing
+```
+
+**Diagram sources**
+- [index.ts](file://apps\worker\src\index.ts#L1-L799)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L1-L818)
+- [package.json](file://apps\worker\package.json)
+
+**Section sources**
+- [index.ts](file://apps\worker\src\index.ts#L1-L799)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L1-L818)
+
 ## Dependency Analysis
 The Worker Service has a layered dependency structure:
 
@@ -523,6 +582,9 @@ Logs --> Pino[pino]
 Logs --> PinoElastic[pino-elasticsearch]
 Audit --> Archival[@repo/audit/src/archival]
 Archival --> Logs[@repo/logs]
+Audit --> GDPR[@repo/audit/src/gdpr]
+GDPR --> Logs[@repo/logs]
+GDPR --> InfisicalKMS[@repo/infisical-kms]
 Worker --> Sentry[@sentry/node]
 ```
 
@@ -553,6 +615,8 @@ The worker is optimized for high-throughput, low-latency processing:
 - **Secret Detection**: Implements efficient scanning of environment variables and configuration without impacting performance.
 - **Redis Connection**: Implements retry logic with exponential backoff for resilient connection establishment.
 - **Error Tracking**: Integrates Sentry for comprehensive error monitoring and performance insights.
+- **Pseudonymization**: Implements efficient pseudonymization using hash-based strategy with caching to avoid redundant operations. The pseudonymization phase adds minimal overhead while ensuring GDPR compliance.
+- **Data Retention**: Implements automated data retention policies with configurable archival and deletion schedules to manage storage costs while maintaining compliance.
 
 The system is horizontally scalable via Kubernetes, with each worker instance maintaining independent state while sharing Redis and PostgreSQL backends.
 
@@ -574,6 +638,8 @@ Common issues and their resolutions:
 - **Redis Connection Failures**: Check Redis server availability and network connectivity. Verify Redis configuration in the S3 configuration file. Ensure Redis credentials are correct.
 - **Sentry Integration Issues**: Verify that the Sentry DSN is correctly configured in the code. Check network connectivity to the Sentry server. Ensure that the release version is properly set.
 - **Configuration Manager Errors**: Verify that the CONFIG_PATH environment variable points to a valid S3 location. Check S3 bucket permissions and network connectivity. Ensure the configuration file is valid JSON.
+- **Pseudonymization Failures**: Check that the KMS service is available and properly configured. Verify that the PSEUDONYM_SALT environment variable is set. Ensure that the pseudonym_mapping table exists in the database.
+- **GDPR Compliance Issues**: Verify that retention policies are properly configured in the audit_retention_policy table. Check that the KMS service is available for encryption/decryption operations. Ensure that the pseudonymization service has proper database permissions.
 
 **Section sources**
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L500-L600)
@@ -586,6 +652,7 @@ Common issues and their resolutions:
 - [postgres-archival-service.ts](file://packages\audit\src\archival\postgres-archival-service.ts#L1-L229)
 - [index.ts](file://apps\worker\src\index.ts#L1-L784)
 - [connection.ts](file://packages\redis-client\src\connection.ts#L48-L119)
+- [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L1-L818)
 
 ## Conclusion
 The Worker Service is a robust, scalable background processor designed for real-time compliance and security monitoring. Its modular architecture, deep observability, and resilience patterns make it well-suited for mission-critical audit processing.
@@ -601,5 +668,7 @@ The archival services have been updated to use the enhanced structured logging s
 A new internal secret detection mechanism has been implemented to prevent accidental leakage of sensitive information, enhancing the overall security posture of the worker service.
 
 The service now includes Redis connection retry logic, improving resilience during startup in environments with transient network issues. Additionally, Sentry has been integrated for comprehensive error tracking and monitoring, providing valuable insights into production issues.
+
+The most significant recent addition is the pseudonymization phase, which implements GDPR compliance requirements for data privacy. The `GDPRComplianceService` ensures that personal data is pseudonymized while maintaining referential integrity through secure mapping storage. This feature enables the system to meet regulatory requirements while preserving the ability to perform compliance investigations when authorized.
 
 Future enhancements could include ML-based anomaly detection, integration with SIEM systems, and enhanced cryptographic features such as digital signatures and certificate-based authentication. The codebase demonstrates strong separation of concerns, extensive testing, and clear extensibility points through pluggable alert handlers and metrics collectors.

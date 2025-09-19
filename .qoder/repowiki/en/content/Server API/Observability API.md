@@ -12,16 +12,17 @@
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L677)
 - [crypto.ts](file://packages/audit/src/crypto.ts#L1-L174)
 - [client.ts](file://packages/infisical-kms/src/client.ts#L1-L73)
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L603) - *Updated in recent commit with RedisEnhancedMetricsCollector*
+- [index.ts](file://apps/worker/src/index.ts#L1-L873) - *Updated in recent commit with structured logging integration*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated Data Collection Mechanism section to reflect enhanced structured logging implementation with KMS encryption
-- Added details about OTLP exporter with encrypted transport and authentication
-- Enhanced error handling and logging details in middleware instrumentation
-- Added KMS integration for secure data export
+- Updated Enhanced Metrics Endpoint to reflect new RedisEnhancedMetricsCollector implementation
+- Added details about structured logging system with KMS encryption in Data Collection Mechanism
+- Updated Integration Examples with new worker endpoint patterns
+- Added references to RedisEnhancedMetricsCollector and worker index.ts in document sources
 - Updated section sources to include newly modified files
-- Added references to OTLP export configuration with security features
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -201,7 +202,7 @@ Retrieves comprehensive system performance metrics and health status.
 - 500: Internal Server Error - failed to retrieve dashboard data
 
 ### Enhanced Metrics Endpoint
-Retrieves system performance metrics in various formats.
+Retrieves system performance metrics in various formats using the RedisEnhancedMetricsCollector.
 
 **URL Pattern**: `GET /api/v1/observability/metrics/enhanced`  
 **HTTP Method**: GET  
@@ -210,7 +211,7 @@ Retrieves system performance metrics in various formats.
 - `format`: Response format (`json` or `prometheus`, default: `json`)
 
 **Summary**: Get Enhanced metrics  
-**Description**: Retrieves current system performance metrics including server, database, and API statistics.
+**Description**: Retrieves current system performance metrics including server, database, and API statistics through the RedisEnhancedMetricsCollector.
 
 **Response Structure (200 OK)**:
 When `format=json`:
@@ -220,30 +221,50 @@ When `format=json`:
     "eventProcessingTime": 89.2,
     "eventValidationTime": 45.6,
     "eventHashingTime": 8.9,
+    "eventPseudonymizationTime": 15.3,
     "eventStorageTime": 189.2,
+    "queueWaitTime": 23.4,
     "queueProcessingTime": 78.5,
+    "queueDepth": 12,
+    "dbConnectionTime": 45.6,
     "dbQueryTime": 245.6,
-    "redisOperationTime": 12.3
+    "dbTransactionTime": 321.4,
+    "redisConnectionTime": 12.3,
+    "redisOperationTime": 18.7,
+    "memoryUsage": 45.2,
+    "heapUsed": 1048576,
+    "heapTotal": 1310720,
+    "cpuUsage": 67.8
   }
 }
 ```
 
 When `format=prometheus`:
 ```
-# TYPE event_processing_time gauge
-event_processing_time 89.2
-# TYPE event_validation_time gauge
-event_validation_time 45.6
-# TYPE event_hashing_time gauge
-event_hashing_time 8.9
-# TYPE event_storage_time gauge
-event_storage_time 189.2
-# TYPE queue_processing_time gauge
-queue_processing_time 78.5
-# TYPE db_query_time gauge
-db_query_time 245.6
-# TYPE redis_operation_time gauge
-redis_operation_time 12.3
+# HELP audit_events_total Total number of audit events processed
+# TYPE audit_events_total counter
+audit_events_total 12345
+# HELP audit_events_per_second Current events per second
+# TYPE audit_events_per_second gauge
+audit_events_per_second 45.6
+# HELP audit_processing_time_avg Average processing time in milliseconds
+# TYPE audit_processing_time_avg gauge
+audit_processing_time_avg 89.2
+# HELP audit_error_rate Error rate as percentage
+# TYPE audit_error_rate gauge
+audit_error_rate 0.02
+# HELP system_cpu_usage CPU usage percentage
+# TYPE system_cpu_usage gauge
+system_cpu_usage 67.8
+# HELP system_memory_usage Memory usage percentage
+# TYPE system_memory_usage gauge
+system_memory_usage 45.2
+# HELP component_health_status Component health status (0=UNHEALTHY, 1=DEGRADED, 2=HEALTHY)
+# TYPE component_health_status gauge
+component_health_status{component="Database"} 2
+# HELP component_response_time Component response time in milliseconds
+# TYPE component_response_time gauge
+component_response_time{component="Database"} 45.6
 ```
 
 **Status Codes**:
@@ -451,6 +472,7 @@ Retrieves detailed profiling results from performance profiling sessions.
 
 **Section sources**
 - [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L51-L400)
+- [index.ts](file://apps/worker/src/index.ts#L269-L315) - *Updated with RedisEnhancedMetricsCollector usage*
 
 ## Authentication and Security
 The Observability API requires authentication via JWT (JSON Web Token) with the `observability:read` scope. This ensures that only authorized users with appropriate permissions can access sensitive performance and tracing data.
@@ -513,8 +535,9 @@ Key components are instrumented with monitoring middleware that automatically ca
 
 - **Request Processing**: Measures end-to-end request duration
 - **Database Operations**: Tracks query execution time and resource usage
-- **Event Processing**: Monitors event validation, hashing, and storage times
+- **Event Processing**: Monitors event validation, hashing, storage, and pseudonymization times
 - **Queue Operations**: Records message processing latency
+- **System Metrics**: Collects CPU, memory, and other system-level metrics
 
 The middleware uses the OpenTelemetry standard for tracing, creating spans that represent discrete units of work. Each span includes metadata about the operation, start time, duration, and relationships to other spans.
 
@@ -527,6 +550,7 @@ The system has been updated to use an enhanced structured logging system based o
 - **Error tracking**: Comprehensive error information including stack traces (when enabled)
 - **Multiple output formats**: Support for console, JSON, OTLP, and file outputs
 - **KMS encryption**: Sensitive log data is encrypted using Infisical KMS before export
+- **RedisEnhancedMetricsCollector**: Centralized metrics collection using Redis as storage backend
 
 The logging system is initialized in the server startup process where `LoggerFactory.setDefaultConfig()` is called with configuration from the server config, setting the log level, format (pretty for development, JSON for production), and outputs (console and OTLP). The `StructuredLogger` instances are created with request-specific context and automatically include performance metrics when enabled.
 
@@ -536,12 +560,22 @@ The OTLP exporter now supports secure transmission with multiple authentication 
 - Encrypted transport using TLS
 - Payload compression for large log entries
 
+The RedisEnhancedMetricsCollector class implements the EnhancedMetricsCollector interface and provides comprehensive metrics collection capabilities:
+- Stores performance metrics in Redis with configurable retention
+- Collects system metrics (CPU, memory, disk, network)
+- Records audit operation metrics with timestamps and success/failure status
+- Provides time series data storage for trend analysis
+- Supports both JSON and Prometheus export formats
+- Implements periodic system metrics collection
+
 **Section sources**
 - [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L400)
 - [monitoring.ts](file://apps/server/src/lib/middleware/monitoring.ts#L1-L343)
 - [logging.ts](file://packages/logs/src/logging.ts#L1-L620)
 - [otpl.ts](file://packages/logs/src/otpl.ts#L1-L166)
 - [crypto.ts](file://packages/audit/src/crypto.ts#L1-L174)
+- [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L603) - *Updated with RedisEnhancedMetricsCollector implementation*
+- [index.ts](file://apps/worker/src/index.ts#L1-L873) - *Updated with structured logging integration*
 
 ## Error Handling
 The Observability API implements comprehensive error handling to provide meaningful feedback while maintaining system security.
@@ -631,6 +665,7 @@ getDashboardData().then(data => {
 
 **Section sources**
 - [observability-api.ts](file://apps/server/src/routes/observability-api.ts#L250-L400)
+- [index.ts](file://apps/worker/src/index.ts#L219-L363) - *Updated with worker endpoint examples*
 
 ## Performance Dashboard Structure
 The performance dashboard data structure is designed to provide a comprehensive view of system health and performance metrics.
