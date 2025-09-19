@@ -9,7 +9,7 @@ import { DatabasePerformanceMonitor } from './performance-monitoring.js'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
 import type { CacheFactoryConfig } from '../cache/cache-factory.js'
-import type { ConnectionPoolConfig } from './connection-pool.js'
+import type { ConnectionPoolConfig, ReplicationConfig } from './connection-pool.js'
 import type * as schema from './schema.js'
 
 /**
@@ -22,9 +22,12 @@ export interface EnhancedClientConfig {
 	connectionPool: ConnectionPoolConfig
 	/** Query cache configuration */
 	queryCacheFactory: CacheFactoryConfig
+	/** Replication configuration */
+	replication: ReplicationConfig
 	/** Partition management configuration */
 	partitioning: {
 		enabled: boolean
+		tables: string[]
 		strategy: 'range' | 'hash' | 'list'
 		interval: 'monthly' | 'quarterly' | 'yearly'
 		retentionDays: number
@@ -666,8 +669,12 @@ export function createEnhancedAuditClient(
 				keyPrefix: 'audit_cache',
 			},
 		},
+		replication: {
+			enabled: false,
+		},
 		partitioning: {
 			enabled: true,
+			tables: ['audit_log', 'error_log'],
 			strategy: 'range',
 			interval: 'monthly',
 			retentionDays: 2555, // 7 years

@@ -3,6 +3,7 @@
  * Requirements 7.4: Connection pooling and query caching where appropriate
  */
 
+import { withReplicas } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
@@ -85,9 +86,34 @@ export class EnhancedConnectionPool {
 			ssl: config.ssl,
 		})
 
-		if (this.replication.enabled) {
-			// TODO: implement clients for read replicas
-			// this.db = withReplicas(primaryDb, [read1, read2])
+		if (
+			this.replication.enabled &&
+			this.replication.readReplicas &&
+			this.replication.readReplicas.length > 0
+		) {
+			let read: PostgresJsDatabase<typeof schema>[] = []
+			let num = 0
+			this.replication.readReplicas?.forEach((url) => {
+				num++
+				const client = postgres(url, {
+					max: config.maxConnections,
+					idle_timeout: Math.floor(config.idleTimeout / 1000), // postgres.js expects seconds
+					connect_timeout: Math.floor(config.acquireTimeout / 1000),
+					prepare: false, // Disable prepared statements for better connection reuse
+					transform: {
+						undefined: null,
+					},
+					onnotice: (notice) => {
+						console.log(`Replica ${num} PostgreSQL notice:`, notice)
+					},
+					// TODO: Add support for SSL
+				})
+				const db = drizzle(client, { schema })
+				read.push(db)
+			})
+
+			const primaryDb = drizzle(this.client, { schema })
+			this.db = withReplicas(primaryDb, read as any)
 		} else {
 			this.db = drizzle(this.client, { schema })
 		}
