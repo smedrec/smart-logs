@@ -1,0 +1,67 @@
+services:
+  postgresql-master:
+    image: bitnami/postgresql
+    container_name: master
+    restart: always
+    ports:
+      - '5432:5432'
+    volumes:
+      - master_data:/bitnami/postgresql
+      #- ./db.sql:/docker-entrypoint-initdb.d/db.sql
+    environment:
+      - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
+      - POSTGRESQL_LOG_HOSTNAME=true
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_user
+      - POSTGRESQL_USERNAME=${POSTGRES_USER}
+      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
+
+  postgresql-slave-1:
+    image: bitnami/postgresql
+    container_name: slave-1
+    restart: always
+    ports:
+      - '5433:5432'
+    depends_on:
+      - postgresql-master
+    environment:
+      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRESQL_MASTER_HOST=postgresql-master
+      - POSTGRESQL_PGAUDIT_LOG=READ
+      - POSTGRESQL_LOG_HOSTNAME=true
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=${REPLICATION_USER}
+      - POSTGRESQL_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
+      - POSTGRESQL_MASTER_PORT_NUMBER=5432
+    volumes:
+      - slave_1_data:/bitnami/postgresql
+
+  postgresql-slave-2:
+    image: bitnami/postgresql
+    container_name: slave-2
+    restart: always
+    ports:
+      - '5434:5432'
+    depends_on:
+      - postgresql-master
+    environment:
+      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRESQL_MASTER_HOST=postgresql-master
+      - POSTGRESQL_PGAUDIT_LOG=READ
+      - POSTGRESQL_LOG_HOSTNAME=true
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=${REPLICATION_USER}
+      - POSTGRESQL_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
+      - POSTGRESQL_MASTER_PORT_NUMBER=5432
+    volumes:
+      - slave_2_data:/bitnami/postgresql
+
+volumes:
+  master_data:
+    driver: local
+  slave_1_data:
+    driver: local
+  slave_2_data:
+    driver: local
+    
