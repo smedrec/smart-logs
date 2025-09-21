@@ -73,9 +73,9 @@ This audit system is purpose-built for healthcare environments, offering:
 ### Future Development
 
 - [Future Enhancements](./future-enhancements/) - Development roadmap and contribution guide
-- TODO: [Roadmap](./future-enhancements/roadmap.md) - Development roadmap
-- TODO: [Unimplemented Features](./future-enhancements/unimplemented-features.md) - Missing features
-- TODO: [Contribution Guide](./future-enhancements/contribution-guide.md) - Contribution guidelines
+- [Roadmap](./future-enhancements/roadmap.md) - Development roadmap
+- [Unimplemented Features](./future-enhancements/unimplemented-features.md) - Missing features
+- [Contribution Guide](./future-enhancements/contribution-guide.md) - Contribution guidelines
 
 ## 🚀 Quick Start
 
