@@ -7,6 +7,8 @@ import { withReplicas } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
+import { LoggerFactory, StructuredLogger } from '@repo/logs'
+
 import { createQueryCache } from '../cache/cache-factory.js'
 import * as schema from './schema.js'
 
@@ -66,11 +68,32 @@ export class EnhancedConnectionPool {
 	private stats: ConnectionPoolStats
 	private connectionTimes: number[] = []
 	private acquisitionTimes: number[] = []
+	private logger: StructuredLogger
 
 	constructor(
 		private config: ConnectionPoolConfig,
 		private replication: ReplicationConfig = { enabled: false }
 	) {
+		// Initialize Structured Logger
+		LoggerFactory.setDefaultConfig({
+			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+			enablePerformanceLogging: true,
+			enableErrorTracking: true,
+			enableMetrics: false,
+			format: 'json',
+			outputs: ['otpl'],
+			otplConfig: {
+				endpoint: 'http://localhost:5080/api/default/default/_json',
+				headers: {
+					Authorization: process.env.OTLP_AUTH_HEADER || '',
+				},
+			},
+		})
+
+		this.logger = LoggerFactory.createLogger({
+			service: '@repo/audit-db - EnhancedConnectionPool',
+		})
+
 		this.client = postgres(config.url, {
 			max: config.maxConnections,
 			idle_timeout: Math.floor(config.idleTimeout / 1000), // postgres.js expects seconds
@@ -80,7 +103,8 @@ export class EnhancedConnectionPool {
 				undefined: null, // Transform undefined to null for PostgreSQL
 			},
 			onnotice: (notice) => {
-				console.log('Primary PostgreSQL notice:', notice)
+				// TODO: add metadata
+				this.logger.info(`Primary PostgreSQL notice: ${notice}`)
 			},
 			debug: process.env.NODE_ENV === 'development',
 			ssl: config.ssl,
@@ -104,7 +128,7 @@ export class EnhancedConnectionPool {
 						undefined: null,
 					},
 					onnotice: (notice) => {
-						console.log(`Replica ${num} PostgreSQL notice:`, notice)
+						this.logger.info(`Replica ${num} PostgreSQL notice: ${notice}`)
 					},
 					// TODO: Add support for SSL
 				})
@@ -114,6 +138,7 @@ export class EnhancedConnectionPool {
 
 			const primaryDb = drizzle(this.client, { schema })
 			this.db = withReplicas(primaryDb, read as any)
+			this.logger.info(`Connected with ${this.replication.readReplicas.length} replicas`)
 		} else {
 			this.db = drizzle(this.client, { schema })
 		}
