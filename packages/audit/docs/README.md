@@ -26,27 +26,41 @@ This audit system is purpose-built for healthcare environments, offering:
 - [Tutorials Overview](./tutorials/) - Complete tutorials guide
 - [Basic Implementation](./tutorials/basic-implementation.md) - Standard audit setup
 - [Healthcare Compliance](./tutorials/healthcare-compliance.md) - HIPAA/GDPR configuration
-- TODO: [FHIR Integration](./tutorials/fhir-integration.md) - FHIR resource audit events
-- TODO: [Security Configuration](./tutorials/security-configuration.md) - Cryptographic setup
-- TODO: [Monitoring & Observability](./tutorials/ monitoring-setup.md) - Monitoring and observability configuration
-- TODO: [Advanced Implementation](./tutorials/advanced-patterns.md) - Complex use cases
+- [FHIR Integration](./tutorials/fhir-integration.md) - FHIR resource audit events
+- [Security Configuration](./tutorials/security-configuration.md) - Cryptographic setup
+- [Monitoring & Observability](./tutorials/monitoring-setup.md) - Monitoring and observability configuration
+- [Advanced Implementation](./tutorials/advanced-patterns.md) - Complex use cases
 
 ### API Reference
 
 - [API Reference Overview](./api-reference/) - Complete API documentation
 - [Core Audit Class](./api-reference/audit-class.md) - Main Audit class documentation
 - [Event Types](./api-reference/event-types.md) - Event interfaces and structures
+- [Configuration](./api-reference/configuration.md) - Configuration options
+- [Cryptography](./api-reference/cryptography.md) - Security functions
+- [Monitoring](./api-reference/monitoring.md) - Monitoring APIs
+- [Compliance](./api-reference/compliance.md) - Compliance APIs
+- [Utilities](./api-reference/utilities.md) - Utility functions
 
 ### Implementation Guides
 
 - [Implementation Guides Overview](./guides/) - Complete implementation guides
 - [Security Best Practices](./guides/security-best-practices.md) - Security guidelines
 - [Performance Optimization](./guides/performance-optimization.md) - Performance tuning
+- [Performance Optimization](./guides/performance-optimization.md) - Performance tuning
+- [Error Handling](./guides/error-handling.md) - Error management
+- [Testing Strategies](./guides/testing-strategies.md) - Testing approaches
+- [Deployment Patterns](./guides/deployment-patterns.md) - Production deployment
+- [Migration Guide](./guides/migration-guide.md) - Version migration
 
 ### Examples
 
 - [Examples Overview](./examples/) - Complete examples guide
 - [Healthcare Scenarios](./examples/healthcare-scenarios.md) - Medical use cases and implementations
+- [FHIR Workflows](./examples/fhir-workflows.md) - FHIR implementations with healthcare-specific patterns
+- [Authentication Flows](./examples/authentication-flows.md) - Auth audit patterns and security integration
+- [Batch Processing](./examples/batch-processing.md) - High-volume scenarios and performance optimization
+- [Integration Patterns](./examples/integration-patterns.md) - Healthcare system integrations and enterprise patterns
 
 ### Troubleshooting & Support
 
@@ -59,6 +73,9 @@ This audit system is purpose-built for healthcare environments, offering:
 ### Future Development
 
 - [Future Enhancements](./future-enhancements/) - Development roadmap and contribution guide
+- TODO: [Roadmap](./future-enhancements/roadmap.md) - Development roadmap
+- TODO: [Unimplemented Features](./future-enhancements/unimplemented-features.md) - Missing features
+- TODO: [Contribution Guide](./future-enhancements/contribution-guide.md) - Contribution guidelines
 
 ## 🚀 Quick Start
 

@@ -1,8 +1,15 @@
+x-postgres-common: &postgres-common
+  image: bitnami/postgresql
+  restart: always
+  healthcheck:
+    test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+    interval: 10s
+    timeout: 5s
+    retries: 5
 services:
   postgresql-master:
-    image: bitnami/postgresql
-    container_name: master
-    restart: always
+    <<: *postgres-common
+    container_name: postgres-master
     ports:
       - '5432:5432'
     volumes:
@@ -18,13 +25,13 @@ services:
       - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
 
   postgresql-slave-1:
-    image: bitnami/postgresql
-    container_name: slave-1
-    restart: always
+    <<: *postgres-common
+    container_name: postgres-slave-1
     ports:
       - '5433:5432'
     depends_on:
-      - postgresql-master
+      postgresql-master:
+        condition: service_healthy
     environment:
       - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRESQL_MASTER_HOST=postgresql-master
@@ -38,13 +45,13 @@ services:
       - slave_1_data:/bitnami/postgresql
 
   postgresql-slave-2:
-    image: bitnami/postgresql
-    container_name: slave-2
-    restart: always
+    <<: *postgres-common
+    container_name: postgres-slave-2
     ports:
       - '5434:5432'
     depends_on:
-      - postgresql-master
+      postgresql-master:
+        condition: service_healthy
     environment:
       - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRESQL_MASTER_HOST=postgresql-master
@@ -56,6 +63,11 @@ services:
       - POSTGRESQL_MASTER_PORT_NUMBER=5432
     volumes:
       - slave_2_data:/bitnami/postgresql
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
 
 volumes:
   master_data:

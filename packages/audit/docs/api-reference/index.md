@@ -12,6 +12,13 @@ The `@repo/audit` package provides a comprehensive audit logging system with the
 ### Data Types & Interfaces
 - **[Event Types](./event-types.md)** - Audit event interfaces and types
 
+### System Components
+- **[Configuration](./configuration.md)** - Configuration management and validation
+- **[Cryptography](./cryptography.md)** - Cryptographic services and security
+- **[Monitoring](./monitoring.md)** - Real-time monitoring and alerting
+- **[Compliance](./compliance.md)** - HIPAA and GDPR compliance systems
+- **[Utilities](./utilities.md)** - Validation, sanitization, and helper functions
+
 ## 🔧 Core API Components
 
 ### Primary Interface
@@ -70,7 +77,9 @@ await GDPRAuditService.logDataProcessing({
 
 ## 🔒 Security APIs
 
-### Cryptographic Operations
+For comprehensive cryptographic operations, see **[Cryptography API](./cryptography.md)**.
+
+### Quick Example
 
 ```typescript
 import { CryptoService } from '@repo/audit'
@@ -87,104 +96,80 @@ const signature = await crypto.generateEventSignature(event)
 const isValid = crypto.verifyHash(event, expectedHash)
 ```
 
-### Tamper Detection
-
-```typescript
-// Verify event integrity
-const isIntact = await auditService.verifyEventHash(event, hash)
-
-// Verify digital signature
-const isAuthentic = await auditService.verifyEventSignature(event, signature)
-```
-
 ## 📊 Monitoring APIs
 
-### Health Checks
+For comprehensive monitoring and observability, see **[Monitoring API](./monitoring.md)**.
+
+### Quick Example
 
 ```typescript
-import { HealthCheckService } from '@repo/audit'
+import { MonitoringService, HealthCheckService } from '@repo/audit'
+
+// Initialize monitoring
+const monitoring = new MonitoringService(config)
 
 // Check system health
 const health = await HealthCheckService.checkAll()
 
-// Check specific components
-const dbHealth = await HealthCheckService.checkDatabase()
-const queueHealth = await HealthCheckService.checkQueue()
-```
-
-### Metrics Collection
-
-```typescript
-import { MetricsCollector } from '@repo/audit'
-
-// Collect performance metrics
-const metrics = await MetricsCollector.collectMetrics()
-
-// Get queue statistics
-const queueStats = await auditService.getQueueStats()
+// Process events with monitoring
+await monitoring.processEvent(auditEvent)
 ```
 
 ## 🔧 Configuration APIs
 
-### Environment Configuration
+For comprehensive configuration management, see **[Configuration API](./configuration.md)**.
+
+### Quick Example
 
 ```typescript
 import { ConfigurationManager } from '@repo/audit'
 
-// Load configuration
-const config = await ConfigurationManager.loadConfig()
-
-// Validate configuration
-const validation = ConfigurationManager.validateConfig(config)
-
-// Update configuration
-await ConfigurationManager.updateConfig(newConfig)
-```
-
-### Dynamic Configuration
-
-```typescript
-// Enable hot reloading
+// Initialize with hot reloading
 const configManager = new ConfigurationManager({
   enableHotReload: true,
-  watchFiles: ['audit-config.json']
+  enableSecureStorage: true
 })
 
-// Listen for changes
-configManager.on('configChanged', (newConfig) => {
-  // Handle configuration updates
-})
+// Load and validate
+const config = await configManager.loadConfig()
+const validation = configManager.validateConfig(config)
 ```
 
-## 🎯 Event Type APIs
+## 🏥 Compliance APIs
 
-### Event Creation
+For HIPAA and GDPR compliance features, see **[Compliance API](./compliance.md)**.
+
+### Quick Example
 
 ```typescript
-import { 
-  createSystemAuditEvent,
-  createAuthAuditEvent,
-  createDataAuditEvent,
-  createFHIRAuditEvent
-} from '@repo/audit'
+import { HIPAAComplianceService, GDPRComplianceService } from '@repo/audit'
 
-// Create typed events
-const systemEvent = createSystemAuditEvent('system.startup', { status: 'success' })
-const authEvent = createAuthAuditEvent('auth.login.success', { principalId: 'user-123' })
-const dataEvent = createDataAuditEvent('data.read', { targetResourceId: 'doc-456' })
-const fhirEvent = createFHIRAuditEvent('fhir.patient.read', { resourceId: 'patient-789' })
+// HIPAA compliance
+const hipaaService = new HIPAAComplianceService(config)
+await hipaaService.logPHIAccess(phiEvent)
+
+// GDPR compliance
+const gdprService = new GDPRComplianceService(client, audit, kms)
+const exportData = await gdprService.exportUserData(request)
 ```
 
-### Event Validation
+## 🛠️ Utilities APIs
+
+For validation, sanitization, and helper functions, see **[Utilities API](./utilities.md)**.
+
+### Quick Example
 
 ```typescript
-import { validateAuditEvent, validateCompliance } from '@repo/audit'
+import { validateAuditEvent, sanitizeAuditEvent, GDPRUtils } from '@repo/audit'
 
-// Validate event structure
+// Validate event
 const validation = validateAuditEvent(event)
 
-// Validate compliance requirements
-const compliance = validateCompliance(event, ['hipaa', 'gdpr'])
+// Sanitize event
+const sanitized = sanitizeAuditEvent(event)
+
+// GDPR utilities
+const pseudonym = GDPRUtils.generateDeterministicPseudonym(originalId)
 ```
 
 ## 🚀 Advanced APIs
@@ -263,6 +248,11 @@ interface AuditConfig {
 ### Essential APIs
 - **[Audit Class](./audit-class.md)** - Core functionality
 - **[Event Types](./event-types.md)** - Event structures
+- **[Configuration](./configuration.md)** - System configuration
+- **[Cryptography](./cryptography.md)** - Security and integrity
+- **[Monitoring](./monitoring.md)** - System monitoring
+- **[Compliance](./compliance.md)** - Regulatory compliance
+- **[Utilities](./utilities.md)** - Helper functions
 
 ## 💡 Usage Patterns
 

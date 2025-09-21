@@ -10,6 +10,10 @@ These tutorials are designed specifically for healthcare applications and regula
 
 1. **[Basic Implementation](./basic-implementation.md)** - Standard audit setup for healthcare applications
 2. **[Healthcare Compliance](./healthcare-compliance.md)** - HIPAA and GDPR compliance configuration
+3. **[FHIR Integration](./fhir-integration.md)** - FHIR-compliant audit logging for healthcare systems
+4. **[Security Configuration](./security-configuration.md)** - Cryptographic security and KMS integration
+5. **[Monitoring & Observability](./monitoring-setup.md)** - Comprehensive monitoring and observability setup
+6. **[Advanced Implementation Patterns](./advanced-patterns.md)** - Multi-tenant, high-availability, and enterprise patterns
 
 ## 🎯 Learning Path
 
@@ -18,14 +22,22 @@ These tutorials are designed specifically for healthcare applications and regula
 **New to Healthcare Auditing?** Follow this path:
 1. Start with [Basic Implementation](./basic-implementation.md)
 2. Learn [Healthcare Compliance](./healthcare-compliance.md) requirements
+3. Implement [FHIR Integration](./fhir-integration.md) for healthcare data
+4. Configure [Security Configuration](./security-configuration.md) for compliance
+5. Set up [Monitoring & Observability](./monitoring-setup.md) for system health
+6. Explore [Advanced Patterns](./advanced-patterns.md) for complex environments
 
 **Experienced with Healthcare Systems?** Jump to:
 1. [Healthcare Compliance](./healthcare-compliance.md) for regulatory requirements
+2. [FHIR Integration](./fhir-integration.md) for healthcare-specific implementations
+3. [Advanced Patterns](./advanced-patterns.md) for enterprise-grade systems
 
 ### For Security Engineers
 
 Focus on security and compliance tutorials:
 1. [Healthcare Compliance](./healthcare-compliance.md) - Regulatory compliance
+2. [Security Configuration](./security-configuration.md) - Cryptographic security implementation
+3. [Advanced Patterns](./advanced-patterns.md) - Enterprise security patterns
 
 ## 📋 Prerequisites
 
@@ -121,6 +133,10 @@ Track your progress through the tutorials:
 
 - [ ] Basic Implementation - Standard audit setup
 - [ ] Healthcare Compliance - HIPAA/GDPR configuration
+- [ ] FHIR Integration - Healthcare data audit logging
+- [ ] Security Configuration - Cryptographic security setup
+- [ ] Monitoring & Observability - System monitoring and alerting
+- [ ] Advanced Patterns - Multi-tenant and enterprise implementations
 
 ## 💡 Tutorial Tips
 
