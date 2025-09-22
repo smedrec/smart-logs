@@ -14,8 +14,8 @@ import { PresetsService } from '../services/presets'
 import { ScheduledReportsService } from '../services/scheduled-reports'
 import { ConfigManager } from './config'
 
+import type { RequestInterceptor, ResponseInterceptor } from '../infrastructure/interceptors'
 import type { Logger } from '../infrastructure/logger'
-import type { RequestInterceptor, ResponseInterceptor } from './base-resource'
 import type { AuditClientConfig, PartialAuditClientConfig } from './config'
 
 /**
@@ -543,15 +543,18 @@ export class AuditClient {
 	/**
 	 * Add request interceptor to all services
 	 */
-	public addRequestInterceptor(interceptor: RequestInterceptor): void {
+	public addRequestInterceptor(
+		interceptor: RequestInterceptor,
+		options: { enabled: true; priority: 0 }
+	): void {
 		this.validateClientState()
 
-		this._events.addRequestInterceptor(interceptor)
-		this._compliance.addRequestInterceptor(interceptor)
-		this._scheduledReports.addRequestInterceptor(interceptor)
-		this._presets.addRequestInterceptor(interceptor)
-		this._metrics.addRequestInterceptor(interceptor)
-		this._health.addRequestInterceptor(interceptor)
+		this._events.addRequestInterceptor(interceptor, options)
+		this._compliance.addRequestInterceptor(interceptor, options)
+		this._scheduledReports.addRequestInterceptor(interceptor, options)
+		this._presets.addRequestInterceptor(interceptor, options)
+		this._metrics.addRequestInterceptor(interceptor, options)
+		this._health.addRequestInterceptor(interceptor, options)
 
 		this.getLogger().debug('Request interceptor added to all services')
 	}
@@ -559,15 +562,18 @@ export class AuditClient {
 	/**
 	 * Add response interceptor to all services
 	 */
-	public addResponseInterceptor(interceptor: ResponseInterceptor): void {
+	public addResponseInterceptor(
+		interceptor: ResponseInterceptor,
+		options: { enabled: true; priority: 0 }
+	): void {
 		this.validateClientState()
 
-		this._events.addResponseInterceptor(interceptor)
-		this._compliance.addResponseInterceptor(interceptor)
-		this._scheduledReports.addResponseInterceptor(interceptor)
-		this._presets.addResponseInterceptor(interceptor)
-		this._metrics.addResponseInterceptor(interceptor)
-		this._health.addResponseInterceptor(interceptor)
+		this._events.addResponseInterceptor(interceptor, options)
+		this._compliance.addResponseInterceptor(interceptor, options)
+		this._scheduledReports.addResponseInterceptor(interceptor, options)
+		this._presets.addResponseInterceptor(interceptor, options)
+		this._metrics.addResponseInterceptor(interceptor, options)
+		this._health.addResponseInterceptor(interceptor, options)
 
 		this.getLogger().debug('Response interceptor added to all services')
 	}

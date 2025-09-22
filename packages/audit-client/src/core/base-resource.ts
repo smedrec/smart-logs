@@ -2,9 +2,15 @@ import { AuthManager } from '../infrastructure/auth'
 import { BatchManager } from '../infrastructure/batch'
 import { CacheManager } from '../infrastructure/cache'
 import { ErrorHandler } from '../infrastructure/error'
+import { InterceptorManager } from '../infrastructure/interceptors'
 import { AuditLogger, LoggerFactory } from '../infrastructure/logger'
 import { RetryManager } from '../infrastructure/retry'
 
+import type {
+	InterceptorContext,
+	RequestInterceptor,
+	ResponseInterceptor,
+} from '../infrastructure/interceptors'
 import type { Logger } from '../infrastructure/logger'
 import type { AuditClientConfig } from './config'
 
@@ -23,20 +29,7 @@ export interface RequestOptions {
 	skipRetry?: boolean
 	cacheTtl?: number
 	cacheTags?: string[]
-}
-
-/**
- * Request interceptor interface
- */
-export interface RequestInterceptor {
-	(options: RequestOptions): Promise<RequestOptions> | RequestOptions
-}
-
-/**
- * Response interceptor interface
- */
-export interface ResponseInterceptor {
-	<T>(response: T, options: RequestOptions): Promise<T> | T
+	metadata?: Record<string, any>
 }
 
 /**
@@ -58,8 +51,15 @@ export abstract class BaseResource {
 	protected batchManager!: BatchManager
 	protected errorHandler!: ErrorHandler
 	protected logger: Logger
-	protected requestInterceptors: RequestInterceptor[] = []
-	protected responseInterceptors: ResponseInterceptor[] = []
+	protected interceptorManager!: InterceptorManager
+	protected requestInterceptors: (
+		| RequestInterceptor
+		| ((options: RequestOptions) => Promise<RequestOptions> | RequestOptions)
+	)[] = []
+	protected responseInterceptors: (
+		| ResponseInterceptor
+		| (<T>(response: T, options: RequestOptions) => Promise<T> | T)
+	)[] = []
 
 	constructor(config: AuditClientConfig, logger?: Logger) {
 		this.config = config
@@ -91,6 +91,12 @@ export abstract class BaseResource {
 			this.config.errorHandling,
 			this.logger
 		)
+
+		// Initialize interceptor manager
+		this.interceptorManager = new InterceptorManager(this.logger)
+
+		// Register global interceptors from config
+		this.registerGlobalInterceptors()
 	}
 
 	/**
@@ -100,9 +106,18 @@ export abstract class BaseResource {
 		const requestId = this.generateRequestId()
 		const startTime = Date.now()
 
+		// Create interceptor context
+		const context: InterceptorContext = {
+			requestId,
+			endpoint,
+			method: options.method || 'GET',
+			timestamp: startTime,
+			metadata: options.metadata,
+		}
+
 		try {
 			// Apply request interceptors
-			const processedOptions = await this.applyRequestInterceptors(options)
+			const processedOptions = await this.applyRequestInterceptors(options, context)
 
 			// Check cache first (unless explicitly skipped)
 			if (!processedOptions.skipCache && this.shouldUseCache(endpoint, processedOptions)) {
@@ -132,7 +147,11 @@ export abstract class BaseResource {
 			}
 
 			// Apply response interceptors
-			const processedResponse = await this.applyResponseInterceptors(response, processedOptions)
+			const processedResponse = await this.applyResponseInterceptors(
+				response,
+				processedOptions,
+				context
+			)
 
 			// Cache successful responses (unless explicitly skipped)
 			if (
@@ -411,45 +430,90 @@ export abstract class BaseResource {
 	}
 
 	/**
-	 * Apply request interceptors
+	 * Register global interceptors from configuration
 	 */
-	private async applyRequestInterceptors(options: RequestOptions): Promise<RequestOptions> {
-		let processedOptions = { ...options }
-
-		// Apply global interceptors from config
-		if (this.config.interceptors.request) {
-			for (const interceptor of this.config.interceptors.request) {
-				processedOptions = await interceptor(processedOptions)
+	private async registerGlobalInterceptors(): Promise<void> {
+		try {
+			// Register global request interceptors from config
+			if (this.config.interceptors.request) {
+				for (const interceptor of this.config.interceptors.request) {
+					await this.interceptorManager.request.register(interceptor)
+				}
 			}
-		}
 
-		// Apply instance interceptors
-		for (const interceptor of this.requestInterceptors) {
-			processedOptions = await interceptor(processedOptions)
-		}
+			// Register global response interceptors from config
+			if (this.config.interceptors.response) {
+				for (const interceptor of this.config.interceptors.response) {
+					await this.interceptorManager.response.register(interceptor)
+				}
+			}
 
-		return processedOptions
+			// Register legacy instance interceptors (convert to enhanced format if needed)
+			for (const interceptor of this.requestInterceptors) {
+				// Convert legacy interceptor to enhanced format if needed
+				const enhancedInterceptor: RequestInterceptor =
+					typeof interceptor === 'function'
+						? {
+								id: `legacy_request_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+								intercept: interceptor,
+							}
+						: interceptor
+				await this.interceptorManager.request.register(enhancedInterceptor)
+			}
+
+			for (const interceptor of this.responseInterceptors) {
+				// Convert legacy interceptor to enhanced format if needed
+				const enhancedInterceptor: ResponseInterceptor =
+					typeof interceptor === 'function'
+						? {
+								id: `legacy_response_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+								intercept: interceptor,
+							}
+						: interceptor
+				await this.interceptorManager.response.register(enhancedInterceptor)
+			}
+		} catch (error) {
+			this.logger.error('Failed to register global interceptors', { error })
+		}
 	}
 
 	/**
-	 * Apply response interceptors
+	 * Apply request interceptors using the enhanced interceptor manager
 	 */
-	private async applyResponseInterceptors<T>(response: T, options: RequestOptions): Promise<T> {
-		let processedResponse = response
-
-		// Apply instance interceptors
-		for (const interceptor of this.responseInterceptors) {
-			processedResponse = await interceptor(processedResponse, options)
+	private async applyRequestInterceptors(
+		options: RequestOptions,
+		context: InterceptorContext
+	): Promise<RequestOptions> {
+		try {
+			return await this.interceptorManager.request.execute(options, context)
+		} catch (error) {
+			this.logger.error('Request interceptor chain failed', {
+				error,
+				requestId: context.requestId,
+				endpoint: context.endpoint,
+			})
+			throw error
 		}
+	}
 
-		// Apply global interceptors from config
-		if (this.config.interceptors.response) {
-			for (const interceptor of this.config.interceptors.response) {
-				processedResponse = await interceptor(processedResponse, options)
-			}
+	/**
+	 * Apply response interceptors using the enhanced interceptor manager
+	 */
+	private async applyResponseInterceptors<T>(
+		response: T,
+		options: RequestOptions,
+		context: InterceptorContext
+	): Promise<T> {
+		try {
+			return await this.interceptorManager.response.execute(response, options, context)
+		} catch (error) {
+			this.logger.error('Response interceptor chain failed', {
+				error,
+				requestId: context.requestId,
+				endpoint: context.endpoint,
+			})
+			throw error
 		}
-
-		return processedResponse
 	}
 
 	/**
@@ -705,49 +769,137 @@ export abstract class BaseResource {
 	}
 
 	/**
-	 * Add request interceptor
+	 * Add request interceptor using the enhanced interceptor manager
 	 */
-	public addRequestInterceptor(interceptor: RequestInterceptor): void {
+	public async addRequestInterceptor(
+		interceptor:
+			| RequestInterceptor
+			| ((options: RequestOptions) => Promise<RequestOptions> | RequestOptions),
+		options: { enabled: boolean; priority: number }
+	): Promise<void> {
+		// Convert legacy function interceptor to enhanced format if needed
+		const enhancedInterceptor: RequestInterceptor =
+			typeof interceptor === 'function'
+				? {
+						id: `request_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+						intercept: interceptor,
+					}
+				: interceptor
+
+		await this.interceptorManager.request.register(enhancedInterceptor, options)
+
+		// Also add to legacy array for backward compatibility
 		this.requestInterceptors.push(interceptor)
 	}
 
 	/**
-	 * Add response interceptor
+	 * Add response interceptor using the enhanced interceptor manager
 	 */
-	public addResponseInterceptor(interceptor: ResponseInterceptor): void {
+	public async addResponseInterceptor(
+		interceptor:
+			| ResponseInterceptor
+			| (<T>(response: T, options: RequestOptions) => Promise<T> | T),
+		options: { enabled: boolean; priority: number }
+	): Promise<void> {
+		// Convert legacy function interceptor to enhanced format if needed
+		const enhancedInterceptor: ResponseInterceptor =
+			typeof interceptor === 'function'
+				? {
+						id: `response_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+						intercept: interceptor,
+					}
+				: interceptor
+
+		await this.interceptorManager.response.register(enhancedInterceptor, options)
+
+		// Also add to legacy array for backward compatibility
 		this.responseInterceptors.push(interceptor)
 	}
 
 	/**
-	 * Remove request interceptor
+	 * Remove request interceptor by ID
 	 */
-	public removeRequestInterceptor(interceptor: RequestInterceptor): boolean {
-		const index = this.requestInterceptors.indexOf(interceptor)
-		if (index > -1) {
-			this.requestInterceptors.splice(index, 1)
-			return true
+	public async removeRequestInterceptor(interceptorId: string): Promise<boolean> {
+		const result = await this.interceptorManager.request.unregister(interceptorId)
+
+		// Also remove from legacy array
+		const interceptor = this.requestInterceptors.find(
+			(i) => typeof i === 'object' && i.id === interceptorId
+		)
+		if (interceptor) {
+			const index = this.requestInterceptors.indexOf(interceptor)
+			if (index > -1) {
+				this.requestInterceptors.splice(index, 1)
+			}
 		}
-		return false
+
+		return result
 	}
 
 	/**
-	 * Remove response interceptor
+	 * Remove response interceptor by ID
 	 */
-	public removeResponseInterceptor(interceptor: ResponseInterceptor): boolean {
-		const index = this.responseInterceptors.indexOf(interceptor)
-		if (index > -1) {
-			this.responseInterceptors.splice(index, 1)
-			return true
+	public async removeResponseInterceptor(interceptorId: string): Promise<boolean> {
+		const result = await this.interceptorManager.response.unregister(interceptorId)
+
+		// Also remove from legacy array
+		const interceptor = this.responseInterceptors.find(
+			(i) => typeof i === 'object' && i.id === interceptorId
+		)
+		if (interceptor) {
+			const index = this.responseInterceptors.indexOf(interceptor)
+			if (index > -1) {
+				this.responseInterceptors.splice(index, 1)
+			}
 		}
-		return false
+
+		return result
 	}
 
 	/**
 	 * Clear all interceptors
 	 */
-	public clearInterceptors(): void {
+	public async clearInterceptors(): Promise<void> {
+		await this.interceptorManager.clearAll()
 		this.requestInterceptors = []
 		this.responseInterceptors = []
+	}
+
+	/**
+	 * Get interceptor manager for advanced interceptor management
+	 */
+	public getInterceptorManager(): InterceptorManager {
+		return this.interceptorManager
+	}
+
+	/**
+	 * Enable or disable an interceptor
+	 */
+	public setInterceptorEnabled(
+		interceptorId: string,
+		enabled: boolean,
+		type: 'request' | 'response'
+	): boolean {
+		if (type === 'request') {
+			return this.interceptorManager.request.setEnabled(interceptorId, enabled)
+		} else {
+			return this.interceptorManager.response.setEnabled(interceptorId, enabled)
+		}
+	}
+
+	/**
+	 * Update interceptor priority
+	 */
+	public setInterceptorPriority(
+		interceptorId: string,
+		priority: number,
+		type: 'request' | 'response'
+	): boolean {
+		if (type === 'request') {
+			return this.interceptorManager.request.setPriority(interceptorId, priority)
+		} else {
+			return this.interceptorManager.response.setPriority(interceptorId, priority)
+		}
 	}
 
 	/**
@@ -775,22 +927,24 @@ export abstract class BaseResource {
 		retry: any
 		batch: any
 		auth: any
+		interceptors: any
 	} {
 		return {
 			cache: this.cacheManager.getStats(),
 			retry: this.retryManager.getCircuitBreakerStats(),
 			batch: this.batchManager.getStats(),
 			auth: this.authManager.getCacheStats(),
+			interceptors: this.interceptorManager.getStats(),
 		}
 	}
 
 	/**
 	 * Cleanup resources
 	 */
-	public destroy(): void {
+	public async destroy(): Promise<void> {
 		this.cacheManager.destroy()
 		this.batchManager.clear()
 		this.authManager.clearAllTokenCache()
-		this.clearInterceptors()
+		await this.clearInterceptors()
 	}
 }

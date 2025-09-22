@@ -21,7 +21,7 @@ export type {
 } from './core/config'
 
 // Base resource exports
-export type { RequestOptions, RequestInterceptor, ResponseInterceptor } from './core/base-resource'
+export type { RequestOptions } from './core/base-resource'
 
 // Infrastructure exports
 export { AuthManager, AuthenticationError } from './infrastructure/auth'
@@ -59,6 +59,34 @@ export {
 	CacheInvalidationStrategy,
 } from './infrastructure/error'
 export type { ErrorContext, ErrorRecoveryStrategy } from './infrastructure/error'
+
+// Interceptor system exports
+export {
+	InterceptorManager,
+	RequestInterceptorManager,
+	ResponseInterceptorManager,
+} from './infrastructure/interceptors'
+export type {
+	InterceptorContext,
+	InterceptorRegistrationOptions,
+	InterceptorExecutionResult,
+	InterceptorChainStats,
+} from './infrastructure/interceptors'
+
+// Built-in interceptors
+export {
+	BuiltInInterceptorFactory,
+	CorrelationIdRequestInterceptor,
+	AuthenticationRequestInterceptor,
+	TimingRequestInterceptor,
+	ValidationRequestInterceptor,
+	CompressionRequestInterceptor,
+	LoggingResponseInterceptor,
+	TransformResponseInterceptor,
+	CachingResponseInterceptor,
+	ValidationResponseInterceptor,
+	ErrorHandlingResponseInterceptor,
+} from './infrastructure/interceptors/built-in'
 
 // Plugin system exports
 export {
