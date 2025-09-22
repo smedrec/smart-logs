@@ -19,11 +19,12 @@ services:
       - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
       - POSTGRESQL_LOG_HOSTNAME=true
       - POSTGRESQL_REPLICATION_MODE=master
-      - POSTGRESQL_REPLICATION_USER=repl_user
-      - POSTGRESQL_REPLICATION_PASSWORD=repl_user
+      - POSTGRESQL_REPLICATION_USER=${REPLICATION_USER}
+      - POSTGRESQL_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
       - POSTGRESQL_USERNAME=${POSTGRES_USER}
       - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pg_stat_statements
+      - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pgaudit, pg_stat_statements
+      - POSTGRESQL_EXTRA_FLAGS=-c wal_level=logical
 
   postgresql-slave-1:
     <<: *postgres-common
@@ -42,7 +43,7 @@ services:
       - POSTGRESQL_REPLICATION_USER=${REPLICATION_USER}
       - POSTGRESQL_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
       - POSTGRESQL_MASTER_PORT_NUMBER=5432
-      - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pg_stat_statements
+      - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pgaudit, pg_stat_statements
     volumes:
       - slave_1_data:/bitnami/postgresql
 
@@ -63,9 +64,24 @@ services:
       - POSTGRESQL_REPLICATION_USER=${REPLICATION_USER}
       - POSTGRESQL_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
       - POSTGRESQL_MASTER_PORT_NUMBER=5432
-      - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pg_stat_statements
+      - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pgaudit, pg_stat_statements
     volumes:
       - slave_2_data:/bitnami/postgresql
+
+  electric:
+    image: docker.io/electricsql/electric:latest
+    container_name: postgres-realtime
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgresql-master:5432/${AUDIT_DB}?sslmode=disable
+      # Not suitable for production. Only use insecure mode in development or if you've otherwise secured the Electric API.
+      # See https://electric-sql.com/docs/guides/security
+      ELECTRIC_INSECURE: true
+    ports:
+      - "4000:3000"
+    depends_on:
+      postgresql-master:
+        condition: service_healthy
 
 #networks:
 #  default:
