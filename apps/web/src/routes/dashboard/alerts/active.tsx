@@ -1,7 +1,6 @@
 import { createColumns } from '@/components/alerts/columns'
 import { DataTable } from '@/components/alerts/data-table'
 import ResolveAlertForm from '@/components/alerts/form'
-//import ResolveAlertForm from '@/components/alerts/form'
 import {
 	Dialog,
 	DialogContent,
