@@ -116,6 +116,19 @@ async function startServer() {
 		})
 	)
 
+	// cors
+	/**app.use('*', (c, next) => {
+		const corsMiddleware = cors({
+			origin: '*', // replace with your origin
+			allowHeaders: ['Content-Type', 'Authorization'],
+			allowMethods: ['POST', 'GET', 'PATCH', 'OPTIONS', 'DELETE'],
+			exposeHeaders: ['Content-Length'],
+			maxAge: 600,
+			//credentials: true,
+		})
+		return corsMiddleware(c, next)
+	})*/
+
 	app.on(['POST', 'GET'], '/api/auth/*', (c) => c.get('services').auth.handler(c.req.raw))
 
 	if (config.server.inngest.enabled) {

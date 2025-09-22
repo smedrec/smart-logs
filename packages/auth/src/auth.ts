@@ -42,7 +42,13 @@ class Auth {
 				provider: 'pg',
 				schema: schema,
 			}),
-			trustedOrigins: config.server.auth.trustedOrigins,
+			trustedOrigins: [
+				`${config.server.auth.betterAuthUrl}/api/auth`,
+				`${config.server.auth.betterAuthUrl}`,
+				'http://localhost:3000',
+				'http://localhost:3001',
+			],
+			//trustedOrigins: config.server.auth.trustedOrigins,
 			emailAndPassword: {
 				enabled: true,
 				minPasswordLength: 8,

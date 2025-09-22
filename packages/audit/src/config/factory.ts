@@ -92,7 +92,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			environment: 'development',
 			timeout: 30000,
 			cors: {
-				origin: '*',
+				origin: ['http://localhost:3000', 'http://localhost:3001'],
 				credentials: true,
 				allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 				allowedHeaders: [

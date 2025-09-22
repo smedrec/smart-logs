@@ -6,7 +6,7 @@ import { UserButton } from '@daveyplate/better-auth-ui'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/dashboard')({
-	beforeLoad: ({ context, location }) => {
+	/**beforeLoad: ({ context, location }) => {
 		if (!context.auth.isAuthenticated) {
 			throw redirect({
 				to: '/auth/sign-in',
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/dashboard')({
 				},
 			})
 		}
-	},
+	},*/
 	component: DashboardLayout,
 })
 

@@ -1,6 +1,6 @@
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import {
-	APIKeysCard,
+	//APIKeysCard,
 	ChangeEmailCard,
 	DeleteAccountCard,
 	UpdateAvatarCard,
@@ -27,7 +27,6 @@ function RouteComponent() {
 					<ChangeEmailCard />
 				</div>
 			</div>
-			<APIKeysCard />
 			<DeleteAccountCard />
 		</div>
 	)
