@@ -1,5 +1,11 @@
 import { BaseResource } from '../core/base-resource'
 import {
+	ConnectionOptions,
+	ManagedConnection,
+	StreamConfig,
+	StreamingManager,
+} from '../infrastructure/streaming'
+import {
 	assertDefined,
 	assertType,
 	isAlert,
@@ -393,8 +399,19 @@ export interface ResolveAlertRequest {
  * - Real-time metrics streaming
  */
 export class MetricsService extends BaseResource {
+	private streamingManager: StreamingManager
+
 	constructor(config: any, logger?: any) {
 		super(config, logger)
+		this.streamingManager = new StreamingManager(
+			{
+				enableCompression: config.performance?.enableCompression || true,
+				maxConcurrentStreams: config.performance?.maxConcurrentRequests || 10,
+				heartbeatInterval: 5000, // 5 seconds for metrics
+				enableMetrics: true,
+			},
+			logger
+		)
 	}
 
 	/**
@@ -719,6 +736,190 @@ export class MetricsService extends BaseResource {
 			method: 'PUT',
 			body: config,
 		})
+	}
+
+	/**
+	 * Create enhanced real-time metrics subscription with streaming infrastructure
+	 *
+	 * @param params - Subscription parameters
+	 * @returns Enhanced managed connection for real-time metrics
+	 *
+	 * Requirements: 10.4 - WHEN system alerts are available THEN the client SHALL provide methods to retrieve and acknowledge alerts
+	 */
+	async createEnhancedMetricsStream(params: {
+		metrics?: string[]
+		interval?: number
+		transport?: 'websocket' | 'sse'
+		filters?: Record<string, any>
+	}): Promise<ManagedConnection> {
+		// Build connection URL with parameters
+		const url = this.buildMetricsStreamUrl(params)
+
+		// Create connection options
+		const connectionOptions: ConnectionOptions = {
+			reconnect: true,
+			maxReconnectAttempts: 10,
+			heartbeatInterval: params.interval || 5000,
+		}
+
+		// Create managed connection
+		const connection = await this.streamingManager.createRealtimeConnection(
+			`metrics_${Date.now()}`,
+			url,
+			params.transport || 'websocket',
+			connectionOptions
+		)
+
+		// Set up metrics-specific event handlers
+		connection.on('data', (_, data) => {
+			// Process metrics data
+			this.processMetricsData(data)
+		})
+
+		connection.on('error', (_, error) => {
+			this.logger.error('Metrics stream error', { error })
+		})
+
+		return connection
+	}
+
+	/**
+	 * Stream historical metrics data with backpressure management
+	 *
+	 * @param params - Historical metrics parameters
+	 * @returns Managed readable stream for historical metrics
+	 */
+	async streamHistoricalMetrics(params: {
+		metrics: string[]
+		timeRange: { startDate: string; endDate: string }
+		resolution?: 'minute' | 'hour' | 'day'
+		format?: 'json' | 'csv'
+	}) {
+		// Create streaming source for historical metrics
+		const streamSource: UnderlyingDefaultSource<any> = {
+			start: async (controller) => {
+				try {
+					// Get the raw stream from the server
+					const rawStream = await this.request<ReadableStream<Uint8Array>>(
+						'/metrics/historical/stream',
+						{
+							method: 'POST',
+							body: params,
+							responseType: 'stream',
+						}
+					)
+
+					// Process the stream with proper parsing
+					const reader = rawStream.getReader()
+					const decoder = new TextDecoder()
+					let buffer = ''
+
+					const processChunk = async () => {
+						try {
+							const { done, value } = await reader.read()
+
+							if (done) {
+								// Process any remaining data in buffer
+								if (buffer.trim()) {
+									try {
+										const data = JSON.parse(buffer.trim())
+										controller.enqueue(data)
+									} catch (error) {
+										this.logger.warn('Failed to parse final metrics buffer', { buffer, error })
+									}
+								}
+								controller.close()
+								return
+							}
+
+							// Decode chunk and add to buffer
+							buffer += decoder.decode(value, { stream: true })
+
+							// Process complete lines
+							const lines = buffer.split('\n')
+							buffer = lines.pop() || ''
+
+							for (const line of lines) {
+								if (line.trim()) {
+									try {
+										const data = JSON.parse(line.trim())
+										controller.enqueue(data)
+									} catch (error) {
+										this.logger.warn('Failed to parse metrics line', { line, error })
+									}
+								}
+							}
+
+							// Continue processing
+							processChunk()
+						} catch (error) {
+							controller.error(error)
+						}
+					}
+
+					// Start processing
+					processChunk()
+				} catch (error) {
+					controller.error(error)
+				}
+			},
+		}
+
+		// Create managed stream
+		return this.streamingManager.createExportStream(streamSource, {
+			enableCompression: true,
+			enableMetrics: true,
+			batchSize: 1000, // Larger batches for metrics data
+		})
+	}
+
+	/**
+	 * Get streaming metrics for the metrics service itself
+	 */
+	getStreamingMetrics() {
+		return this.streamingManager.getMetrics()
+	}
+
+	/**
+	 * Cleanup streaming resources
+	 */
+	async destroyStreaming(): Promise<void> {
+		await this.streamingManager.destroy()
+	}
+
+	private buildMetricsStreamUrl(params: any): string {
+		const wsUrl = this.config.baseUrl.replace(/^https?/, 'wss').replace(/^http/, 'ws')
+		const url = new URL(`${wsUrl}/api/v1/metrics/stream`)
+
+		// Add parameters to URL
+		if (params.metrics?.length) {
+			url.searchParams.set('metrics', params.metrics.join(','))
+		}
+		if (params.interval) {
+			url.searchParams.set('interval', params.interval.toString())
+		}
+		if (params.filters) {
+			Object.entries(params.filters).forEach(([key, value]) => {
+				url.searchParams.set(key, String(value))
+			})
+		}
+
+		return url.toString()
+	}
+
+	private processMetricsData(data: any): void {
+		// Process and validate metrics data
+		try {
+			if (data.type === 'system' && isSystemMetrics(data.payload)) {
+				// Handle system metrics
+				this.logger.debug('Received system metrics', data.payload)
+			} else if (data.type === 'alert' && isAlert(data.payload)) {
+				// Handle alert data
+				this.logger.info('Received alert', data.payload)
+			}
+		} catch (error) {
+			this.logger.warn('Failed to process metrics data', { data, error })
+		}
 	}
 }
 

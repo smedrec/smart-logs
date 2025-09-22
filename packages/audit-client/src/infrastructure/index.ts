@@ -7,6 +7,7 @@ export * from './retry'
 export * from './batch'
 export * from './logger'
 export * from './plugins'
+export * from './streaming'
 
 // Export error module with explicit re-exports to avoid naming conflicts
 export {

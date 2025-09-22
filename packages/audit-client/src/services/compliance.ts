@@ -1,4 +1,5 @@
 import { BaseResource } from '../core/base-resource'
+import { ManagedReadableStream, StreamConfig, StreamingManager } from '../infrastructure/streaming'
 import { assertDefined, assertType, isNonEmptyString, isObject } from '../utils/type-guards'
 import {
 	validateCustomReportParams,
@@ -293,8 +294,20 @@ export interface ReportDownloadOptions {
  * - Report download functionality with multiple formats
  */
 export class ComplianceService extends BaseResource {
+	private streamingManager: StreamingManager
+
 	constructor(config: AuditClientConfig, logger?: Logger) {
 		super(config, logger)
+		this.streamingManager = new StreamingManager(
+			{
+				enableCompression: config.performance?.enableCompression || true,
+				maxConcurrentStreams: config.performance?.maxConcurrentRequests || 10,
+				chunkSize: 8192,
+				batchSize: 100,
+				enableMetrics: true,
+			},
+			logger
+		)
 	}
 
 	/**
@@ -522,18 +535,6 @@ export class ComplianceService extends BaseResource {
 	}
 
 	/**
-	 * Stream large report data
-	 * Requirement 5.4: WHEN reports are large THEN the client SHALL support streaming and chunked downloads
-	 */
-	async streamReport(reportId: string, format: 'json' | 'csv' = 'json'): Promise<ReadableStream> {
-		return this.request<ReadableStream>(`/compliance/reports/${reportId}/stream`, {
-			method: 'GET',
-			query: { format },
-			responseType: 'stream',
-		})
-	}
-
-	/**
 	 * Get report history for an organization
 	 */
 	async getReportHistory(
@@ -696,6 +697,187 @@ export class ComplianceService extends BaseResource {
 				)
 			}
 		}
+	}
+
+	/**
+	 * Stream large compliance report data with backpressure management
+	 *
+	 * @param reportId - The report ID to stream
+	 * @param options - Streaming options including format and compression
+	 * @returns Managed readable stream for large report data
+	 *
+	 * Requirements: 5.4 - WHEN reports are large THEN the client SHALL support streaming and chunked downloads
+	 */
+	async streamReport(
+		reportId: string,
+		options: ReportDownloadOptions & { chunkSize?: number }
+	): Promise<ManagedReadableStream<Uint8Array>> {
+		this.validateDownloadOptions(options)
+
+		// Create streaming source for large report downloads
+		const streamSource: UnderlyingDefaultSource<Uint8Array> = {
+			start: async (controller) => {
+				try {
+					// Get the raw stream from the server
+					const rawStream = await this.request<ReadableStream<Uint8Array>>(
+						`/compliance/reports/${reportId}/stream`,
+						{
+							method: 'GET',
+							query: options,
+							responseType: 'stream',
+						}
+					)
+
+					// Process the stream with proper chunk handling
+					const reader = rawStream.getReader()
+
+					const processChunk = async () => {
+						try {
+							const { done, value } = await reader.read()
+
+							if (done) {
+								controller.close()
+								return
+							}
+
+							controller.enqueue(value)
+
+							// Continue processing
+							processChunk()
+						} catch (error) {
+							controller.error(error)
+						}
+					}
+
+					// Start processing
+					processChunk()
+				} catch (error) {
+					controller.error(error)
+				}
+			},
+		}
+
+		// Create managed stream with enhanced features
+		return this.streamingManager.createExportStream(streamSource, {
+			chunkSize: options.chunkSize || 8192,
+			enableCompression: options.compression !== 'none',
+			enableMetrics: true,
+		})
+	}
+
+	/**
+	 * Stream GDPR data export with enhanced processing
+	 *
+	 * @param params - GDPR export parameters
+	 * @returns Managed readable stream for GDPR data
+	 *
+	 * Requirements: 5.4 - WHEN reports are large THEN the client SHALL support streaming and chunked downloads
+	 */
+	async streamGdprExport(params: GdprExportParams): Promise<ManagedReadableStream<any>> {
+		// Validate input parameters
+		const validationResult = validateGdprExportParams(params)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid GDPR export parameters', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
+
+		// Create streaming source for GDPR data export
+		const streamSource: UnderlyingDefaultSource<any> = {
+			start: async (controller) => {
+				try {
+					// Get the raw stream from the server
+					const rawStream = await this.request<ReadableStream<Uint8Array>>(
+						'/compliance/gdpr/export/stream',
+						{
+							method: 'POST',
+							body: validationResult.data,
+							responseType: 'stream',
+						}
+					)
+
+					// Process the stream with JSON parsing
+					const reader = rawStream.getReader()
+					const decoder = new TextDecoder()
+					let buffer = ''
+
+					const processChunk = async () => {
+						try {
+							const { done, value } = await reader.read()
+
+							if (done) {
+								// Process any remaining data in buffer
+								if (buffer.trim()) {
+									try {
+										const data = JSON.parse(buffer.trim())
+										controller.enqueue(data)
+									} catch (error) {
+										this.logger.warn('Failed to parse final buffer chunk', { buffer, error })
+									}
+								}
+								controller.close()
+								return
+							}
+
+							// Decode chunk and add to buffer
+							buffer += decoder.decode(value, { stream: true })
+
+							// Process complete lines (assuming NDJSON format)
+							const lines = buffer.split('\n')
+							buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+							for (const line of lines) {
+								if (line.trim()) {
+									try {
+										const data = JSON.parse(line.trim())
+										controller.enqueue(data)
+									} catch (error) {
+										this.logger.warn('Failed to parse stream line', { line, error })
+									}
+								}
+							}
+
+							// Continue processing
+							processChunk()
+						} catch (error) {
+							controller.error(error)
+						}
+					}
+
+					// Start processing
+					processChunk()
+				} catch (error) {
+					controller.error(error)
+				}
+			},
+		}
+
+		// Create managed stream with enhanced features
+		return this.streamingManager.createExportStream(streamSource, {
+			enableCompression: true,
+			enableMetrics: true,
+			batchSize: 50, // Smaller batches for GDPR data
+		})
+	}
+
+	/**
+	 * Get streaming metrics for compliance operations
+	 *
+	 * @returns Current streaming metrics
+	 */
+	getStreamingMetrics(): {
+		connections: any
+		totalConnections: number
+		activeConnections: number
+	} {
+		return this.streamingManager.getMetrics()
+	}
+
+	/**
+	 * Cleanup streaming resources
+	 */
+	async destroyStreaming(): Promise<void> {
+		await this.streamingManager.destroy()
 	}
 
 	/**

@@ -1,5 +1,13 @@
 import { BaseResource } from '../core/base-resource'
 import {
+	ConnectionOptions,
+	ManagedConnection,
+	ManagedReadableStream,
+	StreamConfig,
+	StreamingManager,
+	StreamMetrics,
+} from '../infrastructure/streaming'
+import {
 	assertDefined,
 	assertType,
 	isAuditEvent,
@@ -261,7 +269,7 @@ export interface SubscriptionParams {
 }
 
 /**
- * Event subscription interface
+ * Enhanced event subscription interface with streaming capabilities
  */
 export interface EventSubscription {
 	id: string
@@ -271,19 +279,20 @@ export interface EventSubscription {
 	on(event: 'message' | 'error' | 'connect' | 'disconnect', handler: (data?: any) => void): void
 	off(event: 'message' | 'error' | 'connect' | 'disconnect', handler: (data?: any) => void): void
 	updateFilter(filter: SubscriptionParams['filter']): void
+	getMetrics(): StreamMetrics | null
+	send(data: any): boolean
 }
 
 /**
- * Real-time event subscription implementation
+ * Enhanced real-time event subscription implementation using streaming infrastructure
  */
 class EventSubscriptionImpl implements EventSubscription {
 	public readonly id: string
 	public isConnected: boolean = false
 
-	private connection: WebSocket | EventSource | null = null
+	private managedConnection: ManagedConnection | null = null
+	private streamingManager: StreamingManager
 	private eventHandlers: Map<string, Set<Function>> = new Map()
-	private reconnectAttempts: number = 0
-	private heartbeatTimer: NodeJS.Timeout | null = null
 
 	constructor(
 		private baseUrl: string,
@@ -291,6 +300,13 @@ class EventSubscriptionImpl implements EventSubscription {
 		private authManager: any
 	) {
 		this.id = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+		this.streamingManager = new StreamingManager({
+			maxReconnectAttempts: params.maxReconnectAttempts || 5,
+			reconnectDelay: 1000,
+			reconnectBackoffMultiplier: 2,
+			maxReconnectDelay: 30000,
+			heartbeatInterval: params.heartbeatInterval || 30000,
+		})
 		this.initializeEventHandlers()
 	}
 
@@ -310,25 +326,38 @@ class EventSubscriptionImpl implements EventSubscription {
 			const authHeaders = await this.authManager.getAuthHeaders()
 			const transport = this.params.transport || 'websocket'
 
-			if (transport === 'websocket') {
-				await this.connectWebSocket(authHeaders)
-			} else {
-				await this.connectSSE(authHeaders)
+			// Build connection URL with filters
+			const url = this.buildConnectionUrl()
+
+			// Create connection options
+			const connectionOptions: ConnectionOptions = {
+				headers: authHeaders,
+				reconnect: this.params.reconnect !== false,
+				maxReconnectAttempts: this.params.maxReconnectAttempts || 5,
+				heartbeatInterval: this.params.heartbeatInterval || 30000,
 			}
 
+			// Create managed connection
+			this.managedConnection = await this.streamingManager.createRealtimeConnection(
+				this.id,
+				url,
+				transport,
+				connectionOptions
+			)
+
+			// Set up event handlers
+			this.setupConnectionHandlers()
+
+			// Connect
+			await this.managedConnection.connect()
 			this.isConnected = true
-			this.reconnectAttempts = 0
-			this.startHeartbeat()
 			this.emit('connect')
 		} catch (error) {
 			this.emit('error', error)
-			if (this.params.reconnect && this.shouldReconnect()) {
-				setTimeout(() => this.connect(), this.getReconnectDelay())
-			}
 		}
 	}
 
-	private async connectWebSocket(authHeaders: Record<string, string>): Promise<void> {
+	private buildConnectionUrl(): string {
 		const wsUrl = this.baseUrl.replace(/^https?/, 'wss').replace(/^http/, 'ws')
 		const url = new URL(`${wsUrl}/api/v1/audit/events/subscribe`)
 
@@ -343,88 +372,39 @@ class EventSubscriptionImpl implements EventSubscription {
 			})
 		}
 
-		this.connection = new WebSocket(url.toString())
-
-		this.connection.onopen = () => {
-			this.isConnected = true
-		}
-
-		this.connection.onmessage = (event) => {
-			try {
-				const data = JSON.parse(event.data)
-				this.emit('message', data)
-			} catch (error) {
-				this.emit('error', new Error('Failed to parse WebSocket message'))
-			}
-		}
-
-		this.connection.onerror = (error) => {
-			this.emit('error', error)
-		}
-
-		this.connection.onclose = () => {
-			this.isConnected = false
-			this.emit('disconnect')
-			if (this.params.reconnect && this.shouldReconnect()) {
-				setTimeout(() => this.connect(), this.getReconnectDelay())
-			}
-		}
+		return url.toString()
 	}
 
-	private async connectSSE(authHeaders: Record<string, string>): Promise<void> {
-		const url = new URL(`${this.baseUrl}/api/v1/audit/events/subscribe`)
+	private setupConnectionHandlers(): void {
+		if (!this.managedConnection) return
 
-		// Add filter parameters to URL
-		if (this.params.filter) {
-			Object.entries(this.params.filter).forEach(([key, value]) => {
-				if (Array.isArray(value)) {
-					url.searchParams.set(key, value.join(','))
-				} else if (value) {
-					url.searchParams.set(key, String(value))
-				}
-			})
-		}
-
-		// Note: EventSource doesn't support custom headers in browsers
-		// This would need server-side support for auth via query params or cookies
-		this.connection = new EventSource(url.toString())
-
-		this.connection.onopen = () => {
+		this.managedConnection.on('connect', () => {
 			this.isConnected = true
-		}
+			this.emit('connect')
+		})
 
-		this.connection.onmessage = (event) => {
-			try {
-				const data = JSON.parse(event.data)
-				this.emit('message', data)
-			} catch (error) {
-				this.emit('error', new Error('Failed to parse SSE message'))
-			}
-		}
-
-		this.connection.onerror = (error) => {
-			this.emit('error', error)
+		this.managedConnection.on('disconnect', () => {
 			this.isConnected = false
 			this.emit('disconnect')
-			if (this.params.reconnect && this.shouldReconnect()) {
-				setTimeout(() => this.connect(), this.getReconnectDelay())
-			}
-		}
+		})
+
+		this.managedConnection.on('data', (_, data) => {
+			this.emit('message', data)
+		})
+
+		this.managedConnection.on('error', (_, error) => {
+			this.emit('error', error)
+		})
+
+		this.managedConnection.on('reconnect', (_, data) => {
+			// Connection is automatically handled by ManagedConnection
+		})
 	}
 
 	disconnect(): void {
-		if (this.connection) {
-			if (this.connection instanceof WebSocket) {
-				this.connection.close()
-			} else if (this.connection instanceof EventSource) {
-				this.connection.close()
-			}
-			this.connection = null
-		}
-
-		if (this.heartbeatTimer) {
-			clearInterval(this.heartbeatTimer)
-			this.heartbeatTimer = null
+		if (this.managedConnection) {
+			this.managedConnection.disconnect()
+			this.managedConnection = null
 		}
 
 		this.isConnected = false
@@ -449,11 +429,30 @@ class EventSubscriptionImpl implements EventSubscription {
 		if (filter) {
 			this.params.filter = filter
 		}
-		if (this.isConnected) {
+		if (this.isConnected && this.managedConnection) {
 			// Reconnect with new filter
 			this.disconnect()
 			setTimeout(() => this.connect(), 100)
 		}
+	}
+
+	/**
+	 * Get connection metrics
+	 */
+	getMetrics(): StreamMetrics | null {
+		return this.managedConnection?.getMetrics() || null
+	}
+
+	/**
+	 * Send data through the connection (WebSocket only)
+	 */
+	send(data: any): boolean {
+		if (!this.managedConnection || !this.isConnected) {
+			return false
+		}
+
+		const message = typeof data === 'string' ? data : JSON.stringify(data)
+		return this.managedConnection.send(message)
 	}
 
 	private emit(event: string, data?: any): void {
@@ -468,30 +467,6 @@ class EventSubscriptionImpl implements EventSubscription {
 			})
 		}
 	}
-
-	private shouldReconnect(): boolean {
-		const maxAttempts = this.params.maxReconnectAttempts || 5
-		return this.reconnectAttempts < maxAttempts
-	}
-
-	private getReconnectDelay(): number {
-		// Exponential backoff with jitter
-		const baseDelay = 1000
-		const maxDelay = 30000
-		const delay = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts), maxDelay)
-		const jitter = Math.random() * 0.1 * delay
-		this.reconnectAttempts++
-		return delay + jitter
-	}
-
-	private startHeartbeat(): void {
-		const interval = this.params.heartbeatInterval || 30000
-		this.heartbeatTimer = setInterval(() => {
-			if (this.connection instanceof WebSocket && this.connection.readyState === WebSocket.OPEN) {
-				this.connection.send(JSON.stringify({ type: 'ping' }))
-			}
-		}, interval)
-	}
 }
 
 /**
@@ -503,10 +478,25 @@ class EventSubscriptionImpl implements EventSubscription {
  * - Retrieving specific events by ID
  * - Verifying event integrity
  * - Exporting events with multiple formats
- * - Streaming large datasets
- * - Real-time event subscriptions
+ * - Streaming large datasets with backpressure management
+ * - Real-time event subscriptions with enhanced connection management
  */
 export class EventsService extends BaseResource {
+	private streamingManager: StreamingManager
+
+	constructor(config: any, logger?: any) {
+		super(config, logger)
+		this.streamingManager = new StreamingManager(
+			{
+				enableCompression: config.performance?.enableCompression || true,
+				maxConcurrentStreams: config.performance?.maxConcurrentRequests || 10,
+				chunkSize: 8192,
+				batchSize: 100,
+				enableMetrics: true,
+			},
+			logger
+		)
+	}
 	/**
 	 * Create a single audit event
 	 *
@@ -728,14 +718,14 @@ export class EventsService extends BaseResource {
 	}
 
 	/**
-	 * Stream audit events for large datasets
+	 * Stream audit events for large datasets with enhanced backpressure management
 	 *
 	 * @param params - Stream parameters including filters and batch size
-	 * @returns Promise resolving to a readable stream of audit events
+	 * @returns Promise resolving to a managed readable stream of audit events
 	 *
 	 * Requirements: 4.5 - WHEN handling large result sets THEN the client SHALL support pagination and streaming responses
 	 */
-	async stream(params: StreamEventsParams): Promise<ReadableStream<AuditEvent>> {
+	async stream(params: StreamEventsParams): Promise<ManagedReadableStream<AuditEvent>> {
 		// Validate input parameters
 		const validationResult = validateStreamEventsParams(params)
 		if (!validationResult.success) {
@@ -787,15 +777,92 @@ export class EventsService extends BaseResource {
 			queryParams.format = validatedParams.format
 		}
 
-		return this.request<ReadableStream<AuditEvent>>('/audit/events/stream', {
-			method: 'GET',
-			query: queryParams,
-			responseType: 'stream',
+		// Create enhanced streaming source
+		const streamSource: UnderlyingDefaultSource<AuditEvent> = {
+			start: async (controller) => {
+				try {
+					// Get the raw stream from the server
+					const rawStream = await this.request<ReadableStream<Uint8Array>>('/audit/events/stream', {
+						method: 'GET',
+						query: queryParams,
+						responseType: 'stream',
+					})
+
+					// Process the stream with proper parsing and error handling
+					const reader = rawStream.getReader()
+					const decoder = new TextDecoder()
+					let buffer = ''
+
+					const processChunk = async () => {
+						try {
+							const { done, value } = await reader.read()
+
+							if (done) {
+								// Process any remaining data in buffer
+								if (buffer.trim()) {
+									try {
+										const event = JSON.parse(buffer.trim()) as AuditEvent
+										controller.enqueue(event)
+									} catch (error) {
+										this.logger.warn('Failed to parse final buffer chunk', { buffer, error })
+									}
+								}
+								controller.close()
+								return
+							}
+
+							// Decode chunk and add to buffer
+							buffer += decoder.decode(value, { stream: true })
+
+							// Process complete lines (assuming NDJSON format)
+							const lines = buffer.split('\n')
+							buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+							for (const line of lines) {
+								if (line.trim()) {
+									try {
+										const event = JSON.parse(line.trim()) as AuditEvent
+										controller.enqueue(event)
+									} catch (error) {
+										this.logger.warn('Failed to parse stream line', { line, error })
+									}
+								}
+							}
+
+							// Continue processing
+							processChunk()
+						} catch (error) {
+							controller.error(error)
+						}
+					}
+
+					// Start processing
+					processChunk()
+				} catch (error) {
+					controller.error(error)
+				}
+			},
+		}
+
+		// Create managed stream with enhanced features
+		const managedStream = this.streamingManager.createExportStream(streamSource, {
+			batchSize: validatedParams.batchSize || 100,
+			enableCompression: this.config.performance?.enableCompression || false,
+			enableMetrics: true,
 		})
+
+		// Add stream transformers if needed
+		if (validatedParams.format === 'json') {
+			// Already in JSON format, no transformation needed
+			return managedStream
+		}
+
+		// For other formats, we could add transformers here
+		return managedStream
 	}
 
 	/**
-	 * Subscribe to real-time audit events using WebSocket or Server-Sent Events
+	 * Subscribe to real-time audit events using enhanced WebSocket or Server-Sent Events
 	 *
 	 * @param params - Subscription parameters including filters and transport options
 	 * @returns EventSubscription instance for managing the real-time connection
@@ -842,6 +909,40 @@ export class EventsService extends BaseResource {
 			cleanParams.heartbeatInterval = validatedData.heartbeatInterval
 
 		return new EventSubscriptionImpl(this.config.baseUrl, cleanParams, this.authManager)
+	}
+
+	/**
+	 * Get streaming and connection metrics
+	 *
+	 * @returns Current streaming metrics including connection stats and performance data
+	 */
+	getStreamingMetrics(): {
+		connections: StreamMetrics
+		totalConnections: number
+		activeConnections: number
+	} {
+		return this.streamingManager.getMetrics()
+	}
+
+	/**
+	 * Create a custom stream processor for advanced streaming scenarios
+	 *
+	 * @param source - Custom stream source
+	 * @param config - Stream configuration options
+	 * @returns Managed readable stream with enhanced capabilities
+	 */
+	createCustomStream<T>(
+		source: UnderlyingDefaultSource<T>,
+		config: Partial<StreamConfig> = {}
+	): ManagedReadableStream<T> {
+		return this.streamingManager.createExportStream(source, config)
+	}
+
+	/**
+	 * Cleanup streaming resources
+	 */
+	async destroyStreaming(): Promise<void> {
+		await this.streamingManager.destroy()
 	}
 
 	/**
