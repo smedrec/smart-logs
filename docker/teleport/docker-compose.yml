@@ -1,0 +1,17 @@
+services:
+  teleport:
+    image: public.ecr.aws/gravitational/teleport-distroless:18.2.0
+    container_name: teleport
+    restart: always
+    volumes:
+      - ./config:/etc/teleport
+      - data:/var/lib/teleport
+
+networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
+
+volumes:
+  data:
+    driver: local
