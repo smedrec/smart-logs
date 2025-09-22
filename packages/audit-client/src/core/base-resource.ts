@@ -4,6 +4,7 @@ import { CacheManager } from '../infrastructure/cache'
 import { ErrorHandler } from '../infrastructure/error'
 import { InterceptorManager } from '../infrastructure/interceptors'
 import { AuditLogger, LoggerFactory } from '../infrastructure/logger'
+import { PerformanceManager } from '../infrastructure/performance'
 import { RetryManager } from '../infrastructure/retry'
 
 import type {
@@ -52,6 +53,7 @@ export abstract class BaseResource {
 	protected errorHandler!: ErrorHandler
 	protected logger: Logger
 	protected interceptorManager!: InterceptorManager
+	protected performanceManager!: PerformanceManager
 	protected requestInterceptors: (
 		| RequestInterceptor
 		| ((options: RequestOptions) => Promise<RequestOptions> | RequestOptions)
@@ -95,6 +97,9 @@ export abstract class BaseResource {
 		// Initialize interceptor manager
 		this.interceptorManager = new InterceptorManager(this.logger)
 
+		// Initialize performance manager
+		this.performanceManager = new PerformanceManager(this.config.performance, this.logger)
+
 		// Register global interceptors from config
 		this.registerGlobalInterceptors()
 	}
@@ -105,12 +110,16 @@ export abstract class BaseResource {
 	protected async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
 		const requestId = this.generateRequestId()
 		const startTime = Date.now()
+		const method = options.method || 'GET'
+
+		// Start performance tracking
+		this.performanceManager.getMetricsCollector().startRequest(requestId, endpoint, method)
 
 		// Create interceptor context
 		const context: InterceptorContext = {
 			requestId,
 			endpoint,
-			method: options.method || 'GET',
+			method,
 			timestamp: startTime,
 			metadata: options.metadata,
 		}
@@ -125,6 +134,12 @@ export abstract class BaseResource {
 					this.generateCacheKey(endpoint, processedOptions)
 				)
 				if (cached) {
+					// Complete performance tracking for cache hit
+					this.performanceManager.getMetricsCollector().completeRequest(requestId, {
+						status: 200,
+						cached: true,
+					})
+
 					this.logRequest('Cache hit', { endpoint, requestId, cached: true })
 					return cached
 				}
@@ -135,15 +150,34 @@ export abstract class BaseResource {
 				return this.batchManager.addToBatch<T>(endpoint, processedOptions as any)
 			}
 
-			// Execute request with retry logic (unless explicitly skipped)
+			// Use request deduplication if enabled
+			const deduplicationKey = this.performanceManager
+				.getDeduplicationManager()
+				.generateKey(endpoint, method, processedOptions.body, processedOptions.query)
+
+			const executeWithPerformance = async (): Promise<T> => {
+				// Execute request with retry logic (unless explicitly skipped)
+				if (!processedOptions.skipRetry) {
+					return this.retryManager.execute(
+						() => this.executeRequest<T>(endpoint, processedOptions, requestId),
+						{ endpoint, requestId, method }
+					)
+				} else {
+					return this.executeRequest<T>(endpoint, processedOptions, requestId)
+				}
+			}
+
+			// Execute with queue management and deduplication
 			let response: T
-			if (!processedOptions.skipRetry) {
-				response = await this.retryManager.execute(
-					() => this.executeRequest<T>(endpoint, processedOptions, requestId),
-					{ endpoint, requestId, method: processedOptions.method || 'GET' }
-				)
+			if (this.config.performance.requestDeduplication) {
+				response = await this.performanceManager
+					.getDeduplicationManager()
+					.execute(deduplicationKey, executeWithPerformance)
 			} else {
-				response = await this.executeRequest<T>(endpoint, processedOptions, requestId)
+				response = await this.performanceManager.getQueueManager().enqueue(executeWithPerformance, {
+					priority: this.getRequestPriority(endpoint, method),
+					metadata: { endpoint, method, requestId },
+				})
 			}
 
 			// Apply response interceptors
@@ -166,6 +200,12 @@ export abstract class BaseResource {
 				)
 			}
 
+			// Complete performance tracking for successful request
+			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
+				status: 200,
+				cached: false,
+			})
+
 			// Log successful request
 			this.logRequest('Request completed', {
 				endpoint,
@@ -176,6 +216,11 @@ export abstract class BaseResource {
 
 			return processedResponse
 		} catch (error) {
+			// Complete performance tracking for failed request
+			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+
 			// Handle and transform errors
 			const processedError = await this.errorHandler.handleError(error, {
 				endpoint,
@@ -211,7 +256,25 @@ export abstract class BaseResource {
 		const startTime = Date.now()
 		const url = this.buildUrl(endpoint, options.query)
 		const headers = await this.buildHeaders(options.headers, requestId)
-		const body = this.buildBody(options.body)
+		let body = this.buildBody(options.body)
+		let bytesTransferred = 0
+		let compressed = false
+
+		// Apply request compression if enabled and applicable
+		if (this.config.performance.enableCompression && body) {
+			const contentType = headers.get('Content-Type') || 'application/json'
+			const compressionResult = await this.performanceManager
+				.getCompressionManager()
+				.compressRequest(body, contentType)
+
+			body = compressionResult.body
+			compressed = compressionResult.compressed
+
+			// Update headers with compression info
+			Object.entries(compressionResult.headers).forEach(([key, value]) => {
+				headers.set(key, value)
+			})
+		}
 
 		const fetchOptions: RequestInit = {
 			method: options.method || 'GET',
@@ -221,9 +284,14 @@ export abstract class BaseResource {
 			credentials: 'include',
 		}
 
-		// Add compression if enabled
-		if (this.config.performance.enableCompression && body) {
+		// Add compression acceptance if enabled
+		if (this.config.performance.enableCompression) {
 			headers.set('Accept-Encoding', 'gzip, deflate, br')
+		}
+
+		// Calculate request size for metrics
+		if (body) {
+			bytesTransferred += this.getBodySize(body)
 		}
 
 		// Log the outgoing request
@@ -236,31 +304,50 @@ export abstract class BaseResource {
 		const response = await fetch(url, fetchOptions)
 		const duration = Date.now() - startTime
 
+		// Handle response decompression if needed
+		const decompressedResponse = await this.performanceManager
+			.getCompressionManager()
+			.decompressResponse(response)
+
+		// Calculate response size for metrics
+		const contentLength = decompressedResponse.headers.get('content-length')
+		if (contentLength) {
+			bytesTransferred += parseInt(contentLength, 10)
+		}
+
 		// Log the response
 		const responseHeadersObj: Record<string, string> = {}
-		response.headers.forEach((value, key) => {
+		decompressedResponse.headers.forEach((value, key) => {
 			responseHeadersObj[key] = value
 		})
 
-		if (!response.ok) {
+		if (!decompressedResponse.ok) {
+			// Update performance metrics for failed request
+			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
+				status: decompressedResponse.status,
+				bytesTransferred,
+				compressed,
+				error: `HTTP ${decompressedResponse.status} ${decompressedResponse.statusText}`,
+			})
+
 			// Log error response
 			let errorBody: any
 			try {
-				errorBody = await response.clone().json()
+				errorBody = await decompressedResponse.clone().json()
 			} catch {
-				errorBody = await response.clone().text()
+				errorBody = await decompressedResponse.clone().text()
 			}
 
 			this.logHttpResponse(
-				response.status,
-				response.statusText,
+				decompressedResponse.status,
+				decompressedResponse.statusText,
 				responseHeadersObj,
 				errorBody,
 				duration,
 				requestId
 			)
 
-			const httpError = await ErrorHandler.createHttpError(response, requestId, {
+			const httpError = await ErrorHandler.createHttpError(decompressedResponse, requestId, {
 				url,
 				method: options.method || 'GET',
 				headers: headersObj,
@@ -268,12 +355,44 @@ export abstract class BaseResource {
 			throw httpError
 		}
 
-		// Parse response and log success
-		const parsedResponse = await this.parseResponse<T>(response, options.responseType)
+		// Check if response should be streamed
+		const streamingManager = this.performanceManager.getStreamingManager()
+		if (options.responseType === 'stream' || streamingManager.shouldStream(decompressedResponse)) {
+			// Return streaming response
+			const parsedResponse = await this.parseResponse<T>(decompressedResponse, 'stream')
+
+			// Update performance metrics for successful streaming request
+			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
+				status: decompressedResponse.status,
+				bytesTransferred,
+				compressed,
+			})
+
+			this.logHttpResponse(
+				decompressedResponse.status,
+				decompressedResponse.statusText,
+				responseHeadersObj,
+				'[Streaming Response]',
+				duration,
+				requestId
+			)
+
+			return parsedResponse
+		}
+
+		// Parse response normally and log success
+		const parsedResponse = await this.parseResponse<T>(decompressedResponse, options.responseType)
+
+		// Update performance metrics for successful request
+		this.performanceManager.getMetricsCollector().completeRequest(requestId, {
+			status: decompressedResponse.status,
+			bytesTransferred,
+			compressed,
+		})
 
 		this.logHttpResponse(
-			response.status,
-			response.statusText,
+			decompressedResponse.status,
+			decompressedResponse.statusText,
 			responseHeadersObj,
 			this.config.logging.includeResponseBody ? parsedResponse : undefined,
 			duration,
@@ -653,6 +772,56 @@ export abstract class BaseResource {
 	}
 
 	/**
+	 * Get request priority based on endpoint and method
+	 */
+	private getRequestPriority(endpoint: string, method: string): number {
+		// Higher priority for critical endpoints
+		if (endpoint.includes('/health') || endpoint.includes('/ready')) {
+			return 10 // Highest priority for health checks
+		}
+
+		if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
+			return 5 // Higher priority for write operations
+		}
+
+		if (endpoint.includes('/audit/events')) {
+			return 3 // Medium priority for audit events
+		}
+
+		return 1 // Default priority for read operations
+	}
+
+	/**
+	 * Get approximate size of body data
+	 */
+	private getBodySize(body: any): number {
+		if (!body) return 0
+
+		if (typeof body === 'string') {
+			return new Blob([body]).size
+		}
+
+		if (body instanceof ArrayBuffer) {
+			return body.byteLength
+		}
+
+		if (body instanceof Uint8Array) {
+			return body.byteLength
+		}
+
+		if (body instanceof Blob) {
+			return body.size
+		}
+
+		// For objects, estimate JSON size
+		try {
+			return new Blob([JSON.stringify(body)]).size
+		} catch {
+			return 0
+		}
+	}
+
+	/**
 	 * Log request information using enhanced logging system
 	 */
 	private logRequest(message: string, meta: Record<string, any>): void {
@@ -920,6 +1089,49 @@ export abstract class BaseResource {
 	}
 
 	/**
+	 * Get performance manager for advanced performance management
+	 */
+	public getPerformanceManager(): PerformanceManager {
+		return this.performanceManager
+	}
+
+	/**
+	 * Get current performance statistics
+	 */
+	public getPerformanceStats(): ReturnType<PerformanceManager['getStats']> {
+		return this.performanceManager.getStats()
+	}
+
+	/**
+	 * Reset performance tracking
+	 */
+	public resetPerformanceTracking(): void {
+		this.performanceManager.reset()
+	}
+
+	/**
+	 * Create streaming reader for large responses
+	 */
+	public createStreamReader<T>(response: Response): AsyncIterable<T> {
+		return this.performanceManager.getStreamingManager().createStreamReader<T>(response)
+	}
+
+	/**
+	 * Process streaming response with backpressure handling
+	 */
+	public async processStream<T>(
+		stream: AsyncIterable<T>,
+		processor: (chunk: T) => Promise<void> | void,
+		options?: {
+			maxConcurrency?: number
+			bufferSize?: number
+			onProgress?: (processed: number, total?: number) => void
+		}
+	): Promise<void> {
+		return this.performanceManager.getStreamingManager().processStream(stream, processor, options)
+	}
+
+	/**
 	 * Get infrastructure component statistics
 	 */
 	public getStats(): {
@@ -928,6 +1140,7 @@ export abstract class BaseResource {
 		batch: any
 		auth: any
 		interceptors: any
+		performance: any
 	} {
 		return {
 			cache: this.cacheManager.getStats(),
@@ -935,6 +1148,7 @@ export abstract class BaseResource {
 			batch: this.batchManager.getStats(),
 			auth: this.authManager.getCacheStats(),
 			interceptors: this.interceptorManager.getStats(),
+			performance: this.performanceManager.getStats(),
 		}
 	}
 
@@ -945,6 +1159,7 @@ export abstract class BaseResource {
 		this.cacheManager.destroy()
 		this.batchManager.clear()
 		this.authManager.clearAllTokenCache()
+		this.performanceManager.reset()
 		await this.clearInterceptors()
 	}
 }

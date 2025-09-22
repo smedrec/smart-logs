@@ -44,6 +44,10 @@ const PerformanceConfigSchema = z.object({
 	maxConcurrentRequests: z.number().min(1).max(100).default(10),
 	requestDeduplication: z.boolean().default(true),
 	responseTransformation: z.boolean().default(true),
+	metricsCollection: z.boolean().default(true),
+	metricsBufferSize: z.number().min(10).max(10000).default(1000),
+	compressionThreshold: z.number().min(100).max(100000).default(1024),
+	streamingThreshold: z.number().min(1000).max(1000000).default(10240),
 })
 
 const LoggingConfigSchema = z.object({

@@ -8,6 +8,7 @@ export * from './batch'
 export * from './logger'
 export * from './plugins'
 export * from './streaming'
+export * from './performance'
 
 // Export error module with explicit re-exports to avoid naming conflicts
 export {
