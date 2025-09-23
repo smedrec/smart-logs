@@ -1,15 +1,16 @@
-import Header from "@/components/header";
-import Loader from "@/components/loader";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
+import Header from '@/components/header'
+import Loader from '@/components/loader'
+import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 import {
+	createRootRouteWithContext,
 	HeadContent,
 	Outlet,
-	createRootRouteWithContext,
 	useRouterState,
-} from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import "../index.css";
+} from '@tanstack/react-router'
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+
+import '../index.css'
 
 export interface RouterAppContext {}
 
@@ -18,26 +19,26 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 	head: () => ({
 		meta: [
 			{
-				title: "my-better-t-app",
+				title: 'my-better-t-app',
 			},
 			{
-				name: "description",
-				content: "my-better-t-app is a web application",
+				name: 'description',
+				content: 'my-better-t-app is a web application',
 			},
 		],
 		links: [
 			{
-				rel: "icon",
-				href: "/favicon.ico",
+				rel: 'icon',
+				href: '/favicon.ico',
 			},
 		],
 	}),
-});
+})
 
 function RootComponent() {
 	const isFetching = useRouterState({
 		select: (s) => s.isLoading,
-	});
+	})
 
 	return (
 		<>
@@ -56,5 +57,5 @@ function RootComponent() {
 			</ThemeProvider>
 			<TanStackRouterDevtools position="bottom-left" />
 		</>
-	);
+	)
 }

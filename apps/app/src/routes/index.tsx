@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute('/')({
 	component: HomeComponent,
-});
+})
 
 const TITLE_TEXT = `
  ██████╗ ███████╗████████╗████████╗███████╗██████╗
@@ -18,7 +18,7 @@ const TITLE_TEXT = `
     ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
     ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
     ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- `;
+ `
 
 function HomeComponent() {
 	return (
@@ -30,5 +30,5 @@ function HomeComponent() {
 				</section>
 			</div>
 		</div>
-	);
+	)
 }
