@@ -193,19 +193,11 @@ pnpm test:coverage     # Run tests with coverage
 ### Type Checking
 
 ```bash
-pnpm check:types    # Type check
+pnpm check-types    # Type check
 pnpm check:lint     # Lint check
 ```
 
-## Documentation
-
-- [Getting Started Guide](./docs/GETTING_STARTED.md)
-- [API Reference](./docs/API_REFERENCE.md)
-- [Tutorials](./docs/TUTORIALS.md)
-- [Code Examples](./docs/CODE_EXAMPLES.md)
-- [Troubleshooting & FAQ](./docs/TROUBLESHOOTING_AND_FAQ.md)
-- [Framework Integration](./docs/FRAMEWORK_INTEGRATION.md)
-- [Plugin Architecture](./docs/PLUGIN_ARCHITECTURE.md)
+## [Documentation](./docs/README.md)
 
 ## License
 
