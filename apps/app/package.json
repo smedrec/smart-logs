@@ -15,6 +15,7 @@
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^5.2.2",
+		"@smedrec/audit-client": "workspace:*",
 		"@tailwindcss/vite": "^4.1.13",
 		"@tanstack/react-form": "^1.23.0",
 		"@tanstack/react-query": "^5.90.1",
