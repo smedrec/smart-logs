@@ -1,7 +1,7 @@
 {
 	"name": "@smedrec/audit-client",
-	"version": "0.1.0",
-	"private": true,
+	"version": "1.0.0",
+	"private": false,
 	"description": "Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features including retry mechanisms, caching, authentication, and type safety",
 	"keywords": [
 		"audit",
@@ -30,44 +30,20 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"import": "./dist/index.mjs",
-			"require": "./dist/index.js",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs",
 			"default": "./dist/index.js"
-		},
-		"./services": {
-			"types": "./dist/services/index.d.ts",
-			"import": "./dist/services/index.mjs",
-			"require": "./dist/services/index.js"
-		},
-		"./infrastructure": {
-			"types": "./dist/infrastructure/index.d.ts",
-			"import": "./dist/infrastructure/index.mjs",
-			"require": "./dist/infrastructure/index.js"
-		},
-		"./core": {
-			"types": "./dist/core/index.d.ts",
-			"import": "./dist/core/index.mjs",
-			"require": "./dist/core/index.js"
-		},
-		"./utils": {
-			"types": "./dist/utils/index.d.ts",
-			"import": "./dist/utils/index.mjs",
-			"require": "./dist/utils/index.js"
-		},
-		"./types": {
-			"types": "./dist/types.d.ts",
-			"import": "./dist/types.mjs",
-			"require": "./dist/types.js"
 		},
 		"./package.json": "./package.json"
 	},
-	"main": "./dist/index.js",
-	"module": "./dist/index.mjs",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"files": [
-		"dist",
+		"dist/**/*",
 		"README.md",
-		"CHANGELOG.md"
+		"CHANGELOG.md",
+		"LICENSE"
 	],
 	"scripts": {
 		"build": "tsup",
@@ -76,13 +52,21 @@
 		"check:lint": "run-eslint",
 		"clean": "rm -rf dist node_modules .turbo",
 		"dev": "tsup --watch",
-		"prepublishOnly": "pnpm run build",
+		"lint": "run-eslint",
+		"lint:fix": "run-eslint --fix",
+		"prepack": "pnpm run build && pnpm run check-types && pnpm run test",
+		"prepublishOnly": "pnpm run prepack",
+		"release": "pnpm run prepack && npm publish",
+		"release:dry": "pnpm run prepack && npm publish --dry-run",
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
-		"test:watch": "vitest"
+		"test:environments": "node scripts/test-environments.cjs",
+		"test:watch": "vitest",
+		"validate": "pnpm run check-types && pnpm run lint && pnpm run test",
+		"validate:full": "pnpm run validate && pnpm run validate:package && pnpm run test:environments",
+		"validate:package": "node scripts/validate-package.cjs"
 	},
 	"dependencies": {
-		"@repo/audit": "workspace:*",
 		"zod": "^3.22.4"
 	},
 	"devDependencies": {
@@ -106,6 +90,7 @@
 		"node": ">=18.0.0"
 	},
 	"publishConfig": {
-		"access": "public"
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
 	}
 }

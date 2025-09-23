@@ -1,0 +1,215 @@
+name: Audit Client CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packages/audit-client/**'
+      - '.github/workflows/audit-client-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/audit-client/**'
+      - '.github/workflows/audit-client-ci.yml'
+  release:
+    types: [published]
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['18', '20', '22']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm --filter @smedrec/audit-client check-types
+
+      - name: Lint
+        run: pnpm --filter @smedrec/audit-client lint
+
+      - name: Run tests
+        run: pnpm --filter @smedrec/audit-client test:coverage
+
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '20'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./packages/audit-client/coverage/lcov.info
+          flags: audit-client
+          name: audit-client-coverage
+          fail_ci_if_error: false
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm --filter @smedrec/audit-client build
+
+      - name: Validate package
+        run: pnpm --filter @smedrec/audit-client release:dry
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-client-dist
+          path: packages/audit-client/dist/
+          retention-days: 7
+
+  compatibility-test:
+    name: Compatibility Test
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      matrix:
+        environment: ['node', 'browser', 'react-native']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: audit-client-dist
+          path: packages/audit-client/dist/
+
+      - name: Test ${{ matrix.environment }} compatibility
+        run: |
+          cd packages/audit-client
+          case "${{ matrix.environment }}" in
+            "node")
+              node -e "const client = require('./dist/index.js'); console.log('✅ CJS import works');"
+              node -e "import('./dist/index.mjs').then(() => console.log('✅ ESM import works'));"
+              ;;
+            "browser")
+              # Test browser compatibility with basic bundler simulation
+              echo "Testing browser compatibility..."
+              node -e "
+                const fs = require('fs');
+                const content = fs.readFileSync('./dist/index.mjs', 'utf8');
+                if (content.includes('require(') && !content.includes('typeof require')) {
+                  throw new Error('Browser build contains Node.js specific code');
+                }
+                console.log('✅ Browser compatibility check passed');
+              "
+              ;;
+            "react-native")
+              # Test React Native compatibility
+              echo "Testing React Native compatibility..."
+              node -e "
+                const fs = require('fs');
+                const content = fs.readFileSync('./dist/index.mjs', 'utf8');
+                if (content.includes('process.') && !content.includes('typeof process')) {
+                  throw new Error('React Native build contains Node.js specific code');
+                }
+                console.log('✅ React Native compatibility check passed');
+              "
+              ;;
+          esac
+
+  publish:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: [test, build, compatibility-test]
+    if: github.event_name == 'release' && github.event.action == 'published'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm --filter @smedrec/audit-client build
+
+      - name: Publish to NPM
+        run: pnpm --filter @smedrec/audit-client publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release Assets
+        run: |
+          cd packages/audit-client
+          tar -czf audit-client-${{ github.event.release.tag_name }}.tar.gz dist/ README.md CHANGELOG.md LICENSE package.json
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: packages/audit-client/audit-client-${{ github.event.release.tag_name }}.tar.gz
+          asset_name: audit-client-${{ github.event.release.tag_name }}.tar.gz
+          asset_content_type: application/gzip

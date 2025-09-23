@@ -613,9 +613,6 @@ importers:
 
   packages/audit-client:
     dependencies:
-      '@repo/audit':
-        specifier: workspace:*
-        version: link:../audit
       zod:
         specifier: ^3.22.4
         version: 3.25.76

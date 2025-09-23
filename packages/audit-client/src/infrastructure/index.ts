@@ -7,8 +7,40 @@ export * from './retry'
 export * from './batch'
 export * from './logger'
 export * from './plugins'
-export * from './streaming'
-export * from './performance'
+
+// Export streaming module with explicit re-exports to avoid naming conflicts
+export {
+	StreamingManager as StreamManager,
+	ConnectionManager,
+	StreamProcessor,
+	ManagedReadableStream,
+	ManagedConnection,
+	DEFAULT_STREAM_CONFIG,
+} from './streaming'
+
+export type {
+	StreamConfig,
+	StreamEventType,
+	StreamEventHandler,
+	StreamMetrics,
+	StreamConnectionState,
+	BackpressureStrategy,
+	StreamTransformer,
+	StreamFilter,
+	ConnectionOptions,
+} from './streaming'
+
+// Export performance module with explicit re-exports to avoid naming conflicts
+export {
+	StreamingManager as PerformanceStreamingManager,
+	CompressionManager,
+	RequestQueueManager,
+	PerformanceMetricsCollector,
+	RequestDeduplicationManager,
+	PerformanceManager,
+} from './performance'
+
+export type { PerformanceConfig, PerformanceMetrics, RequestPerformance } from './performance'
 
 // Export error module with explicit re-exports to avoid naming conflicts
 export {

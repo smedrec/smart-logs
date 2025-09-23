@@ -1,0 +1,163 @@
+name: Audit Client Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0, 1.1.0, 2.0.0)'
+        required: true
+        type: string
+      release_type:
+        description: 'Type of release'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate and set version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+
+          # Validate semver format
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
+            echo "Error: Invalid version format. Must be semver (e.g., 1.0.0, 1.0.0-beta.1)"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: validate-version
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Update package version
+        run: |
+          cd packages/audit-client
+          npm version ${{ needs.validate-version.outputs.version }} --no-git-tag-version
+
+      - name: Update changelog
+        run: |
+          cd packages/audit-client
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+
+          # Create new changelog entry
+          sed -i "s/## \[Unreleased\]/## [Unreleased]\n\n## [$VERSION] - $DATE/" CHANGELOG.md
+
+      - name: Build package
+        run: pnpm --filter @smedrec/audit-client build
+
+      - name: Run tests
+        run: pnpm --filter @smedrec/audit-client test
+
+      - name: Validate package
+        run: pnpm --filter @smedrec/audit-client release:dry
+
+      - name: Commit version changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add packages/audit-client/package.json packages/audit-client/CHANGELOG.md
+          git commit -m "chore(audit-client): release v${{ needs.validate-version.outputs.version }}"
+          git tag ${{ needs.validate-version.outputs.tag }}
+
+      - name: Push changes
+        run: |
+          git push origin main
+          git push origin ${{ needs.validate-version.outputs.tag }}
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cd packages/audit-client
+          VERSION="${{ needs.validate-version.outputs.version }}"
+
+          # Extract changelog for this version
+          CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d' | tail -n +2)
+
+          # Create release notes
+          cat > release_notes.md << EOF
+          # @smedrec/audit-client v$VERSION
+
+          Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features including retry mechanisms, caching, authentication, and type safety.
+
+          ## Changes
+
+          $CHANGELOG_CONTENT
+
+          ## Installation
+
+          \`\`\`bash
+          npm install @smedrec/audit-client
+          # or
+          pnpm add @smedrec/audit-client
+          # or
+          yarn add @smedrec/audit-client
+          \`\`\`
+
+          ## Documentation
+
+          - [API Documentation](https://github.com/smedrec/smart-logs/tree/main/packages/audit-client/docs)
+          - [Getting Started Guide](https://github.com/smedrec/smart-logs/tree/main/packages/audit-client/README.md)
+          - [Examples](https://github.com/smedrec/smart-logs/tree/main/packages/audit-client/docs/examples)
+          EOF
+
+          echo "release_notes_file=packages/audit-client/release_notes.md" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.validate-version.outputs.tag }}
+          release_name: '@smedrec/audit-client v${{ needs.validate-version.outputs.version }}'
+          body_path: ${{ steps.release_notes.outputs.release_notes_file }}
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease }}
