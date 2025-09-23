@@ -1,5 +1,7 @@
 # smart-logs
 
+![Smart Logs](./docs/logo.png)
+
 The Smart Logs Audit System provides comprehensive audit logging capabilities for healthcare applications, ensuring compliance with HIPAA, GDPR, and other regulatory requirements.
 
 ## Key Features
