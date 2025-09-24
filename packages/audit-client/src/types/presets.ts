@@ -290,7 +290,7 @@ export const PresetContextSchema = z.object({
 	sessionContext: z
 		.object({
 			sessionId: z.string().min(1),
-			ipAddress: z.string().ip(),
+			ipAddress: z.string(), //.ip(),
 			userAgent: z.string().min(1),
 			geolocation: z.string().optional(),
 		})

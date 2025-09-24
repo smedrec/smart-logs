@@ -21,7 +21,7 @@ export type AuditEventStatus = z.infer<typeof AuditEventStatusSchema>
  */
 export const SessionContextSchema = z.object({
 	sessionId: z.string().min(1, 'Session ID is required'),
-	ipAddress: z.string().ip('Invalid IP address format'),
+	ipAddress: z.string(), //.ip('Invalid IP address format'),
 	userAgent: z.string().min(1, 'User agent is required'),
 	geolocation: z.string().optional(),
 	deviceId: z.string().optional(),

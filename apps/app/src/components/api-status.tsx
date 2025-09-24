@@ -1,38 +1,62 @@
-import { Status, StatusIndicator, StatusLabel } from '@/components/ui/kibo-ui/status'
-import { trpc } from '@/utils/trpc'
+import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status'
+import { auditClient } from '@/lib/audit-client'
 import { useQuery } from '@tanstack/react-query'
 
 function ApiStatus() {
-	const status = useQuery(trpc.metrics.status.queryOptions())
-	const overallStatus = status.data?.status
+	const {
+		isPending,
+		error,
+		data: status,
+	} = useQuery({
+		queryKey: ['health-check'],
+		queryFn: async () => await auditClient.health.check(),
+	})
 
-	switch (overallStatus) {
-		case 'OK':
+	if (isPending) {
+		return (
+			<Status status="maintenance">
+				<StatusIndicator />
+				<StatusLabel>Loading...</StatusLabel>
+			</Status>
+		)
+	}
+
+	if (error) {
+		return (
+			<Status status="offline">
+				<StatusIndicator />
+				<StatusLabel>Error</StatusLabel>
+			</Status>
+		)
+	}
+
+	switch (status.status) {
+		case 'healthy':
 			return (
 				<Status status="online">
 					<StatusIndicator />
-					<StatusLabel />
+					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
 				</Status>
 			)
-		case 'WARNING':
+		case 'degraded':
 			return (
 				<Status status="degraded">
 					<StatusIndicator />
-					<StatusLabel />
+					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
 				</Status>
 			)
-		case 'CRITICAL':
+		case 'unhealthy':
 			return (
 				<Status status="offline">
 					<StatusIndicator />
-					<StatusLabel />
+					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
 				</Status>
 			)
 		default:
 			return (
 				<Status status="offline">
 					<StatusIndicator />
-					<StatusLabel />
+					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
 				</Status>
 			)
 	}

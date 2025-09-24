@@ -166,7 +166,7 @@ async function startServer() {
 	// Mount health check API
 	const { createHealthAPI } = await import('./routes/health-api.js')
 	const healthAPI = createHealthAPI()
-	app.route('', healthAPI)
+	app.route(``, healthAPI)
 
 	// Mount metrics API if enabled
 	if (config.server.monitoring.enableMetrics) {

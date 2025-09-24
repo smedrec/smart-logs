@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-//import { ApiStatus } from './api-status'
+import { ApiStatus } from './api-status'
 import { NavOrganizations } from './nav-organizations'
 
 const data = {
@@ -120,7 +120,9 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	return (
 		<Sidebar collapsible="icon" {...props}>
-			<SidebarHeader>Smart Logs</SidebarHeader>
+			<SidebarHeader>
+				<ApiStatus />
+			</SidebarHeader>
 			<SidebarContent>
 				<NavMain items={data.navMain} />
 				<NavOrganizations />
