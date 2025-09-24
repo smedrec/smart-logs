@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import "@daveyplate/better-auth-ui/css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -129,6 +130,7 @@ body {
 	* {
 		@apply border-border outline-ring/50;
 	}
+
 	body {
 		@apply bg-background text-foreground;
 	}

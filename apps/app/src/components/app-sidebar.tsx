@@ -94,23 +94,23 @@ const data = {
 			items: [
 				{
 					title: 'Account',
-					url: '/dashboard/settings/account',
+					url: '/settings/account',
 				},
 				{
 					title: 'Organization',
-					url: '/dashboard/settings/organization',
+					url: '/settings/organization',
 				},
 				{
 					title: 'Staff',
-					url: '/dashboard/settings/staff',
+					url: '/settings/staff',
 				},
 				{
 					title: 'Security',
-					url: '/dashboard/settings/security',
+					url: '/settings/security',
 				},
 				{
 					title: 'Billing',
-					url: '/dashboard/settings/billing',
+					url: '/settings/billing',
 				},
 			],
 		},

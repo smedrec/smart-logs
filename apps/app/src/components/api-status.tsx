@@ -1,8 +1,10 @@
+import { useSidebar } from '@/components/ui/sidebar'
 import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status'
 import { auditClient } from '@/lib/audit-client'
 import { useQuery } from '@tanstack/react-query'
 
 function ApiStatus() {
+	const { state } = useSidebar()
 	const {
 		isPending,
 		error,
@@ -16,7 +18,7 @@ function ApiStatus() {
 		return (
 			<Status status="maintenance">
 				<StatusIndicator />
-				<StatusLabel>Loading...</StatusLabel>
+				{state === 'collapsed' ? null : <StatusLabel>Loading...</StatusLabel>}
 			</Status>
 		)
 	}
@@ -25,7 +27,7 @@ function ApiStatus() {
 		return (
 			<Status status="offline">
 				<StatusIndicator />
-				<StatusLabel>Error</StatusLabel>
+				{state === 'collapsed' ? null : <StatusLabel>Error</StatusLabel>}
 			</Status>
 		)
 	}
@@ -35,28 +37,28 @@ function ApiStatus() {
 			return (
 				<Status status="online">
 					<StatusIndicator />
-					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
+					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
 				</Status>
 			)
 		case 'degraded':
 			return (
 				<Status status="degraded">
 					<StatusIndicator />
-					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
+					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
 				</Status>
 			)
 		case 'unhealthy':
 			return (
 				<Status status="offline">
 					<StatusIndicator />
-					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
+					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
 				</Status>
 			)
 		default:
 			return (
 				<Status status="offline">
 					<StatusIndicator />
-					<StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>
+					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
 				</Status>
 			)
 	}

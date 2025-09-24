@@ -2,17 +2,21 @@ import Loader from '@/components/loader'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/contexts/auth-provider'
 import { ThemeProvider } from '@/contexts/theme-provider'
+import { AuthUIProviderTanstack } from '@daveyplate/better-auth-ui/tanstack'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import {
 	createRootRouteWithContext,
 	HeadContent,
+	Link,
 	Outlet,
+	useRouter,
 	useRouterState,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 import '../index.css'
 
+import { authClient } from '@/lib/auth-client'
 import { seo } from '@/lib/seo'
 
 import type { QueryClient } from '@tanstack/react-query'
@@ -48,6 +52,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 })
 
 function RootComponent() {
+	const router = useRouter()
 	const isFetching = useRouterState({
 		select: (s) => s.isLoading,
 	})
@@ -62,9 +67,26 @@ function RootComponent() {
 				storageKey="vite-ui-theme"
 			>
 				<AuthProvider>
-					<div className="grid grid-rows-[auto_1fr] h-svh">
-						{isFetching ? <Loader /> : <Outlet />}
-					</div>
+					<AuthUIProviderTanstack
+						authClient={authClient}
+						navigate={(href) => router.navigate({ href })}
+						replace={(href) => router.navigate({ href, replace: true })}
+						Link={({ href, ...props }) => <Link to={href} {...props} />}
+						avatar={true}
+						organization={{
+							logo: true,
+						}}
+						apiKey={{
+							metadata: {
+								environment: 'development',
+								version: 'v1',
+							},
+						}}
+					>
+						<div className="grid grid-rows-[auto_1fr] h-svh">
+							{isFetching ? <Loader /> : <Outlet />}
+						</div>
+					</AuthUIProviderTanstack>
 				</AuthProvider>
 				<Toaster richColors />
 			</ThemeProvider>
