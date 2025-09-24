@@ -62,7 +62,7 @@ export function createDevelopmentConfig(): AuditConfig {
 				},
 			},
 			replication: {
-				enabled: true,
+				enabled: false,
 				readReplicas: [
 					process.env.AUDIT_DB_READ_REPLICA_URL_1 || 'postgresql://localhost:5433/audit_dev',
 					process.env.AUDIT_DB_READ_REPLICA_URL_2 || 'postgresql://localhost:5434/audit_dev',

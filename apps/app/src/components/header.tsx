@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 
+import { NavUser } from './auth/nav-user'
 import { ModeToggle } from './mode-toggle'
 
 export default function Header() {
@@ -19,6 +20,7 @@ export default function Header() {
 				</nav>
 				<div className="flex items-center gap-2">
 					<ModeToggle />
+					<NavUser />
 				</div>
 			</div>
 			<hr />
