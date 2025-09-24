@@ -15,6 +15,7 @@
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^5.2.2",
+		"@radix-ui/react-slot": "^1.2.3",
 		"@smedrec/audit-client": "workspace:*",
 		"@tabler/icons-react": "^3.35.0",
 		"@tailwindcss/vite": "^4.1.13",
