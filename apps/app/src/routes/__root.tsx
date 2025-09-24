@@ -1,4 +1,3 @@
-import Header from '@/components/header'
 import Loader from '@/components/loader'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/contexts/auth-provider'
@@ -64,7 +63,6 @@ function RootComponent() {
 			>
 				<AuthProvider>
 					<div className="grid grid-rows-[auto_1fr] h-svh">
-						<Header />
 						{isFetching ? <Loader /> : <Outlet />}
 					</div>
 				</AuthProvider>
