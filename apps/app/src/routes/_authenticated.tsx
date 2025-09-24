@@ -30,10 +30,10 @@ export const Route = createFileRoute('/_authenticated')({
 	},
 	errorComponent: ({ error }) => {
 		const ErrorComponent = () => {
-			const { data: session } = authClient.useSession()
+			const { isAuthenticated } = useAuth()
 
 			// Only redirect to login if user is not authenticated
-			if (!session && typeof window !== `undefined`) {
+			if (!isAuthenticated && typeof window !== `undefined`) {
 				window.location.href = `/sign-in`
 				return null
 			}
