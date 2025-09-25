@@ -6,6 +6,7 @@
 - **TanStack Router** - File-based routing with full type safety
 - **TailwindCSS** - Utility-first CSS for rapid UI development
 - **shadcn/ui** - Reusable UI components
+- **TanStack DB** - A reactive client store for building super fast apps on sync
 - **Tauri** - Build native desktop applications
 
 ## Getting Started
