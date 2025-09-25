@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/contexts/auth-provider'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { authClient } from '@/lib/auth-client'
+import { authClient, authStateCollection } from '@/lib/auth-client'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { BadgeCheck, Bell, ChevronsUpDown, CreditCard, LogOut, Sparkles } from 'lucide-react'
 
@@ -22,13 +22,14 @@ import Loader from '../loader'
 export function NavUser() {
 	const navigate = useNavigate()
 	const isMobile = useIsMobile()
-	const { session, isPending } = useAuth()
+	const auth = authStateCollection.get(`auth`)
+	//const { session, isPending } = useAuth()
 
-	if (isPending) {
-		return <Loader />
-	}
+	//if (isPending) {
+	//return <Loader />
+	//}
 
-	if (!session) {
+	if (!auth) {
 		return (
 			<Button variant="outline" asChild>
 				<Link to="/sign-in">Sign In</Link>
@@ -42,14 +43,14 @@ export function NavUser() {
 				<Button variant="outline" size="lg">
 					<Avatar className="h-8 w-8 rounded-lg">
 						<AvatarImage
-							src={session.user.image === null ? undefined : session.user.image}
-							alt={session.user.name}
+							src={auth.user.image === null ? undefined : auth.user.image}
+							alt={auth.user.name}
 						/>
 						<AvatarFallback className="rounded-lg">CN</AvatarFallback>
 					</Avatar>
 					<div className="grid flex-1 text-left text-sm leading-tight">
-						<span className="truncate font-medium">{session.user.name}</span>
-						<span className="truncate text-xs">{session.user.email}</span>
+						<span className="truncate font-medium">{auth.user.name}</span>
+						<span className="truncate text-xs">{auth.user.email}</span>
 					</div>
 					<ChevronsUpDown className="ml-auto size-4" />
 				</Button>
@@ -64,14 +65,14 @@ export function NavUser() {
 					<div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
 						<Avatar className="h-8 w-8 rounded-lg">
 							<AvatarImage
-								src={session.user.image === null ? undefined : session.user.image}
-								alt={session.user.name}
+								src={auth.user.image === null ? undefined : auth.user.image}
+								alt={auth.user.name}
 							/>
 							<AvatarFallback className="rounded-lg">CN</AvatarFallback>
 						</Avatar>
 						<div className="grid flex-1 text-left text-sm leading-tight">
-							<span className="truncate font-medium">{session.user.name}</span>
-							<span className="truncate text-xs">{session.user.email}</span>
+							<span className="truncate font-medium">{auth.user.name}</span>
+							<span className="truncate text-xs">{auth.user.email}</span>
 						</div>
 					</div>
 				</DropdownMenuLabel>

@@ -20,9 +20,14 @@ export const Route = createFileRoute('/_authenticated')({
 			authStateCollection.get(`auth`) &&
 			authStateCollection.get(`auth`)?.session.expiresAt > new Date()
 		) {
-			return authStateCollection.get(`auth`)!
+			return authStateCollection.get(`auth`)
 		} else {
 			const result = await authClient.getSession()
+			if (!result.data) {
+				authStateCollection.delete(`auth`)
+				return null
+			}
+			// Store session in local collection
 			const session = result.data as Session
 			authStateCollection.insert({ id: `auth`, ...session })
 			return session

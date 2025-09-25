@@ -46,21 +46,22 @@ const queryAlertsCollection = createCollection(
 	})
 )
 
-const recentAlertsCollection = createCollection(
-	electricCollectionOptions({
-		id: 'sync-recent-alerts',
-		shapeOptions: {
-			url: 'https://electric.smedrec.qzz.io/v1/shape',
-			params: {
-				table: 'alerts',
-				where: `
-          organization_id = '${currentUser.id}'
+export const recentAlertsCollection = (activeOrganizationId: string) =>
+	createCollection(
+		electricCollectionOptions({
+			id: 'sync-recent-alerts',
+			shapeOptions: {
+				url: 'https://electric.smedrec.qzz.io/v1/shape',
+				params: {
+					table: 'alerts',
+					where: `
+          organization_id = '${activeOrganizationId}'
           AND
-          inserted_at >= '2025-01-01'
+          created_at >= '2025-01-01'
         `,
+				},
 			},
-		},
-		getKey: (item) => item.id,
-		schema: AlertSchema,
-	})
-)
+			getKey: (item) => item.id,
+			schema: AlertSchema,
+		})
+	)

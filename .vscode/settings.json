@@ -4,7 +4,7 @@
 		"plaintext": false,
 		"markdown": false,
 		"scminput": false,
-		"typescript": false,
+		"typescript": true,
 		"typescriptreact": true
 	},
 	"github.copilot.nextEditSuggestions.enabled": false
