@@ -705,6 +705,7 @@ export function isDetailedHealthStatus(value: unknown): value is DetailedHealthS
 export function isAlert(value: unknown): value is Alert {
 	if (!isObject(value)) return false
 
+	// FIXME: the alert type is wrong
 	const alert = value as any
 	return (
 		startsWith(alert.id, 'alert-') &&

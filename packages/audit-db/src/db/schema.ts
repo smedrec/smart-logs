@@ -376,7 +376,7 @@ export const archiveStorage = pgTable(
 export const alerts = pgTable(
 	'alerts',
 	{
-		id: varchar('id', { length: 255 }).primaryKey(), // Alert ID (UUID)
+		id: varchar('id', { length: 255 }).primaryKey(), // Alert ID
 		organizationId: varchar('organization_id', { length: 255 }).notNull(), // Multi-tenant isolation
 		severity: varchar('severity', { length: 20 }).notNull(), // LOW, MEDIUM, HIGH, CRITICAL
 		type: varchar('type', { length: 20 }).notNull(), // SECURITY, COMPLIANCE, PERFORMANCE, SYSTEM

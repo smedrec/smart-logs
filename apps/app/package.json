@@ -27,6 +27,7 @@
 		"@tabler/icons-react": "^3.35.0",
 		"@tailwindcss/vite": "^4.1.13",
 		"@tanstack/electric-db-collection": "^0.1.23",
+		"@tanstack/query-db-collection": "^0.2.20",
 		"@tanstack/react-db": "^0.1.21",
 		"@tanstack/react-form": "^1.23.0",
 		"@tanstack/react-query": "^5.90.1",

@@ -264,6 +264,7 @@ export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'suppressed'
  */
 export interface Alert {
 	id: string
+	organizationId: string
 	title: string
 	description: string
 	severity: AlertSeverity

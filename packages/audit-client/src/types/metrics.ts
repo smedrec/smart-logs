@@ -472,7 +472,8 @@ export type AlertCondition = z.infer<typeof AlertConditionSchema>
  * Alert
  */
 export const AlertSchema = z.object({
-	id: z.string().uuid(),
+	id: z.string(),
+	organizationId: z.string().min(1),
 	title: z.string().min(1),
 	description: z.string().optional(),
 	severity: AlertSeveritySchema,
