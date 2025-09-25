@@ -36,19 +36,19 @@ const data = {
 			items: [
 				{
 					title: 'Board',
-					url: '/dashboard/alerts/board',
+					url: '/alerts/board',
 				},
 				{
 					title: 'Active',
-					url: '/dashboard/alerts/active',
+					url: '/alerts/active',
 				},
 				{
 					title: 'Resolved',
-					url: '/dashboard/alerts/resolved',
+					url: '/alerts/resolved',
 				},
 				{
 					title: 'Statistics',
-					url: '/dashboard/alerts/statistics',
+					url: '/alerts/statistics',
 				},
 			],
 		},
@@ -59,31 +59,31 @@ const data = {
 			items: [
 				{
 					title: 'Hipaa Report',
-					url: '/dashboard/compliance/hipaa',
+					url: '/compliance/hipaa',
 				},
 				{
 					title: 'GDPR Report',
-					url: '/dashboard/compliance/gdpr',
+					url: '/compliance/gdpr',
 				},
 				{
 					title: 'Integrity Report',
-					url: '/dashboard/compliance/integrity',
+					url: '/compliance/integrity',
 				},
 				{
 					title: 'Export Reports',
-					url: '/dashboard/compliance/export-reports',
+					url: '/compliance/export-reports',
 				},
 				{
 					title: 'Export Events',
-					url: '/dashboard/compliance/export-events',
+					url: '/compliance/export-events',
 				},
 				{
 					title: 'Scheduled Reports',
-					url: '/dashboard/compliance/scheduled-reports',
+					url: '/compliance/scheduled-reports',
 				},
 				{
 					title: 'Report Templates',
-					url: '/dashboard/compliance/report-templates',
+					url: '/compliance/report-templates',
 				},
 			],
 		},

@@ -13,11 +13,28 @@ const authStateSchema = z.object({
 	user: z.any().nullable(),
 })
 
+const activeOrganizationSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	slug: z.string(),
+	createdAt: z.iso.datetime(),
+	logo: z.string().nullable().optional(),
+	metadata: z.record(z.string(), z.any()).optional(),
+})
+
 export const authStateCollection = createCollection(
 	localOnlyCollectionOptions({
 		id: `auth-state`,
 		getKey: (item) => item.id,
 		schema: authStateSchema,
+	})
+)
+
+export const activeOrganizationCollection = createCollection(
+	localOnlyCollectionOptions({
+		id: `active-organization`,
+		getKey: (item) => item.id,
+		schema: activeOrganizationSchema,
 	})
 )
 

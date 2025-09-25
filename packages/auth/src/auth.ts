@@ -1,7 +1,21 @@
 import { expo } from '@better-auth/expo'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { admin, apiKey, mcp, oidcProvider, openAPI, organization } from 'better-auth/plugins'
+import {
+	admin as adminPlugin,
+	apiKey,
+	mcp,
+	oidcProvider,
+	openAPI,
+	organization,
+} from 'better-auth/plugins'
+import { createAccessControl } from 'better-auth/plugins/access'
+import {
+	adminAc,
+	defaultStatements,
+	memberAc,
+	ownerAc,
+} from 'better-auth/plugins/organization/access'
 import { Inngest } from 'inngest'
 
 import { initDrizzle } from './db/index.js'
@@ -13,6 +27,36 @@ import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Audit, AuditConfig } from '@repo/audit'
 import type { MailerSendOptions } from '@repo/mailer'
 import type { AuthDrizzleDb } from './db/index.js'
+
+const statement = {
+	...defaultStatements,
+} as const
+
+const ac = createAccessControl(statement)
+
+const admin = ac.newRole({
+	...adminAc.statements,
+})
+
+const owner = ac.newRole({
+	...ownerAc.statements,
+})
+
+const member = ac.newRole({
+	...memberAc.statements,
+})
+
+const auditor = ac.newRole({
+	...memberAc.statements,
+})
+
+const officer = ac.newRole({
+	...memberAc.statements,
+})
+
+const developer = ac.newRole({
+	...memberAc.statements,
+})
 
 class Auth {
 	private auth: ReturnType<typeof betterAuth>
@@ -231,11 +275,23 @@ class Auth {
 			//	storage: 'secondary-storage',
 			//},
 			plugins: [
-				admin({
+				adminPlugin({
 					defaultRole: 'user',
 				}),
 				expo(),
 				organization({
+					ac,
+					roles: {
+						owner,
+						admin,
+						member,
+						auditor,
+						officer,
+						developer,
+					},
+					defaultRole: 'owner',
+					inviteExpirationDays: 7,
+					maxOrganizationsPerUser: 5,
 					teams: {
 						enabled: true,
 						maximumTeams: 10, // Optional: limit teams per organization
