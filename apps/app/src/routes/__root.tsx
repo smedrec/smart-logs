@@ -75,6 +75,11 @@ function RootComponent() {
 						avatar={true}
 						organization={{
 							logo: true,
+							customRoles: [
+								{ role: 'auditor', label: 'Auditor' },
+								{ role: 'officer', label: 'Compliance Officer' },
+								{ role: 'developer', label: 'Developer' },
+							],
 						}}
 						apiKey={{
 							metadata: {
