@@ -7,19 +7,23 @@ import {
 import { createAuthClient } from 'better-auth/react'
 import { z } from 'zod'
 
+import type { InvitationStatus } from 'better-auth/plugins/organization'
+
 const authStateSchema = z.object({
 	id: z.string(),
 	session: z.any().nullable(),
 	user: z.any().nullable(),
 })
 
-const activeOrganizationSchema = z.object({
+const ActiveOrganizationSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	slug: z.string(),
-	createdAt: z.iso.datetime(),
+	createdAt: z.date(),
 	logo: z.string().nullable().optional(),
-	metadata: z.record(z.string(), z.any()).optional(),
+	metadata: z.any().nullable().optional(),
+	members: z.any(),
+	invitations: z.any().nullable(),
 })
 
 export const authStateCollection = createCollection(
@@ -34,7 +38,7 @@ export const activeOrganizationCollection = createCollection(
 	localOnlyCollectionOptions({
 		id: `active-organization`,
 		getKey: (item) => item.id,
-		schema: activeOrganizationSchema,
+		schema: ActiveOrganizationSchema,
 	})
 )
 
@@ -42,6 +46,39 @@ export const authClient = createAuthClient({
 	baseURL: import.meta.env.VITE_SERVER_URL,
 	plugins: [apiKeyClient(), organizationClient()],
 })
+
+export type ActiveOrganization =
+	| ({
+			members: {
+				id: string
+				organizationId: string
+				role: 'member' | 'admin' | 'owner'
+				createdAt: Date
+				userId: string
+				user: {
+					email: string
+					name: string
+					image?: string | undefined
+				}
+			}[]
+			invitations: {
+				id: string
+				organizationId: string
+				email: string
+				role: 'member' | 'admin' | 'owner' | 'auditor' | 'officer' | 'developer'
+				status: InvitationStatus
+				inviterId: string
+				expiresAt: Date
+			}[]
+	  } & {
+			id: string
+			name: string
+			slug: string
+			createdAt: Date
+			logo?: string | null | undefined
+			metadata?: any
+	  })
+	| null
 
 export type Session = {
 	session: {

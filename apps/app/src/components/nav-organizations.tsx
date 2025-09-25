@@ -16,23 +16,48 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from '@/components/ui/sidebar'
-import { authClient } from '@/lib/auth-client'
+import { activeOrganizationCollection, authClient } from '@/lib/auth-client'
 import { Link } from '@tanstack/react-router'
 import { Folder, Forward, MoreHorizontal, PlusCircle, Trash2 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Spinner } from './ui/spinner'
 
+import type { ActiveOrganization } from '@/lib/auth-client'
+
 function NavOrganizations() {
+	const [activeOrganization, setActiveOrganization] = useState<ActiveOrganization>(null)
 	const { isMobile } = useSidebar()
+
+	useEffect(() => {
+		getOrg()
+
+		async function getOrg() {
+			if (activeOrganizationCollection.get(`activeOrganization`)) {
+				setActiveOrganization(
+					activeOrganizationCollection.get(`activeOrganization`) as ActiveOrganization
+				)
+			} else {
+				const { data: activeOrganization, error } =
+					await authClient.organization.getFullOrganization()
+
+				if (!activeOrganization) {
+					activeOrganizationCollection.delete(`activeOrganization`)
+				} else {
+					activeOrganizationCollection.insert({ id: `activeOrganization`, ...activeOrganization })
+					setActiveOrganization(activeOrganization)
+				}
+			}
+		}
+	}, [])
+
 	const {
 		data: organizationsData,
 		isPending: isLoadingOrganizations,
 		error: organizationsError,
 	} = authClient.useListOrganizations()
-	const { data: activeOrganization } = authClient.useActiveOrganization()
-
+	//const { data: activeOrganization } = authClient.useActiveOrganization()
 	const organizations = useMemo(() => organizationsData || [], [organizationsData])
 
 	const organizationsLoadError = organizationsError
