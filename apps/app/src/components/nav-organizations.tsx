@@ -52,7 +52,7 @@ function NavOrganizations() {
 					return (
 						<SidebarMenuItem key={item.name}>
 							<SidebarMenuButton isActive={active} asChild>
-								<Link to={`/dashboard/organizations/${item.slug}`}>
+								<Link to={`/organizations/${item.slug}`}>
 									<Avatar className="h-4 w-4 rounded-full border border-background object-cover">
 										<AvatarImage src={item.logo || undefined} alt={item.name} />
 										<AvatarFallback>OR</AvatarFallback>
