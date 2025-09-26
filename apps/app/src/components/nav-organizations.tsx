@@ -16,7 +16,8 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from '@/components/ui/sidebar'
-import { activeOrganizationCollection, authClient } from '@/lib/auth-client'
+import { authStateCollection, OrganizationsCollection } from '@/lib/auth-client'
+import { useLiveQuery } from '@tanstack/react-db'
 import { Link } from '@tanstack/react-router'
 import { Folder, Forward, MoreHorizontal, PlusCircle, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -27,37 +28,15 @@ import { Spinner } from './ui/spinner'
 import type { ActiveOrganization } from '@/lib/auth-client'
 
 function NavOrganizations() {
-	const [activeOrganization, setActiveOrganization] = useState<ActiveOrganization>(null)
 	const { isMobile } = useSidebar()
 
-	useEffect(() => {
-		getOrg()
-
-		async function getOrg() {
-			if (activeOrganizationCollection.get(`activeOrganization`)) {
-				setActiveOrganization(
-					activeOrganizationCollection.get(`activeOrganization`) as ActiveOrganization
-				)
-			} else {
-				const { data: activeOrganization, error } =
-					await authClient.organization.getFullOrganization()
-
-				if (!activeOrganization) {
-					activeOrganizationCollection.delete(`activeOrganization`)
-				} else {
-					activeOrganizationCollection.insert({ id: `activeOrganization`, ...activeOrganization })
-					setActiveOrganization(activeOrganization)
-				}
-			}
-		}
-	}, [])
-
+	const activeOrganizationId = authStateCollection.get(`auth`)?.session.activeOrganizationId
 	const {
 		data: organizationsData,
-		isPending: isLoadingOrganizations,
-		error: organizationsError,
-	} = authClient.useListOrganizations()
-	//const { data: activeOrganization } = authClient.useActiveOrganization()
+		isLoading: isLoadingOrganizations,
+		isError: organizationsError,
+	} = useLiveQuery((q) => q.from({ user: OrganizationsCollection }))
+
 	const organizations = useMemo(() => organizationsData || [], [organizationsData])
 
 	const organizationsLoadError = organizationsError
@@ -73,7 +52,7 @@ function NavOrganizations() {
 				)}
 				{isLoadingOrganizations && !organizationsError && <Spinner variant="bars" size={32} />}
 				{organizations.map((item) => {
-					const active = item.id === activeOrganization?.id
+					const active = item.id === activeOrganizationId
 					return (
 						<SidebarMenuItem key={item.name}>
 							<SidebarMenuButton isActive={active} asChild>

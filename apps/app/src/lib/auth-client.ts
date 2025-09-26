@@ -1,3 +1,4 @@
+import { queryCollectionOptions } from '@tanstack/query-db-collection'
 import { createCollection, localOnlyCollectionOptions } from '@tanstack/react-db'
 import {
 	apiKeyClient,
@@ -7,7 +8,14 @@ import {
 import { createAuthClient } from 'better-auth/react'
 import { z } from 'zod'
 
+import { queryClient } from './query-client'
+
 import type { InvitationStatus } from 'better-auth/plugins/organization'
+
+export const authClient = createAuthClient({
+	baseURL: import.meta.env.VITE_SERVER_URL,
+	plugins: [apiKeyClient(), organizationClient()],
+})
 
 const authStateSchema = z.object({
 	id: z.string(),
@@ -15,16 +23,14 @@ const authStateSchema = z.object({
 	user: z.any().nullable(),
 })
 
-const ActiveOrganizationSchema = z.object({
-	id: z.string(),
-	name: z.string(),
-	slug: z.string(),
-	createdAt: z.date(),
-	logo: z.string().nullable().optional(),
-	metadata: z.any().nullable().optional(),
-	members: z.any(),
-	invitations: z.any().nullable(),
-})
+type Organization = {
+	id: string
+	name: string
+	slug: string
+	createdAt: Date
+	logo?: string | null | undefined
+	metadata?: any
+}
 
 export const authStateCollection = createCollection(
 	localOnlyCollectionOptions({
@@ -34,18 +40,17 @@ export const authStateCollection = createCollection(
 	})
 )
 
-export const activeOrganizationCollection = createCollection(
-	localOnlyCollectionOptions({
-		id: `active-organization`,
+export const OrganizationsCollection = createCollection(
+	queryCollectionOptions({
+		queryKey: [`organizations`],
+		queryFn: async () => {
+			const { data } = await authClient.organization.list()
+			return data as Organization[]
+		},
+		queryClient,
 		getKey: (item) => item.id,
-		schema: ActiveOrganizationSchema,
 	})
 )
-
-export const authClient = createAuthClient({
-	baseURL: import.meta.env.VITE_SERVER_URL,
-	plugins: [apiKeyClient(), organizationClient()],
-})
 
 export type ActiveOrganization =
 	| ({
