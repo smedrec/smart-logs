@@ -20,8 +20,13 @@ export const Route = createFileRoute('/_authenticated/alerts/statistics')({
 		if (!activeOrganizationId) {
 			throw new Error('No active organization')
 		}
-		const statistics = await auditClient.metrics.getAlertStatistics()
-		return statistics
+		try {
+			const statistics = await auditClient.metrics.getAlertStatistics()
+			return statistics
+		} catch (error) {
+			console.error('Failed to load alert statistics:', error)
+			throw error
+		}
 	},
 })
 

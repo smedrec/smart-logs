@@ -576,7 +576,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<any> Alert statistics summary
 	 */
 	async getAlertStatistics(): Promise<AlertStatistics> {
-		return this.request<AlertStatistics>('/alerts/statistics', {
+		return await this.request<AlertStatistics>('/alerts/statistics', {
 			method: 'GET',
 		})
 	}
