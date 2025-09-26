@@ -1,12 +1,8 @@
 import { electricCollectionOptions } from '@tanstack/electric-db-collection'
-import { queryCollectionOptions } from '@tanstack/query-db-collection'
 import { createCollection } from '@tanstack/react-db'
 import { z } from 'zod'
 
 import { auditClient } from './audit-client'
-import { queryClient } from './query-client'
-
-import type { AlertsParams } from '@smedrec/audit-client'
 
 const AlertSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
 const AlertTypeSchema = z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM'])
@@ -34,20 +30,6 @@ const AlertSchema = z.object({
 
 export type Alert = z.infer<typeof AlertSchema>
 
-const queryAlertsCollection = createCollection(
-	queryCollectionOptions({
-		id: 'fetch-alerts',
-		queryKey: ['alerts'],
-		queryFn: async () => {
-			const alertsWithPagination = await auditClient.metrics.getAlerts()
-			return alertsWithPagination.alerts as Alert[]
-		},
-		getKey: (item) => item.id,
-		schema: AlertSchema,
-		queryClient,
-	})
-)
-
 export const recentAlertsCollection = (activeOrganizationId: string) =>
 	createCollection(
 		electricCollectionOptions({
@@ -65,17 +47,3 @@ export const recentAlertsCollection = (activeOrganizationId: string) =>
 			schema: AlertSchema,
 		})
 	)
-
-export const alertsCollection = createCollection(
-	electricCollectionOptions({
-		id: 'sync-alerts',
-		shapeOptions: {
-			url: 'https://electric.smedrec.qzz.io/v1/shape',
-			params: {
-				table: 'alerts',
-			},
-		},
-		getKey: (item) => item.id,
-		schema: AlertSchema,
-	})
-)

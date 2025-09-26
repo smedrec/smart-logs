@@ -395,9 +395,7 @@ export interface AcknowledgeAlertRequest {
  * Alert resolution request
  */
 export interface ResolveAlertRequest {
-	resolvedBy: string
 	resolution: string
-	notes?: string
 }
 
 /**
@@ -576,7 +574,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<any> Alert statistics summary
 	 */
 	async getAlertStatistics(): Promise<AlertStatistics> {
-		return await this.request<AlertStatistics>('/alerts/statistics', {
+		return this.request<AlertStatistics>('/alerts/statistics', {
 			method: 'GET',
 		})
 	}
