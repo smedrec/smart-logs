@@ -357,7 +357,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 				FROM alerts
 			`
 		if (organizationId !== undefined) {
-			query += ` WHERE organization_id = ${organizationId}`
+			query += ` WHERE organization_id = '${organizationId}'`
 		}
 		try {
 			const result = await this.client.executeMonitoredQuery(

@@ -242,6 +242,36 @@ const getAlertsRoute = createRoute({
 	},
 })
 
+const getAlertStatisticsRoute = createRoute({
+	method: 'get',
+	path: '/alerts/statistics',
+	tags: ['Alerts'],
+	summary: 'Get alert statistics',
+	description: 'Retrieves statistics about alerts such as counts by severity and type.',
+	responses: {
+		200: {
+			description: 'Alert statistics retrieved successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						total: z.number(),
+						active: z.number(),
+						acknowledged: z.number(),
+						resolved: z.number(),
+						bySeverity: z.record(z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']), z.number()),
+						byType: z.record(
+							z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS']),
+							z.number()
+						),
+						recentAlerts: z.array(AlertSchema).optional(),
+					}),
+				},
+			},
+		},
+		...openApiErrorResponses,
+	},
+})
+
 const acknowledgeAlertRoute = createRoute({
 	method: 'post',
 	path: '/alerts/{id}/acknowledge',
@@ -476,6 +506,47 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
+			})
+
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+		}
+	})
+
+	app.openapi(getAlertStatisticsRoute, async (c) => {
+		const { monitor, logger } = c.get('services')
+		const session = c.get('session')
+		const requestId = c.get('requestId')
+
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
+		const organizationId = session.session.activeOrganizationId
+		if (!organizationId) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'No active organization',
+			})
+		}
+
+		try {
+			// Get alert statistics
+			const stats = await monitor.alert.getAlertStatistics(organizationId)
+
+			logger.info('Retrieved alert statistics', { requestId, userId: session.session.userId })
+
+			return c.json(stats, 200)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error('Failed to get alert statistics', message, {
+				requestId,
+				error: message,
 			})
 
 			throw new ApiError({

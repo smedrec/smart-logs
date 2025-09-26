@@ -38,7 +38,10 @@ function RouteComponent() {
 	const dataTableRef = useRef<DataTableRef>(null)
 
 	const { data: activeAlerts, isLoading } = useLiveQuery((q) =>
-		q.from({ alert: alertsCollection }).where(({ alert }) => eq(alert.resolved, 'false'))
+		q
+			.from({ alert: alertsCollection })
+			.where(({ alert }) => eq(alert.resolved, 'false'))
+			.orderBy(({ alert }) => alert.created_at, 'desc')
 	)
 
 	const handlemultiResolve = (alerts: Alert[]) => {
