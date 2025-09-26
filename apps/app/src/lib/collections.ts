@@ -13,7 +13,7 @@ const AlertTypeSchema = z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM
 
 const AlertSchema = z.object({
 	id: z.string(),
-	organizationId: z.string(),
+	organization_id: z.string(),
 	severity: AlertSeveritySchema,
 	type: AlertTypeSchema,
 	title: z.string().min(1),
@@ -21,16 +21,18 @@ const AlertSchema = z.object({
 	source: z.string(),
 	correlationId: z.string().optional(),
 	metadata: z.record(z.string(), z.any()).optional(),
-	acknowledged: z.boolean().default(false),
-	acknowledgedAt: z.iso.datetime().optional(),
-	acknowledgedBy: z.string().optional(),
-	resolved: z.boolean().default(false),
-	resolvedAt: z.iso.datetime().optional(),
-	resolvedBy: z.string().optional(),
+	acknowledged: z.string().default('false'),
+	acknowledged_at: z.iso.datetime().optional(),
+	acknowledged_by: z.string().optional(),
+	resolved: z.string().default('false'),
+	resolved_at: z.iso.datetime().optional(),
+	resolved_by: z.string().optional(),
 	resolutionNotes: z.string().optional(),
-	createdAt: z.iso.datetime(),
-	updatedAt: z.iso.datetime(),
+	created_at: z.iso.datetime(),
+	updated_at: z.iso.datetime(),
 })
+
+export type Alert = z.infer<typeof AlertSchema>
 
 const queryAlertsCollection = createCollection(
 	queryCollectionOptions({
@@ -38,7 +40,7 @@ const queryAlertsCollection = createCollection(
 		queryKey: ['alerts'],
 		queryFn: async () => {
 			const alertsWithPagination = await auditClient.metrics.getAlerts()
-			return alertsWithPagination.alerts
+			return alertsWithPagination.alerts as Alert[]
 		},
 		getKey: (item) => item.id,
 		schema: AlertSchema,
@@ -56,8 +58,6 @@ export const recentAlertsCollection = (activeOrganizationId: string) =>
 					table: 'alerts',
 					where: `
           organization_id = '${activeOrganizationId}'
-          AND
-          created_at >= '2025-01-01'
         `,
 				},
 			},
@@ -65,3 +65,17 @@ export const recentAlertsCollection = (activeOrganizationId: string) =>
 			schema: AlertSchema,
 		})
 	)
+
+export const alertsCollection = createCollection(
+	electricCollectionOptions({
+		id: 'sync-alerts',
+		shapeOptions: {
+			url: 'https://electric.smedrec.qzz.io/v1/shape',
+			params: {
+				table: 'alerts',
+			},
+		},
+		getKey: (item) => item.id,
+		schema: AlertSchema,
+	})
+)

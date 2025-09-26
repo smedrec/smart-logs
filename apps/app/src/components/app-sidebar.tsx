@@ -43,6 +43,10 @@ const data = {
 					url: '/alerts/active',
 				},
 				{
+					title: 'Acknowledged',
+					url: '/alerts/acknowledged',
+				},
+				{
 					title: 'Resolved',
 					url: '/alerts/resolved',
 				},
