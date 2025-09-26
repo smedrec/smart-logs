@@ -8,17 +8,17 @@ const options: PartialAuditClientConfig = {
 	timeout: 60000,
 	environment: 'development',
 	authentication: {
-		type: 'session',
-		autoRefresh: true,
+		type: 'apiKey',
+		apiKey: import.meta.env.VITE_API_KEY,
 	},
 	// Enable automatic retries on network errors or server issues
 	retry: {
-		enabled: true,
+		enabled: false,
 		maxAttempts: 3,
 	},
 	// Enable in-memory caching for GET requests to reduce latency
 	cache: {
-		enabled: true,
+		enabled: false,
 		defaultTtlMs: 60000, // Cache responses for 1 minute
 	},
 	// Configure logging for better observability

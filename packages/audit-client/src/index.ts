@@ -253,7 +253,7 @@ export {
 	type UsageMetricsParams,
 	type UsageMetrics,
 	type AlertSeverity,
-	type AlertStatus,
+	type AlertType,
 	type Alert,
 	type AlertsParams,
 	type PaginatedAlerts,

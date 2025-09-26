@@ -4,8 +4,8 @@ import { Checkbox } from '../ui/checkbox'
 import { DataTableColumnHeader } from '../ui/data-table-column-header'
 import { severities, types } from './data'
 
+import type { Alert } from '@/lib/collections'
 import type { ColumnDef } from '@tanstack/react-table'
-import type { Alert } from '@repo/audit'
 
 export const createColumns = (): ColumnDef<Alert>[] => {
 	const columns: ColumnDef<Alert>[] = [
@@ -83,7 +83,9 @@ export const createColumns = (): ColumnDef<Alert>[] => {
 			cell: ({ row }) => {
 				return (
 					<div className="flex gap-2">
-						<span className="max-w-[500px] truncate font-medium">{row.getValue('title')}</span>
+						<span className="max-w-[500px] truncate font-medium">
+							{row.getValue('description')}
+						</span>
 					</div>
 				)
 			},

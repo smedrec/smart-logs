@@ -252,12 +252,12 @@ export interface UsageMetrics {
 /**
  * Alert severity levels
  */
-export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical'
+export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
 /**
- * Alert status types
+ * Alert types for categorization
  */
-export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'suppressed'
+export type AlertType = 'SECURITY' | 'COMPLIANCE' | 'PERFORMANCE' | 'SYSTEM' | 'METRICS'
 
 /**
  * Alert interface
@@ -268,7 +268,7 @@ export interface Alert {
 	title: string
 	description: string
 	severity: AlertSeverity
-	status: AlertStatus
+	type: AlertType
 	source: string
 	category: string
 	createdAt: string
@@ -287,7 +287,7 @@ export interface Alert {
  * Alert query parameters
  */
 export interface AlertsParams {
-	status?: AlertStatus[]
+	type?: AlertType[]
 	severity?: AlertSeverity[]
 	category?: string[]
 	source?: string[]
@@ -324,6 +324,18 @@ export interface PaginatedAlerts {
 		bySeverity: Record<AlertSeverity, number>
 		byCategory: Record<string, number>
 	}
+}
+
+/**
+ * Alert Statistics interface
+ */
+export interface AlertStatistics {
+	total: number
+	active: number
+	acknowledged: number
+	resolved: number
+	bySeverity: Record<AlertSeverity, number>
+	byType: Record<AlertType, number>
 }
 
 /**
@@ -383,9 +395,7 @@ export interface AcknowledgeAlertRequest {
  * Alert resolution request
  */
 export interface ResolveAlertRequest {
-	resolvedBy: string
 	resolution: string
-	notes?: string
 }
 
 /**
@@ -556,6 +566,17 @@ export class MetricsService extends BaseResource {
 			}
 			throw error
 		}
+	}
+
+	/**
+	 * Get alert statistics summary
+	 *
+	 * @returns Promise<any> Alert statistics summary
+	 */
+	async getAlertStatistics(): Promise<AlertStatistics> {
+		return this.request<AlertStatistics>('/alerts/statistics', {
+			method: 'GET',
+		})
 	}
 
 	/**
