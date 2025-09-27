@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { AuthenticationError, AuthManager } from '../auth'
+import { AuthenticationError, AuthManager } from '../../infrastructure/auth'
 
 import type { AuthenticationConfig } from '../../core/config'
 

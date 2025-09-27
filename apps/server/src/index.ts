@@ -106,7 +106,7 @@ async function startServer() {
 	app.use('*', responseCachingMiddleware(300)) // 5 minutes cache
 
 	// Configure CORS with settings from configuration
-	app.use(
+	/**app.use(
 		'/*',
 		cors({
 			origin: config.server.cors.origin,
@@ -114,20 +114,20 @@ async function startServer() {
 			allowHeaders: config.server.cors.allowedHeaders,
 			credentials: config.server.cors.credentials,
 		})
-	)
+	)*/
 
 	// cors
-	/**app.use('*', (c, next) => {
+	app.use('*', (c, next) => {
 		const corsMiddleware = cors({
-			origin: '*', // replace with your origin
-			allowHeaders: ['Content-Type', 'Authorization'],
-			allowMethods: ['POST', 'GET', 'PATCH', 'OPTIONS', 'DELETE'],
-			exposeHeaders: ['Content-Length'],
-			maxAge: 600,
-			//credentials: true,
+			origin: config.server.cors.origin, // replace with your origin
+			allowHeaders: config.server.cors.allowedHeaders,
+			allowMethods: config.server.cors.allowedMethods,
+			//exposeHeaders: ['Content-Length'],
+			maxAge: 86400,
+			credentials: config.server.cors.credentials,
 		})
 		return corsMiddleware(c, next)
-	})*/
+	})
 
 	app.on(['POST', 'GET'], '/api/auth/*', (c) => c.get('services').auth.handler(c.req.raw))
 
