@@ -3,46 +3,42 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { Spinner } from '@/components/ui/spinner'
-import { auditClient } from '@/lib/audit-client'
+import { useAuditContext } from '@/contexts/audit-provider'
 import { authStateCollection } from '@/lib/auth-client'
 import { transformSeverityData, transformTypeData } from '@/lib/charts'
+import { type AlertStatistics } from '@smedrec/audit-client'
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Pie, PieChart } from 'recharts'
+import { set } from 'zod'
 
 import type { ChartConfig } from '@/components/ui/chart'
 import type { SeverityDataItem, TypeDataItem } from '@/lib/charts'
 
 export const Route = createFileRoute('/_authenticated/alerts/statistics')({
 	component: RouteComponent,
-	loader: async () => {
-		const activeOrganizationId = authStateCollection.get('auth')?.session.activeOrganizationId
-		if (!activeOrganizationId) {
-			throw new Error('No active organization')
-		}
-		try {
-			const statistics = await auditClient.metrics.getAlertStatistics()
-			return statistics
-		} catch (error) {
-			console.error('Failed to load alert statistics:', error)
-			throw error
-		}
-	},
 })
 
 function RouteComponent() {
+	const { client, isConnected } = useAuditContext()
+	const [statistics, setStatistics] = useState<AlertStatistics | null>(null)
 	const [severityData, setSeverityData] = useState<SeverityDataItem[]>([])
 	const [typeData, setTypeData] = useState<TypeDataItem[]>([])
 	const isLoading = false
 
-	const statistics = Route.useLoaderData()
-
 	useEffect(() => {
-		if (statistics) {
-			setSeverityData(transformSeverityData(statistics.bySeverity))
-			setTypeData(transformTypeData(statistics.byType))
+		function getStats() {
+			if (!client) return
+			client.metrics.getAlertStatistics().then((statistics) => {
+				setStatistics(statistics)
+				setSeverityData(transformSeverityData(statistics.bySeverity))
+				setTypeData(transformTypeData(statistics.byType))
+			})
 		}
-	}, [statistics])
+		if (isConnected) {
+			getStats()
+		}
+	}, [])
 
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">

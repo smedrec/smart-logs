@@ -15,7 +15,7 @@ export async function basicClientExample() {
 
 	// Create client with minimal configuration
 	const client = new AuditClient({
-		baseUrl: 'https://api.example.com',
+		baseUrl: 'http://localhost:3000',
 		authentication: {
 			type: 'apiKey',
 			apiKey: 'your-api-key-here',
@@ -177,6 +177,7 @@ export async function configurationAndInterceptorsExample() {
 		logging: {
 			enabled: true,
 			level: 'info',
+			format: 'json', // This will be ignored as the logger is no
 			includeRequestBody: false,
 			includeResponseBody: false,
 			maskSensitiveData: true,
@@ -198,18 +199,21 @@ export async function configurationAndInterceptorsExample() {
 				'X-Custom-Header': 'intercepted-request',
 			},
 		}
-	})
+	}, {})
 
 	// Add response interceptor
 	console.log('🔌 Adding response interceptor...')
-	client.addResponseInterceptor((response) => {
-		console.log('🔍 Response interceptor: Processing response')
-		return {
-			...response,
-			intercepted: true,
-			timestamp: new Date().toISOString(),
-		}
-	})
+	client.addResponseInterceptor(
+		(response) => {
+			console.log('🔍 Response interceptor: Processing response')
+			return {
+				...response,
+				intercepted: true,
+				timestamp: new Date().toISOString(),
+			}
+		},
+		{ enabled: true, priority: 0 }
+	)
 
 	console.log('✅ Interceptors added')
 

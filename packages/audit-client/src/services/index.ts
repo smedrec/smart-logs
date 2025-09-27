@@ -94,6 +94,7 @@ export {
 	type AlertType,
 	type Alert,
 	type AlertsParams,
+	type AlertStatistics,
 	type PaginatedAlerts,
 	type AuditMetricsParams,
 	type MetricsSubscriptionParams,

@@ -1,17 +1,38 @@
 import { useSidebar } from '@/components/ui/sidebar'
 import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status'
+import { useAuditContext } from '@/contexts/audit-provider'
 import { auditClient } from '@/lib/audit-client'
 import { useQuery } from '@tanstack/react-query'
 
 function ApiStatus() {
+	const { client, isConnected } = useAuditContext()
 	const { state } = useSidebar()
+
+	if (!isConnected) {
+		return (
+			<Status status="offline">
+				<StatusIndicator />
+				{state === 'collapsed' ? null : <StatusLabel>Not connected</StatusLabel>}
+			</Status>
+		)
+	}
+
+	if (!client) {
+		return (
+			<Status status="offline">
+				<StatusIndicator />
+				{state === 'collapsed' ? null : <StatusLabel>Client not initialized</StatusLabel>}
+			</Status>
+		)
+	}
+
 	const {
 		isPending,
 		error,
 		data: status,
 	} = useQuery({
 		queryKey: ['health-check'],
-		queryFn: async () => await auditClient.health.check(),
+		queryFn: async () => await client.health.check(),
 	})
 
 	if (isPending) {

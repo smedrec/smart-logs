@@ -7,12 +7,12 @@
 
 import { EventsService } from '../services/events'
 
+import type { PartialAuditClientConfig } from '../index'
 import type { CreateAuditEventInput } from '../services/events'
-import type { AuditClientConfig } from '../types'
 
 // Example configuration
-const config: AuditClientConfig = {
-	baseUrl: 'https://api.smartlogs.com',
+const config: PartialAuditClientConfig = {
+	baseUrl: 'http://localhost:3000',
 	apiVersion: 'v1',
 	timeout: 30000,
 	authentication: {
@@ -173,8 +173,8 @@ async function queryEventsWithFilters() {
 		const queryParams = {
 			filter: {
 				dateRange: {
-					startDate: '2023-10-01T00:00:00.000Z',
-					endDate: '2023-10-31T23:59:59.999Z',
+					startDate: '2025-08-01T00:00:00.000Z',
+					endDate: '2025-10-31T23:59:59.999Z',
 				},
 				principalIds: ['doctor-123', 'nurse-456'],
 				actions: ['data.read', 'data.update', 'data.delete'],
@@ -268,8 +268,8 @@ async function exportEvents() {
 			format: 'json' as const,
 			filter: {
 				dateRange: {
-					startDate: '2023-10-01T00:00:00.000Z',
-					endDate: '2023-10-31T23:59:59.999Z',
+					startDate: '2025-08-01T00:00:00.000Z',
+					endDate: '2025-10-31T23:59:59.999Z',
 				},
 				dataClassifications: ['PHI'] as const,
 			},
@@ -455,8 +455,8 @@ async function completeWorkflowExample() {
 		const bulkResult = await createBulkEvents()
 
 		// 3. Query events with filters
-		console.log('\n3. Querying audit events...')
-		const queryResults = await queryEventsWithFilters()
+		//console.log('\n3. Querying audit events...')
+		//const queryResults = await queryEventsWithFilters()
 
 		// 4. Get specific event by ID
 		console.log('\n4. Retrieving specific event...')
@@ -467,8 +467,8 @@ async function completeWorkflowExample() {
 		await verifyEventIntegrity(singleEvent.id)
 
 		// 6. Export events
-		console.log('\n6. Exporting audit events...')
-		const exportResult = await exportEvents()
+		//console.log('\n6. Exporting audit events...')
+		//const exportResult = await exportEvents()
 
 		// 7. Get statistics
 		console.log('\n7. Getting event statistics...')
@@ -504,6 +504,6 @@ export {
 }
 
 // Run the complete example if this file is executed directly
-if (require.main === module) {
-	completeWorkflowExample().catch(console.error)
-}
+//if (require.main === module) {
+completeWorkflowExample().catch(console.error)
+//}

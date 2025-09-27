@@ -16,6 +16,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 import '../index.css'
 
+import { AuditProvider } from '@/contexts/audit-provider'
 import { authClient } from '@/lib/auth-client'
 import { seo } from '@/lib/seo'
 
@@ -88,9 +89,11 @@ function RootComponent() {
 							},
 						}}
 					>
-						<div className="grid grid-rows-[auto_1fr] h-svh">
-							{isFetching ? <Loader /> : <Outlet />}
-						</div>
+						<AuditProvider>
+							<div className="grid grid-rows-[auto_1fr] h-svh">
+								{isFetching ? <Loader /> : <Outlet />}
+							</div>
+						</AuditProvider>
 					</AuthUIProviderTanstack>
 				</AuthProvider>
 				<Toaster richColors />

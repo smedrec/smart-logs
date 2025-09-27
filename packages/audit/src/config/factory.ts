@@ -98,9 +98,13 @@ export function createDevelopmentConfig(): AuditConfig {
 				allowedHeaders: [
 					'Content-Type',
 					'Authorization',
+					'x-api-key',
 					'x-application',
-					'x-requestid',
+					'x-request-id',
+					'requestId',
 					'x-version',
+					'accept-version',
+					'user-agent',
 				],
 			},
 			rateLimit: {

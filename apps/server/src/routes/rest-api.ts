@@ -11,6 +11,7 @@
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
  */
 
+import { uptime } from 'process'
 import { apiVersion } from '@/lib/middleware/api-version'
 import {
 	requireAuth,
@@ -299,6 +300,7 @@ Pagination information is included in the response:
 		return c.json({
 			status: 'healthy',
 			timestamp: new Date().toISOString(),
+			uptime: Math.floor(process.uptime()),
 			version: c.get('apiVersion')?.resolved || '1.0.0',
 		})
 	})

@@ -526,7 +526,7 @@ export class MetricsService extends BaseResource {
 
 		const validatedQuery = validationResult.data!
 
-		const response = await this.request<PaginatedAlerts>('/alerts', {
+		const response = await this.request<PaginatedAlerts>('/metrics/alerts', {
 			method: 'GET',
 			query: validatedQuery,
 		})
@@ -553,7 +553,7 @@ export class MetricsService extends BaseResource {
 		}
 
 		try {
-			const response = await this.request<Alert>(`/alerts/${id}`, {
+			const response = await this.request<Alert>(`/metrics/alerts/${id}`, {
 				method: 'GET',
 			})
 
@@ -574,7 +574,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<any> Alert statistics summary
 	 */
 	async getAlertStatistics(): Promise<AlertStatistics> {
-		return this.request<AlertStatistics>('/alerts/statistics', {
+		return this.request<AlertStatistics>('/metrics/alerts/statistics', {
 			method: 'GET',
 		})
 	}
@@ -587,7 +587,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<Alert> Updated alert
 	 */
 	async acknowledgeAlert(id: string, request: AcknowledgeAlertRequest): Promise<Alert> {
-		return this.request<Alert>(`/alerts/${id}/acknowledge`, {
+		return this.request<Alert>(`/metrics/alerts/${id}/acknowledge`, {
 			method: 'POST',
 			body: request,
 		})
@@ -601,7 +601,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<Alert> Updated alert
 	 */
 	async resolveAlert(id: string, request: ResolveAlertRequest): Promise<Alert> {
-		return this.request<Alert>(`/alerts/${id}/resolve`, {
+		return this.request<Alert>(`/metrics/alerts/${id}/resolve`, {
 			method: 'POST',
 			body: request,
 		})
@@ -616,7 +616,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<Alert> Updated alert
 	 */
 	async suppressAlert(id: string, duration: number, reason: string): Promise<Alert> {
-		return this.request<Alert>(`/alerts/${id}/suppress`, {
+		return this.request<Alert>(`/metrics/alerts/${id}/suppress`, {
 			method: 'POST',
 			body: {
 				duration,
