@@ -28,9 +28,14 @@ export function AuditProvider({ children, config }: AuditProviderProps) {
 		apiVersion: 'v1',
 		timeout: 30000,
 		authentication: {
-			type: 'apiKey',
-			apiKey: import.meta.env.VITE_API_KEY || 'test-api-key',
-			//customHeaders: {}, // No authentication headers for health endpoints
+			// Use cookie authentication for Better Auth compatibility
+			type: 'cookie',
+			includeBrowserCookies: true,
+			// Fallback to API key if VITE_USE_API_KEY is set
+			...(import.meta.env.VITE_USE_API_KEY && {
+				type: 'apiKey' as const,
+				apiKey: import.meta.env.VITE_API_KEY || 'test-api-key',
+			}),
 			autoRefresh: false,
 		},
 		retry: {

@@ -2,11 +2,13 @@ import { z } from 'zod'
 
 // Zod schemas for configuration validation
 const AuthenticationConfigSchema = z.object({
-	type: z.enum(['apiKey', 'session', 'bearer', 'custom']),
+	type: z.enum(['apiKey', 'session', 'bearer', 'custom', 'cookie']),
 	apiKey: z.string().optional(),
 	sessionToken: z.string().optional(),
 	bearerToken: z.string().optional(),
 	customHeaders: z.record(z.string()).optional(),
+	cookies: z.record(z.string()).optional(),
+	includeBrowserCookies: z.boolean().default(false),
 	autoRefresh: z.boolean().default(false),
 	refreshEndpoint: z.string().optional(),
 })
@@ -343,7 +345,7 @@ export class ConfigManager {
 		if (environment) config.environment = environment
 
 		// Authentication configuration
-		const authType = getEnvVar('AUTH_TYPE') as 'apiKey' | 'session' | 'bearer' | 'custom'
+		const authType = getEnvVar('AUTH_TYPE') as 'apiKey' | 'session' | 'bearer' | 'custom' | 'cookie'
 		if (authType) {
 			config.authentication = {
 				type: authType,
@@ -353,6 +355,8 @@ export class ConfigManager {
 				autoRefresh: parseBoolean(getEnvVar('AUTH_AUTO_REFRESH')),
 				refreshEndpoint: getEnvVar('AUTH_REFRESH_ENDPOINT'),
 				customHeaders: parseJSON(getEnvVar('AUTH_CUSTOM_HEADERS')),
+				cookies: parseJSON(getEnvVar('AUTH_COOKIES')),
+				includeBrowserCookies: parseBoolean(getEnvVar('AUTH_INCLUDE_BROWSER_COOKIES')),
 			}
 		}
 

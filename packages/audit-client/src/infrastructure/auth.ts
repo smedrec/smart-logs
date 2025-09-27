@@ -69,6 +69,9 @@ export class AuthManager {
 				case 'custom':
 					return this.getCustomHeaders()
 
+				case 'cookie':
+					return await this.getCookieHeaders()
+
 				default:
 					throw new AuthenticationError(
 						`Unsupported authentication type: ${this.config.type}`,
@@ -202,6 +205,63 @@ export class AuthManager {
 		}
 
 		return { ...this.config.customHeaders }
+	}
+
+	/**
+	 * Gets cookie-based authentication headers
+	 * Handles both explicit cookies and browser cookies
+	 */
+	private async getCookieHeaders(): Promise<Record<string, string>> {
+		const headers: Record<string, string> = {}
+		const cookieValues: string[] = []
+
+		// Add explicit cookies from config
+		if (this.config.cookies) {
+			for (const [name, value] of Object.entries(this.config.cookies)) {
+				cookieValues.push(`${name}=${value}`)
+			}
+		}
+
+		// Include browser cookies if enabled and available
+		if (this.config.includeBrowserCookies && typeof document !== 'undefined') {
+			const browserCookies = this.getBrowserCookies()
+			cookieValues.push(...browserCookies)
+		}
+
+		// Set Cookie header if we have any cookies
+		if (cookieValues.length > 0) {
+			headers.Cookie = cookieValues.join('; ')
+		}
+
+		// Validate that we have some form of cookie authentication
+		if (cookieValues.length === 0) {
+			throw new AuthenticationError(
+				'No cookies available for cookie authentication type',
+				'MISSING_COOKIES'
+			)
+		}
+
+		return headers
+	}
+
+	/**
+	 * Gets browser cookies as an array of cookie strings
+	 */
+	private getBrowserCookies(): string[] {
+		if (typeof document === 'undefined') {
+			return []
+		}
+
+		const cookies = document.cookie
+		if (!cookies) {
+			return []
+		}
+
+		// Split cookies and clean them up
+		return cookies
+			.split(';')
+			.map((cookie) => cookie.trim())
+			.filter((cookie) => cookie.length > 0)
 	}
 
 	/**
@@ -377,6 +437,18 @@ export class AuthManager {
 			case 'custom':
 				if (!this.config.customHeaders || Object.keys(this.config.customHeaders).length === 0) {
 					errors.push('Custom headers are required for custom authentication')
+				}
+				break
+
+			case 'cookie':
+				const hasCookies = this.config.cookies && Object.keys(this.config.cookies).length > 0
+				const hasBrowserCookies =
+					this.config.includeBrowserCookies && typeof document !== 'undefined'
+
+				if (!hasCookies && !hasBrowserCookies) {
+					errors.push(
+						'Either explicit cookies or browser cookies must be available for cookie authentication'
+					)
 				}
 				break
 

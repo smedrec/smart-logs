@@ -1,0 +1,9 @@
+{
+	"inputs": [],
+	"servers": {
+		"smart-logs Docs": {
+			"type": "sse",
+			"url": "https://gitmcp.io/smedrec/smart-logs"
+		}
+	}
+}

@@ -7,7 +7,7 @@ Enhanced TypeScript SDK for Smart Logs Audit API with comprehensive features inc
 - 🔒 **Type Safety**: Full TypeScript support with strict type checking
 - 🔄 **Retry Logic**: Exponential backoff with configurable retry policies
 - 💾 **Intelligent Caching**: Multiple storage backends with TTL management
-- 🔐 **Authentication**: Support for API keys, session tokens, and custom auth
+- 🔐 **Authentication**: Support for API keys, session tokens, bearer tokens, cookies, and custom auth
 - 📊 **Request Batching**: Automatic request batching and deduplication
 - 🚨 **Error Handling**: Comprehensive error management with correlation IDs
 - 📈 **Performance**: Request compression, streaming, and performance monitoring
@@ -127,6 +127,104 @@ const config: AuditClientConfig = {
 }
 
 const client = new AuditClient(config)
+```
+
+## Authentication
+
+The audit client supports multiple authentication methods to integrate with various backend systems:
+
+### API Key Authentication
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'apiKey',
+		apiKey: 'your-api-key',
+	},
+})
+```
+
+### Bearer Token Authentication
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'bearer',
+		bearerToken: 'your-bearer-token',
+		autoRefresh: true,
+		refreshEndpoint: '/auth/refresh',
+	},
+})
+```
+
+### Session Token Authentication
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'session',
+		sessionToken: 'your-session-token',
+		autoRefresh: true,
+		refreshEndpoint: '/auth/refresh',
+	},
+})
+```
+
+### Cookie Authentication (Better Auth Compatible)
+
+Perfect for applications using Better Auth or other cookie-based authentication systems:
+
+```typescript
+// Use browser cookies (most common for web apps)
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'cookie',
+		includeBrowserCookies: true, // Automatically includes all browser cookies
+	},
+})
+
+// Use explicit cookies (useful for server-side or specific cookie control)
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'cookie',
+		cookies: {
+			'better-auth.session_token': 'your-session-token',
+			'better-auth.csrf_token': 'your-csrf-token',
+		},
+	},
+})
+
+// Combine browser cookies with additional explicit cookies
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'cookie',
+		includeBrowserCookies: true,
+		cookies: {
+			'custom-header': 'custom-value',
+		},
+	},
+})
+```
+
+### Custom Authentication
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: {
+		type: 'custom',
+		customHeaders: {
+			'X-Custom-Auth': 'your-custom-token',
+			'X-API-Version': '2024-01-01',
+		},
+	},
+})
 ```
 
 ## Services
