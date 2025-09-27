@@ -10,7 +10,6 @@ import { type AlertStatistics } from '@smedrec/audit-client'
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Pie, PieChart } from 'recharts'
-import { set } from 'zod'
 
 import type { ChartConfig } from '@/components/ui/chart'
 import type { SeverityDataItem, TypeDataItem } from '@/lib/charts'

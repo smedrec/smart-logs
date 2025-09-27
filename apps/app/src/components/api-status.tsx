@@ -1,7 +1,6 @@
 import { useSidebar } from '@/components/ui/sidebar'
 import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status'
 import { useAuditContext } from '@/contexts/audit-provider'
-import { auditClient } from '@/lib/audit-client'
 import { useQuery } from '@tanstack/react-query'
 
 function ApiStatus() {

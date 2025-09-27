@@ -2,8 +2,6 @@ import { electricCollectionOptions } from '@tanstack/electric-db-collection'
 import { createCollection } from '@tanstack/react-db'
 import { z } from 'zod'
 
-import { auditClient } from './audit-client'
-
 const AlertSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
 const AlertTypeSchema = z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM'])
 

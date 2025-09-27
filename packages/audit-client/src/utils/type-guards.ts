@@ -678,6 +678,7 @@ export function isHealthStatus(value: unknown): value is HealthStatus {
 	return (
 		isString(status.status) &&
 		isISODateTime(status.timestamp) &&
+		isString(status.environment) &&
 		isNonNegativeNumber(status.uptime) &&
 		isString(status.version)
 	)

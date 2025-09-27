@@ -11,7 +11,6 @@
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
  */
 
-import { uptime } from 'process'
 import { apiVersion } from '@/lib/middleware/api-version'
 import {
 	requireAuth,
@@ -27,6 +26,7 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import { createAuditAPI } from './audit-api'
 import { createComplianceAPI } from './compliance-api'
 import { createFunctionsAPI } from './functions-api'
+import { createHealthAPI } from './health-api'
 import { createMetricsAPI } from './metrics-api'
 import { createObservabilityAPI } from './observability-api'
 import { createOrganizationAPI } from './organization-api'
@@ -276,6 +276,7 @@ Pagination information is included in the response:
 	// Mount API routes
 	app.route('/audit', createAuditAPI())
 	app.route('/compliance', createComplianceAPI())
+	app.route('/health', createHealthAPI()) // Health check endpoints (no authentication required)
 	app.route('/metrics', createMetricsAPI())
 	app.route('/observability', createObservabilityAPI())
 	app.route('/performance', createPerformanceAPI())
@@ -293,16 +294,6 @@ Pagination information is included in the response:
 	// API documentation redirect
 	app.get('/', (c) => {
 		return c.redirect('/api/v1/docs')
-	})
-
-	// Health check endpoint (no authentication required)
-	app.get('/health', (c) => {
-		return c.json({
-			status: 'healthy',
-			timestamp: new Date().toISOString(),
-			uptime: Math.floor(process.uptime()),
-			version: c.get('apiVersion')?.resolved || '1.0.0',
-		})
 	})
 
 	// API information endpoint

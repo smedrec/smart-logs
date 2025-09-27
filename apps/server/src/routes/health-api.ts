@@ -16,7 +16,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import type { HonoEnv } from '@/lib/hono/context'
 
 // Zod schemas for health responses
-const BasicHealthSchema = z.object({
+export const BasicHealthSchema = z.object({
 	status: z.enum(['healthy', 'degraded', 'unhealthy']),
 	timestamp: z.string(),
 	environment: z.string(),
@@ -114,7 +114,7 @@ const DatabaseHealthSchema = z.object({
 // Route definitions
 const basicHealthRoute = createRoute({
 	method: 'get',
-	path: '/health',
+	path: '/',
 	tags: ['Health'],
 	summary: 'Basic health check',
 	description: 'Returns basic server health status for load balancers and monitoring systems.',
@@ -140,7 +140,7 @@ const basicHealthRoute = createRoute({
 
 const detailedHealthRoute = createRoute({
 	method: 'get',
-	path: '/health/detailed',
+	path: '/detailed',
 	tags: ['Health'],
 	summary: 'Detailed health check',
 	description:
@@ -165,61 +165,9 @@ const detailedHealthRoute = createRoute({
 	},
 })
 
-const readinessRoute = createRoute({
-	method: 'get',
-	path: '/ready',
-	tags: ['Health'],
-	summary: 'Readiness probe',
-	description: 'Kubernetes readiness probe to determine if the service is ready to accept traffic.',
-	responses: {
-		200: {
-			description: 'Service is ready',
-			content: {
-				'application/json': {
-					schema: ReadinessSchema,
-				},
-			},
-		},
-		503: {
-			description: 'Service is not ready',
-			content: {
-				'application/json': {
-					schema: ReadinessSchema,
-				},
-			},
-		},
-	},
-})
-
-const livenessRoute = createRoute({
-	method: 'get',
-	path: '/live',
-	tags: ['Health'],
-	summary: 'Liveness probe',
-	description: 'Kubernetes liveness probe to determine if the service should be restarted.',
-	responses: {
-		200: {
-			description: 'Service is alive',
-			content: {
-				'application/json': {
-					schema: BasicHealthSchema,
-				},
-			},
-		},
-		503: {
-			description: 'Service is not responding',
-			content: {
-				'application/json': {
-					schema: BasicHealthSchema,
-				},
-			},
-		},
-	},
-})
-
 const databaseHealthRoute = createRoute({
 	method: 'get',
-	path: '/health/database',
+	path: '/database',
 	tags: ['Health'],
 	summary: 'Database ',
 	description: 'Returns detailed database ',
@@ -263,7 +211,7 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 
 	// Basic health check
 	app.openapi(basicHealthRoute, async (c) => {
-		const { logger } = c.get('services')
+		const { config, logger } = c.get('services')
 		const requestId = c.get('requestId')
 
 		try {
@@ -273,8 +221,8 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 				const response = {
 					status: 'unhealthy' as const,
 					timestamp: new Date().toISOString(),
-					environment: process.env.NODE_ENV || 'unknown',
-					version: process.env.APP_VERSION || '1.0.0',
+					environment: config.getEnvironment() || 'unknown',
+					version: c.get('apiVersion')?.resolved || '1.0.0',
 					uptime: process.uptime(),
 				}
 
@@ -302,8 +250,8 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			const basicHealth = {
 				status: 'healthy' as const,
 				timestamp: new Date().toISOString(),
-				environment: process.env.NODE_ENV || 'unknown',
-				version: process.env.APP_VERSION || '1.0.0',
+				environment: config.getEnvironment() || 'unknown',
+				version: c.get('apiVersion')?.resolved || '1.0.0',
 				uptime: process.uptime(),
 			}
 
@@ -316,7 +264,7 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			const errorResponse = {
 				status: 'unhealthy' as const,
 				timestamp: new Date().toISOString(),
-				environment: process.env.NODE_ENV || 'unknown',
+				environment: config.getEnvironment() || 'unknown',
 				uptime: process.uptime(),
 			}
 
@@ -399,81 +347,6 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 					errorRate: 1,
 					activeConnections: 0,
 				},
-			}
-
-			return c.json(errorResponse, 503)
-		}
-	})
-
-	// Readiness probe
-	app.openapi(readinessRoute, async (c) => {
-		const { logger } = c.get('services')
-		const requestId = c.get('requestId')
-
-		try {
-			logger.debug('Readiness check started', { requestId })
-
-			if (!healthService) {
-				throw new Error('Health service not initialized')
-			}
-
-			const readinessStatus = await healthService.getReadinessStatus()
-			const statusCode = readinessStatus.status === 'ready' ? 200 : 503
-
-			logger.debug('Readiness check completed', {
-				requestId,
-				status: readinessStatus.status,
-				reason: readinessStatus.reason,
-			})
-
-			return c.json(readinessStatus, statusCode)
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Readiness check failed', errorMessage, { requestId, error: errorMessage })
-
-			const errorResponse = {
-				status: 'not_ready' as const,
-				timestamp: new Date().toISOString(),
-				reason: errorMessage,
-				checks: {
-					database: false,
-					redis: false,
-					auth: false,
-					migrations: false,
-				},
-			}
-
-			return c.json(errorResponse, 503)
-		}
-	})
-
-	// Liveness probe
-	app.openapi(livenessRoute, async (c) => {
-		const { logger } = c.get('services')
-		const requestId = c.get('requestId')
-
-		try {
-			// Liveness probe should be simple and fast
-			// It only checks if the process is responsive
-			const livenessStatus = {
-				status: 'healthy' as const,
-				timestamp: new Date().toISOString(),
-				environment: process.env.NODE_ENV || 'unknown',
-				version: process.env.APP_VERSION || '1.0.0',
-				uptime: process.uptime(),
-			}
-
-			logger.debug('Liveness check completed', { requestId, status: 'healthy' })
-			return c.json(livenessStatus, 200)
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Liveness check failed', errorMessage, { requestId, error: errorMessage })
-
-			const errorResponse = {
-				status: 'unhealthy' as const,
-				timestamp: new Date().toISOString(),
-				environment: process.env.NODE_ENV || 'unknown',
-				uptime: process.uptime(),
 			}
 
 			return c.json(errorResponse, 503)

@@ -16,15 +16,63 @@ export async function basicClientExample() {
 	// Create client with minimal configuration
 	const client = new AuditClient({
 		baseUrl: 'http://localhost:3000',
+		apiVersion: 'v1',
+		timeout: 30000,
 		authentication: {
 			type: 'apiKey',
-			apiKey: 'test_GHoOmNbAmkoLOqfBxFtLHGXBZkTHbkuSDrjaRCJtxOhBZldxhdCTblBsVEyOcFwN',
+			apiKey: '',
+		},
+		retry: {
+			enabled: true,
+			maxAttempts: 3,
+			initialDelayMs: 1000,
+			maxDelayMs: 10000,
+			backoffMultiplier: 2,
+			retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+			retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR'],
+		},
+		/**cache: {
+			enabled: false,
+			defaultTtlMs: 300000, // 5 minutes
+			maxSize: 100,
+			storage: 'localStorage',
+			keyPrefix: 'audit-cache',
+			compressionEnabled: false,
+		},*/
+		batching: {
+			enabled: true,
+			maxBatchSize: 10,
+			batchTimeoutMs: 1000,
+			batchableEndpoints: ['/audit/events'],
+		},
+		performance: {
+			enableCompression: true,
+			enableStreaming: true,
+			maxConcurrentRequests: 5,
+			requestDeduplication: true,
+			responseTransformation: true,
+		},
+		logging: {
+			enabled: true,
+			level: 'info',
+			includeRequestBody: false,
+			includeResponseBody: false,
+			maskSensitiveData: true,
+		},
+		errorHandling: {
+			throwOnError: false,
+			includeStackTrace: true,
+			//errorTransformation: true,
 		},
 	})
 
 	console.log('✅ Client initialized successfully')
 	console.log('📊 Client state:', client.getState())
 	console.log('🔧 Client ready:', client.isReady())
+
+	// Health check
+	const health = await client.health.check()
+	console.log('\n🏥 Health check:', health)
 
 	// Access services
 	console.log('\n📋 Available services:')

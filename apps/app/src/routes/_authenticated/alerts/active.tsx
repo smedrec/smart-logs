@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { Spinner } from '@/components/ui/spinner'
-import { auditClient } from '@/lib/audit-client'
+import { useAuditContext } from '@/contexts/audit-provider'
 import { authStateCollection } from '@/lib/auth-client'
 import { recentAlertsCollection } from '@/lib/collections'
 import { eq, useLiveQuery } from '@tanstack/react-db'
@@ -31,6 +31,7 @@ export const Route = createFileRoute('/_authenticated/alerts/active')({
 })
 
 function RouteComponent() {
+	const { client } = useAuditContext()
 	const [resolvingAlert, setResolvingAlert] = useState<Set<string>>(new Set())
 	const [isDialogOpen, setIsDialogOpen] = useState(false)
 	const [formKey, setFormKey] = useState(0)
@@ -42,7 +43,8 @@ function RouteComponent() {
 	const resolveAlert = useMutation({
 		mutationFn: async (params: { alertId: string; resolutionNotes: string }) => {
 			try {
-				await auditClient.metrics.resolveAlert(params.alertId, {
+				if (!client) return false
+				await client.metrics.resolveAlert(params.alertId, {
 					resolution: params.resolutionNotes,
 				})
 				return { success: true, message: 'fulfilled' }

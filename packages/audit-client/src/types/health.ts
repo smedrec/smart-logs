@@ -10,6 +10,7 @@ import { z } from 'zod'
 export const HealthStatusSchema = z.object({
 	status: z.enum(['healthy', 'degraded', 'unhealthy']),
 	timestamp: z.string().datetime(),
+	environment: z.string().min(1),
 	uptime: z.number().min(0),
 	version: z.string().min(1),
 })

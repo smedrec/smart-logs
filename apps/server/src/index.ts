@@ -163,10 +163,10 @@ async function startServer() {
 		app.route(`${config.server.api.restPath}/v1`, restAPI)
 	}
 
-	// Mount health check API
-	const { createHealthAPI } = await import('./routes/health-api.js')
-	const healthAPI = createHealthAPI()
-	app.route(``, healthAPI)
+	// Mount kubernetes health check API
+	const { createKubernetesHealthAPI } = await import('./routes/kubernetes-health-api.js')
+	const kubernetesHealthAPI = createKubernetesHealthAPI()
+	app.route(``, kubernetesHealthAPI)
 
 	// Mount metrics API if enabled
 	if (config.server.monitoring.enableMetrics) {

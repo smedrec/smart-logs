@@ -23,6 +23,7 @@ import type { RequestOptions } from '../core/base-resource'
 export interface HealthStatus {
 	status: 'healthy' | 'unhealthy' | 'degraded'
 	timestamp: string
+	environment: string
 	uptime: number
 	version: string
 }
