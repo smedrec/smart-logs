@@ -76,18 +76,6 @@ const DetailedHealthSchema = z.object({
 	metrics: PerformanceMetricsSchema,
 })
 
-const ReadinessSchema = z.object({
-	status: z.enum(['ready', 'not_ready']),
-	timestamp: z.string(),
-	reason: z.string().optional(),
-	checks: z.object({
-		database: z.boolean(),
-		redis: z.boolean(),
-		auth: z.boolean(),
-		migrations: z.boolean(),
-	}),
-})
-
 const DatabaseHealthSchema = z.object({
 	overall: z.enum(['healthy', 'warning', 'critical']),
 	components: z.object({
@@ -118,6 +106,32 @@ const basicHealthRoute = createRoute({
 	tags: ['Health'],
 	summary: 'Basic health check',
 	description: 'Returns basic server health status for load balancers and monitoring systems.',
+	responses: {
+		200: {
+			description: 'Server is healthy',
+			content: {
+				'application/json': {
+					schema: BasicHealthSchema,
+				},
+			},
+		},
+		503: {
+			description: 'Server is unhealthy',
+			content: {
+				'application/json': {
+					schema: BasicHealthSchema,
+				},
+			},
+		},
+	},
+})
+
+const clientHealthRoute = createRoute({
+	method: 'get',
+	path: '/client',
+	tags: ['Health'],
+	summary: 'Client health check',
+	description: 'Returns basic server health status for Audit client.',
 	responses: {
 		200: {
 			description: 'Server is healthy',
@@ -241,7 +255,7 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 					uptime: cachedHealth.uptime,
 				}
 
-				const statusCode = cachedHealth.status === 'healthy' ? 200 : 503
+				const statusCode = cachedHealth.status === 'unhealthy' ? 503 : 200
 				logger.info('Basic health check (cached)', { requestId, status: cachedHealth.status })
 				return c.json(basicHealth, statusCode)
 			}
@@ -256,6 +270,69 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			logger.info('Basic health check (fallback)', { requestId, status: 'healthy' })
+			return c.json(basicHealth, 200)
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+			logger.error('Basic health check failed', errorMessage, { requestId, error: errorMessage })
+
+			const errorResponse = {
+				status: 'unhealthy' as const,
+				timestamp: new Date().toISOString(),
+				environment: config.getEnvironment() || 'unknown',
+				uptime: process.uptime(),
+			}
+
+			return c.json(errorResponse, 503)
+		}
+	})
+
+	// Client health check
+	app.openapi(clientHealthRoute, async (c) => {
+		const { config, logger } = c.get('services')
+		const requestId = c.get('requestId')
+
+		try {
+			// Check if we're shutting down
+			const isShuttingDown = c.get('isShuttingDown') || false
+			if (isShuttingDown) {
+				const response = {
+					status: 'unhealthy' as const,
+					timestamp: new Date().toISOString(),
+					environment: config.getEnvironment() || 'unknown',
+					version: c.get('apiVersion')?.resolved || '1.0.0',
+					uptime: process.uptime(),
+				}
+
+				logger.warn('Health check during shutdown', { requestId, status: 'shutting_down' })
+				return c.json(response, 503)
+			}
+
+			// Get cached health status for performance
+			const cachedHealth = healthService?.getCachedHealth()
+			if (cachedHealth) {
+				const basicHealth = {
+					status: cachedHealth.status,
+					timestamp: cachedHealth.timestamp,
+					environment: cachedHealth.environment,
+					version: cachedHealth.version,
+					uptime: cachedHealth.uptime,
+				}
+
+				const statusCode = cachedHealth.status === 'unhealthy' ? 503 : 200
+				logger.info('Client health check (cached)', { requestId, status: cachedHealth.status })
+				return c.json(basicHealth, statusCode)
+			}
+
+			// Fallback to simple health check
+			const basicHealth = {
+				status: 'healthy' as const,
+				timestamp: new Date().toISOString(),
+				environment: config.getEnvironment() || 'unknown',
+				version: c.get('apiVersion')?.resolved || '1.0.0',
+				uptime: process.uptime(),
+			}
+
+			logger.info('Client health check (fallback)', { requestId, status: 'healthy' })
 			return c.json(basicHealth, 200)
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error'

@@ -57,28 +57,28 @@ function ApiStatus() {
 			return (
 				<Status status="online">
 					<StatusIndicator />
-					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
+					{state === 'collapsed' ? null : <StatusLabel>{Math.floor(status.uptime)}</StatusLabel>}
 				</Status>
 			)
 		case 'degraded':
 			return (
 				<Status status="degraded">
 					<StatusIndicator />
-					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
+					{state === 'collapsed' ? null : <StatusLabel>{Math.floor(status.uptime)}</StatusLabel>}
 				</Status>
 			)
 		case 'unhealthy':
 			return (
 				<Status status="offline">
 					<StatusIndicator />
-					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
+					{state === 'collapsed' ? null : <StatusLabel>{Math.floor(status.uptime)}</StatusLabel>}
 				</Status>
 			)
 		default:
 			return (
 				<Status status="offline">
 					<StatusIndicator />
-					{state === 'collapsed' ? null : <StatusLabel>`${Math.floor(status.uptime)}`</StatusLabel>}
+					{state === 'collapsed' ? null : <StatusLabel>{Math.floor(status.uptime)}</StatusLabel>}
 				</Status>
 			)
 	}

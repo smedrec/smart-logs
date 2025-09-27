@@ -225,6 +225,10 @@ Pagination information is included in the response:
 				name: 'Alerts',
 				description: 'Alert management operations',
 			},
+			{
+				name: 'Organization',
+				description: 'Organization configuration API',
+			},
 		],
 	}))
 

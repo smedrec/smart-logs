@@ -20,7 +20,7 @@ export async function basicClientExample() {
 		timeout: 30000,
 		authentication: {
 			type: 'apiKey',
-			apiKey: '',
+			apiKey: 'test_GHoOmNbAmkoLOqfBxFtLHGXBZkTHbkuSDrjaRCJtxOhBZldxhdCTblBsVEyOcFwN',
 		},
 		retry: {
 			enabled: true,
@@ -60,7 +60,7 @@ export async function basicClientExample() {
 			maskSensitiveData: true,
 		},
 		errorHandling: {
-			throwOnError: false,
+			throwOnError: true,
 			includeStackTrace: true,
 			//errorTransformation: true,
 		},
@@ -95,6 +95,34 @@ export async function basicClientExample() {
 	console.log('- Total:', statistics.total, 'alerts')
 	console.log('- Active:', statistics.active, 'alerts')
 	console.log('- by type:', statistics.byType)
+
+	// Get infrastructure statistics
+	console.log('📊 Infrastructure statistics:')
+	const infraStats = client.getInfrastructureStats()
+	console.log('- Cache stats available:', !!infraStats.cache)
+	console.log('- Retry stats available:', !!infraStats.retry)
+	console.log('- Batch stats available:', !!infraStats.batch)
+	console.log('- Auth stats available:', !!infraStats.auth)
+
+	// Get service statistics
+	console.log('\n📋 Service statistics:')
+	const serviceStats = client.getServiceStats()
+	console.log('- Events service stats:', !!serviceStats.events)
+	console.log('- Compliance service stats:', !!serviceStats.compliance)
+	console.log('- Health service stats:', !!serviceStats.health)
+
+	// Perform health check (this will fail with the example URL, but shows the structure)
+	console.log('\n🏥 Performing health check...')
+	try {
+		const healthResult = await client.healthCheck()
+		console.log('✅ Health check result:')
+		console.log('- Overall status:', healthResult.overall)
+		console.log('- Services:', Object.keys(healthResult.services).length)
+		console.log('- Timestamp:', healthResult.timestamp)
+	} catch (error) {
+		console.log('❌ Health check failed (expected with example URL)')
+		console.log('- This is normal for the example - real API would work')
+	}
 
 	// Cleanup
 	await client.destroy()

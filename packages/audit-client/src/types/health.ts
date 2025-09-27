@@ -12,7 +12,7 @@ export const HealthStatusSchema = z.object({
 	timestamp: z.string().datetime(),
 	environment: z.string().min(1),
 	uptime: z.number().min(0),
-	version: z.string().min(1),
+	version: z.string().min(1).optional(),
 })
 export type HealthStatus = z.infer<typeof HealthStatusSchema>
 

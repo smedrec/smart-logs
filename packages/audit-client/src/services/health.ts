@@ -25,7 +25,7 @@ export interface HealthStatus {
 	timestamp: string
 	environment: string
 	uptime: number
-	version: string
+	version?: string
 }
 
 /**
@@ -233,7 +233,6 @@ export class HealthService extends BaseResource {
 		}
 
 		const response = await this.request<HealthStatus>('/health', options)
-
 		// Validate response using type guards
 		assertType(response, isHealthStatus, 'Invalid health status response from server')
 		return response

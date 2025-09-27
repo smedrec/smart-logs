@@ -483,7 +483,7 @@ export class StructuredLogger {
 				const response = await fetch(this.config.otplConfig.endpoint, requestConfig)
 
 				if (response.ok) {
-					console.debug(`Successfully exported log to OTLP`)
+					//console.debug(`Successfully exported log to OTLP`)
 					return
 				}
 

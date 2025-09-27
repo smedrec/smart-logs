@@ -28,12 +28,13 @@ export function AuditProvider({ children, config }: AuditProviderProps) {
 		apiVersion: 'v1',
 		timeout: 30000,
 		authentication: {
-			type: 'session',
-			//apiKey: import.meta.env.VITE_API_KEY,
-			autoRefresh: true,
+			type: 'apiKey',
+			apiKey: import.meta.env.VITE_API_KEY || 'test-api-key',
+			//customHeaders: {}, // No authentication headers for health endpoints
+			autoRefresh: false,
 		},
 		retry: {
-			enabled: true,
+			enabled: false,
 			maxAttempts: 3,
 			initialDelayMs: 1000,
 			maxDelayMs: 10000,
@@ -42,7 +43,7 @@ export function AuditProvider({ children, config }: AuditProviderProps) {
 			retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR'],
 		},
 		cache: {
-			enabled: true,
+			enabled: false,
 			defaultTtlMs: 300000, // 5 minutes
 			maxSize: 100,
 			storage: 'localStorage',
@@ -70,8 +71,8 @@ export function AuditProvider({ children, config }: AuditProviderProps) {
 			maskSensitiveData: true,
 		},
 		errorHandling: {
-			throwOnError: false,
-			includeStackTrace: process.env.NODE_ENV === 'development',
+			throwOnError: true,
+			includeStackTrace: true, //process.env.NODE_ENV === 'development',
 			//errorTransformation: true,
 		},
 		environment: process.env.NODE_ENV as 'development' | 'production',
@@ -84,7 +85,7 @@ export function AuditProvider({ children, config }: AuditProviderProps) {
 			const auditClient = new AuditClient(defaultConfig)
 
 			// Test connection
-			await auditClient.health.check()
+			//await auditClient.health.check()
 
 			setClient(auditClient)
 			setIsConnected(true)

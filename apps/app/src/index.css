@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import "@daveyplate/better-auth-ui/css";
+@import '@daveyplate/better-auth-ui/css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -52,6 +52,21 @@ body {
 	--sidebar-accent-foreground: oklch(0.205 0 0);
 	--sidebar-border: oklch(0.922 0 0);
 	--sidebar-ring: oklch(0.708 0 0);
+	--color-low: oklch(0.72 0.19 150);
+	--color-medium: oklch(0.8 0.16 86);
+	--color-high: oklch(0.7 0.19 48);
+	--color-critical: oklch(0.577 0.245 27.325);
+	--color-security: oklch(0.64 0.21 25);
+	--color-compliance: oklch(0.49 0.22 264);
+	--color-performance: oklch(0.72 0.19 150);
+	--color-system: oklch(0.37 0.03 260);
+	--color-attempt: oklch(0.8 0.16 86);
+	--color-success: oklch(0.72 0.19 150);
+	--color-failure: oklch(0.577 0.245 27.325);
+	--color-phi: oklch(0.577 0.245 27.325);
+	--color-confidential: oklch(0.8 0.16 86);
+	--color-public: oklch(0.72 0.19 150);
+	--color-internal: oklch(0.37 0.03 260);
 }
 
 .dark {
@@ -124,6 +139,21 @@ body {
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	--color-low: var(--low);
+	--color-medium: var(--medium);
+	--color-high: var(--high);
+	--color-critical: var(--critical);
+	--color-security: var(--security);
+	--color-compliance: var(--compliance);
+	--color-performance: var(--performance);
+	--color-system: var(--system);
+	--color-attempt: var(--attempt);
+	--color-success: var(--success);
+	--color-failure: var(--failure);
+	--color-phi: var(--phi);
+	--color-confidential: var(--confidential);
+	--color-public: var(--public);
+	--color-internal: var(--internal);
 }
 
 @layer base {

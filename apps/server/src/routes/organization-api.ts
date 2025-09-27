@@ -1,8 +1,14 @@
 /**
- * @fileoverview Inngest Functions API
+ * @fileoverview Organization configuration API
  *
- * Provides REST API endpoints for Inngest functions:
- * - Hello World
+ * Provides REST API endpoints for config organizations:
+ * - Configure Organization Email Provider
+ * - Create Organization Role
+ * - Update Organization Role
+ * - Delete Organization Role
+ * - Create Organization Member
+ * - Update Organization Member
+ * - Delete Organization Member
  *
  */
 import { ApiError } from '@/lib/errors/http.js'
@@ -54,7 +60,7 @@ const RoleSchema = z.object({
 const organizationEmailProviderRoute = createRoute({
 	method: 'post',
 	path: '/email/provider',
-	tags: ['Organization Email Provider Configuration'],
+	tags: ['Organization'],
 	summary: 'Configure Organization Email Provider',
 	description: 'Configures the organization email provider.',
 	request: {
@@ -82,7 +88,7 @@ const organizationEmailProviderRoute = createRoute({
 const organizationRoleCreateRoute = createRoute({
 	method: 'post',
 	path: '/role',
-	tags: ['Organization Role Management'],
+	tags: ['Organization'],
 	summary: 'Create Organization Role',
 	description: 'Creates a new organization role.',
 	request: {
