@@ -295,15 +295,20 @@ export function responseCachingMiddleware(
 
 		// Cache successful responses
 		if (cacheableStatusCodes.includes(c.res.status)) {
-			try {
-				const responseBody = await c.res.clone().json()
-				await performance.executeOptimized(async () => responseBody, {
-					cacheKey,
-					cacheTTL: defaultTTL,
-				})
-			} catch (error) {
-				// Ignore caching errors
-				console.error('Response caching failed:', error)
+			const contenType = c.res.headers.get('content-type') || ''
+			if (!contenType.includes('application/json')) {
+				console.warn(`Response caching skipped for non-JSON response: ${contenType} at ${path}`) // Ignore non-JSON responses
+			} else {
+				try {
+					const responseBody = await c.res.clone().json()
+					await performance.executeOptimized(async () => responseBody, {
+						cacheKey,
+						cacheTTL: defaultTTL,
+					})
+				} catch (error) {
+					// Ignore caching errors
+					console.error('Response caching failed:', error)
+				}
 			}
 		}
 	}

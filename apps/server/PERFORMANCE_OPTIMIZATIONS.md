@@ -186,7 +186,44 @@ concurrency: {
 
 ## Usage Examples
 
-### 1. TRPC Optimized Queries
+### 1. Cache Configuration with Exclusions
+
+```typescript
+// Configure caching with endpoint exclusions
+const performanceConfig: PerformanceConfig = {
+	responseCache: {
+		enabled: true,
+		defaultTTL: 300, // 5 minutes
+		maxSizeMB: 100,
+		keyPrefix: 'api_cache',
+
+		// Exclude specific endpoints from caching
+		excludeEndpoints: [
+			'/api/v1/auth/session',
+			'/api/v1/auth/logout',
+			'/graphql', // Disable caching for GraphQL
+		],
+
+		// Exclude endpoints matching patterns
+		disableCachePatterns: [
+			'/api/v1/realtime/*', // All real-time endpoints
+			'/api/v1/streaming/*', // All streaming endpoints
+			'*/live', // Any endpoint ending with /live
+			'*/current', // Any endpoint ending with /current
+		],
+
+		// Custom TTL for specific endpoints
+		endpointTTLOverrides: {
+			'/api/v1/metrics/*': 60, // 1 minute for metrics
+			'/api/v1/health': 30, // 30 seconds for health
+			'/api/v1/audit/events/recent': 120, // 2 minutes for recent events
+		},
+	},
+	// ... other config
+}
+```
+
+### 2. TRPC Optimized Queries
 
 ```typescript
 // Cached query with pagination
@@ -225,9 +262,43 @@ mutation BulkCreateEvents($events: [CreateAuditEventInput!]!) {
 }
 ```
 
-### 4. Cache Management
+### 4. Using Performance Service with Cache Exclusions
 
 ```typescript
+// Check if caching is enabled for an endpoint
+const isCachingEnabled = performanceService.isCachingEnabledForEndpoint('/api/v1/auth/session')
+// Returns: false (excluded in config)
+
+// Get cache TTL for an endpoint
+const ttl = performanceService.getCacheTTLForEndpoint('/api/v1/metrics/dashboard')
+// Returns: 60 (from endpointTTLOverrides)
+
+// Create optimized handler with automatic cache rules
+const optimizedHandler = performanceService.createOptimizedHandler(
+	'/api/v1/audit/events',
+	async () => {
+		// Your handler logic here
+		return await fetchAuditEvents()
+	}
+)
+
+// Execute with endpoint-specific caching
+const result = await performanceService.executeOptimized(async () => await fetchData(), {
+	cacheKey: 'my-cache-key',
+	endpoint: '/api/v1/realtime/events', // Will be excluded from cache
+})
+```
+
+### 5. Cache Management
+
+```typescript
+// Get cache configuration summary
+const cacheConfig = performanceService.getCacheConfigSummary()
+console.log('Cache exclusions:', cacheConfig.excludedEndpoints)
+console.log('Disabled patterns:', cacheConfig.disabledPatterns)
+console.log('TTL overrides:', cacheConfig.ttlOverrides)
+console.log('Cache stats:', cacheConfig.stats)
+
 // Warm up cache
 await trpc.performance.cacheOperations.warmUp.mutate({
 	organizationIds: ['org-123', 'org-456'],
@@ -239,6 +310,88 @@ await trpc.performance.cacheOperations.invalidate.mutate({
 	pattern: 'audit_events*',
 })
 ```
+
+## Cache Exclusion Configuration
+
+### Endpoint Exclusion Strategies
+
+**1. Exact Endpoint Exclusions**
+
+```typescript
+excludeEndpoints: [
+	'/api/v1/auth/session', // Authentication endpoints
+	'/api/v1/auth/logout', // Logout endpoints
+	'/graphql', // GraphQL endpoint
+]
+```
+
+**2. Pattern-Based Exclusions**
+
+```typescript
+disableCachePatterns: [
+	'/api/v1/realtime/*', // All real-time endpoints
+	'/api/v1/streaming/*', // All streaming endpoints
+	'*/live', // Any endpoint ending with /live
+	'*/current', // Current state endpoints
+	'/api/v1/auth/*', // All authentication endpoints
+	'*/websocket', // WebSocket endpoints
+]
+```
+
+**3. TTL Overrides for Specific Endpoints**
+
+```typescript
+endpointTTLOverrides: {
+	'/api/v1/metrics/*': 60,           // Short cache for metrics (1 min)
+	'/api/v1/health': 30,              // Very short for health checks (30 sec)
+	'/api/v1/audit/events/recent': 120, // Medium cache for recent events (2 min)
+	'/api/v1/reports/*': 1800,         // Long cache for reports (30 min)
+}
+```
+
+### Common Exclusion Patterns
+
+**Real-time Data Endpoints:**
+
+- `/api/v1/realtime/*`
+- `/api/v1/live/*`
+- `/api/v1/streaming/*`
+- `*/current`
+- `*/now`
+
+**Authentication & Session Endpoints:**
+
+- `/api/v1/auth/*`
+- `/api/v1/session/*`
+- `/api/v1/logout`
+- `/api/v1/refresh`
+
+**User-Specific Data:**
+
+- `/api/v1/user/*/preferences`
+- `/api/v1/user/*/settings`
+- `/api/v1/profile/*`
+
+**Frequently Changing Data:**
+
+- `/api/v1/metrics/*`
+- `/api/v1/stats/*`
+- `/api/v1/counters/*`
+
+### Pattern Matching Rules
+
+The cache exclusion system supports simple wildcard patterns:
+
+- `*` matches any characters within a path segment
+- `*/pattern` matches any path ending with `/pattern`
+- `pattern/*` matches any path starting with `pattern/`
+- `*/pattern/*` matches any path containing `/pattern/`
+
+Examples:
+
+- `/api/v1/auth/*` matches `/api/v1/auth/login`, `/api/v1/auth/logout`
+- `*/live` matches `/api/v1/metrics/live`, `/dashboard/live`
+- `/api/*/realtime` matches `/api/v1/realtime`, `/api/v2/realtime`
 
 ## Configuration
 
@@ -265,6 +418,14 @@ await trpc.performance.cacheOperations.invalidate.mutate({
 ### Middleware Configuration
 
 ```typescript
+// Smart caching middleware with automatic exclusions
+import {
+	cacheDebugMiddleware,
+	cacheInvalidationMiddleware,
+	cacheWarmingMiddleware,
+	smartCachingMiddleware,
+} from './lib/middleware/smart-caching'
+
 // Enable all performance optimizations
 app.use(
 	'*',
@@ -276,6 +437,18 @@ app.use(
 		enableMetrics: true,
 	})
 )
+
+// Apply smart caching (respects exclusion configuration)
+app.use('*', smartCachingMiddleware)
+
+// Automatic cache invalidation on write operations
+app.use('*', cacheInvalidationMiddleware)
+
+// Cache warming for frequently accessed endpoints
+app.use('*', cacheWarmingMiddleware)
+
+// Debug cache behavior (development only)
+app.use('*', cacheDebugMiddleware)
 ```
 
 ## Monitoring and Alerts
@@ -296,12 +469,43 @@ Monitor system health via:
 - REST: `GET /api/v1/performance/health`
 - GraphQL: `query { performanceHealth { ... } }`
 
+### Cache Exclusion Monitoring
+
+Monitor cache exclusion effectiveness:
+
+```typescript
+// Get cache statistics including exclusions
+const cacheConfig = performanceService.getCacheConfigSummary()
+
+console.log('Cache Statistics:', {
+	hitRatio: cacheConfig.stats.hitRatio,
+	exclusionRatio: cacheConfig.stats.exclusionRatio,
+	totalRequests: cacheConfig.stats.totalRequests,
+	excludedRequests: cacheConfig.stats.excludedRequests,
+})
+
+// Health check includes cache exclusion metrics
+const health = await performanceService.healthCheck()
+console.log('Cache Health:', health.details.cache)
+```
+
+### Response Headers for Cache Debugging
+
+The smart caching middleware adds helpful headers:
+
+- `X-Cache-Status`: `HIT`, `MISS`, or `EXCLUDED`
+- `X-Cache-TTL`: Configured TTL for the endpoint
+- `X-Cache-Invalidated`: Number of cache entries invalidated (on write operations)
+- `X-Cache-Enabled`: Whether caching is enabled for the endpoint (debug mode)
+- `X-Cache-Hit-Ratio`: Current cache hit ratio (debug mode)
+
 ### Automated Alerts
 
 The system automatically alerts on:
 
 - High memory usage (>85%)
 - Low cache hit ratios (<50%)
+- High cache exclusion ratios (>30% - may indicate misconfiguration)
 - High concurrency utilization (>95%)
 - Slow requests (above threshold)
 

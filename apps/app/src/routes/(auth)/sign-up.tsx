@@ -14,6 +14,7 @@ function RouteComponent() {
 						throw new Error('Function not implemented.')
 					}}
 				/>
+				<p>By clicking Sign Up, I agree to SMEDREC's terms, privacy policy, and cookie policy.</p>
 			</div>
 		</div>
 	)

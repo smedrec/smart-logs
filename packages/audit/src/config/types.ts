@@ -222,6 +222,12 @@ export interface PerformanceConfig {
 		defaultTTL: number
 		maxSizeMB: number
 		keyPrefix: string
+		/** Endpoints to exclude from caching (supports patterns) */
+		excludeEndpoints?: string[]
+		/** Specific cache TTL overrides per endpoint pattern */
+		endpointTTLOverrides?: Record<string, number>
+		/** Disable caching for endpoints matching these patterns */
+		disableCachePatterns?: string[]
 	}
 	/** Pagination configuration */
 	pagination: {

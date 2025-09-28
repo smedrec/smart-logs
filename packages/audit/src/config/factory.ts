@@ -146,6 +146,7 @@ export function createDevelopmentConfig(): AuditConfig {
 					defaultTTL: 60, // 1 minute for faster development
 					maxSizeMB: 50,
 					keyPrefix: 'dev_api_cache',
+					excludeEndpoints: ['/api/auth/get-session', '/api/v1/health'],
 				},
 				pagination: {
 					defaultLimit: 20,

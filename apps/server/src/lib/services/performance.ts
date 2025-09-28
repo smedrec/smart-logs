@@ -3,8 +3,8 @@ import { createHash } from 'crypto'
 import type { Context } from 'hono'
 import type { PerformanceConfig } from '@repo/audit'
 import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
+import type { StructuredLogger } from '@repo/logs'
 import type { Redis } from '@repo/redis-client'
-import type { StructuredLogger } from './logging.js'
 
 /**
  * Performance optimization service for the production server
@@ -149,6 +149,7 @@ class ResponseCache {
 		totalRequests: 0,
 		totalHits: 0,
 		totalMisses: 0,
+		excludedRequests: 0,
 	}
 
 	constructor(
@@ -158,10 +159,79 @@ class ResponseCache {
 		this.keyPrefix = config.keyPrefix
 	}
 
-	async get<T>(key: string): Promise<T | null> {
+	/**
+	 * Check if endpoint should be excluded from caching
+	 */
+	private shouldExcludeFromCache(endpoint: string): boolean {
+		if (!this.config.excludeEndpoints && !this.config.disableCachePatterns) {
+			return false
+		}
+
+		// Check exact matches in excludeEndpoints
+		if (this.config.excludeEndpoints?.includes(endpoint)) {
+			return true
+		}
+
+		// Check pattern matches in disableCachePatterns
+		if (this.config.disableCachePatterns) {
+			for (const pattern of this.config.disableCachePatterns) {
+				if (this.matchesPattern(endpoint, pattern)) {
+					return true
+				}
+			}
+		}
+
+		return false
+	}
+
+	/**
+	 * Get TTL for specific endpoint (with overrides)
+	 */
+	private getTTLForEndpoint(endpoint: string, defaultTTL?: number): number {
+		const baseTTL = defaultTTL || this.config.defaultTTL
+
+		if (!this.config.endpointTTLOverrides) {
+			return baseTTL
+		}
+
+		// Check for exact match first
+		if (this.config.endpointTTLOverrides[endpoint]) {
+			return this.config.endpointTTLOverrides[endpoint]
+		}
+
+		// Check for pattern matches
+		for (const [pattern, ttl] of Object.entries(this.config.endpointTTLOverrides)) {
+			if (this.matchesPattern(endpoint, pattern)) {
+				return ttl
+			}
+		}
+
+		return baseTTL
+	}
+
+	/**
+	 * Simple pattern matching (supports * wildcards)
+	 */
+	private matchesPattern(text: string, pattern: string): boolean {
+		// Convert pattern to regex
+		const regexPattern = pattern
+			.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // Escape special regex chars
+			.replace(/\\\*/g, '.*') // Convert * to .*
+
+		const regex = new RegExp(`^${regexPattern}$`, 'i')
+		return regex.test(text)
+	}
+
+	async get<T>(key: string, endpoint?: string): Promise<T | null> {
 		if (!this.config.enabled) return null
 
 		this.stats.totalRequests++
+
+		// Check if endpoint should be excluded from caching
+		if (endpoint && this.shouldExcludeFromCache(endpoint)) {
+			this.stats.excludedRequests++
+			return null
+		}
 
 		try {
 			const fullKey = `${this.keyPrefix}:${key}`
@@ -181,13 +251,20 @@ class ResponseCache {
 		}
 	}
 
-	async set<T>(key: string, value: T, ttl?: number): Promise<void> {
+	async set<T>(key: string, value: T, ttl?: number, endpoint?: string): Promise<void> {
 		if (!this.config.enabled) return
+
+		// Check if endpoint should be excluded from caching
+		if (endpoint && this.shouldExcludeFromCache(endpoint)) {
+			return
+		}
 
 		try {
 			const fullKey = `${this.keyPrefix}:${key}`
 			const serialized = JSON.stringify(value)
-			const cacheTTL = ttl || this.config.defaultTTL
+			const cacheTTL = endpoint
+				? this.getTTLForEndpoint(endpoint, ttl)
+				: ttl || this.config.defaultTTL
 
 			await this.redis.setex(fullKey, cacheTTL, serialized)
 		} catch (error) {
@@ -214,10 +291,14 @@ class ResponseCache {
 	}
 
 	getStats() {
+		const eligibleRequests = this.stats.totalRequests - this.stats.excludedRequests
 		return {
 			...this.stats,
-			hitRatio:
-				this.stats.totalRequests > 0 ? (this.stats.totalHits / this.stats.totalRequests) * 100 : 0,
+			hitRatio: eligibleRequests > 0 ? (this.stats.totalHits / eligibleRequests) * 100 : 0,
+			exclusionRatio:
+				this.stats.totalRequests > 0
+					? (this.stats.excludedRequests / this.stats.totalRequests) * 100
+					: 0,
 		}
 	}
 }
@@ -260,13 +341,14 @@ export class PerformanceService {
 			cacheTTL?: number
 			skipCache?: boolean
 			skipQueue?: boolean
+			endpoint?: string
 		}
 	): Promise<T> {
-		const { cacheKey, cacheTTL, skipCache = false, skipQueue = false } = options || {}
+		const { cacheKey, cacheTTL, skipCache = false, skipQueue = false, endpoint } = options || {}
 
 		// Try cache first
 		if (!skipCache && cacheKey) {
-			const cached = await this.responseCache.get<T>(cacheKey)
+			const cached = await this.responseCache.get<T>(cacheKey, endpoint)
 			if (cached !== null) {
 				return cached
 			}
@@ -278,7 +360,7 @@ export class PerformanceService {
 
 			// Cache result
 			if (!skipCache && cacheKey) {
-				await this.responseCache.set(cacheKey, result, cacheTTL)
+				await this.responseCache.set(cacheKey, result, cacheTTL, endpoint)
 			}
 
 			return result
@@ -554,6 +636,69 @@ export class PerformanceService {
 	}
 
 	/**
+	 * Check if caching is enabled for a specific endpoint
+	 */
+	isCachingEnabledForEndpoint(endpoint: string): boolean {
+		if (!this.config.responseCache.enabled) {
+			return false
+		}
+
+		// Check if endpoint should be excluded from caching
+		if (this.config.responseCache.excludeEndpoints?.includes(endpoint)) {
+			return false
+		}
+
+		// Check pattern matches in disableCachePatterns
+		if (this.config.responseCache.disableCachePatterns) {
+			for (const pattern of this.config.responseCache.disableCachePatterns) {
+				if (this.matchesPattern(endpoint, pattern)) {
+					return false
+				}
+			}
+		}
+
+		return true
+	}
+
+	/**
+	 * Get cache TTL for a specific endpoint
+	 */
+	getCacheTTLForEndpoint(endpoint: string, defaultTTL?: number): number {
+		const baseTTL = defaultTTL || this.config.responseCache.defaultTTL
+
+		if (!this.config.responseCache.endpointTTLOverrides) {
+			return baseTTL
+		}
+
+		// Check for exact match first
+		if (this.config.responseCache.endpointTTLOverrides[endpoint]) {
+			return this.config.responseCache.endpointTTLOverrides[endpoint]
+		}
+
+		// Check for pattern matches
+		for (const [pattern, ttl] of Object.entries(this.config.responseCache.endpointTTLOverrides)) {
+			if (this.matchesPattern(endpoint, pattern)) {
+				return ttl
+			}
+		}
+
+		return baseTTL
+	}
+
+	/**
+	 * Simple pattern matching (supports * wildcards)
+	 */
+	private matchesPattern(text: string, pattern: string): boolean {
+		// Convert pattern to regex
+		const regexPattern = pattern
+			.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // Escape special regex chars
+			.replace(/\\\*/g, '.*') // Convert * to .*
+
+		const regex = new RegExp(`^${regexPattern}$`, 'i')
+		return regex.test(text)
+	}
+
+	/**
 	 * Get content type for streaming format
 	 */
 	private getContentType(format: string): string {
@@ -570,12 +715,58 @@ export class PerformanceService {
 	}
 
 	/**
+	 * Create optimized handler for endpoint with automatic caching rules
+	 */
+	createOptimizedHandler<T>(
+		endpoint: string,
+		handler: () => Promise<T>,
+		options?: {
+			customCacheTTL?: number
+			forceSkipCache?: boolean
+			forceSkipQueue?: boolean
+		}
+	): () => Promise<T> {
+		return async () => {
+			const cacheKey = this.generateCacheKey(endpoint, {})
+			const skipCache = options?.forceSkipCache || !this.isCachingEnabledForEndpoint(endpoint)
+			const cacheTTL = options?.customCacheTTL || this.getCacheTTLForEndpoint(endpoint)
+
+			return this.executeOptimized(handler, {
+				cacheKey: skipCache ? undefined : cacheKey,
+				cacheTTL,
+				skipCache,
+				skipQueue: options?.forceSkipQueue,
+				endpoint,
+			})
+		}
+	}
+
+	/**
+	 * Get cache configuration summary
+	 */
+	getCacheConfigSummary(): {
+		enabled: boolean
+		excludedEndpoints: string[]
+		disabledPatterns: string[]
+		ttlOverrides: Record<string, number>
+		stats: ReturnType<ResponseCache['getStats']>
+	} {
+		return {
+			enabled: this.config.responseCache.enabled,
+			excludedEndpoints: this.config.responseCache.excludeEndpoints || [],
+			disabledPatterns: this.config.responseCache.disableCachePatterns || [],
+			ttlOverrides: this.config.responseCache.endpointTTLOverrides || {},
+			stats: this.responseCache.getStats(),
+		}
+	}
+
+	/**
 	 * Health check for performance service
 	 */
 	async healthCheck(): Promise<{
 		status: 'healthy' | 'warning' | 'critical'
 		details: {
-			cache: { status: string; hitRatio: number }
+			cache: { status: string; hitRatio: number; exclusionRatio: number }
 			concurrency: { status: string; utilization: number }
 			memory: { status: string; usage: number }
 		}
@@ -586,10 +777,12 @@ export class PerformanceService {
 			(metrics.concurrency.activeRequests / metrics.concurrency.maxConcurrentRequests) * 100
 		const memoryUsage = metrics.memoryUsage.percentage
 
+		const cacheStats = this.responseCache.getStats()
 		const details = {
 			cache: {
 				status: cacheHitRatio > 70 ? 'healthy' : cacheHitRatio > 50 ? 'warning' : 'critical',
 				hitRatio: cacheHitRatio,
+				exclusionRatio: cacheStats.exclusionRatio,
 			},
 			concurrency: {
 				status:
@@ -626,6 +819,20 @@ export const DEFAULT_PERFORMANCE_CONFIG: PerformanceConfig = {
 		defaultTTL: 300, // 5 minutes
 		maxSizeMB: 100,
 		keyPrefix: 'api_cache',
+		// Example exclusions - endpoints that should not be cached
+		excludeEndpoints: [
+			'/api/v1/auth/session',
+			'/api/v1/auth/logout',
+			'/graphql', // Disable caching for all GraphQL requests
+		],
+		// Example patterns - disable caching for real-time endpoints
+		disableCachePatterns: ['/api/v1/realtime/*', '/api/v1/streaming/*', '*/live', '*/current'],
+		// Example TTL overrides - shorter cache for frequently changing data
+		endpointTTLOverrides: {
+			'/api/v1/metrics/*': 60, // 1 minute for metrics
+			'/api/v1/health': 30, // 30 seconds for health checks
+			'/api/v1/audit/events/recent': 120, // 2 minutes for recent events
+		},
 	},
 	pagination: {
 		defaultLimit: 50,
