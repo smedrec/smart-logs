@@ -251,26 +251,18 @@ export class GDPRComplianceService {
 		principalId: string,
 		strategy: PseudonymizationStrategy = 'hash'
 	): Promise<string> {
-		let encryptedOriginalId: string | undefined = undefined
-		try {
-			const { ciphertext } = await this.kms.encrypt(principalId)
-			encryptedOriginalId = ciphertext
-		} catch (error) {
-			this.logger.error(
-				'Error encrypting original ID',
-				error instanceof Error ? error : new Error('Error encrypting original ID')
-			)
-			throw error
-		}
+		// Generate pseudonym ID
+		const pseudonymId = this.generatePseudonymId(principalId, strategy)
+
 		try {
 			const existingMapping = await this.client.executeOptimizedQuery(
 				(db) =>
 					db
 						.select()
 						.from(pseudonymMapping)
-						.where(eq(pseudonymMapping.originalId, encryptedOriginalId))
+						.where(eq(pseudonymMapping.pseudonymId, pseudonymId))
 						.limit(1),
-				{ cacheKey: `check_existing_pseudonym_${encryptedOriginalId}` }
+				{ cacheKey: `check_existing_pseudonym_${pseudonymId}` }
 			)
 
 			if (existingMapping.length > 0) {
@@ -284,8 +276,18 @@ export class GDPRComplianceService {
 			)
 			throw error
 		}
-		// Generate pseudonym ID
-		const pseudonymId = this.generatePseudonymId(principalId, strategy)
+
+		let encryptedOriginalId: string | undefined = undefined
+		try {
+			const { ciphertext } = await this.kms.encrypt(principalId)
+			encryptedOriginalId = ciphertext
+		} catch (error) {
+			this.logger.error(
+				'Error encrypting original ID',
+				error instanceof Error ? error : new Error('Error encrypting original ID')
+			)
+			throw error
+		}
 
 		try {
 			const insert = await this.db
