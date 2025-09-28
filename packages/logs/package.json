@@ -13,7 +13,7 @@
 	"dependencies": {
 		"chalk": "^5.5.0",
 		"dotenv": "17.2.0",
-		"zod": "^4.1.5"
+		"zod": "^4.1.11"
 	},
 	"devDependencies": {
 		"@repo/eslint-config": "workspace:*",

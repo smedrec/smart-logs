@@ -5,6 +5,7 @@ import crypto from 'crypto'
 
 import { createQueryCache } from './cache-factory.js'
 
+import type { Redis as RedisType } from 'ioredis'
 import type { Pool } from 'pg'
 import type { CacheFactoryConfig, IQueryCache } from './cache-factory.js'
 
@@ -32,10 +33,11 @@ export class CachedQueryExecutor {
 	private cache: IQueryCache
 
 	constructor(
+		connection: RedisType,
 		private pool: Pool,
 		cacheConfig: CacheFactoryConfig
 	) {
-		this.cache = createQueryCache(cacheConfig)
+		this.cache = createQueryCache(connection, cacheConfig)
 	}
 
 	/**

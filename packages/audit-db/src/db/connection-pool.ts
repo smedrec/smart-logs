@@ -13,6 +13,7 @@ import { createQueryCache } from '../cache/cache-factory.js'
 import * as schema from './schema.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { Redis as RedisType } from 'ioredis'
 import type { Sql } from 'postgres'
 import type { CacheFactoryConfig } from '../cache/cache-factory.js'
 import type { IQueryCache, QueryCacheStats } from '../cache/query-cache.js'
@@ -71,6 +72,7 @@ export class EnhancedConnectionPool {
 	private logger: StructuredLogger
 
 	constructor(
+		private connection: RedisType,
 		private config: ConnectionPoolConfig,
 		private replication: ReplicationConfig = { enabled: false }
 	) {
@@ -292,12 +294,13 @@ export class EnhancedDatabaseClient {
 	private cleanupInterval: NodeJS.Timeout | null = null
 
 	constructor(
+		connection: RedisType,
 		poolConfig: ConnectionPoolConfig,
 		cacheConfig: CacheFactoryConfig,
 		replicationConfig: ReplicationConfig
 	) {
-		this.connectionPool = new EnhancedConnectionPool(poolConfig, replicationConfig)
-		this.queryCache = createQueryCache(cacheConfig)
+		this.connectionPool = new EnhancedConnectionPool(connection, poolConfig, replicationConfig)
+		this.queryCache = createQueryCache(connection, cacheConfig)
 		this.cacheConfig = cacheConfig
 
 		// Setup periodic cache cleanup

@@ -1,6 +1,7 @@
 import { QueryCache } from './query-cache.js'
 import { RedisQueryCache } from './redis-query-cache.js'
 
+import type { Redis as RedisType } from 'ioredis'
 import type { QueryCacheStats } from './query-cache.js'
 import type { RedisQueryCacheConfig } from './redis-query-cache.js'
 
@@ -59,7 +60,7 @@ export type { QueryCacheStats, CacheEntry } from './query-cache.js'
 /**
  * Factory function to create appropriate cache instance
  */
-export function createQueryCache(config: CacheFactoryConfig): IQueryCache {
+export function createQueryCache(connection: RedisType, config: CacheFactoryConfig): IQueryCache {
 	switch (config.type) {
 		case 'local':
 			return new LocalCacheAdapter(new QueryCache(config.queryCache))
@@ -75,7 +76,7 @@ export function createQueryCache(config: CacheFactoryConfig): IQueryCache {
 				enableLocalCache: false, // Pure Redis mode
 			}
 
-			return new RedisQueryCache(redisConfig)
+			return new RedisQueryCache(connection, redisConfig)
 
 		case 'hybrid':
 			if (!config.redis) {
@@ -88,7 +89,7 @@ export function createQueryCache(config: CacheFactoryConfig): IQueryCache {
 				enableLocalCache: true, // Enable L1 cache
 			}
 
-			return new RedisQueryCache(hybridConfig)
+			return new RedisQueryCache(connection, hybridConfig)
 
 		default:
 			throw new Error(`Unknown cache type: ${config.type}`)

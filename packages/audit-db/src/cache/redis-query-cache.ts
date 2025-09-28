@@ -5,7 +5,7 @@ import { getSharedRedisConnection } from '@repo/redis-client'
 
 import { QueryCache } from './query-cache.js'
 
-import type { Redis } from 'ioredis'
+import type { Redis as RedisType } from 'ioredis'
 import type { QueryCacheConfig } from './cache-factory.js'
 import type { CacheEntry, QueryCacheStats } from './query-cache.js'
 
@@ -26,13 +26,16 @@ export interface RedisQueryCacheConfig extends QueryCacheConfig {
  * Distributed query cache using Redis with optional local L1 cache
  */
 export class RedisQueryCache {
-	private redis: Redis
+	//private redis: Redis
 	private localCache?: QueryCache
 	private stats: QueryCacheStats
 	private compressionThreshold = 1024 // Compress values larger than 1KB
 
-	constructor(private config: RedisQueryCacheConfig) {
-		this.redis = getSharedRedisConnection()
+	constructor(
+		private redis: RedisType,
+		private config: RedisQueryCacheConfig
+	) {
+		//this.redis = getSharedRedisConnection()
 
 		// Initialize local L1 cache if enabled
 		if (config.enableLocalCache) {

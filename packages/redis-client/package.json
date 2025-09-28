@@ -14,7 +14,7 @@
 	"dependencies": {
 		"@repo/logs": "workspace:*",
 		"dotenv": "17.2.0",
-		"ioredis": "5.7.0"
+		"ioredis": "5.8.0"
 	},
 	"devDependencies": {
 		"@repo/eslint-config": "workspace:*",
@@ -23,6 +23,6 @@
 		"typescript": "5.8.2"
 	},
 	"peerDependencies": {
-		"ioredis": "5.7.0"
+		"ioredis": "5.8.0"
 	}
 }

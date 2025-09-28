@@ -27,7 +27,7 @@
 		"bullmq": "5.58.5",
 		"dotenv": "17.2.2",
 		"hono": "4.9.7",
-		"ioredis": "5.7.0",
+		"ioredis": "5.8.0",
 		"postgres": "3.4.7",
 		"workers-tagged-logger": "0.13.1"
 	},

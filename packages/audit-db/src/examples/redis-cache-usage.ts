@@ -4,17 +4,19 @@
 import { DEFAULT_CACHE_CONFIGS } from '../cache/cache-factory.js'
 import { CachedQueryExecutor, QueryCacheUtils } from '../cache/cached-query-executor.js'
 
+import type { Redis as RedisType } from 'ioredis'
 import type { Pool } from 'pg'
 
 /**
  * Example: Setting up cached query executor
  */
 export function setupCachedQueryExecutor(
+	connection: RedisType,
 	pool: Pool,
 	environment: 'development' | 'production' | 'test'
 ) {
 	const cacheConfig = DEFAULT_CACHE_CONFIGS[environment]
-	return new CachedQueryExecutor(pool, cacheConfig)
+	return new CachedQueryExecutor(connection, pool, cacheConfig)
 }
 
 /**

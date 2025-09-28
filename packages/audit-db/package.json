@@ -44,7 +44,7 @@
 		"@repo/redis-client": "workspace:*",
 		"commander": "^12.1.0",
 		"drizzle-orm": "0.44.5",
-		"ioredis": "5.7.0",
+		"ioredis": "5.8.0",
 		"postgres": "3.4.7"
 	},
 	"devDependencies": {

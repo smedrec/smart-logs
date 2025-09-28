@@ -122,6 +122,7 @@ export class EnhancedAuditDatabaseClient {
 
 		// Initialize enhanced database client with connection pooling and caching
 		this.client = new EnhancedDatabaseClient(
+			this.connection,
 			config.connectionPool,
 			config.queryCacheFactory,
 			config.replication
