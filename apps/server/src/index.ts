@@ -77,6 +77,19 @@ async function startServer() {
 		app.use('*', nodeEnv())
 	}
 
+	// Configure CORS with settings from configuration
+	app.use(
+		'*',
+		cors({
+			origin: config.server.cors.origin,
+			credentials: config.server.cors.credentials,
+			allowMethods: config.server.cors.allowedMethods,
+			allowHeaders: config.server.cors.allowedHeaders,
+			exposeHeaders: config.server.cors.exposeHeaders,
+			maxAge: config.server.cors.maxAge,
+		})
+	)
+
 	app.use('*', init(configManager))
 
 	// Add comprehensive error handling middleware
@@ -104,30 +117,6 @@ async function startServer() {
 
 	// Add response caching for GET requests
 	app.use('*', responseCachingMiddleware(300)) // 5 minutes cache
-
-	// Configure CORS with settings from configuration
-	/**app.use(
-		'/*',
-		cors({
-			origin: config.server.cors.origin,
-			allowMethods: config.server.cors.allowedMethods,
-			allowHeaders: config.server.cors.allowedHeaders,
-			credentials: config.server.cors.credentials,
-		})
-	)*/
-
-	// cors
-	app.use('*', (c, next) => {
-		const corsMiddleware = cors({
-			origin: config.server.cors.origin, // replace with your origin
-			allowHeaders: config.server.cors.allowedHeaders,
-			allowMethods: config.server.cors.allowedMethods,
-			//exposeHeaders: ['Content-Length'],
-			maxAge: 86400,
-			credentials: config.server.cors.credentials,
-		})
-		return corsMiddleware(c, next)
-	})
 
 	app.on(['POST', 'GET'], '/api/auth/*', (c) => c.get('services').auth.handler(c.req.raw))
 

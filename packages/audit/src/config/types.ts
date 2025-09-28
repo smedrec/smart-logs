@@ -267,6 +267,8 @@ export interface ServerConfig {
 		credentials: boolean
 		allowedMethods: string[]
 		allowedHeaders: string[]
+		exposeHeaders: string[]
+		maxAge: number
 	}
 	rateLimit: {
 		windowMs: number

@@ -106,6 +106,8 @@ export function createDevelopmentConfig(): AuditConfig {
 					'accept-version',
 					'user-agent',
 				],
+				exposeHeaders: ['Content-Type'],
+				maxAge: 86400,
 			},
 			rateLimit: {
 				windowMs: 60000,
