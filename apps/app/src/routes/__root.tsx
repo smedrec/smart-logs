@@ -1,4 +1,3 @@
-import Loader from '@/components/loader'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/contexts/auth-provider'
 import { ThemeProvider } from '@/contexts/theme-provider'
@@ -16,6 +15,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 import '../index.css'
 
+import { Spinner } from '@/components/ui/spinner'
 import { AuditProvider } from '@/contexts/audit-provider'
 import { authClient } from '@/lib/auth-client'
 import { seo } from '@/lib/seo'
@@ -40,7 +40,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 			...seo({
 				title: 'Smart Logs | Opensource Audit Logging compatible with FHIR',
 				description:
-					'Smart Logs is an opensource FHIR Auditing system that provides comprehensive audit logging capabilities for healthcare applications, ensuring compliance with HIPAA, GDPR, and other regulatory requirements.',
+					'Smart Logs is an opensource Auditing system that provides comprehensive audit logging capabilities for healthcare applications, ensuring compliance with HIPAA, GDPR, and other regulatory requirements.',
 			}),
 		],
 		links: [
@@ -91,7 +91,7 @@ function RootComponent() {
 					>
 						<AuditProvider>
 							<div className="grid grid-rows-[auto_1fr] h-svh">
-								{isFetching ? <Loader /> : <Outlet />}
+								{isFetching ? <Spinner variant="bars" size={64} /> : <Outlet />}
 							</div>
 						</AuditProvider>
 					</AuthUIProviderTanstack>

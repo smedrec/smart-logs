@@ -3,6 +3,7 @@ import { NavUser } from '@/components/auth/nav-user'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/contexts/auth-provider'
 import { authClient, authStateCollection } from '@/lib/auth-client'
 //import { useLiveQuery } from '@tanstack/react-db'
@@ -112,11 +113,11 @@ function AuthenticatedLayout() {
   }*/
 
 	if (isPending) {
-		return null
+		return <Spinner variant="bars" size={64} />
 	}
 
 	if (!session) {
-		return null
+		navigate({ to: '/sign-in' })
 	}
 
 	return (

@@ -34,7 +34,8 @@ export const queryClient = new QueryClient({
 	},
 	queryCache: new QueryCache({
 		onError: (error) => {
-			toast.error(error.message, {
+			const message = error instanceof Error ? error.message : 'An unknown error occurred'
+			toast.error(message, {
 				action: {
 					label: 'retry',
 					onClick: () => {
