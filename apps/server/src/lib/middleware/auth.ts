@@ -17,39 +17,13 @@ export const requireAuthOrApiKey = createMiddleware<HonoEnv>(async (c, next) => 
 	const { audit } = c.get('services')
 	const isApiKeyAuth = c.get('isApiKeyAuth')
 
-	// If session not exists and API key is not provided, use session auth
-	if (!session && !isApiKeyAuth) {
-		return requireAuth(c, next)
-	}
-
-	// If API key provided, use API key auth
-	if (!session && isApiKeyAuth) {
+	// Try API key authentication first if API key is provided
+	if (isApiKeyAuth) {
 		return requireApiKey(c, next)
 	}
 
-	audit.logAuth({
-		action: 'session',
-		status: 'failure',
-		sessionContext: {
-			sessionId: 'anonymous',
-			ipAddress: c.get('location'),
-			userAgent: c.get('userAgent'),
-			requestId: c.get('requestId'),
-			path: c.req.path,
-			method: c.req.method,
-			component: 'auth-middleware',
-			operation: 'requireAuthOrApiKey',
-		},
-		reason: isApiKeyAuth
-			? 'Authentication required. Provide a valid API key.'
-			: 'Authentication required.',
-	})
-	// No authentication provided
-	throw new HTTPException(401, {
-		message: isApiKeyAuth
-			? 'Authentication required. Provide a valid API key.'
-			: 'Authentication required.',
-	})
+	// Otherwise, try session authentication
+	return requireAuth(c, next)
 })
 
 /**

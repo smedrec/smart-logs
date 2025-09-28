@@ -32,10 +32,8 @@ export const createGraphQLServer = () => {
 		schema,
 
 		// Context creation function
-		context: async ({ request, ...rest }): Promise<GraphQLContext> => {
-			// Extract Hono context from the request
-			const honoContext = (rest as any).context || (request as any).context
-
+		context: async ({ request, context: honoContext, ...rest }): Promise<GraphQLContext> => {
+			// Extract Hono context - it should be passed directly now
 			if (!honoContext) {
 				throw new Error('Hono context not available in GraphQL context')
 			}
@@ -121,12 +119,9 @@ export const graphqlServer = createGraphQLServer()
  * Helper function to handle GraphQL requests in Hono
  */
 export const handleGraphQLRequest = async (c: Context) => {
-	// Add Hono context to the request for GraphQL context creation
-	const request = c.req.raw
-	;(request as any).context = c
-
-	// Handle the GraphQL request
+	// Handle the GraphQL request with Hono context
 	return graphqlServer.handle({
-		request,
+		request: c.req.raw,
+		context: c, // Pass Hono context directly
 	})
 }
