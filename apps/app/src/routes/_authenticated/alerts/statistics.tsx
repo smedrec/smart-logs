@@ -1,15 +1,14 @@
-import { ComingSoon } from '@/components/coming-soon'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { Spinner } from '@/components/ui/spinner'
 import { useAuditContext } from '@/contexts/audit-provider'
-import { authStateCollection } from '@/lib/auth-client'
 import { transformSeverityData, transformTypeData } from '@/lib/charts'
 import { type AlertStatistics } from '@smedrec/audit-client'
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Pie, PieChart } from 'recharts'
+import { toast } from 'sonner'
 
 import type { ChartConfig } from '@/components/ui/chart'
 import type { SeverityDataItem, TypeDataItem } from '@/lib/charts'
@@ -19,20 +18,32 @@ export const Route = createFileRoute('/_authenticated/alerts/statistics')({
 })
 
 function RouteComponent() {
-	const { client, isConnected } = useAuditContext()
+	const [isLoading, setIsLoading] = useState(false)
 	const [statistics, setStatistics] = useState<AlertStatistics | null>(null)
 	const [severityData, setSeverityData] = useState<SeverityDataItem[]>([])
 	const [typeData, setTypeData] = useState<TypeDataItem[]>([])
-	const isLoading = false
+	const { client, isConnected } = useAuditContext()
 
 	useEffect(() => {
 		function getStats() {
 			if (!client) return
-			client.metrics.getAlertStatistics().then((statistics) => {
-				setStatistics(statistics)
-				setSeverityData(transformSeverityData(statistics.bySeverity))
-				setTypeData(transformTypeData(statistics.byType))
-			})
+			setIsLoading(true)
+			client.metrics
+				.getAlertStatistics()
+				.then((statistics) => {
+					setStatistics(statistics)
+					setSeverityData(transformSeverityData(statistics.bySeverity))
+					setTypeData(transformTypeData(statistics.byType))
+				})
+				.catch((error) => {
+					toast.error('Failed to get statistics', {
+						description: error.message,
+					})
+					console.error(error)
+				})
+				.finally(() => {
+					setIsLoading(false)
+				})
 		}
 		if (isConnected) {
 			getStats()
