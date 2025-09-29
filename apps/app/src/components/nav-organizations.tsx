@@ -16,7 +16,12 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from '@/components/ui/sidebar'
-import { authStateCollection, OrganizationsCollection } from '@/lib/auth-client'
+import {
+	activeOrganizationCollection,
+	authClient,
+	authStateCollection,
+	OrganizationsCollection,
+} from '@/lib/auth-client'
 import { useLiveQuery } from '@tanstack/react-db'
 import { Link } from '@tanstack/react-router'
 import { Folder, Forward, MoreHorizontal, PlusCircle, Trash2 } from 'lucide-react'
@@ -39,6 +44,18 @@ function NavOrganizations() {
 
 	const organizations = useMemo(() => organizationsData || [], [organizationsData])
 
+	/**useEffect(() => {
+		async function insertActiveOrganization() {
+			const { data: activeOrganization } = await authClient.organization.getFullOrganization()
+			if (!activeOrganization) return
+			activeOrganizationCollection.insert({ id: activeOrganization.slug, ...activeOrganization })
+		}
+		const activeOrganization = organizations.find((org) => org.id === activeOrganizationId)
+		if (activeOrganization && !activeOrganizationCollection.get(activeOrganization.slug)) {
+			insertActiveOrganization()
+		}
+	}, [activeOrganizationId, organizations])*/
+
 	const organizationsLoadError = organizationsError
 		? 'Error loading organizations: NetworkError: Unable to connect to the server. Please check if the server is running.'
 		: undefined
@@ -56,6 +73,7 @@ function NavOrganizations() {
 					return (
 						<SidebarMenuItem key={item.name}>
 							<SidebarMenuButton isActive={active} asChild>
+								{/** @ts-expect-error */}
 								<Link to={`/organizations/${item.slug}`}>
 									<Avatar className="h-4 w-4 rounded-full border border-background object-cover">
 										<AvatarImage src={item.logo || undefined} alt={item.name} />

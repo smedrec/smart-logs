@@ -26,7 +26,12 @@ function RouteComponent() {
 
 	useEffect(() => {
 		function getStats() {
-			if (!client) return
+			if (!client) {
+				toast.error('Failed to get statistics', {
+					description: 'No client available',
+				})
+				return
+			}
 			setIsLoading(true)
 			client.metrics
 				.getAlertStatistics()

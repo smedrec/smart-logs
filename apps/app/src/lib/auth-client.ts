@@ -23,6 +23,19 @@ const authStateSchema = z.object({
 	user: z.any().nullable(),
 })
 
+const activeOrganizationSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	slug: z.string(),
+	createdAt: z.date(),
+	logo: z.string().nullable(),
+	metadata: z.any().nullable(),
+	retentionDays: z.number(),
+	members: z.any().nullable(),
+	invitations: z.any().nullable(),
+	teams: z.any().nullable(),
+})
+
 type Organization = {
 	id: string
 	name: string
@@ -37,6 +50,14 @@ export const authStateCollection = createCollection(
 		id: `auth-state`,
 		getKey: (item) => item.id,
 		schema: authStateSchema,
+	})
+)
+
+export const activeOrganizationCollection = createCollection(
+	localOnlyCollectionOptions({
+		id: `active-organization`,
+		getKey: (item) => item.id,
+		schema: activeOrganizationSchema,
 	})
 )
 
@@ -57,7 +78,7 @@ export type ActiveOrganization =
 			members: {
 				id: string
 				organizationId: string
-				role: 'member' | 'admin' | 'owner'
+				role: 'member' | 'admin' | 'owner' | 'auditor' | 'officer' | 'developer'
 				createdAt: Date
 				userId: string
 				user: {
