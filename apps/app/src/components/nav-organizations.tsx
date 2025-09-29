@@ -16,21 +16,14 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from '@/components/ui/sidebar'
-import {
-	activeOrganizationCollection,
-	authClient,
-	authStateCollection,
-	OrganizationsCollection,
-} from '@/lib/auth-client'
+import { authStateCollection, OrganizationsCollection } from '@/lib/auth-client'
 import { useLiveQuery } from '@tanstack/react-db'
 import { Link } from '@tanstack/react-router'
 import { Folder, Forward, MoreHorizontal, PlusCircle, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Spinner } from './ui/spinner'
-
-import type { ActiveOrganization } from '@/lib/auth-client'
 
 function NavOrganizations() {
 	const { isMobile } = useSidebar()
@@ -43,18 +36,6 @@ function NavOrganizations() {
 	} = useLiveQuery((q) => q.from({ organization: OrganizationsCollection }))
 
 	const organizations = useMemo(() => organizationsData || [], [organizationsData])
-
-	/**useEffect(() => {
-		async function insertActiveOrganization() {
-			const { data: activeOrganization } = await authClient.organization.getFullOrganization()
-			if (!activeOrganization) return
-			activeOrganizationCollection.insert({ id: activeOrganization.slug, ...activeOrganization })
-		}
-		const activeOrganization = organizations.find((org) => org.id === activeOrganizationId)
-		if (activeOrganization && !activeOrganizationCollection.get(activeOrganization.slug)) {
-			insertActiveOrganization()
-		}
-	}, [activeOrganizationId, organizations])*/
 
 	const organizationsLoadError = organizationsError
 		? 'Error loading organizations: NetworkError: Unable to connect to the server. Please check if the server is running.'
