@@ -1,5 +1,5 @@
 import { electricCollectionOptions } from '@tanstack/electric-db-collection'
-import { createCollection } from '@tanstack/react-db'
+import { createCollection, createOptimisticAction } from '@tanstack/react-db'
 import { z } from 'zod'
 
 const AlertSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
@@ -45,3 +45,23 @@ export const recentAlertsCollection = (activeOrganizationId: string) =>
 			schema: AlertSchema,
 		})
 	)
+
+type ResolveAlertInput = {
+	id: string
+	resolutionNotes: string
+}
+const resolveAlert = createOptimisticAction<ResolveAlertInput>({
+	onMutate: (input) => {
+		return {
+			id: input.id,
+			resolutionNotes: input.resolutionNotes,
+		}
+	},
+	mutationFn: async (input, params) => {
+		const response = await fetch(`/api/alerts/${input.id}/resolve`, {
+			method: 'POST',
+			body: JSON.stringify(input),
+		})
+		return response.json()
+	},
+})
