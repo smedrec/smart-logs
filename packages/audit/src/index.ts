@@ -53,6 +53,7 @@ export {
 
 // Export compliance reporting services
 export * from './report/compliance-reporting.js'
+export * from './report/compliance-service.js'
 export * from './report/data-export.js'
 export * from './report/scheduled-reporting.js'
 

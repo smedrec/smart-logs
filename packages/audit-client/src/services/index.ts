@@ -22,23 +22,7 @@ export {
 } from './events'
 
 // Compliance Service - HIPAA, GDPR, and custom reporting
-export {
-	ComplianceService,
-	type ReportCriteria,
-	type ReportMetadata,
-	type HIPAASection,
-	type HIPAAReport,
-	type GDPRSection,
-	type GDPRReport,
-	type CustomReportParams,
-	type CustomReport,
-	type GdprExportParams,
-	type GdprExportResult,
-	type PseudonymizationParams,
-	type PseudonymizationResult,
-	type ReportTemplate,
-	type ReportDownloadOptions,
-} from './compliance'
+export { ComplianceService, type ReportDownloadOptions } from './compliance'
 
 // Scheduled Reports Service - Comprehensive scheduled report management
 export {

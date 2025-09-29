@@ -1,11 +1,18 @@
 import { z } from 'zod'
 
-import {
-	DateRangeFilterSchema,
-	PaginationMetadataSchema,
-	PaginationParamsSchema,
-	QueryFilterSchema,
-} from './api'
+/**
+ * Date range filter with validation
+ */
+export const DateRangeFilterSchema = z
+	.object({
+		startDate: z.string().datetime('Invalid start date format'),
+		endDate: z.string().datetime('Invalid end date format'),
+	})
+	.refine((data) => new Date(data.startDate) <= new Date(data.endDate), {
+		message: 'Start date must be before or equal to end date',
+		path: ['endDate'],
+	})
+export type DateRangeFilter = z.infer<typeof DateRangeFilterSchema>
 
 // ============================================================================
 // Compliance Report Types
