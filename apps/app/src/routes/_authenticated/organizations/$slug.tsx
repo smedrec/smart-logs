@@ -1,4 +1,4 @@
-//import { AuditPresets } from '@/components/organization/audit-presets'
+import { AuditPresets } from '@/components/organization/audit-presets'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { authClient } from '@/lib/auth-client'
 import { createFileRoute } from '@tanstack/react-router'
@@ -13,7 +13,7 @@ function RouteComponent() {
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">
 			<PageBreadcrumb link="Organization" page={organization?.name || slug} />
-			{/* <AuditPresets organizationSlug={slug} /> */}
+			<AuditPresets />
 		</div>
 	)
 }

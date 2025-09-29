@@ -35,7 +35,7 @@ function NavOrganizations() {
 		data: organizationsData,
 		isLoading: isLoadingOrganizations,
 		isError: organizationsError,
-	} = useLiveQuery((q) => q.from({ user: OrganizationsCollection }))
+	} = useLiveQuery((q) => q.from({ organization: OrganizationsCollection }))
 
 	const organizations = useMemo(() => organizationsData || [], [organizationsData])
 

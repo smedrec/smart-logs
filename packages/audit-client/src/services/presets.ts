@@ -281,7 +281,7 @@ export class PresetsService extends BaseResource {
 			query: params,
 		}
 
-		return this.request<PaginatedAuditPresets>('/audit-presets', options)
+		return this.request<PaginatedAuditPresets>('/compliance/audit-presets', options)
 	}
 
 	/**
