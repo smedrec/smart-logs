@@ -36,5 +36,12 @@
 		}
 	},
 	"include": ["src/**/*.ts"],
-	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts", "examples/**/*"]
+	"exclude": [
+		"node_modules",
+		"dist",
+		"**/*.test.ts",
+		"**/*.spec.ts",
+		"examples/**/*",
+		"src/examples/**/*"
+	]
 }

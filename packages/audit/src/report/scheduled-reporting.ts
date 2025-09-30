@@ -715,9 +715,14 @@ export class ScheduledReportingService {
 			format: overrides.format || template.defaultFormat,
 			schedule: overrides.schedule || {
 				frequency: 'monthly',
-				dayOfMonth: 1,
-				time: '09:00',
 				timezone: 'UTC',
+				hour: 9,
+				minute: 0,
+				dayOfMonth: 1,
+				skipWeekends: false,
+				skipHolidays: false,
+				maxMissedRuns: 3,
+				catchUpMissedRuns: false,
 			},
 			delivery: overrides.delivery || {
 				method: 'email',
@@ -883,20 +888,30 @@ export class ScheduledReportingService {
 
 	private calculateNextRun(schedule: ScheduledReportConfig['schedule']): string {
 		const now = new Date()
-		const [hours, minutes] = schedule.time.split(':').map(Number)
+		const hours = schedule.hour
+		const minutes = schedule.minute
 
 		let nextRun = new Date(now)
 		nextRun.setHours(hours, minutes, 0, 0)
 
+		if (schedule.timezone) {
+			// Note: Proper timezone handling would require a library like 'luxon' or 'date-fns-tz'
+			// This is a placeholder implementation assuming server is in UTC
+			// In production, convert 'nextRun' to the specified timezone
+		}
+
 		// If the time has already passed today, move to the next occurrence
 		if (nextRun <= now) {
 			switch (schedule.frequency) {
+				case 'hourly':
+					nextRun.setHours(nextRun.getHours() + 1)
+					break
 				case 'daily':
 					nextRun.setDate(nextRun.getDate() + 1)
 					break
 				case 'weekly': {
-					const targetDay = schedule.dayOfWeek || 1 // Default to Monday
-					const currentDay = nextRun.getDay()
+					const targetDay = Number(schedule.dayOfWeek ?? 0) // Default to Sunday
+					const currentDay = Number(nextRun.getDay())
 					const daysUntilTarget = (targetDay - currentDay + 7) % 7 || 7
 					nextRun.setDate(nextRun.getDate() + daysUntilTarget)
 					break
@@ -909,6 +924,15 @@ export class ScheduledReportingService {
 				case 'quarterly':
 					nextRun.setMonth(nextRun.getMonth() + 3, schedule.dayOfMonth || 1)
 					break
+				case 'yearly':
+					nextRun.setFullYear(
+						nextRun.getFullYear() + 1,
+						schedule.monthOfYear || 1,
+						schedule.dayOfMonth || 1
+					)
+					break
+				default:
+					throw new Error(`Unsupported schedule frequency: ${schedule.frequency}`)
 			}
 		}
 

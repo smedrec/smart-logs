@@ -75,21 +75,21 @@ export const ScheduleConfigSchema = z
 		cronExpression: CronExpressionSchema.optional(),
 		startDate: z.string().datetime().optional(),
 		endDate: z.string().datetime().optional(),
-		timezone: TimezoneSchema.default('UTC'),
+		timezone: TimezoneSchema, //.default('UTC'),
 
 		// For specific frequencies
-		hour: z.number().int().min(0).max(23),
-		minute: z.number().int().min(0).max(59).default(0),
+		hour: z.number().int().min(0).max(23), //.default(0),
+		minute: z.number().int().min(0).max(59), //.default(0),
 		dayOfWeek: DayOfWeekSchema.optional(),
 		dayOfMonth: z.number().int().min(1).max(31).optional(),
 		monthOfYear: z.number().int().min(1).max(12).optional(),
 
 		// Advanced options
-		skipWeekends: z.boolean().default(false),
-		skipHolidays: z.boolean().default(false),
+		skipWeekends: z.boolean(), //.default(false),
+		skipHolidays: z.boolean(), //.default(false),
 		holidayCalendar: z.string().optional(),
-		maxMissedRuns: z.number().int().min(0).max(100).default(3),
-		catchUpMissedRuns: z.boolean().default(false),
+		maxMissedRuns: z.number().int().min(0).max(100), //.default(3),
+		catchUpMissedRuns: z.boolean(), //.default(false),
 	})
 	.refine(
 		(data) => {
@@ -143,13 +143,13 @@ export const DeliveryConfigSchema = z
 		webhook: z
 			.object({
 				url: z.string().url(),
-				method: z.enum(['POST', 'PUT']).default('POST'),
+				method: z.enum(['POST', 'PUT']), //.default('POST'),
 				headers: z.record(z.string(), z.string()).optional(),
-				timeout: z.number().int().min(1000).max(300000).default(30000),
+				timeout: z.number().int().min(1000).max(300000), //.default(30000),
 				retryConfig: z.object({
-					maxRetries: z.number().int().min(0).max(5).default(3),
-					backoffMultiplier: z.number().int().min(1).max(10).default(2),
-					maxBackoffDelay: z.number().int().min(1000).max(300000).default(30000),
+					maxRetries: z.number().int().min(0).max(5), //.default(3),
+					backoffMultiplier: z.number().int().min(1).max(10), //.default(2),
+					maxBackoffDelay: z.number().int().min(1000).max(300000), //.default(30000),
 				}),
 			})
 			.optional(),
@@ -158,7 +158,7 @@ export const DeliveryConfigSchema = z
 		sftp: z
 			.object({
 				host: z.string(),
-				port: z.number().int().min(1).max(65535).default(22),
+				port: z.number().int().min(1).max(65535), //.default(22),
 				username: z.string().optional(),
 				password: z.string().optional(),
 				privateKey: z.string().optional(),
@@ -174,7 +174,7 @@ export const DeliveryConfigSchema = z
 				config: z.record(z.string(), z.any()).optional(),
 				retention: z.object({
 					days: z.number().int().min(1).max(365),
-					autoCleanup: z.boolean().default(true),
+					autoCleanup: z.boolean(), //.default(true),
 				}),
 			})
 			.optional()
@@ -192,13 +192,13 @@ export const DeliveryConfigSchema = z
 
 		download: z
 			.object({
-				expiryHours: z.number().int().min(1).max(168).default(24),
+				expiryHours: z.number().int().min(1).max(168), //.default(24),
 			})
 			.optional(),
 
 		// General options
-		compression: z.enum(['none', 'gzip', 'zip']).default('none'),
-		encryption: z.boolean().default(false),
+		compression: z.enum(['none', 'gzip', 'zip']), //.default('none'),
+		encryption: z.boolean(), //.default(false),
 		encryptionKey: z.string().optional(),
 		retentionDays: z.number().int().min(1).max(365).optional(),
 	})
@@ -231,10 +231,10 @@ export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>
  */
 export const NotificationConfigSchema = z.object({
 	recipients: z.array(z.string().email()),
-	onSuccess: z.boolean().default(false),
-	onFailure: z.boolean().default(true),
-	onSkip: z.boolean().default(false),
-	includeReport: z.boolean().default(false),
+	onSuccess: z.boolean(), //.default(false),
+	onFailure: z.boolean(), //.default(true),
+	onSkip: z.boolean(), //.default(false),
+	includeReport: z.boolean(), //.default(false),
 	customMessage: z.string().optional(),
 })
 export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
@@ -243,7 +243,7 @@ export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
  * Scheduled report
  */
 export const ScheduledReportSchema = z.object({
-	id: z.string(),
+	id: z.string().startsWith('report-'),
 	name: z.string().min(1, 'Report name is required').max(255),
 	description: z.string().max(1000).optional(),
 	organizationId: z.string().min(1, 'Organization ID is required'),
@@ -257,7 +257,7 @@ export const ScheduledReportSchema = z.object({
 	notifications: NotificationConfigSchema.optional(),
 
 	// Status and metadata
-	enabled: z.boolean().default(true),
+	enabled: z.boolean(), //.default(true),
 	createdAt: z.string().datetime(),
 	updatedAt: z.string().datetime(),
 	createdBy: z.string().min(1),
@@ -266,15 +266,15 @@ export const ScheduledReportSchema = z.object({
 	// Execution tracking
 	lastRun: z.string().datetime().optional(),
 	nextRun: z.string().datetime(),
-	executionCount: z.number().int().min(0).default(0),
-	successCount: z.number().int().min(0).default(0),
-	failureCount: z.number().int().min(0).default(0),
+	executionCount: z.number().int().min(0), //.default(0),
+	successCount: z.number().int().min(0), //.default(0),
+	failureCount: z.number().int().min(0), //.default(0),
 	runId: z.string().optional(),
 
 	// Configuration
-	tags: z.array(z.string()).default([]),
+	tags: z.array(z.string()), //.default([]),
 	metadata: z.record(z.unknown()).optional(),
-	version: z.number().int().min(1).default(1),
+	version: z.number().int().min(1), //.default(1),
 })
 export type ScheduledReport = z.infer<typeof ScheduledReportSchema>
 
@@ -361,7 +361,7 @@ export type DeliveryAttempt = z.infer<typeof DeliveryAttemptSchema>
  * Report execution
  */
 export const ReportExecutionSchema = z.object({
-	id: z.string(),
+	id: z.string().startsWith('execution-'),
 	scheduledReportId: z.string(),
 	status: ExecutionStatusSchema,
 	trigger: ExecutionTriggerSchema,

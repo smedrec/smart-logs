@@ -276,11 +276,29 @@ export interface ScheduledReportConfig {
 	criteria: ReportCriteria
 	format: ReportFormat
 	schedule: {
-		frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly'
-		dayOfWeek?: number // 0-6 for weekly
-		dayOfMonth?: number // 1-31 for monthly
-		time: string // HH:MM format
-		timezone?: string
+		frequency:
+			| 'custom'
+			| 'once'
+			| 'hourly'
+			| 'daily'
+			| 'weekly'
+			| 'monthly'
+			| 'quarterly'
+			| 'yearly'
+		timezone: string
+		hour: number
+		minute: number
+		skipWeekends: boolean
+		skipHolidays: boolean
+		maxMissedRuns: number
+		catchUpMissedRuns: boolean
+		startDate?: string
+		endDate?: string
+		cronExpression?: string
+		dayOfWeek?: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+		dayOfMonth?: number
+		monthOfYear?: number
+		holidayCalendar?: string
 	}
 	delivery: {
 		method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
