@@ -45,9 +45,9 @@ export interface DeliveryAttempt {
 	attemptId: string
 	timestamp: string
 	status: DeliveryStatus
-	method: 'email' | 'webhook' | 'storage'
+	method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
 	target: string
-	error?: string
+	error?: Error | string
 	responseCode?: number
 	responseTime?: number
 	retryCount: number
@@ -58,16 +58,17 @@ export interface DeliveryAttempt {
  */
 export interface ReportExecution {
 	executionId: string
-	reportConfigId: string
+	scheduledReportId: string
 	scheduledTime: string
 	executionTime: string
-	status: 'running' | 'completed' | 'failed'
+	status: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending' | 'skipped' | 'timeout'
+	trigger?: 'manual' | 'scheduled' | 'retry' | 'api' | 'catchup'
 	duration?: number
 	recordsProcessed?: number
 	exportResult?: ExportResult
 	integrityReport?: IntegrityVerificationReport
 	deliveryAttempts: DeliveryAttempt[]
-	error?: string
+	error?: Error | string
 }
 
 /**
@@ -97,6 +98,7 @@ export interface ReportTemplate {
  * Delivery configuration for different methods
  */
 export interface DeliveryConfig {
+	method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
 	email?: {
 		smtpConfig: {
 			host: string
@@ -134,6 +136,26 @@ export interface DeliveryConfig {
 			autoCleanup: boolean
 		}
 	}
+
+	sftp?: {
+		host: string
+		port: number
+		username?: string
+		password?: string
+		privateKey?: string
+		path: string
+		filename?: string
+	}
+
+	download?: {
+		expiryHours: number
+	}
+
+	// General options
+	compression?: 'none' | 'gzip' | 'zip'
+	encryption?: boolean
+	encryptionKey?: string
+	retentionDays?: number
 }
 
 /**
@@ -305,7 +327,7 @@ export class ScheduledReportingService {
 		await this.unscheduleReport(reportId)
 
 		// Delete related executions first (foreign key constraint)
-		await db.delete(reportExecutions).where(eq(reportExecutions.reportConfigId, reportId))
+		await db.delete(reportExecutions).where(eq(reportExecutions.scheduledReportId, reportId))
 
 		// Delete the scheduled report
 		await db.delete(scheduledReports).where(eq(scheduledReports.id, reportId))
@@ -396,10 +418,11 @@ export class ScheduledReportingService {
 
 		const execution: ReportExecution = {
 			executionId,
-			reportConfigId: reportId,
+			scheduledReportId: reportId,
 			scheduledTime: now,
 			executionTime: now,
 			status: 'running',
+			trigger: 'scheduled',
 			deliveryAttempts: [],
 		}
 
@@ -409,12 +432,13 @@ export class ScheduledReportingService {
 			// Insert execution record
 			const dbExecution = {
 				id: executionId,
-				reportConfigId: reportId,
+				scheduledReportId: reportId,
 				organizationId: (config as any).organizationId || 'unknown',
 				runId: config.runId,
 				scheduledTime: now,
 				executionTime: now,
 				status: 'running' as const,
+				trigger: 'scheduled' as const,
 				duration: null,
 				recordsProcessed: null,
 				exportResult: null,
@@ -496,7 +520,7 @@ export class ScheduledReportingService {
 				db
 					.select()
 					.from(reportExecutions)
-					.where(eq(reportExecutions.reportConfigId, reportId))
+					.where(eq(reportExecutions.scheduledReportId, reportId))
 					.orderBy(desc(reportExecutions.executionTime))
 					.limit(limit),
 			{ cacheKey: `report-executions-${reportId}-${limit}` }
@@ -504,10 +528,11 @@ export class ScheduledReportingService {
 
 		return records.map((record) => ({
 			executionId: record.id,
-			reportConfigId: record.reportConfigId,
+			scheduledReportId: record.scheduledReportId,
 			scheduledTime: record.scheduledTime,
 			executionTime: record.executionTime,
 			status: record.status as 'running' | 'completed' | 'failed',
+			trigger: record.trigger as 'manual' | 'scheduled' | 'retry' | 'api' | 'catchup',
 			duration: record.duration || undefined,
 			recordsProcessed: record.recordsProcessed || undefined,
 			exportResult: (record.exportResult as ExportResult) || undefined,
@@ -734,10 +759,11 @@ export class ScheduledReportingService {
 			if (failedAttempts.length > 0) {
 				const execution: ReportExecution = {
 					executionId: executionRecord.id,
-					reportConfigId: executionRecord.reportConfigId,
+					scheduledReportId: executionRecord.scheduledReportId,
 					scheduledTime: executionRecord.scheduledTime,
 					executionTime: executionRecord.executionTime,
 					status: executionRecord.status as 'running' | 'completed' | 'failed',
+					trigger: executionRecord.trigger as 'manual' | 'scheduled' | 'retry' | 'api' | 'catchup',
 					duration: executionRecord.duration || undefined,
 					recordsProcessed: executionRecord.recordsProcessed || undefined,
 					exportResult: (executionRecord.exportResult as ExportResult) || undefined,
@@ -909,6 +935,12 @@ export class ScheduledReportingService {
 				case 'storage':
 					await this.deliverViaStorage(config.delivery, reportResult, deliveryAttempt)
 					break
+				case 'sftp':
+				case 'download':
+					console.warn(`Delivery method ${config.delivery.method} not yet implemented`)
+					deliveryAttempt.status = 'failed'
+					deliveryAttempt.error = `Delivery method ${config.delivery.method} not yet implemented`
+					throw new Error(deliveryAttempt.error)
 				default:
 					throw new Error(`Unsupported delivery method: ${config.delivery.method}`)
 			}
@@ -953,7 +985,7 @@ export class ScheduledReportingService {
 	}
 
 	private async retryDelivery(execution: ReportExecution, attempt: DeliveryAttempt): Promise<void> {
-		const config = await this.getScheduledReport(execution.reportConfigId)
+		const config = await this.getScheduledReport(execution.scheduledReportId)
 		if (!config || !execution.exportResult) return
 
 		attempt.retryCount++

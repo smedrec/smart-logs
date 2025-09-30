@@ -538,7 +538,7 @@ export const reportExecutions = pgTable(
 	'report_executions',
 	{
 		id: varchar('id', { length: 255 }).primaryKey(), // executionId
-		reportConfigId: varchar('report_config_id', { length: 255 })
+		scheduledReportId: varchar('scheduled_report_id', { length: 255 })
 			.references(() => scheduledReports.id)
 			.notNull(),
 		organizationId: varchar('organization_id', { length: 255 }).notNull(),
@@ -546,12 +546,13 @@ export const reportExecutions = pgTable(
 		scheduledTime: timestamp('scheduled_time', { withTimezone: true, mode: 'string' }).notNull(),
 		executionTime: timestamp('execution_time', { withTimezone: true, mode: 'string' }).notNull(),
 		status: varchar('status', { length: 20 }).notNull(), // running, completed, failed
+		trigger: varchar('trigger', { length: 20 }).notNull(), // scheduled, manual
 		duration: integer('duration'), // in milliseconds
 		recordsProcessed: integer('records_processed'),
 		exportResult: jsonb('export_result'), // ExportResult as JSON
 		integrityReport: jsonb('integrity_report'), // IntegrityVerificationReport as JSON
 		deliveryAttempts: jsonb('delivery_attempts').notNull().default('[]'), // Array of DeliveryAttempt
-		error: text('error'),
+		error: text('error'), // TODO: alter to jsonb
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
 			.notNull()
 			.defaultNow(),
@@ -559,17 +560,19 @@ export const reportExecutions = pgTable(
 	(table) => {
 		return [
 			// Primary indexes
-			index('report_executions_report_config_id_idx').on(table.reportConfigId),
+			index('report_executions_scheduled_report_id_idx').on(table.scheduledReportId),
 			index('report_executions_organization_id_idx').on(table.organizationId),
 			index('report_executions_status_idx').on(table.status),
+			index('report_executions_trigger_idx').on(table.trigger),
 			index('report_executions_scheduled_time_idx').on(table.scheduledTime),
 			index('report_executions_execution_time_idx').on(table.executionTime),
 			index('report_executions_created_at_idx').on(table.createdAt),
 
 			// Composite indexes for common queries
 			index('report_executions_org_status_idx').on(table.organizationId, table.status),
+			index('report_executions_org_trigger_idx').on(table.organizationId, table.trigger),
 			index('report_executions_config_execution_time_idx').on(
-				table.reportConfigId,
+				table.scheduledReportId,
 				table.executionTime
 			),
 			index('report_executions_org_execution_time_idx').on(

@@ -291,7 +291,7 @@ export type IntegrityVerificationResult = z.infer<typeof IntegrityVerificationRe
 /**
  * Export format types
  */
-export const ExportFormatSchema = z.enum(['json', 'csv', 'xml', 'parquet', 'avro'])
+export const ExportFormatSchema = z.enum(['json', 'csv', 'xml', 'pdf', 'parquet', 'avro'])
 export type ExportFormat = z.infer<typeof ExportFormatSchema>
 
 /**
@@ -330,10 +330,11 @@ export type ExportEventsParams = z.infer<typeof ExportEventsParamsSchema>
  * Export result with validation
  */
 export const ExportResultSchema = z.object({
-	exportId: z.string().uuid(),
+	exportId: z.string(),
+	format: ExportFormatSchema,
 	recordCount: z.number().int().min(0),
 	dataSize: z.number().int().min(0),
-	format: ExportFormatSchema,
+
 	exportTimestamp: z.string().datetime(),
 	downloadUrl: z.string().url().optional(),
 	expiresAt: z.string().datetime().optional(),

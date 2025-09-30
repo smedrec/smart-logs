@@ -64,6 +64,20 @@
       "when": 1758225267905,
       "tag": "0008_swift_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1759198784743,
+      "tag": "0009_ambiguous_carnage",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1759202350488,
+      "tag": "0010_thin_revanche",
+      "breakpoints": true
     }
   ]
 }

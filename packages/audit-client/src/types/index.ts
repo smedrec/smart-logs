@@ -14,12 +14,16 @@ import type {
 	QueryAuditEventsParams,
 } from './api'
 import type {
+	ComplianceReportEvent,
 	CustomReport,
 	GdprExportResult,
 	GDPRReport,
 	HIPAAReport,
+	IntegrityFailure,
+	IntegrityVerificationReport,
 	PseudonymizationResult,
 	ReportCriteria,
+	SuspiciousPattern,
 } from './compliance'
 import type {
 	Alert,
@@ -38,6 +42,8 @@ import type {
 } from './presets'
 import type {
 	CreateScheduledReportInput,
+	DeliveryAttempt,
+	DeliveryStatus,
 	PaginatedExecutions,
 	ReportExecution,
 	ScheduledReport,

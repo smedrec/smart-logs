@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import {
+	DataClassificationSchema,
 	DateRangeFilterSchema,
 	PaginationMetadataSchema,
 	PaginationParamsSchema,
@@ -99,6 +100,32 @@ export const HIPAAComplianceStatusSchema = z.enum([
 	'unknown',
 ])
 export type HIPAAComplianceStatus = z.infer<typeof HIPAAComplianceStatusSchema>
+
+/**
+ * Simplified event structure for compliance reports
+ */
+export const ComplianceReportEventSchema = z.object({
+	id: z.string().uuid(),
+	timestamp: z.string().datetime(),
+	principalId: z.string().min(1),
+	organizationId: z.string().min(1),
+	action: z.string().min(1),
+	targetResourceType: z.string().min(1),
+	targetResourceId: z.string().optional(),
+	status: z.enum(['attempt', 'success', 'failure']),
+	outcomeDescription: z.string().optional(),
+	dataClassification: DataClassificationSchema,
+	sessionContext: z
+		.object({
+			ipAddress: z.string().ip(),
+			userAgent: z.string().min(1),
+			sessionId: z.string().min(1),
+		})
+		.optional(),
+	integrityStatus: z.enum(['verified', 'failed', 'not_checked']).optional(),
+	correlationId: z.string().optional(),
+})
+export type ComplianceReportEvent = z.infer<typeof ComplianceReportEventSchema>
 
 /**
  * HIPAA section
@@ -387,6 +414,58 @@ export const GdprExportResultSchema = z.object({
 		.optional(),
 })
 export type GdprExportResult = z.infer<typeof GdprExportResultSchema>
+
+/**
+ * Integrity verification failure details
+ */
+export const IntegrityFailureSchema = z.object({
+	eventId: z.string(),
+	timestamp: z.string().datetime(),
+	expectedHash: z.string(),
+	actualHash: z.string(),
+	hashAlgorithm: z.string(),
+	failureReason: z.string(),
+	severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+})
+export type IntegrityFailure = z.infer<typeof IntegrityFailureSchema>
+
+/**
+ * Audit trail verification report
+ */
+export const IntegrityVerificationReportSchema = z.object({
+	verificationId: z.string(),
+	verifiedAt: z.string().datetime(),
+	verifiedBy: z.string().optional(),
+	results: z.object({
+		totalEvents: z.number().int().min(0),
+		verifiedEvents: z.number().int().min(0),
+		failedVerifications: z.number().int().min(0),
+		unverifiedEvents: z.number().int().min(0),
+		verificationRate: z.number().min(0).max(100),
+	}),
+	failures: z.array(IntegrityFailureSchema),
+	statistics: z.object({
+		hashAlgorithms: z.record(z.string(), z.number()),
+		verificationLatency: z.object({
+			average: z.number().min(0),
+			median: z.number().min(0),
+			p95: z.number().min(0),
+		}),
+	}),
+})
+export type IntegrityVerificationReport = z.infer<typeof IntegrityVerificationReportSchema>
+
+/**
+ * Suspicious pattern detection result
+ */
+export const SuspiciousPatternSchema = z.object({
+	patternType: z.string(),
+	description: z.string(),
+	events: z.array(ComplianceReportEventSchema),
+	riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+	recommendation: z.string(),
+})
+export type SuspiciousPattern = z.infer<typeof SuspiciousPatternSchema>
 
 // ============================================================================
 // Pseudonymization Types

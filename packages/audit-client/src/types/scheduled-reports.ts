@@ -1,7 +1,12 @@
 import { z } from 'zod'
 
-import { PaginationMetadataSchema, PaginationParamsSchema } from './api'
-import { ReportCriteriaSchema, ReportFormatSchema, ReportTypeSchema } from './compliance'
+import { ExportResultSchema, PaginationMetadataSchema, PaginationParamsSchema } from './api'
+import {
+	IntegrityVerificationReportSchema,
+	ReportCriteriaSchema,
+	ReportFormatSchema,
+	ReportTypeSchema,
+} from './compliance'
 
 // ============================================================================
 // Scheduled Report Types
@@ -111,31 +116,85 @@ export type ScheduleConfig = z.infer<typeof ScheduleConfigSchema>
  */
 export const DeliveryConfigSchema = z
 	.object({
-		method: z.enum(['email', 'webhook', 'sftp', 's3', 'download']),
+		method: z.enum(['email', 'webhook', 'sftp', 'storage', 'download']),
 
 		// Email delivery
-		recipients: z.array(z.string().email()).optional(),
-		subject: z.string().optional(),
-		body: z.string().optional(),
-		attachmentName: z.string().optional(),
+		email: z
+			.object({
+				smtpConfig: z.object({
+					host: z.string(),
+					port: z.number(),
+					secure: z.boolean(),
+					auth: z.object({
+						user: z.string(),
+						pass: z.string(),
+					}),
+				}),
+				from: z.string().email(),
+				replyTo: z.string().email().optional(),
+				subject: z.string(),
+				bodyTemplate: z.string().optional(),
+				attachmentName: z.string().optional(),
+				recipients: z.array(z.string().email()).optional(),
+			})
+			.optional(),
 
 		// Webhook delivery
-		webhookUrl: z.string().url().optional(),
-		webhookHeaders: z.record(z.string()).optional(),
-		webhookTimeout: z.number().int().min(1000).max(300000).default(30000),
-		webhookRetries: z.number().int().min(0).max(5).default(3),
+		webhook: z
+			.object({
+				url: z.string().url(),
+				method: z.enum(['POST', 'PUT']).default('POST'),
+				headers: z.record(z.string(), z.string()).optional(),
+				timeout: z.number().int().min(1000).max(300000).default(30000),
+				retryConfig: z.object({
+					maxRetries: z.number().int().min(0).max(5).default(3),
+					backoffMultiplier: z.number().int().min(1).max(10).default(2),
+					maxBackoffDelay: z.number().int().min(1000).max(300000).default(30000),
+				}),
+			})
+			.optional(),
 
 		// SFTP delivery
-		sftpHost: z.string().optional(),
-		sftpPort: z.number().int().min(1).max(65535).default(22),
-		sftpUsername: z.string().optional(),
-		sftpPath: z.string().optional(),
-		sftpFilename: z.string().optional(),
+		sftp: z
+			.object({
+				host: z.string(),
+				port: z.number().int().min(1).max(65535).default(22),
+				username: z.string().optional(),
+				password: z.string().optional(),
+				privateKey: z.string().optional(),
+				path: z.string(),
+				filename: z.string().optional(),
+			})
+			.optional(),
 
-		// S3 delivery
-		s3Bucket: z.string().optional(),
-		s3Key: z.string().optional(),
-		s3Region: z.string().optional(),
+		// Storage delivery
+		storage: z
+			.object({
+				provider: z.enum(['local', 's3', 'azure', 'gcp']),
+				config: z.record(z.string(), z.any()).optional(),
+				retention: z.object({
+					days: z.number().int().min(1).max(365),
+					autoCleanup: z.boolean().default(true),
+				}),
+			})
+			.optional()
+			.transform((data) => {
+				if (data?.provider === 'local') {
+					return {
+						provider: 'local',
+						config: {
+							basePath: '/tmp/smart-reports',
+						},
+					}
+				}
+				return data
+			}),
+
+		download: z
+			.object({
+				expiryHours: z.number().int().min(1).max(168).default(24),
+			})
+			.optional(),
 
 		// General options
 		compression: z.enum(['none', 'gzip', 'zip']).default('none'),
@@ -148,13 +207,15 @@ export const DeliveryConfigSchema = z
 			// Validate required fields based on delivery method
 			switch (data.method) {
 				case 'email':
-					return data.recipients && data.recipients.length > 0
+					return data.email?.recipients && data.email.recipients.length > 0
 				case 'webhook':
-					return !!data.webhookUrl
+					return !!data.webhook?.url
 				case 'sftp':
-					return !!(data.sftpHost && data.sftpUsername && data.sftpPath)
-				case 's3':
-					return !!(data.s3Bucket && data.s3Key)
+					return !!(data.sftp?.host && data.sftp.path)
+				case 'storage':
+					return !!(data.storage?.provider && data.storage?.config)
+				case 'download':
+					return !!data.download?.expiryHours
 				default:
 					return true
 			}
@@ -193,11 +254,11 @@ export const ScheduledReportSchema = z.object({
 	notifications: NotificationConfigSchema.optional(),
 
 	// Status and metadata
-	enabled: z.boolean().default(true),
+	isActive: z.boolean().default(true),
 	createdAt: z.string().datetime(),
 	updatedAt: z.string().datetime(),
 	createdBy: z.string().min(1),
-	lastModifiedBy: z.string().min(1),
+	updatedBy: z.string().min(1),
 
 	// Execution tracking
 	lastExecuted: z.string().datetime().optional(),
@@ -262,25 +323,56 @@ export const ExecutionTriggerSchema = z.enum(['scheduled', 'manual', 'api', 'ret
 export type ExecutionTrigger = z.infer<typeof ExecutionTriggerSchema>
 
 /**
+ * Delivery Status
+ */
+export const DeliveryStatusSchema = z.enum(['pending', 'delivered', 'failed', 'skipped'])
+export type DeliveryStatus = z.infer<typeof DeliveryStatusSchema>
+
+/**
+ * Delivery attempt record
+ */
+export const DeliveryAttemptSchema = z.object({
+	attemptId: z.string(),
+	timestamp: z.string().datetime(),
+	status: DeliveryStatusSchema,
+	method: z.enum(['email', 'webhook', 'storage', 'download', 'sftp']),
+	target: z.string(),
+	error: z
+		.object({
+			code: z.string(),
+			message: z.string(),
+			details: z.record(z.unknown()).optional(),
+			stackTrace: z.string().optional(),
+		})
+		.optional(),
+	responseCode: z.number().optional(),
+	responseTime: z.number().optional(),
+	retryCount: z.number().int().min(0),
+})
+export type DeliveryAttempt = z.infer<typeof DeliveryAttemptSchema>
+
+/**
  * Report execution
  */
 export const ReportExecutionSchema = z.object({
 	id: z.string(),
-	scheduledReportId: z.string().uuid(),
+	scheduledReportId: z.string(),
 	status: ExecutionStatusSchema,
 	trigger: ExecutionTriggerSchema,
 
 	// Timing
-	scheduledAt: z.string().datetime(),
-	startedAt: z.string().datetime().optional(),
-	completedAt: z.string().datetime().optional(),
+	scheduledTime: z.string().datetime(),
+	executionTime: z.string().datetime().optional(),
 	duration: z.number().min(0).optional(),
 
 	// Results
 	reportId: z.string().optional(),
-	recordCount: z.number().int().min(0).optional(),
-	fileSize: z.number().int().min(0).optional(),
-	downloadUrl: z.string().url().optional(),
+	recordsProcessed: z.number().int().min(0).optional(),
+	exportResult: ExportResultSchema.optional(),
+	integrityReport: IntegrityVerificationReportSchema.optional(),
+
+	// Delivery tracking
+	deliveryAttempts: z.array(DeliveryAttemptSchema),
 
 	// Error handling
 	error: z
@@ -292,14 +384,8 @@ export const ReportExecutionSchema = z.object({
 		})
 		.optional(),
 
-	// Delivery tracking
-	deliveryStatus: z.enum(['pending', 'delivered', 'failed', 'skipped']).optional(),
-	deliveryAttempts: z.number().int().min(0).default(0),
-	lastDeliveryAttempt: z.string().datetime().optional(),
-	deliveryError: z.string().optional(),
-
 	// Metadata
-	executedBy: z.string().optional(),
+	/**executedBy: z.string().optional(),
 	metadata: z.record(z.unknown()).optional(),
 	logs: z
 		.array(
@@ -310,7 +396,7 @@ export const ReportExecutionSchema = z.object({
 				details: z.record(z.unknown()).optional(),
 			})
 		)
-		.optional(),
+		.optional(),*/
 })
 export type ReportExecution = z.infer<typeof ReportExecutionSchema>
 

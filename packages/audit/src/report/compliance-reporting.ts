@@ -238,7 +238,7 @@ export interface SuspiciousPattern {
 /**
  * Report export format options
  */
-export type ReportFormat = 'json' | 'csv' | 'xml' | 'pdf'
+export type ReportFormat = 'json' | 'csv' | 'xml' | 'pdf' | 'parquet' | 'avro'
 
 /**
  * Export configuration
@@ -247,7 +247,7 @@ export interface ExportConfig {
 	format: ReportFormat
 	includeMetadata?: boolean
 	includeIntegrityReport?: boolean
-	compression?: 'none' | 'gzip' | 'zip'
+	compression?: 'none' | 'gzip' | 'zip' | 'bzip2'
 	encryption?: {
 		enabled: boolean
 		algorithm?: string
@@ -274,7 +274,7 @@ export interface ScheduledReportConfig {
 		timezone?: string
 	}
 	delivery: {
-		method: 'email' | 'webhook' | 'storage'
+		method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
 		recipients?: string[]
 		webhookUrl?: string
 		storageLocation?: string
