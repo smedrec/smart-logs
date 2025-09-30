@@ -273,7 +273,7 @@ export const ScheduledReportSchema = z.object({
 
 	// Configuration
 	tags: z.array(z.string()), //.default([]),
-	metadata: z.record(z.unknown()).optional(),
+	metadata: z.record(z.string(), z.any()).optional(),
 	version: z.number().int().min(1), //.default(1),
 })
 export type ScheduledReport = z.infer<typeof ScheduledReportSchema>
@@ -281,26 +281,43 @@ export type ScheduledReport = z.infer<typeof ScheduledReportSchema>
 /**
  * Create scheduled report input
  */
-export const CreateScheduledReportInputSchema = ScheduledReportSchema.omit({
-	id: true,
-	organizationId: true,
-	enabled: true,
-	createdAt: true,
-	updatedAt: true,
-	lastRun: true,
-	nextRun: true,
-	executionCount: true,
-	successCount: true,
-	failureCount: true,
-	version: true,
+export const CreateScheduledReportInputSchema = z.object({
+	name: z.string().min(1, 'Report name is required').max(255),
+	description: z.string().max(1000).optional(),
+	templateId: z.string().optional(),
+	reportType: ReportTypeSchema,
+	criteria: ReportCriteriaSchema,
+	format: ReportFormatSchema,
+	schedule: ScheduleConfigSchema,
+	delivery: DeliveryConfigSchema,
+	export: ExportResultSchema,
+	notifications: NotificationConfigSchema.optional(),
+	createdBy: z.string().min(1),
+	updatedBy: z.string().min(1),
+	runId: z.string().optional(),
+	tags: z.array(z.string()).default([]),
+	metadata: z.record(z.unknown()).optional(),
 })
 export type CreateScheduledReportInput = z.infer<typeof CreateScheduledReportInputSchema>
 
 /**
  * Update scheduled report input
  */
-export const UpdateScheduledReportInputSchema = CreateScheduledReportInputSchema.partial().extend({
+export const UpdateScheduledReportInputSchema = z.object({
+	name: z.string().min(1, 'Report name is required').max(255).optional(),
+	description: z.string().max(1000).optional(),
+	templateId: z.string().optional(),
+	reportType: ReportTypeSchema.optional(),
+	criteria: ReportCriteriaSchema.optional(),
+	format: ReportFormatSchema.optional(),
+	schedule: ScheduleConfigSchema.optional(),
+	delivery: DeliveryConfigSchema.optional(),
+	export: ExportResultSchema.optional(),
+	notifications: NotificationConfigSchema.optional(),
 	updatedBy: z.string().min(1),
+	runId: z.string().optional(),
+	tags: z.array(z.string()).optional(),
+	metadata: z.record(z.unknown()).optional(),
 })
 export type UpdateScheduledReportInput = z.infer<typeof UpdateScheduledReportInputSchema>
 
@@ -347,7 +364,7 @@ export const DeliveryAttemptSchema = z.object({
 		.object({
 			code: z.string(),
 			message: z.string(),
-			details: z.record(z.unknown()).optional(),
+			details: z.record(z.string(), z.any()).optional(),
 			stackTrace: z.string().optional(),
 		})
 		.optional(),
@@ -385,7 +402,7 @@ export const ReportExecutionSchema = z.object({
 		.object({
 			code: z.string(),
 			message: z.string(),
-			details: z.record(z.unknown()).optional(),
+			details: z.record(z.string(), z.any()).optional(),
 			stackTrace: z.string().optional(),
 		})
 		.optional(),

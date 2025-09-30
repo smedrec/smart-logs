@@ -15,7 +15,7 @@ import { EnhancedAuditDatabaseClient } from '@repo/audit-db'
 
 import { Audit } from '../audit.js'
 import { CryptoConfig, CryptoService } from '../crypto.js'
-import { ReportTemplate } from './scheduled-reporting.js'
+import { DeliveryConfig, ReportTemplate } from './scheduled-reporting.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { AuditEventStatus, AuditLogEvent, DataClassification } from '../types.js'
@@ -253,70 +253,6 @@ export interface ExportConfig {
 		algorithm?: string
 		keyId?: string
 	}
-}
-
-export interface NotificationConfig {
-	recipients: string[]
-	onSuccess: boolean
-	onFailure: boolean
-	onSkip: boolean
-	includeReport: boolean
-	customMessage?: string
-}
-
-/**
- * Scheduled report configuration
- */
-export interface ScheduledReportConfig {
-	id: string
-	name: string
-	description?: string
-	templateId?: string
-	reportType: ReportTemplate['reportType']
-	criteria: ReportCriteria
-	format: ReportFormat
-	schedule: {
-		frequency:
-			| 'custom'
-			| 'once'
-			| 'hourly'
-			| 'daily'
-			| 'weekly'
-			| 'monthly'
-			| 'quarterly'
-			| 'yearly'
-		timezone: string
-		hour: number
-		minute: number
-		skipWeekends: boolean
-		skipHolidays: boolean
-		maxMissedRuns: number
-		catchUpMissedRuns: boolean
-		startDate?: string
-		endDate?: string
-		cronExpression?: string
-		dayOfWeek?: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
-		dayOfMonth?: number
-		monthOfYear?: number
-		holidayCalendar?: string
-	}
-	delivery: {
-		method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
-		recipients?: string[]
-		webhookUrl?: string
-		storageLocation?: string
-	}
-	export: ExportConfig
-	notification: NotificationConfig
-	enabled: boolean
-	createdAt: string
-	createdBy: string
-	lastRun?: string
-	nextRun?: string
-	runId?: string
-	tags?: string[]
-	metadata?: Record<string, any>
-	version?: number
 }
 
 /**

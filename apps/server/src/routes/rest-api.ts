@@ -21,7 +21,7 @@ import {
 import { errorHandler, notFoundHandler } from '@/lib/middleware/error-handler'
 import { adaptiveRateLimit, rateLimit } from '@/lib/middleware/rate-limit'
 import { swaggerUI } from '@hono/swagger-ui'
-import { OpenAPIHono } from '@hono/zod-openapi'
+import { OpenAPIHono, z } from '@hono/zod-openapi'
 
 import { createAuditAPI } from './audit-api'
 import { createComplianceAPI } from './compliance-api'

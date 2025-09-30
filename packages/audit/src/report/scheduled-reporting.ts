@@ -24,12 +24,9 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
 	ComplianceReportingService,
 	ExportConfig,
-	GDPRComplianceReport,
-	HIPAAComplianceReport,
 	IntegrityVerificationReport,
 	ReportCriteria,
 	ReportFormat,
-	ScheduledReportConfig,
 } from './compliance-reporting.js'
 import type { DataExportService, ExportResult } from './data-export.js'
 
@@ -111,8 +108,9 @@ export interface DeliveryConfig {
 		}
 		from: string
 		subject: string
-		bodyTemplate: string
+		bodyTemplate?: string
 		attachmentName?: string
+		recipients?: string[]
 	}
 
 	webhook?: {
@@ -156,6 +154,67 @@ export interface DeliveryConfig {
 	encryption?: boolean
 	encryptionKey?: string
 	retentionDays?: number
+}
+
+export interface ScheduleConfig {
+	frequency: 'once' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom'
+	timezone: string
+	hour: number
+	minute: number
+	skipWeekends: boolean
+	skipHolidays: boolean
+	maxMissedRuns: number
+	catchUpMissedRuns: boolean
+	cronExpression?: string
+	startDate?: string
+	endDate?: string
+	dayOfWeek?:
+		| 'sunday'
+		| 'monday'
+		| 'tuesday'
+		| 'wednesday'
+		| 'thursday'
+		| 'friday'
+		| 'saturday'
+		| undefined
+	dayOfMonth?: number
+	monthOfYear?: number
+	holidayCalendar?: string
+}
+
+export interface NotificationConfig {
+	recipients: string[]
+	onSuccess: boolean
+	onFailure: boolean
+	onSkip: boolean
+	includeReport: boolean
+	customMessage?: string
+}
+
+/**
+ * Scheduled report configuration
+ */
+export interface ScheduledReportConfig {
+	id: string
+	name: string
+	description?: string
+	templateId?: string
+	reportType: ReportTemplate['reportType']
+	criteria: ReportCriteria
+	format: ReportFormat
+	schedule: ScheduleConfig
+	delivery: DeliveryConfig
+	export: ExportConfig
+	notification: NotificationConfig
+	enabled: boolean
+	createdAt: string
+	createdBy: string
+	lastRun?: string
+	nextRun?: string
+	runId?: string
+	tags?: string[]
+	metadata?: Record<string, any>
+	version?: number
 }
 
 /**
@@ -726,7 +785,22 @@ export class ScheduledReportingService {
 			},
 			delivery: overrides.delivery || {
 				method: 'email',
-				recipients: [],
+				email: {
+					smtpConfig: {
+						host: 'smtp.example.com',
+						port: 587,
+						secure: false,
+						auth: {
+							user: 'user',
+							pass: 'pass',
+						},
+					},
+					from: 'reports@smedrec.com',
+					subject: `Scheduled Report: ${template.name}`,
+					bodyTemplate: 'Please find the attached report.',
+					attachmentName: `report-${new Date().toISOString().split('T')[0]}.json`,
+					recipients: ['teste@exemplo.com'],
+				},
 			},
 			export: overrides.export || {
 				format: 'json',
@@ -1020,7 +1094,7 @@ export class ScheduledReportingService {
 		attempt: DeliveryAttempt
 	): Promise<void> {
 		// TODO Placeholder email delivery implementation
-		console.log(`Delivering report via email to: ${delivery.recipients?.join(', ')}`)
+		console.log(`Delivering report via email to: ${delivery.email?.recipients?.join(', ')}`)
 		attempt.responseTime = 250 // Placeholder
 	}
 
@@ -1030,7 +1104,7 @@ export class ScheduledReportingService {
 		attempt: DeliveryAttempt
 	): Promise<void> {
 		// TODO Placeholder webhook delivery implementation
-		console.log(`Delivering report via webhook to: ${delivery.webhookUrl}`)
+		console.log(`Delivering report via webhook to: ${delivery.webhook?.url}`)
 		attempt.responseCode = 200
 		attempt.responseTime = 150 // Placeholder
 	}
@@ -1041,7 +1115,7 @@ export class ScheduledReportingService {
 		attempt: DeliveryAttempt
 	): Promise<void> {
 		// TODO Placeholder storage delivery implementation
-		console.log(`Storing report at: ${delivery.storageLocation}`)
+		console.log(`Storing report at: ${delivery.storage?.path}`)
 		attempt.responseTime = 100 // Placeholder
 	}
 
@@ -1064,11 +1138,11 @@ export class ScheduledReportingService {
 	private getDeliveryTarget(delivery: ScheduledReportConfig['delivery']): string {
 		switch (delivery.method) {
 			case 'email':
-				return delivery.recipients?.join(', ') || 'unknown'
+				return delivery.email?.recipients?.join(', ') || 'unknown'
 			case 'webhook':
-				return delivery.webhookUrl || 'unknown'
+				return delivery.webhook?.url || 'unknown'
 			case 'storage':
-				return delivery.storageLocation || 'unknown'
+				return delivery.storage?.path || 'unknown'
 			default:
 				return 'unknown'
 		}

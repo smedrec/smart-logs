@@ -112,6 +112,9 @@ export class DataExportService {
 			case 'pdf':
 				;({ data, contentType, filename } = await this.exportToPDF(report, config))
 				break
+			case 'parquet':
+			case 'avro':
+				throw new Error(`Export format not yet implemented: ${config.format}`)
 			default:
 				throw new Error(`Unsupported export format: ${config.format}`)
 		}
@@ -512,7 +515,10 @@ export class DataExportService {
 	/**
 	 * Compress data using specified algorithm
 	 */
-	private async compressData(data: string | Buffer, algorithm: 'gzip' | 'zip'): Promise<Buffer> {
+	private async compressData(
+		data: string | Buffer,
+		algorithm: 'gzip' | 'zip' | 'bzip2'
+	): Promise<Buffer> {
 		// Placeholder implementation
 		// TODO In real implementation, would use zlib for gzip or archiver for zip
 		const inputBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8')
@@ -520,9 +526,11 @@ export class DataExportService {
 		if (algorithm === 'gzip') {
 			// Placeholder: return gzipped data
 			return Buffer.from(`GZIP:${inputBuffer.toString('base64')}`)
-		} else {
+		} else if (algorithm === 'zip') {
 			// Placeholder: return zipped data
 			return Buffer.from(`ZIP:${inputBuffer.toString('base64')}`)
+		} else {
+			throw new Error(`Unsupported compression algorithm: ${algorithm}`)
 		}
 	}
 

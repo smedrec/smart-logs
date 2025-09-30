@@ -287,14 +287,11 @@ export * from './services'
 // Utils exports (will be implemented in later tasks)
 export * from './utils'
 
-// Legacy types for backward compatibility
-export type {
-	ClientOptions,
-	PaginationParams,
-	DeleteObjectResponse,
-	VersionResponse,
-	LegacyAuditEvent,
-	LegacyCreateAuditEventInput,
-	LegacyQueryAuditEventsParams,
-	LegacyPaginatedAuditEvents,
-} from './types'
+// Export Schemas for the generated types
+export {
+	CreateScheduledReportInputSchema,
+	ListScheduledReportsParamsSchema,
+	PaginatedScheduledReportsSchema,
+	ScheduledReportSchema,
+	UpdateScheduledReportInputSchema,
+} from './types/scheduled-reports'

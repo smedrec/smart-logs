@@ -5,7 +5,6 @@
 export { ComplianceReportingService } from './compliance-reporting.js'
 export { EnhancedComplianceService } from './compliance-service.js'
 export { ScheduledReportingService } from './scheduled-reporting.js'
-export type { ReportTemplate } from './scheduled-reporting.js'
 
 // Re-export types for convenience
 export type {
@@ -19,5 +18,15 @@ export type {
 	SuspiciousPattern,
 	ReportFormat,
 	ExportConfig,
-	ScheduledReportConfig,
 } from './compliance-reporting.js'
+
+export type {
+	DeliveryStatus,
+	ScheduledReportConfig,
+	DeliveryAttempt,
+	ReportExecution,
+	ReportTemplate,
+	DeliveryConfig,
+	ScheduleConfig,
+	NotificationConfig,
+} from './scheduled-reporting.js'
