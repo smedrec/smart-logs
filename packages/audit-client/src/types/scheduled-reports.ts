@@ -73,7 +73,7 @@ export const ScheduleConfigSchema = z
 		timezone: TimezoneSchema.default('UTC'),
 
 		// For specific frequencies
-		hour: z.number().int().min(0).max(23).optional(),
+		hour: z.number().int().min(0).max(23),
 		minute: z.number().int().min(0).max(59).default(0),
 		dayOfWeek: DayOfWeekSchema.optional(),
 		dayOfMonth: z.number().int().min(1).max(31).optional(),
@@ -182,7 +182,7 @@ export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
  * Scheduled report
  */
 export const ScheduledReportSchema = z.object({
-	id: z.string().uuid(),
+	id: z.string(),
 	name: z.string().min(1, 'Report name is required').max(255),
 	description: z.string().max(1000).optional(),
 	reportType: ReportTypeSchema,
@@ -265,7 +265,7 @@ export type ExecutionTrigger = z.infer<typeof ExecutionTriggerSchema>
  * Report execution
  */
 export const ReportExecutionSchema = z.object({
-	id: z.string().uuid(),
+	id: z.string(),
 	scheduledReportId: z.string().uuid(),
 	status: ExecutionStatusSchema,
 	trigger: ExecutionTriggerSchema,
@@ -277,7 +277,7 @@ export const ReportExecutionSchema = z.object({
 	duration: z.number().min(0).optional(),
 
 	// Results
-	reportId: z.string().uuid().optional(),
+	reportId: z.string().optional(),
 	recordCount: z.number().int().min(0).optional(),
 	fileSize: z.number().int().min(0).optional(),
 	downloadUrl: z.string().url().optional(),

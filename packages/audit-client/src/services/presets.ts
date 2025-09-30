@@ -1,3 +1,15 @@
+import {
+	AuditPreset,
+	CreateAuditPresetInput,
+	PresetApplicationResult,
+	PresetContext,
+	PresetUsageStats,
+	PresetVersion,
+	PresetVersionHistory,
+	UpdateAuditPresetInput,
+	ValidationRule,
+} from '@/types/presets'
+
 import { BaseResource } from '../core/base-resource'
 import {
 	assertDefined,
@@ -18,21 +30,6 @@ import {
 import type { RequestOptions } from '../core/base-resource'
 import type { AuditClientConfig } from '../core/config'
 import type { Logger } from '../infrastructure/logger'
-
-/**
- * Validation rule interface for preset field validation
- */
-export interface ValidationRule {
-	type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'email' | 'url' | 'date'
-	required?: boolean
-	minLength?: number
-	maxLength?: number
-	min?: number
-	max?: number
-	pattern?: string
-	enum?: string[]
-	customValidator?: (value: any) => boolean | string
-}
 
 /**
  * Audit preset template interface
@@ -72,63 +69,6 @@ export interface AuditPresetMetadata {
 }
 
 /**
- * Complete audit preset interface
- */
-export interface AuditPreset {
-	name: string
-	description?: string
-	template: AuditPresetTemplate
-	validation: AuditPresetValidation
-	metadata: AuditPresetMetadata
-}
-
-/**
- * Input for creating a new audit preset
- */
-export interface CreateAuditPresetInput {
-	name: string
-	description?: string
-	template: AuditPresetTemplate
-	validation: AuditPresetValidation
-	tags?: string[]
-	category?: string
-}
-
-/**
- * Input for updating an existing audit preset
- */
-export interface UpdateAuditPresetInput {
-	description?: string
-	template?: Partial<AuditPresetTemplate>
-	validation?: Partial<AuditPresetValidation>
-	tags?: string[]
-	category?: string
-}
-
-/**
- * Context for applying a preset to create an audit event
- */
-export interface PresetContext {
-	principalId: string
-	organizationId: string
-	targetResourceId?: string
-	sessionContext?: {
-		sessionId?: string
-		ipAddress?: string
-		userAgent?: string
-		location?: string
-	}
-	customDetails?: Record<string, any>
-	overrides?: {
-		action?: string
-		targetResourceType?: string
-		dataClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
-		status?: 'attempt' | 'success' | 'failure'
-		outcomeDescription?: string
-	}
-}
-
-/**
  * Result of preset validation
  */
 export interface ValidationResult {
@@ -142,33 +82,6 @@ export interface ValidationResult {
 		field: string
 		message: string
 		code: string
-	}>
-}
-
-/**
- * Result of applying a preset to create an audit event
- */
-export interface PresetApplicationResult {
-	success: boolean
-	auditEvent?: {
-		id: string
-		timestamp: string
-		action: string
-		targetResourceType: string
-		targetResourceId?: string
-		principalId: string
-		organizationId: string
-		status: 'attempt' | 'success' | 'failure'
-		outcomeDescription?: string
-		dataClassification: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
-		details?: Record<string, any>
-		correlationId?: string
-	}
-	validationResult: ValidationResult
-	errors?: Array<{
-		message: string
-		code: string
-		details?: any
 	}>
 }
 
@@ -203,46 +116,6 @@ export interface PaginatedAuditPresets {
 		totalCategories: number
 		totalTags: number
 	}
-}
-
-/**
- * Preset versioning information
- */
-export interface PresetVersion {
-	version: string
-	createdAt: string
-	changes: string[]
-	author?: string
-	preset: AuditPreset
-}
-
-/**
- * Preset version history
- */
-export interface PresetVersionHistory {
-	presetName: string
-	currentVersion: string
-	versions: PresetVersion[]
-	totalVersions: number
-}
-
-/**
- * Preset usage statistics
- */
-export interface PresetUsageStats {
-	presetName: string
-	totalUsage: number
-	usageByPeriod: Array<{
-		period: string
-		count: number
-	}>
-	topUsers: Array<{
-		principalId: string
-		count: number
-	}>
-	successRate: number
-	averageExecutionTime: number
-	lastUsed: string
 }
 
 /**
@@ -529,7 +402,7 @@ export class PresetsService extends BaseResource {
 		// Validate response structure
 		assertType(response, isObject, 'Invalid preset application result from server')
 		assertDefined(response.success, 'Preset application result missing success field')
-		assertDefined(response.validationResult, 'Preset application result missing validation result')
+		//assertDefined(response.validationResult, 'Preset application result missing validation result')
 
 		return response
 	}

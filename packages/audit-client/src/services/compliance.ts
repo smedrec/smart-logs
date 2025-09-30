@@ -1,17 +1,5 @@
 import { BaseResource } from '../core/base-resource'
 import { ManagedReadableStream, StreamConfig, StreamingManager } from '../infrastructure/streaming'
-import {
-	CustomReport,
-	CustomReportParams,
-	GdprExportParams,
-	GdprExportResult,
-	GDPRReport,
-	HIPAAReport,
-	PseudonymizationParams,
-	PseudonymizationResult,
-	ReportCriteria,
-	ReportTemplate,
-} from '../types/compliance'
 import { assertDefined, assertType, isNonEmptyString, isObject } from '../utils/type-guards'
 import {
 	validateCustomReportParams,
@@ -24,6 +12,18 @@ import {
 import type { RequestOptions } from '../core/base-resource'
 import type { AuditClientConfig } from '../core/config'
 import type { Logger } from '../infrastructure/logger'
+import type {
+	CustomReport,
+	CustomReportParams,
+	GdprExportParams,
+	GdprExportResult,
+	GDPRReport,
+	HIPAAReport,
+	PseudonymizationParams,
+	PseudonymizationResult,
+	ReportCriteria,
+	ReportTemplate,
+} from '../types/compliance'
 
 /**
  * Report download options

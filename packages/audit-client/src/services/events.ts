@@ -28,245 +28,22 @@ import {
 	ValidationError,
 } from '../utils/validation'
 
+import type {
+	AuditEvent,
+	AuditEventStatus,
+	BulkCreateResult,
+	CreateAuditEventInput,
+	CreateAuditEventOptions,
+	DataClassification,
+	ExportEventsParams,
+	ExportResult,
+	IntegrityVerificationResult,
+	PaginatedAuditEvents,
+	QueryAuditEventsParams,
+	StreamEventsParams,
+	SubscriptionParams,
+} from '@/types/api'
 import type { RequestOptions } from '../core/base-resource'
-
-/**
- * Session context information for audit events
- */
-export interface SessionContext {
-	sessionId: string
-	ipAddress: string
-	userAgent: string
-	geolocation?: string
-}
-
-/**
- * Data classification levels for audit events
- */
-export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
-
-/**
- * Audit event status types
- */
-export type AuditEventStatus = 'attempt' | 'success' | 'failure'
-
-/**
- * Complete audit event interface
- */
-export interface AuditEvent {
-	id: string
-	timestamp: string
-	action: string
-	targetResourceType: string
-	targetResourceId?: string
-	principalId: string
-	organizationId: string
-	status: AuditEventStatus
-	outcomeDescription?: string
-	dataClassification: DataClassification
-	details?: Record<string, any>
-	hash?: string
-	correlationId?: string
-	sessionContext?: SessionContext
-}
-
-/**
- * Input interface for creating audit events
- */
-export interface CreateAuditEventInput {
-	action: string
-	targetResourceType: string
-	targetResourceId?: string
-	principalId: string
-	organizationId: string
-	status: AuditEventStatus
-	outcomeDescription?: string
-	dataClassification: DataClassification
-	sessionContext?: SessionContext
-	details?: Record<string, any>
-}
-
-export interface CreateAuditEventOptions {
-	priority?: number
-	delay?: number
-	durabilityGuarantees?: boolean
-	generateHash?: boolean
-	generateSignature?: boolean
-	correlationId?: string
-	eventVersion?: string
-	skipValidation?: boolean
-	validationConfig?: ValidationConfig
-}
-
-/**
- * Configuration for validation rules
- */
-export interface ValidationConfig {
-	maxStringLength: number
-	allowedDataClassifications: DataClassification[]
-	requiredFields: Array<keyof AuditEvent>
-	maxCustomFieldDepth: number
-	allowedEventVersions: string[]
-}
-
-/**
- * Default validation configuration
- */
-export const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
-	maxStringLength: 10000,
-	allowedDataClassifications: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'],
-	requiredFields: ['timestamp', 'action', 'status'],
-	maxCustomFieldDepth: 3,
-	allowedEventVersions: ['1.0', '1.1', '2.0'],
-}
-
-/**
- * Bulk create input interface
- */
-export interface BulkCreateAuditEventsInput {
-	events: CreateAuditEventInput[]
-}
-
-/**
- * Bulk create result interface
- */
-export interface BulkCreateResult {
-	requestId: string
-	total: number
-	successful: number
-	failed: number
-	results: Array<{
-		success: boolean
-		event?: AuditEvent
-		error?: string
-		index: number
-	}>
-	processingTime: number
-}
-
-/**
- * Query parameters for audit events
- */
-export interface QueryAuditEventsParams {
-	filter?: {
-		dateRange?: {
-			startDate: string
-			endDate: string
-		}
-		principalIds?: string[]
-		organizationIds?: string[]
-		actions?: string[]
-		statuses?: AuditEventStatus[]
-		dataClassifications?: DataClassification[]
-		resourceTypes?: string[]
-		verifiedOnly?: boolean
-		correlationId?: string
-	}
-	pagination?: {
-		limit?: number
-		offset?: number
-	}
-	sort?: {
-		field: 'timestamp' | 'status' | 'action'
-		direction: 'asc' | 'desc'
-	}
-}
-
-/**
- * Paginated audit events response
- */
-export interface PaginatedAuditEvents {
-	events: AuditEvent[]
-	pagination: {
-		total: number
-		limit: number
-		offset: number
-		hasNext: boolean
-		hasPrevious: boolean
-	}
-	metadata?: {
-		queryTime: number
-		cacheHit: boolean
-		totalFiltered: number
-	}
-}
-
-/**
- * Integrity verification result
- */
-export interface IntegrityVerificationResult {
-	eventId: string
-	isValid: boolean
-	verificationTimestamp: string
-	hashAlgorithm: string
-	computedHash: string
-	storedHash: string
-	details?: {
-		signatureValid?: boolean
-		chainIntegrity?: boolean
-		timestampValid?: boolean
-	}
-}
-
-/**
- * Export parameters
- */
-export interface ExportEventsParams {
-	filter?: QueryAuditEventsParams['filter']
-	format: 'json' | 'csv' | 'xml'
-	includeMetadata?: boolean
-	compression?: 'gzip' | 'zip' | 'none'
-	encryption?: {
-		enabled: boolean
-		algorithm?: string
-		publicKey?: string
-	}
-}
-
-/**
- * Export result
- */
-export interface ExportResult {
-	exportId: string
-	recordCount: number
-	dataSize: number
-	format: string
-	exportTimestamp: string
-	downloadUrl?: string
-	expiresAt?: string
-	metadata?: {
-		compression?: string
-		encryption?: boolean
-		checksum?: string
-	}
-}
-
-/**
- * Stream parameters for large datasets
- */
-export interface StreamEventsParams {
-	filter?: QueryAuditEventsParams['filter']
-	batchSize?: number
-	format?: 'json' | 'ndjson'
-}
-
-/**
- * Subscription parameters for real-time events
- */
-export interface SubscriptionParams {
-	filter?: {
-		actions?: string[]
-		principalIds?: string[]
-		organizationIds?: string[]
-		resourceTypes?: string[]
-		dataClassifications?: DataClassification[]
-		statuses?: AuditEventStatus[]
-	}
-	transport?: 'websocket' | 'sse' | 'polling'
-	reconnect?: boolean
-	maxReconnectAttempts?: number
-	heartbeatInterval?: number
-}
 
 /**
  * Enhanced event subscription interface with streaming capabilities
@@ -881,7 +658,14 @@ export class EventsService extends BaseResource {
 		const validatedData = validationResult.data!
 
 		// Create clean params object that only includes defined properties
-		const cleanParams: SubscriptionParams = {}
+		const cleanParams: SubscriptionParams = {
+			bufferSize: 0,
+			compression: false,
+			transport: 'websocket',
+			reconnect: false,
+			maxReconnectAttempts: 0,
+			heartbeatInterval: 0,
+		}
 
 		if (validatedData.filter) {
 			const filter: SubscriptionParams['filter'] = {}

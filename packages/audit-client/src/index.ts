@@ -184,9 +184,8 @@ export {
 } from './services'
 
 // Compliance Service exports
-export { ComplianceService, type ReportDownloadOptions } from './services'
-
 export {
+	ComplianceService,
 	type ReportCriteria,
 	type ReportMetadata,
 	type HIPAASection,
@@ -200,14 +199,14 @@ export {
 	type PseudonymizationParams,
 	type PseudonymizationResult,
 	type ReportTemplate,
-} from './types/compliance'
+	type ReportDownloadOptions,
+} from './services'
 
 // Scheduled Reports Service exports
 export {
 	ScheduledReportsService,
 	type ScheduleConfig,
 	type DeliveryConfig,
-	type ScheduledReportCriteria,
 	type ScheduledReport,
 	type CreateScheduledReportInput,
 	type UpdateScheduledReportInput,

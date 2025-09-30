@@ -145,7 +145,7 @@ export type SystemMetrics = z.infer<typeof SystemMetricsSchema>
  * Audit metrics parameters
  */
 export const AuditMetricsParamsSchema = z.object({
-	timeRange: DateRangeFilterSchema,
+	timeRange: DateRangeFilterSchema.optional(),
 	granularity: z.enum(['minute', 'hour', 'day', 'week', 'month']).default('hour'),
 	organizationIds: z.array(z.string().min(1)).optional(),
 	principalIds: z.array(z.string().min(1)).optional(),
@@ -336,7 +336,7 @@ export type PerformanceMetrics = z.infer<typeof PerformanceMetricsSchema>
  * Usage metrics parameters
  */
 export const UsageMetricsParamsSchema = z.object({
-	timeRange: DateRangeFilterSchema,
+	timeRange: DateRangeFilterSchema.optional(),
 	granularity: z.enum(['hour', 'day', 'week', 'month']).default('day'),
 	organizationIds: z.array(z.string().min(1)).optional(),
 	includeDetails: z.boolean().default(false),

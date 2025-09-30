@@ -1,3 +1,5 @@
+import { ReportCriteria } from '@/types/compliance'
+
 import { BaseResource } from '../core/base-resource'
 import { assertDefined, assertType, isNonEmptyString, isObject } from '../utils/type-guards'
 import {
@@ -8,168 +10,20 @@ import {
 	ValidationError,
 } from '../utils/validation'
 
+import type {
+	CreateScheduledReportInput,
+	DeliveryConfig,
+	ExecutionHistoryParams,
+	ListScheduledReportsParams,
+	PaginatedExecutions,
+	PaginatedScheduledReports,
+	ReportExecution,
+	ScheduleConfig,
+	ScheduledReport,
+	UpdateScheduledReportInput,
+} from '@/types/scheduled-reports'
 import type { AuditClientConfig } from '../core/config'
 import type { Logger } from '../infrastructure/logger'
-
-/**
- * Schedule configuration interface
- */
-export interface ScheduleConfig {
-	frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly'
-	dayOfWeek?: number // 0-6 (Sunday-Saturday) for weekly
-	dayOfMonth?: number // 1-31 for monthly/quarterly
-	hour: number // 0-23
-	minute: number // 0-59
-	timezone: string // IANA timezone identifier
-}
-
-/**
- * Delivery configuration interface
- */
-export interface DeliveryConfig {
-	method: 'email' | 'webhook' | 'storage'
-	config: {
-		recipients?: string[] // For email delivery
-		webhookUrl?: string // For webhook delivery
-		storageLocation?: string // For storage delivery
-	}
-}
-
-/**
- * Report criteria interface for scheduled reports
- */
-export interface ScheduledReportCriteria {
-	dateRange: {
-		startDate: string
-		endDate: string
-	}
-	organizationIds?: string[]
-	principalIds?: string[]
-	resourceTypes?: string[]
-	actions?: string[]
-	dataClassifications?: ('PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI')[]
-	includeDetails?: boolean
-	includeMetadata?: boolean
-	format: 'json' | 'csv' | 'pdf' | 'xlsx'
-}
-
-/**
- * Scheduled report interface
- */
-export interface ScheduledReport {
-	id: string
-	name: string
-	description?: string
-	reportType: 'hipaa' | 'gdpr' | 'custom' | 'integrity'
-	criteria: ScheduledReportCriteria
-	schedule: ScheduleConfig
-	deliveryConfig: DeliveryConfig
-	isActive: boolean
-	createdAt: string
-	updatedAt: string
-	lastExecution?: string
-	nextExecution: string
-	createdBy: string
-	organizationId: string
-}
-
-/**
- * Create scheduled report input interface
- */
-export interface CreateScheduledReportInput {
-	name: string
-	description?: string
-	reportType: 'hipaa' | 'gdpr' | 'custom' | 'integrity'
-	criteria: ScheduledReportCriteria
-	schedule: ScheduleConfig
-	deliveryConfig: DeliveryConfig
-	isActive?: boolean
-}
-
-/**
- * Update scheduled report input interface
- */
-export interface UpdateScheduledReportInput {
-	name?: string
-	description?: string
-	criteria?: Partial<ScheduledReportCriteria>
-	schedule?: Partial<ScheduleConfig>
-	deliveryConfig?: Partial<DeliveryConfig>
-	isActive?: boolean
-}
-
-/**
- * List scheduled reports parameters
- */
-export interface ListScheduledReportsParams {
-	organizationId?: string
-	reportType?: 'hipaa' | 'gdpr' | 'custom' | 'integrity'
-	isActive?: boolean
-	createdBy?: string
-	limit?: number
-	offset?: number
-	sortBy?: 'name' | 'createdAt' | 'lastExecution' | 'nextExecution'
-	sortOrder?: 'asc' | 'desc'
-}
-
-/**
- * Paginated scheduled reports response
- */
-export interface PaginatedScheduledReports {
-	reports: ScheduledReport[]
-	pagination: {
-		total: number
-		limit: number
-		offset: number
-		hasNext: boolean
-		hasPrevious: boolean
-	}
-}
-
-/**
- * Report execution interface
- */
-export interface ReportExecution {
-	id: string
-	reportId: string
-	startedAt: string
-	completedAt?: string
-	status: 'pending' | 'running' | 'completed' | 'failed'
-	progress?: number
-	error?: string
-	downloadUrl?: string
-	fileSize?: number
-	recordCount?: number
-}
-
-/**
- * Execution history parameters
- */
-export interface ExecutionHistoryParams {
-	limit?: number
-	offset?: number
-	status?: 'pending' | 'running' | 'completed' | 'failed'
-	dateRange?: {
-		startDate: string
-		endDate: string
-	}
-	sortBy?: 'startedAt' | 'completedAt' | 'status'
-	sortOrder?: 'asc' | 'desc'
-}
-
-/**
- * Paginated executions response
- */
-export interface PaginatedExecutions {
-	executions: ReportExecution[]
-	pagination: {
-		total: number
-		limit: number
-		offset: number
-		hasNext: boolean
-		hasPrevious: boolean
-	}
-}
 
 /**
  * ScheduledReportsService - Comprehensive scheduled report management
@@ -457,8 +311,17 @@ export class ScheduledReportsService extends BaseResource {
 		}
 
 		if (schedule.frequency === 'weekly' && schedule.dayOfWeek !== undefined) {
-			if (schedule.dayOfWeek < 0 || schedule.dayOfWeek > 6) {
-				throw new Error('Day of week must be between 0 (Sunday) and 6 (Saturday)')
+			const validDayOfWeek = [
+				'monday',
+				'tuesday',
+				'wednesday',
+				'thursday',
+				'friday',
+				'saturday',
+				'sunday',
+			]
+			if (!validDayOfWeek.includes(schedule.dayOfWeek)) {
+				throw new Error(`Invalid day of week. Must be one of: ${validDayOfWeek.join(', ')}`)
 			}
 		}
 
@@ -498,13 +361,13 @@ export class ScheduledReportsService extends BaseResource {
 		}
 
 		if (delivery.method === 'email') {
-			if (!delivery.config.recipients || delivery.config.recipients.length === 0) {
+			if (!delivery.recipients || delivery.recipients.length === 0) {
 				throw new Error('Email recipients are required for email delivery')
 			}
 
 			// Validate email addresses
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-			for (const email of delivery.config.recipients) {
+			for (const email of delivery.recipients) {
 				if (!emailRegex.test(email)) {
 					throw new Error(`Invalid email address: ${email}`)
 				}
@@ -512,21 +375,21 @@ export class ScheduledReportsService extends BaseResource {
 		}
 
 		if (delivery.method === 'webhook') {
-			if (!delivery.config.webhookUrl) {
+			if (!delivery.webhookUrl) {
 				throw new Error('Webhook URL is required for webhook delivery')
 			}
 
 			// Validate webhook URL
 			try {
-				new URL(delivery.config.webhookUrl)
+				new URL(delivery.webhookUrl)
 			} catch {
 				throw new Error('Invalid webhook URL format')
 			}
 		}
 
-		if (delivery.method === 'storage') {
-			if (!delivery.config.storageLocation) {
-				throw new Error('Storage location is required for storage delivery')
+		if (delivery.method === 's3') {
+			if (!delivery.s3Bucket) {
+				throw new Error('s3 bucket is ')
 			}
 		}
 	}
@@ -534,7 +397,7 @@ export class ScheduledReportsService extends BaseResource {
 	/**
 	 * Validate report criteria
 	 */
-	private validateReportCriteria(criteria: ScheduledReportCriteria): void {
+	private validateReportCriteria(criteria: ReportCriteria): void {
 		if (!criteria.dateRange || !criteria.dateRange.startDate || !criteria.dateRange.endDate) {
 			throw new Error('Report criteria must include a valid date range')
 		}
@@ -550,11 +413,11 @@ export class ScheduledReportsService extends BaseResource {
 			throw new Error('Start date must be before end date')
 		}
 
-		if (!criteria.format) {
+		/**if (!criteria.format) {
 			throw new Error('Report format is required')
 		}
 
-		this.validateFormat(criteria.format)
+		this.validateFormat(criteria.format)*/
 	}
 
 	/**
@@ -597,9 +460,13 @@ export class ScheduledReportsService extends BaseResource {
 			throw new Error(`Invalid report type. Must be one of: ${validReportTypes.join(', ')}`)
 		}
 
+		if (input.format) {
+			this.validateFormat(input.format)
+		}
+
 		this.validateReportCriteria(input.criteria)
 		this.validateScheduleConfig(input.schedule)
-		this.validateDeliveryConfig(input.deliveryConfig)
+		this.validateDeliveryConfig(input.delivery)
 	}
 
 	/**
@@ -634,8 +501,8 @@ export class ScheduledReportsService extends BaseResource {
 				}
 			}
 
-			if (input.criteria.format) {
-				this.validateFormat(input.criteria.format)
+			if (input.format) {
+				this.validateFormat(input.format)
 			}
 		}
 
@@ -663,8 +530,17 @@ export class ScheduledReportsService extends BaseResource {
 			}
 
 			if (input.schedule.dayOfWeek !== undefined) {
-				if (input.schedule.dayOfWeek < 0 || input.schedule.dayOfWeek > 6) {
-					throw new Error('Day of week must be between 0 (Sunday) and 6 (Saturday)')
+				const validDayOfWeek = [
+					'monday',
+					'tuesday',
+					'wednesday',
+					'thursday',
+					'friday',
+					'saturday',
+					'sunday',
+				]
+				if (!validDayOfWeek.includes(input.schedule.dayOfWeek)) {
+					throw new Error(`Invalid day of week. Must be one of: ${validDayOfWeek.join(', ')}`)
 				}
 			}
 
@@ -675,31 +551,29 @@ export class ScheduledReportsService extends BaseResource {
 			}
 		}
 
-		if (input.deliveryConfig) {
+		if (input.delivery) {
 			// Validate partial delivery config
-			if (input.deliveryConfig.method) {
+			if (input.delivery.method) {
 				const validMethods = ['email', 'webhook', 'storage']
-				if (!validMethods.includes(input.deliveryConfig.method)) {
+				if (!validMethods.includes(input.delivery.method)) {
 					throw new Error(`Invalid delivery method. Must be one of: ${validMethods.join(', ')}`)
 				}
 			}
 
-			if (input.deliveryConfig.config) {
-				if (input.deliveryConfig.config.recipients) {
-					const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-					for (const email of input.deliveryConfig.config.recipients) {
-						if (!emailRegex.test(email)) {
-							throw new Error(`Invalid email address: ${email}`)
-						}
+			if (input.delivery.recipients) {
+				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+				for (const email of input.delivery.recipients) {
+					if (!emailRegex.test(email)) {
+						throw new Error(`Invalid email address: ${email}`)
 					}
 				}
+			}
 
-				if (input.deliveryConfig.config.webhookUrl) {
-					try {
-						new URL(input.deliveryConfig.config.webhookUrl)
-					} catch {
-						throw new Error('Invalid webhook URL format')
-					}
+			if (input.delivery.webhookUrl) {
+				try {
+					new URL(input.delivery.webhookUrl)
+				} catch {
+					throw new Error('Invalid webhook URL format')
 				}
 			}
 		}
@@ -709,35 +583,37 @@ export class ScheduledReportsService extends BaseResource {
 	 * Validate list parameters
 	 */
 	private validateListParams(params: ListScheduledReportsParams): void {
-		if (params.limit !== undefined) {
-			if (params.limit < 1 || params.limit > 1000) {
+		if (params.pagination?.limit !== undefined) {
+			if (params.pagination.limit < 1 || params.pagination.limit > 1000) {
 				throw new Error('Limit must be between 1 and 1000')
 			}
 		}
 
-		if (params.offset !== undefined) {
-			if (params.offset < 0) {
+		if (params.pagination?.offset !== undefined) {
+			if (params.pagination.offset < 0) {
 				throw new Error('Offset must be non-negative')
 			}
 		}
 
 		if (params.reportType) {
 			const validReportTypes = ['hipaa', 'gdpr', 'custom', 'integrity']
-			if (!validReportTypes.includes(params.reportType)) {
-				throw new Error(`Invalid report type. Must be one of: ${validReportTypes.join(', ')}`)
+			for (const reportType of params.reportType) {
+				if (!validReportTypes.includes(reportType)) {
+					throw new Error(`Invalid report type. Must be one of: ${validReportTypes.join(', ')}`)
+				}
 			}
 		}
 
-		if (params.sortBy) {
+		if (params.sort?.field) {
 			const validSortFields = ['name', 'createdAt', 'lastExecution', 'nextExecution']
-			if (!validSortFields.includes(params.sortBy)) {
+			if (!validSortFields.includes(params.sort.field)) {
 				throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`)
 			}
 		}
 
-		if (params.sortOrder) {
+		if (params.sort?.direction) {
 			const validSortOrders = ['asc', 'desc']
-			if (!validSortOrders.includes(params.sortOrder)) {
+			if (!validSortOrders.includes(params.sort.direction)) {
 				throw new Error(`Invalid sort order. Must be one of: ${validSortOrders.join(', ')}`)
 			}
 		}
@@ -747,22 +623,32 @@ export class ScheduledReportsService extends BaseResource {
 	 * Validate execution history parameters
 	 */
 	private validateExecutionHistoryParams(params: ExecutionHistoryParams): void {
-		if (params.limit !== undefined) {
-			if (params.limit < 1 || params.limit > 1000) {
+		if (params.pagination?.limit !== undefined) {
+			if (params.pagination.limit < 1 || params.pagination.limit > 1000) {
 				throw new Error('Limit must be between 1 and 1000')
 			}
 		}
 
-		if (params.offset !== undefined) {
-			if (params.offset < 0) {
+		if (params.pagination?.offset !== undefined) {
+			if (params.pagination.offset < 0) {
 				throw new Error('Offset must be non-negative')
 			}
 		}
 
 		if (params.status) {
-			const validStatuses = ['pending', 'running', 'completed', 'failed']
-			if (!validStatuses.includes(params.status)) {
-				throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`)
+			const validStatuses = [
+				'pending',
+				'running',
+				'completed',
+				'failed',
+				'cancelled',
+				'skipped',
+				'timeout',
+			]
+			for (const status of params.status) {
+				if (!validStatuses.includes(status)) {
+					throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`)
+				}
 			}
 		}
 
@@ -779,16 +665,16 @@ export class ScheduledReportsService extends BaseResource {
 			}
 		}
 
-		if (params.sortBy) {
+		if (params.sort?.field) {
 			const validSortFields = ['startedAt', 'completedAt', 'status']
-			if (!validSortFields.includes(params.sortBy)) {
+			if (!validSortFields.includes(params.sort.field)) {
 				throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`)
 			}
 		}
 
-		if (params.sortOrder) {
+		if (params.sort?.direction) {
 			const validSortOrders = ['asc', 'desc']
-			if (!validSortOrders.includes(params.sortOrder)) {
+			if (!validSortOrders.includes(params.sort.direction)) {
 				throw new Error(`Invalid sort order. Must be one of: ${validSortOrders.join(', ')}`)
 			}
 		}

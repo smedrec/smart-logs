@@ -22,26 +22,22 @@ import {
 	ValidationError,
 } from '../utils/validation'
 
+import type {
+	Alert,
+	AlertSeverity,
+	AlertsParams,
+	AlertType,
+	AuditMetrics,
+	AuditMetricsParams,
+	CpuUsage,
+	MemoryUsage,
+	PaginatedAlerts,
+	PerformanceMetrics,
+	SystemMetrics,
+	UsageMetrics,
+	UsageMetricsParams,
+} from '@/types/metrics'
 import type { RequestOptions } from '../core/base-resource'
-
-/**
- * Memory usage metrics
- */
-export interface MemoryUsage {
-	used: number
-	free: number
-	total: number
-	percentage: number
-}
-
-/**
- * CPU usage metrics
- */
-export interface CpuUsage {
-	percentage: number
-	loadAverage: number[]
-	cores: number
-}
 
 /**
  * Database metrics
@@ -93,240 +89,6 @@ export interface EndpointStats {
 }
 
 /**
- * System metrics interface
- */
-export interface SystemMetrics {
-	timestamp: string
-	server: {
-		uptime: number
-		memoryUsage: MemoryUsage
-		cpuUsage: CpuUsage
-		diskUsage?: {
-			used: number
-			free: number
-			total: number
-			percentage: number
-		}
-	}
-	database: DatabaseMetrics
-	cache: CacheMetrics
-	api: ApiMetrics
-}
-
-/**
- * Audit-specific metrics
- */
-export interface AuditMetrics {
-	timestamp: string
-	timeRange: {
-		startDate: string
-		endDate: string
-	}
-	eventsProcessed: number
-	processingLatency: {
-		average: number
-		p50: number
-		p95: number
-		p99: number
-		min: number
-		max: number
-	}
-	integrityVerifications: {
-		total: number
-		passed: number
-		failed: number
-		averageTime: number
-		successRate: number
-	}
-	complianceReports: {
-		generated: number
-		scheduled: number
-		failed: number
-		averageGenerationTime: number
-	}
-	errorRates: {
-		total: number
-		byType: Record<string, number>
-		byEndpoint: Record<string, number>
-		byStatus: Record<string, number>
-	}
-	dataClassificationStats: {
-		PUBLIC: number
-		INTERNAL: number
-		CONFIDENTIAL: number
-		PHI: number
-	}
-}
-
-/**
- * Performance metrics interface
- */
-export interface PerformanceMetrics {
-	timestamp: string
-	responseTime: {
-		average: number
-		p50: number
-		p95: number
-		p99: number
-		min: number
-		max: number
-	}
-	throughput: {
-		requestsPerSecond: number
-		eventsPerSecond: number
-		reportsPerHour: number
-	}
-	resourceUtilization: {
-		cpu: number
-		memory: number
-		disk: number
-		network: {
-			bytesIn: number
-			bytesOut: number
-			packetsIn: number
-			packetsOut: number
-		}
-	}
-	concurrency: {
-		activeConnections: number
-		queuedRequests: number
-		processingThreads: number
-	}
-}
-
-/**
- * Usage metrics parameters
- */
-export interface UsageMetricsParams {
-	timeRange?: {
-		startDate: string
-		endDate: string
-	}
-	granularity?: 'hour' | 'day' | 'week' | 'month'
-	includeBreakdown?: boolean
-}
-
-/**
- * Usage metrics interface
- */
-export interface UsageMetrics {
-	timestamp: string
-	timeRange: {
-		startDate: string
-		endDate: string
-	}
-	apiUsage: {
-		totalRequests: number
-		uniqueUsers: number
-		topEndpoints: Array<{
-			endpoint: string
-			requestCount: number
-			percentage: number
-		}>
-		rateLimitHits: number
-		quotaUsage: {
-			current: number
-			limit: number
-			percentage: number
-		}
-	}
-	auditEvents: {
-		totalEvents: number
-		eventsByType: Record<string, number>
-		eventsByOrganization: Record<string, number>
-		eventsByDataClassification: Record<string, number>
-	}
-	reports: {
-		totalGenerated: number
-		reportsByType: Record<string, number>
-		scheduledReports: number
-		onDemandReports: number
-	}
-	storage: {
-		totalSize: number
-		growthRate: number
-		retentionCompliance: number
-	}
-}
-
-/**
- * Alert severity levels
- */
-export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-
-/**
- * Alert types for categorization
- */
-export type AlertType = 'SECURITY' | 'COMPLIANCE' | 'PERFORMANCE' | 'SYSTEM' | 'METRICS'
-
-/**
- * Alert interface
- */
-export interface Alert {
-	id: string
-	organizationId: string
-	title: string
-	description: string
-	severity: AlertSeverity
-	type: AlertType
-	source: string
-	category: string
-	createdAt: string
-	updatedAt: string
-	acknowledgedAt?: string
-	acknowledgedBy?: string
-	resolvedAt?: string
-	resolvedBy?: string
-	resolution?: string
-	metadata: Record<string, any>
-	affectedResources?: string[]
-	relatedAlerts?: string[]
-}
-
-/**
- * Alert query parameters
- */
-export interface AlertsParams {
-	type?: AlertType[]
-	severity?: AlertSeverity[]
-	category?: string[]
-	source?: string[]
-	timeRange?: {
-		startDate: string
-		endDate: string
-	}
-	pagination?: {
-		limit?: number
-		offset?: number
-	}
-	sort?: {
-		field: 'createdAt' | 'updatedAt' | 'severity' | 'status'
-		direction: 'asc' | 'desc'
-	}
-}
-
-/**
- * Paginated alerts response
- */
-export interface PaginatedAlerts {
-	alerts: Alert[]
-	pagination: {
-		total: number
-		limit: number
-		offset: number
-		hasNext: boolean
-		hasPrevious: boolean
-	}
-	summary: {
-		totalActive: number
-		totalAcknowledged: number
-		totalResolved: number
-		bySeverity: Record<AlertSeverity, number>
-		byCategory: Record<string, number>
-	}
-}
-
-/**
  * Alert Statistics interface
  */
 export interface AlertStatistics {
@@ -336,20 +98,6 @@ export interface AlertStatistics {
 	resolved: number
 	bySeverity: Record<AlertSeverity, number>
 	byType: Record<AlertType, number>
-}
-
-/**
- * Audit metrics query parameters
- */
-export interface AuditMetricsParams {
-	timeRange?: {
-		startDate: string
-		endDate: string
-	}
-	granularity?: 'hour' | 'day' | 'week' | 'month'
-	includeBreakdown?: boolean
-	organizationIds?: string[]
-	dataClassifications?: string[]
 }
 
 /**
@@ -446,7 +194,13 @@ export class MetricsService extends BaseResource {
 	 * @param params Query parameters for audit metrics
 	 * @returns Promise<AuditMetrics> Audit system metrics
 	 */
-	async getAuditMetrics(params: AuditMetricsParams = {}): Promise<AuditMetrics> {
+	async getAuditMetrics(
+		params: AuditMetricsParams = {
+			granularity: 'minute',
+			includeBreakdown: false,
+			includeTimeline: false,
+		}
+	): Promise<AuditMetrics> {
 		// Validate input parameters
 		const validationResult = validateAuditMetricsParams(params)
 		if (!validationResult.success) {
@@ -486,7 +240,12 @@ export class MetricsService extends BaseResource {
 	 * @param params Query parameters for usage metrics
 	 * @returns Promise<UsageMetrics> API usage statistics
 	 */
-	async getUsageMetrics(params: UsageMetricsParams = {}): Promise<UsageMetrics> {
+	async getUsageMetrics(
+		params: UsageMetricsParams = {
+			granularity: 'hour',
+			includeDetails: false,
+		}
+	): Promise<UsageMetrics> {
 		// Validate input parameters
 		const validationResult = validateUsageMetricsParams(params)
 		if (!validationResult.success) {

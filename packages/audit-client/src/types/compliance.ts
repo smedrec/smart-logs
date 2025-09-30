@@ -14,7 +14,7 @@ import {
 /**
  * Report types
  */
-export const ReportTypeSchema = z.enum(['hipaa', 'gdpr', 'sox', 'pci', 'iso27001', 'custom'])
+export const ReportTypeSchema = z.enum(['hipaa', 'gdpr', 'integrity', 'custom'])
 export type ReportType = z.infer<typeof ReportTypeSchema>
 
 /**

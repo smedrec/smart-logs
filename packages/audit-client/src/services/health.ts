@@ -15,44 +15,13 @@ import {
 	ValidationError,
 } from '../utils/validation'
 
+import type {
+	DetailedHealthStatus,
+	HealthStatus,
+	ReadinessStatus,
+	VersionInfo,
+} from '@/types/health'
 import type { RequestOptions } from '../core/base-resource'
-
-/**
- * Basic health status response
- */
-export interface HealthStatus {
-	status: 'healthy' | 'unhealthy' | 'degraded'
-	timestamp: string
-	environment: string
-	uptime: number
-	version?: string
-}
-
-/**
- * Detailed health status with component breakdown
- */
-export interface DetailedHealthStatus {
-	status: 'healthy' | 'unhealthy' | 'degraded'
-	timestamp: string
-	uptime: number
-	version: string
-	components: {
-		database: ComponentHealth
-		cache: ComponentHealth
-		storage: ComponentHealth
-		authentication: ComponentHealth
-		audit: ComponentHealth
-		compliance: ComponentHealth
-		[key: string]: ComponentHealth
-	}
-	dependencies: ServiceDependency[]
-	metrics: {
-		responseTime: number
-		memoryUsage: number
-		cpuUsage: number
-		activeConnections: number
-	}
-}
 
 /**
  * Individual component health status
@@ -80,24 +49,6 @@ export interface ServiceDependency {
 }
 
 /**
- * Readiness probe response
- */
-export interface ReadinessStatus {
-	ready: boolean
-	timestamp: string
-	checks: {
-		database: boolean
-		cache: boolean
-		storage: boolean
-		authentication: boolean
-		migrations: boolean
-		[key: string]: boolean
-	}
-	failedChecks?: string[]
-	message?: string
-}
-
-/**
  * Liveness probe response
  */
 export interface LivenessStatus {
@@ -106,22 +57,6 @@ export interface LivenessStatus {
 	uptime: number
 	lastActivity: string
 	message?: string
-}
-
-/**
- * API version and build information
- */
-export interface VersionInfo {
-	version: string
-	buildDate: string
-	gitCommit?: string
-	gitBranch?: string
-	environment: string
-	apiVersion: string
-	features: string[]
-	dependencies: {
-		[key: string]: string
-	}
 }
 
 /**

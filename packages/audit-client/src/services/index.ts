@@ -2,8 +2,9 @@
 // This file will export all service classes
 
 // Events Service - Comprehensive audit event management
+export { EventsService, type EventSubscription } from './events'
+
 export {
-	EventsService,
 	type AuditEvent,
 	type CreateAuditEventInput,
 	type BulkCreateAuditEventsInput,
@@ -15,21 +16,36 @@ export {
 	type ExportResult,
 	type StreamEventsParams,
 	type SubscriptionParams,
-	type EventSubscription,
 	type SessionContext,
 	type DataClassification,
 	type AuditEventStatus,
-} from './events'
+} from '../types/api'
 
 // Compliance Service - HIPAA, GDPR, and custom reporting
 export { ComplianceService, type ReportDownloadOptions } from './compliance'
 
-// Scheduled Reports Service - Comprehensive scheduled report management
 export {
-	ScheduledReportsService,
+	type ReportCriteria,
+	type ReportMetadata,
+	type HIPAASection,
+	type HIPAAReport,
+	type GDPRSection,
+	type GDPRReport,
+	type CustomReportParams,
+	type CustomReport,
+	type GdprExportParams,
+	type GdprExportResult,
+	type PseudonymizationParams,
+	type PseudonymizationResult,
+	type ReportTemplate,
+} from '../types/compliance'
+
+// Scheduled Reports Service - Comprehensive scheduled report management
+export { ScheduledReportsService } from './scheduled-reports'
+
+export {
 	type ScheduleConfig,
 	type DeliveryConfig,
-	type ScheduledReportCriteria,
 	type ScheduledReport,
 	type CreateScheduledReportInput,
 	type UpdateScheduledReportInput,
@@ -38,37 +54,49 @@ export {
 	type ReportExecution,
 	type ExecutionHistoryParams,
 	type PaginatedExecutions,
-} from './scheduled-reports'
+} from '../types/scheduled-reports'
 
 // Audit Presets Service - Comprehensive audit preset management
 export {
 	PresetsService,
-	type ValidationRule,
 	type AuditPresetTemplate,
 	type AuditPresetValidation,
 	type AuditPresetMetadata,
+	type ValidationResult,
+	type ListAuditPresetsParams,
+	type PaginatedAuditPresets,
+} from './presets'
+
+export {
+	type ValidationRule,
 	type AuditPreset,
 	type CreateAuditPresetInput,
 	type UpdateAuditPresetInput,
 	type PresetContext,
-	type ValidationResult,
 	type PresetApplicationResult,
-	type ListAuditPresetsParams,
-	type PaginatedAuditPresets,
 	type PresetVersion,
 	type PresetVersionHistory,
 	type PresetUsageStats,
-} from './presets'
+} from '../types/presets'
 
 // Metrics Service - Comprehensive system monitoring and metrics
 export {
 	MetricsService,
-	type MemoryUsage,
-	type CpuUsage,
+	type AlertStatistics,
 	type DatabaseMetrics,
 	type CacheMetrics,
 	type ApiMetrics,
 	type EndpointStats,
+	type MetricsSubscriptionParams,
+	type RealTimeMetricsData,
+	type MetricsSubscription,
+	type AcknowledgeAlertRequest,
+	type ResolveAlertRequest,
+} from './metrics'
+
+export {
+	type MemoryUsage,
+	type CpuUsage,
 	type SystemMetrics,
 	type AuditMetrics,
 	type PerformanceMetrics,
@@ -78,29 +106,26 @@ export {
 	type AlertType,
 	type Alert,
 	type AlertsParams,
-	type AlertStatistics,
 	type PaginatedAlerts,
 	type AuditMetricsParams,
-	type MetricsSubscriptionParams,
-	type RealTimeMetricsData,
-	type MetricsSubscription,
-	type AcknowledgeAlertRequest,
-	type ResolveAlertRequest,
-} from './metrics'
+} from '../types/metrics'
 
 // Health Service - Comprehensive system health monitoring
 export {
 	HealthService,
-	type HealthStatus,
-	type DetailedHealthStatus,
 	type ComponentHealth,
 	type ServiceDependency,
-	type ReadinessStatus,
 	type LivenessStatus,
-	type VersionInfo,
 	type ApiStatus,
 	type HealthCheckConfig,
 	type HealthSubscriptionParams,
 	type RealTimeHealthData,
 	type HealthSubscription,
 } from './health'
+
+export {
+	type HealthStatus,
+	type DetailedHealthStatus,
+	type ReadinessStatus,
+	type VersionInfo,
+} from '../types/health'
