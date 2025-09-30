@@ -128,8 +128,8 @@ export const PaginationMetadataSchema = z.object({
 	offset: z.number().int().min(0),
 	hasNext: z.boolean(),
 	hasPrevious: z.boolean(),
-	totalPages: z.number().int().min(0),
-	currentPage: z.number().int().min(1),
+	nextCursor: z.string().optional(),
+	previousCursor: z.string().optional(),
 })
 export type PaginationMetadata = z.infer<typeof PaginationMetadataSchema>
 

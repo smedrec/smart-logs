@@ -255,6 +255,15 @@ export interface ExportConfig {
 	}
 }
 
+export interface NotificationConfig {
+	recipients: string[]
+	onSuccess: boolean
+	onFailure: boolean
+	onSkip: boolean
+	includeReport: boolean
+	customMessage?: string
+}
+
 /**
  * Scheduled report configuration
  */
@@ -280,12 +289,16 @@ export interface ScheduledReportConfig {
 		storageLocation?: string
 	}
 	export: ExportConfig
+	notification: NotificationConfig
 	enabled: boolean
 	createdAt: string
 	createdBy: string
 	lastRun?: string
 	nextRun?: string
 	runId?: string
+	tags?: string[]
+	metadata?: Record<string, any>
+	version?: number
 }
 
 /**

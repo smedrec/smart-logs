@@ -230,10 +230,10 @@ export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>
  * Notification configuration
  */
 export const NotificationConfigSchema = z.object({
+	recipients: z.array(z.string().email()),
 	onSuccess: z.boolean().default(false),
 	onFailure: z.boolean().default(true),
 	onSkip: z.boolean().default(false),
-	recipients: z.array(z.string().email()),
 	includeReport: z.boolean().default(false),
 	customMessage: z.string().optional(),
 })
@@ -246,26 +246,30 @@ export const ScheduledReportSchema = z.object({
 	id: z.string(),
 	name: z.string().min(1, 'Report name is required').max(255),
 	description: z.string().max(1000).optional(),
+	organizationId: z.string().min(1, 'Organization ID is required'),
+	templateId: z.string().optional(),
 	reportType: ReportTypeSchema,
 	criteria: ReportCriteriaSchema,
 	format: ReportFormatSchema,
 	schedule: ScheduleConfigSchema,
 	delivery: DeliveryConfigSchema,
+	export: ExportResultSchema,
 	notifications: NotificationConfigSchema.optional(),
 
 	// Status and metadata
-	isActive: z.boolean().default(true),
+	enabled: z.boolean().default(true),
 	createdAt: z.string().datetime(),
 	updatedAt: z.string().datetime(),
 	createdBy: z.string().min(1),
 	updatedBy: z.string().min(1),
 
 	// Execution tracking
-	lastExecuted: z.string().datetime().optional(),
-	nextExecution: z.string().datetime(),
+	lastRun: z.string().datetime().optional(),
+	nextRun: z.string().datetime(),
 	executionCount: z.number().int().min(0).default(0),
 	successCount: z.number().int().min(0).default(0),
 	failureCount: z.number().int().min(0).default(0),
+	runId: z.string().optional(),
 
 	// Configuration
 	tags: z.array(z.string()).default([]),
@@ -279,10 +283,12 @@ export type ScheduledReport = z.infer<typeof ScheduledReportSchema>
  */
 export const CreateScheduledReportInputSchema = ScheduledReportSchema.omit({
 	id: true,
+	organizationId: true,
+	enabled: true,
 	createdAt: true,
 	updatedAt: true,
-	lastExecuted: true,
-	nextExecution: true,
+	lastRun: true,
+	nextRun: true,
 	executionCount: true,
 	successCount: true,
 	failureCount: true,
@@ -294,7 +300,7 @@ export type CreateScheduledReportInput = z.infer<typeof CreateScheduledReportInp
  * Update scheduled report input
  */
 export const UpdateScheduledReportInputSchema = CreateScheduledReportInputSchema.partial().extend({
-	lastModifiedBy: z.string().min(1),
+	updatedBy: z.string().min(1),
 })
 export type UpdateScheduledReportInput = z.infer<typeof UpdateScheduledReportInputSchema>
 
@@ -415,7 +421,7 @@ export const ExecutionHistoryParamsSchema = z.object({
 	pagination: PaginationParamsSchema.optional(),
 	sort: z
 		.object({
-			field: z.enum(['scheduledAt', 'startedAt', 'completedAt', 'duration', 'status']),
+			field: z.enum(['scheduledTime', 'executionTime', 'duration', 'status']),
 			direction: z.enum(['asc', 'desc']).default('desc'),
 		})
 		.optional(),
@@ -433,8 +439,8 @@ export const PaginatedExecutionsSchema = z.object({
 			totalExecutions: z.number().int().min(0),
 			successRate: z.number().min(0).max(100),
 			averageDuration: z.number().min(0),
-			lastExecution: z.string().datetime().optional(),
-			nextExecution: z.string().datetime().optional(),
+			lastRun: z.string().datetime().optional(),
+			nextRun: z.string().datetime().optional(),
 		})
 		.optional(),
 })
@@ -455,7 +461,7 @@ export const ListScheduledReportsParamsSchema = z.object({
 	search: z.string().optional(),
 	dateRange: z
 		.object({
-			field: z.enum(['createdAt', 'updatedAt', 'lastExecuted', 'nextExecution']),
+			field: z.enum(['createdAt', 'updatedAt', 'lastRun', 'nextRun']),
 			startDate: z.string().datetime(),
 			endDate: z.string().datetime(),
 		})

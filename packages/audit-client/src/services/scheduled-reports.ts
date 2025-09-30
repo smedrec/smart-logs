@@ -10,6 +10,8 @@ import {
 	ValidationError,
 } from '../utils/validation'
 
+import type { AuditClientConfig } from '../core/config'
+import type { Logger } from '../infrastructure/logger'
 import type {
 	CreateScheduledReportInput,
 	DeliveryConfig,
@@ -21,9 +23,7 @@ import type {
 	ScheduleConfig,
 	ScheduledReport,
 	UpdateScheduledReportInput,
-} from '@/types/scheduled-reports'
-import type { AuditClientConfig } from '../core/config'
-import type { Logger } from '../infrastructure/logger'
+} from '../types/scheduled-reports'
 
 /**
  * ScheduledReportsService - Comprehensive scheduled report management
@@ -361,13 +361,13 @@ export class ScheduledReportsService extends BaseResource {
 		}
 
 		if (delivery.method === 'email') {
-			if (!delivery.recipients || delivery.recipients.length === 0) {
+			if (!delivery.email?.recipients || delivery.email.recipients.length === 0) {
 				throw new Error('Email recipients are required for email delivery')
 			}
 
 			// Validate email addresses
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-			for (const email of delivery.recipients) {
+			for (const email of delivery.email.recipients) {
 				if (!emailRegex.test(email)) {
 					throw new Error(`Invalid email address: ${email}`)
 				}
@@ -375,21 +375,21 @@ export class ScheduledReportsService extends BaseResource {
 		}
 
 		if (delivery.method === 'webhook') {
-			if (!delivery.webhookUrl) {
+			if (!delivery.webhook?.url) {
 				throw new Error('Webhook URL is required for webhook delivery')
 			}
 
 			// Validate webhook URL
 			try {
-				new URL(delivery.webhookUrl)
+				new URL(delivery.webhook.url)
 			} catch {
 				throw new Error('Invalid webhook URL format')
 			}
 		}
 
-		if (delivery.method === 's3') {
-			if (!delivery.s3Bucket) {
-				throw new Error('s3 bucket is ')
+		if (delivery.method === 'storage') {
+			if (!delivery.storage?.config) {
+				throw new Error('storage config is required for storage delivery')
 			}
 		}
 	}
@@ -554,24 +554,24 @@ export class ScheduledReportsService extends BaseResource {
 		if (input.delivery) {
 			// Validate partial delivery config
 			if (input.delivery.method) {
-				const validMethods = ['email', 'webhook', 'storage']
+				const validMethods = ['email', 'webhook', 'storage', 'sftp', 'download']
 				if (!validMethods.includes(input.delivery.method)) {
 					throw new Error(`Invalid delivery method. Must be one of: ${validMethods.join(', ')}`)
 				}
 			}
 
-			if (input.delivery.recipients) {
+			if (input.delivery.email?.recipients) {
 				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-				for (const email of input.delivery.recipients) {
+				for (const email of input.delivery.email.recipients) {
 					if (!emailRegex.test(email)) {
 						throw new Error(`Invalid email address: ${email}`)
 					}
 				}
 			}
 
-			if (input.delivery.webhookUrl) {
+			if (input.delivery.webhook?.url) {
 				try {
-					new URL(input.delivery.webhookUrl)
+					new URL(input.delivery.webhook.url)
 				} catch {
 					throw new Error('Invalid webhook URL format')
 				}

@@ -10,7 +10,7 @@
  * Requirements: 4.1, 4.4, 8.1
  */
 
-import { and, desc, eq, gte, lte } from 'drizzle-orm'
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
 import { Inngest } from 'inngest'
 
 import {
@@ -186,7 +186,9 @@ export class ScheduledReportingService {
 	 * Create a new scheduled report configuration
 	 */
 	async createScheduledReport(
-		config: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> & { organizationId: string }
+		config: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun' | 'version'> & {
+			organizationId: string
+		}
 	): Promise<ScheduledReportConfig> {
 		const reportId = this.generateId('report')
 		const nextRun = this.calculateNextRun(config.schedule)
@@ -204,10 +206,13 @@ export class ScheduledReportingService {
 			schedule: config.schedule,
 			delivery: config.delivery,
 			export: config.export,
+			notification: config.notification,
 			enabled: config.enabled ? 'true' : 'false',
 			lastRun: null,
 			nextRun,
 			runId: null,
+			tags: config.tags || [],
+			metadata: config.metadata || null,
 			createdBy: config.createdBy,
 			updatedBy: null,
 		}
@@ -257,6 +262,7 @@ export class ScheduledReportingService {
 			(updates.schedule ? this.calculateNextRun(updates.schedule) : existing.nextRun)
 
 		const updateData: any = {
+			version: (existing as any).version + 1,
 			updatedAt: new Date().toISOString(),
 			updatedBy: updates.updatedBy || null,
 		}
@@ -269,7 +275,10 @@ export class ScheduledReportingService {
 		if (updates.schedule) updateData.schedule = updates.schedule
 		if (updates.delivery) updateData.delivery = updates.delivery
 		if (updates.export) updateData.export = updates.export
+		if (updates.notification) updateData.notification = updates.notification
 		if (updates.enabled !== undefined) updateData.enabled = updates.enabled ? 'true' : 'false'
+		if (updates.tags && updates.tags.length > 0) updateData.tags = updates.tags
+		if (updates.metadata) updateData.metadata = updates.metadata
 		if (nextRun) updateData.nextRun = nextRun
 
 		await db.update(scheduledReports).set(updateData).where(eq(scheduledReports.id, reportId))
@@ -291,10 +300,14 @@ export class ScheduledReportingService {
 			schedule: updated.schedule as ScheduledReportConfig['schedule'],
 			delivery: updated.delivery as ScheduledReportConfig['delivery'],
 			export: updated.export as ScheduledReportConfig['export'],
+			notification: updated.notification as ScheduledReportConfig['notification'],
 			enabled: updated.enabled === 'true',
 			lastRun: updated.lastRun || undefined,
 			nextRun: updated.nextRun || undefined,
 			runId: updated.runId || undefined,
+			tags: (updated.tags as string[]) || [],
+			metadata: (updated.metadata as any) || undefined,
+			version: updated.version,
 			createdAt: updated.createdAt,
 			createdBy: updated.createdBy,
 		}
@@ -358,10 +371,14 @@ export class ScheduledReportingService {
 			schedule: record.schedule as ScheduledReportConfig['schedule'],
 			delivery: record.delivery as ScheduledReportConfig['delivery'],
 			export: record.export as ScheduledReportConfig['export'],
+			notification: record.notification as ScheduledReportConfig['notification'],
 			enabled: record.enabled === 'true',
 			lastRun: record.lastRun || undefined,
 			nextRun: record.nextRun || undefined,
 			runId: record.runId || undefined,
+			tags: (record.tags as ScheduledReportConfig['tags']) || [],
+			metadata: (record.metadata as ScheduledReportConfig['metadata']) || undefined,
+			version: record.version,
 			createdAt: record.createdAt,
 			createdBy: record.createdBy,
 		}))
@@ -391,10 +408,14 @@ export class ScheduledReportingService {
 			schedule: record.schedule as ScheduledReportConfig['schedule'],
 			delivery: record.delivery as ScheduledReportConfig['delivery'],
 			export: record.export as ScheduledReportConfig['export'],
+			notification: record.notification as ScheduledReportConfig['notification'],
 			enabled: record.enabled === 'true',
 			lastRun: record.lastRun || undefined,
 			nextRun: record.nextRun || undefined,
 			runId: record.runId || undefined,
+			tags: (record.tags as ScheduledReportConfig['tags']) || [],
+			metadata: (record.metadata as ScheduledReportConfig['metadata']) || undefined,
+			version: record.version,
 			createdAt: record.createdAt,
 			createdBy: record.createdBy,
 		}
@@ -490,6 +511,8 @@ export class ScheduledReportingService {
 				.set({
 					lastRun: execution.executionTime,
 					nextRun,
+					executionCount: sql`scheduledReports.executionCount + 1`,
+					successCount: sql`scheduledReports.successCount + 1`,
 				})
 				.where(eq(scheduledReports.id, reportId))
 			// TODO: schedule next run
@@ -506,6 +529,13 @@ export class ScheduledReportingService {
 					deliveryAttempts: execution.deliveryAttempts,
 				})
 				.where(eq(reportExecutions.id, executionId))
+
+			await db
+				.update(scheduledReports)
+				.set({
+					failureCount: sql`scheduledReports.failureCount + 1`,
+				})
+				.where(eq(scheduledReports.id, reportId))
 		}
 
 		return execution
@@ -669,7 +699,7 @@ export class ScheduledReportingService {
 			throw new Error(`Report template not found: ${templateId}`)
 		}
 
-		const reportConfig: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> & {
+		const reportConfig: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun' | 'version'> & {
 			organizationId: string
 		} = {
 			...overrides,
@@ -697,6 +727,13 @@ export class ScheduledReportingService {
 				format: 'json',
 				includeMetadata: true,
 				includeIntegrityReport: false,
+			},
+			notification: overrides.notification || {
+				recipients: ['reports@smedrec.com'],
+				onSuccess: false,
+				onFailure: true,
+				onSkip: false,
+				includeReport: false,
 			},
 			enabled: overrides.enabled !== undefined ? overrides.enabled : true,
 			createdBy: overrides.createdBy || 'system',

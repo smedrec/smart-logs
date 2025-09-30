@@ -452,10 +452,18 @@ export const scheduledReports = pgTable(
 		schedule: jsonb('schedule').notNull(), // Schedule configuration
 		delivery: jsonb('delivery').notNull(), // Delivery configuration
 		export: jsonb('export').notNull(), // Export configuration
+		notification: jsonb('notification').notNull(), // Notification configuration
 		enabled: varchar('enabled', { length: 10 }).notNull().default('true'),
 		lastRun: timestamp('last_run', { withTimezone: true, mode: 'string' }),
 		nextRun: timestamp('next_run', { withTimezone: true, mode: 'string' }),
+		executionCount: integer('execution_count').notNull().default(0),
+		successCount: integer('success_count').notNull().default(0),
+		failureCount: integer('failure_count').notNull().default(0),
 		runId: varchar('run_id', { length: 255 }),
+		tags: jsonb('tags').notNull().default('[]'), // Array of tags
+		metadata: jsonb('metadata'), // Additional report metadata
+		version: integer('version').notNull().default(1), // Version control for concurrency
+		isDeleted: varchar('is_deleted', { length: 10 }).notNull().default('false'),
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
 			.notNull()
 			.defaultNow(),
