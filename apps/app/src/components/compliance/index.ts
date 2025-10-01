@@ -1,6 +1,15 @@
 // Core compliance components exports - implemented
 export { ComplianceLayout, CompliancePage, ComplianceSection } from './layout'
 
+// Manual execution components - implemented
+export {
+	ManualExecutionDialog,
+	ExecutionProgressTracker,
+	NotificationCenter,
+	useNotifications,
+	ManualExecutionDemo,
+} from './manual'
+
 // Export types
 export type * from './types'
 
@@ -10,7 +19,6 @@ export type * from './types'
 // - Reports management components (./reports/)
 // - Form components (./forms/)
 // - Execution components (./execution/)
-// - Manual execution components (./manual/)
 // - Error handling components (./error/)
 // - Navigation components (./navigation/)
 // - Hooks (./hooks/)

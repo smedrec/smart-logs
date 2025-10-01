@@ -1,5 +1,5 @@
-// Manual execution components - to be implemented in subsequent tasks
-// Directory structure ready for:
-// - ManualExecutionDialog (./manual-execution-dialog.tsx)
-// - ExecutionProgressTracker (./execution-progress-tracker.tsx)
-// - NotificationCenter (./notification-center.tsx)
+// Manual execution components
+export { ManualExecutionDialog } from './manual-execution-dialog'
+export { ExecutionProgressTracker } from './execution-progress-tracker'
+export { NotificationCenter, useNotifications } from './notification-center'
+export { ManualExecutionDemo } from './manual-execution-demo'
