@@ -176,49 +176,6 @@ const PaginatedScheduledReportsSchema = z.object({
 	}),
 })
 
-const ListScheduledReportsParamsSchema = z.object({
-	enabled: z.boolean().optional(),
-	reportType: z
-		.array(
-			z.enum([
-				'HIPAA_AUDIT_TRAIL',
-				'GDPR_PROCESSING_ACTIVITIES',
-				'GENERAL_COMPLIANCE',
-				'INTEGRITY_VERIFICATION',
-			])
-		)
-		.optional(),
-	createdBy: z.array(z.string()).optional(),
-	tags: z.array(z.string()).optional(),
-	search: z.string().optional(),
-	dateRange: z
-		.object({
-			field: z.enum(['created_at', 'updated_at', 'last_run', 'next_run']),
-			startDate: z.string().datetime(),
-			endDate: z.string().datetime(),
-		})
-		.optional(),
-	pagination: z
-		.object({
-			limit: z.number().int().min(1).max(1000).default(50),
-			offset: z.number().int().min(0).default(0),
-		})
-		.optional(),
-	sort: z
-		.object({
-			field: z.enum([
-				'name',
-				'created_at',
-				'updated_at',
-				'last_run',
-				'next_run',
-				'execution_count',
-			]),
-			direction: z.enum(['asc', 'desc']).default('desc'),
-		})
-		.optional(),
-})
-
 // Route definitions
 
 const createScheduledReportRoute = createRoute({
@@ -256,7 +213,31 @@ const getScheduledReportsRoute = createRoute({
 	summary: 'Get scheduled reports',
 	description: 'Retrieves scheduled compliance reports.',
 	request: {
-		query: ListScheduledReportsParamsSchema,
+		query: z.object({
+			enabled: z.boolean().optional(),
+			reportType: z
+				.array(
+					z.enum([
+						'HIPAA_AUDIT_TRAIL',
+						'GDPR_PROCESSING_ACTIVITIES',
+						'GENERAL_COMPLIANCE',
+						'INTEGRITY_VERIFICATION',
+					])
+				)
+				.optional(),
+			createdBy: z.array(z.string()).optional(),
+			tags: z.array(z.string()).optional(),
+			search: z.string().optional(),
+			rangeBy: z.enum(['created_at', 'updated_at', 'last_run', 'next_run']).optional(),
+			startDate: z.string().datetime().optional(),
+			endDate: z.string().datetime().optional(),
+			limit: z.string().optional(),
+			offset: z.string().optional(),
+			sortBy: z
+				.enum(['name', 'created_at', 'updated_at', 'last_run', 'next_run', 'execution_count'])
+				.optional(),
+			sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
+		}),
 	},
 	responses: {
 		200: {
@@ -352,6 +333,103 @@ const deleteScheduledReportRoute = createRoute({
 	},
 })
 
+const getExecutionHistoryRoute = createRoute({
+	method: 'get',
+	path: '/{id}/executions',
+	tags: ['Scheduled Reports'],
+	summary: 'Get execution history for a scheduled report',
+	description: 'Retrieves the execution history for a specific scheduled report.',
+	request: {
+		params: z.object({
+			id: z.string().startsWith('report-'),
+		}),
+		query: z.object({
+			status: z
+				.array(
+					z.enum(['pending', 'running', 'completed', 'failed', 'cancelled', 'skipped', 'timeout'])
+				)
+				.optional(),
+			trigger: z.array(z.enum(['scheduled', 'manual', 'api', 'retry', 'catchup'])).optional(),
+			startDate: z.string().datetime().optional(),
+			endDate: z.string().datetime().optional(),
+			limit: z.string().optional(),
+			offset: z.string().optional(),
+			sortBy: z.enum(['scheduled_time', 'execution_time', 'duration', 'status']).optional(),
+			sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
+		}),
+	},
+	responses: {
+		200: {
+			description: 'Execution history retrieved successfully',
+			content: {
+				'application/json': {
+					schema: z.object({
+						data: z.array(
+							z.object({
+								id: z.string().startsWith('execution-'),
+								scheduledReportId: z.string(),
+								status: z.enum([
+									'pending',
+									'running',
+									'completed',
+									'failed',
+									'cancelled',
+									'skipped',
+									'timeout',
+								]),
+								trigger: z.enum(['scheduled', 'manual', 'api', 'retry', 'catchup']),
+								scheduledTime: z.string().datetime(),
+								executionTime: z.string().datetime().optional(),
+								duration: z.number().min(0).optional(),
+								reportId: z.string().optional(),
+								recordsProcessed: z.number().int().min(0).optional(),
+								deliveryAttempts: z.array(
+									z.object({
+										attemptId: z.string(),
+										timestamp: z.string().datetime(),
+										status: z.enum(['pending', 'delivered', 'failed', 'skipped']),
+										method: z.enum(['email', 'webhook', 'storage', 'download', 'sftp']),
+										target: z.string(),
+										error: z
+											.object({
+												code: z.string(),
+												message: z.string(),
+												details: z.record(z.string(), z.any()).optional(),
+												stackTrace: z.string().optional(),
+											})
+											.optional(),
+										responseCode: z.number().optional(),
+										responseTime: z.number().optional(),
+										retryCount: z.number().int().min(0),
+									})
+								),
+								error: z
+									.object({
+										code: z.string(),
+										message: z.string(),
+										details: z.record(z.string(), z.any()).optional(),
+										stackTrace: z.string().optional(),
+									})
+									.optional(),
+							})
+						),
+						pagination: z.object({
+							total: z.number().int().min(0),
+							limit: z.number().int().min(1),
+							offset: z.number().int().min(0),
+							hasNext: z.boolean(),
+							hasPrevious: z.boolean(),
+							nextCursor: z.string().optional(),
+							previousCursor: z.string().optional(),
+						}),
+					}),
+				},
+			},
+		},
+		...openApiErrorResponses,
+	},
+})
+
 /**
  * Create compliance API router
  */
@@ -418,9 +496,12 @@ export function createscheduledReportAPI(): OpenAPIHono<HonoEnv> {
 			})
 		}
 
-		const params = c.req.valid('query')
-
-		logger.info(`Getting scheduled reports: ${JSON.stringify(params)}`)
+		const query = c.req.valid('query')
+		const params = {
+			...query,
+			limit: query.limit ? parseInt(query.limit) : 50,
+			offset: query.offset ? parseInt(query.offset) : 0,
+		}
 
 		try {
 			const scheduledReports = await compliance.scheduled.getScheduledReports(
@@ -428,7 +509,10 @@ export function createscheduledReportAPI(): OpenAPIHono<HonoEnv> {
 				{ ...params }
 			)
 
-			const response = performance.createPaginatedResponse(scheduledReports, params.pagination)
+			const response = performance.createPaginatedResponse(scheduledReports, {
+				limit: params.limit,
+				offset: params.offset,
+			})
 
 			return c.json(
 				{
@@ -471,14 +555,7 @@ export function createscheduledReportAPI(): OpenAPIHono<HonoEnv> {
 				})
 			}
 
-			// Ensure nextRun and createdAt are always present as strings
-			const safeScheduledReport = {
-				...scheduledReport,
-				nextRun: scheduledReport.nextRun ?? new Date().toISOString(),
-				createdAt: scheduledReport.createdAt ?? new Date().toISOString(),
-			}
-
-			return c.json(safeScheduledReport, 200)
+			return c.json(scheduledReport, 200)
 		} catch (error) {
 			if (error instanceof ApiError) {
 				throw error
@@ -553,6 +630,54 @@ export function createscheduledReportAPI(): OpenAPIHono<HonoEnv> {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error(`Failed to delete scheduled report: ${message}`)
+
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+		}
+	})
+
+	// Get execution history
+	app.openapi(getExecutionHistoryRoute, async (c) => {
+		const { compliance, performance, logger } = c.get('services')
+		const session = c.get('session')
+
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
+		try {
+			const { id } = c.req.valid('param')
+			const query = c.req.valid('query')
+			const params = {
+				...query,
+				limit: query.limit ? parseInt(query.limit) : 50,
+				offset: query.offset ? parseInt(query.offset) : 0,
+			}
+
+			logger.info(`Getting execution history for report: ${id}`)
+
+			const executionHistory = await compliance.scheduled.getExecutionHistory(id, params.limit)
+
+			const response = performance.createPaginatedResponse(executionHistory, {
+				limit: params.limit,
+				offset: params.offset,
+			})
+
+			return c.json(
+				{
+					data: response.data,
+					pagination: response.pagination,
+				},
+				200
+			)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error(`Failed to get execution history: ${message}`)
 
 			throw new ApiError({
 				code: 'INTERNAL_SERVER_ERROR',

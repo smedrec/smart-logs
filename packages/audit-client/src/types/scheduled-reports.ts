@@ -429,19 +429,12 @@ export type ReportExecution = z.infer<typeof ReportExecutionSchema>
 export const ExecutionHistoryParamsSchema = z.object({
 	status: z.array(ExecutionStatusSchema).optional(),
 	trigger: z.array(ExecutionTriggerSchema).optional(),
-	dateRange: z
-		.object({
-			startDate: z.string().datetime(),
-			endDate: z.string().datetime(),
-		})
-		.optional(),
-	pagination: PaginationParamsSchema.optional(),
-	sort: z
-		.object({
-			field: z.enum(['scheduledTime', 'executionTime', 'duration', 'status']),
-			direction: z.enum(['asc', 'desc']).default('desc'),
-		})
-		.optional(),
+	startDate: z.string().datetime().optional(),
+	endDate: z.string().datetime().optional(),
+	limit: z.number().int().min(1).max(1000).optional(),
+	offset: z.number().int().min(0).optional(),
+	sortBy: z.enum(['scheduled_time', 'execution_time', 'duration', 'status']).optional(),
+	sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 })
 export type ExecutionHistoryParams = z.infer<typeof ExecutionHistoryParamsSchema>
 
@@ -472,31 +465,28 @@ export type PaginatedExecutions = z.infer<typeof PaginatedExecutionsSchema>
  */
 export const ListScheduledReportsParamsSchema = z.object({
 	enabled: z.boolean().optional(),
-	reportType: z.array(ReportTypeSchema).optional(),
+	reportType: z
+		.array(
+			z.enum([
+				'HIPAA_AUDIT_TRAIL',
+				'GDPR_PROCESSING_ACTIVITIES',
+				'GENERAL_COMPLIANCE',
+				'INTEGRITY_VERIFICATION',
+			])
+		)
+		.optional(),
 	createdBy: z.array(z.string()).optional(),
 	tags: z.array(z.string()).optional(),
 	search: z.string().optional(),
-	dateRange: z
-		.object({
-			field: z.enum(['created_at', 'updated_at', 'last_run', 'next_run']),
-			startDate: z.string().datetime(),
-			endDate: z.string().datetime(),
-		})
+	rangeBy: z.enum(['created_at', 'updated_at', 'last_run', 'next_run']).optional(),
+	startDate: z.string().datetime().optional(),
+	endDate: z.string().datetime().optional(),
+	limit: z.number().int().min(1).max(1000).optional(),
+	offset: z.number().int().min(0).optional(),
+	sortBy: z
+		.enum(['name', 'created_at', 'updated_at', 'last_run', 'next_run', 'execution_count'])
 		.optional(),
-	pagination: PaginationParamsSchema.optional(),
-	sort: z
-		.object({
-			field: z.enum([
-				'name',
-				'created_at',
-				'updated_at',
-				'last_run',
-				'next_run',
-				'execution_count',
-			]),
-			direction: z.enum(['asc', 'desc']).default('desc'),
-		})
-		.optional(),
+	sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 })
 export type ListScheduledReportsParams = z.infer<typeof ListScheduledReportsParamsSchema>
 

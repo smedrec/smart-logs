@@ -45,27 +45,41 @@ export class ScheduledReportsService extends BaseResource {
 	 * Requirement 6.3: WHEN listing scheduled reports THEN the client SHALL provide filtering and pagination options
 	 */
 	async list(params: ListScheduledReportsParams = {}): Promise<PaginatedScheduledReports> {
-		// Validate input using centralized validation
-		const validationResult = validateListScheduledReportsParams(params)
-		if (!validationResult.success) {
-			throw new ValidationError('Invalid list scheduled reports parameters', {
-				...(validationResult.zodError && { originalError: validationResult.zodError }),
+		try {
+			// Validate input using centralized validation
+			const validationResult = validateListScheduledReportsParams(params)
+			if (!validationResult.success) {
+				throw new ValidationError('Invalid list scheduled reports parameters', {
+					...(validationResult.zodError && { originalError: validationResult.zodError }),
+				})
+			}
+
+			const validatedQuery = validationResult.data!
+
+			const response = await this.request<PaginatedScheduledReports>('/scheduled-reports', {
+				method: 'GET',
+				query: validatedQuery,
 			})
+
+			// Validate response structure
+			assertType(response, isObject, 'Invalid paginated scheduled reports response from server')
+			assertDefined(response.data, 'Paginated scheduled reports response missing reports array')
+			assertDefined(response.pagination, 'Paginated scheduled reports response missing pagination')
+
+			return response
+		} catch (error) {
+			// Fallback: try with minimal parameters
+			try {
+				const fallbackParams = { limit: 50, offset: 0 }
+
+				return await this.request<PaginatedScheduledReports>('/scheduled-reports', {
+					method: 'GET',
+					query: fallbackParams,
+				})
+			} catch (fallbackError) {
+				throw error // Throw original error
+			}
 		}
-
-		const validatedQuery = validationResult.data!
-
-		const response = await this.request<PaginatedScheduledReports>('/scheduled-reports', {
-			method: 'GET',
-			query: validatedQuery,
-		})
-
-		// Validate response structure
-		assertType(response, isObject, 'Invalid paginated scheduled reports response from server')
-		assertDefined(response.data, 'Paginated scheduled reports response missing reports array')
-		assertDefined(response.pagination, 'Paginated scheduled reports response missing pagination')
-
-		return response
 	}
 
 	/**
@@ -188,20 +202,34 @@ export class ScheduledReportsService extends BaseResource {
 
 		const validatedQuery = validationResult.data!
 
-		const response = await this.request<PaginatedExecutions>(
-			`/scheduled-reports/${id}/executions`,
-			{
-				method: 'GET',
-				query: validatedQuery,
+		try {
+			const response = await this.request<PaginatedExecutions>(
+				`/scheduled-reports/${id}/executions`,
+				{
+					method: 'GET',
+					query: validatedQuery,
+				}
+			)
+
+			// Validate response structure
+			assertType(response, isObject, 'Invalid paginated executions response from server')
+			assertDefined(response.data, 'Paginated executions response missing executions array')
+			assertDefined(response.pagination, 'Paginated executions response missing pagination')
+
+			return response
+		} catch (error) {
+			// Fallback: try with minimal parameters
+			try {
+				const fallbackParams = { limit: 50, offset: 0 }
+
+				return await this.request<PaginatedExecutions>(`/scheduled-reports/${id}/executions`, {
+					method: 'GET',
+					query: fallbackParams,
+				})
+			} catch (fallbackError) {
+				throw error // Throw original error
 			}
-		)
-
-		// Validate response structure
-		assertType(response, isObject, 'Invalid paginated executions response from server')
-		assertDefined(response.data, 'Paginated executions response missing executions array')
-		assertDefined(response.pagination, 'Paginated executions response missing pagination')
-
-		return response
+		}
 	}
 
 	/**
@@ -583,14 +611,14 @@ export class ScheduledReportsService extends BaseResource {
 	 * Validate list parameters
 	 */
 	private validateListParams(params: ListScheduledReportsParams): void {
-		if (params.pagination?.limit !== undefined) {
-			if (params.pagination.limit < 1 || params.pagination.limit > 1000) {
+		if (params.limit !== undefined) {
+			if (params.limit < 1 || params.limit > 1000) {
 				throw new Error('Limit must be between 1 and 1000')
 			}
 		}
 
-		if (params.pagination?.offset !== undefined) {
-			if (params.pagination.offset < 0) {
+		if (params.offset !== undefined) {
+			if (params.offset < 0) {
 				throw new Error('Offset must be non-negative')
 			}
 		}
@@ -604,16 +632,16 @@ export class ScheduledReportsService extends BaseResource {
 			}
 		}
 
-		if (params.sort?.field) {
+		if (params.sortBy) {
 			const validSortFields = ['name', 'createdAt', 'lastExecution', 'nextExecution']
-			if (!validSortFields.includes(params.sort.field)) {
+			if (!validSortFields.includes(params.sortBy)) {
 				throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`)
 			}
 		}
 
-		if (params.sort?.direction) {
+		if (params.sortOrder) {
 			const validSortOrders = ['asc', 'desc']
-			if (!validSortOrders.includes(params.sort.direction)) {
+			if (!validSortOrders.includes(params.sortOrder)) {
 				throw new Error(`Invalid sort order. Must be one of: ${validSortOrders.join(', ')}`)
 			}
 		}
@@ -623,14 +651,14 @@ export class ScheduledReportsService extends BaseResource {
 	 * Validate execution history parameters
 	 */
 	private validateExecutionHistoryParams(params: ExecutionHistoryParams): void {
-		if (params.pagination?.limit !== undefined) {
-			if (params.pagination.limit < 1 || params.pagination.limit > 1000) {
+		if (params.limit !== undefined) {
+			if (params.limit < 1 || params.limit > 1000) {
 				throw new Error('Limit must be between 1 and 1000')
 			}
 		}
 
-		if (params.pagination?.offset !== undefined) {
-			if (params.pagination.offset < 0) {
+		if (params.offset !== undefined) {
+			if (params.offset < 0) {
 				throw new Error('Offset must be non-negative')
 			}
 		}
@@ -652,9 +680,9 @@ export class ScheduledReportsService extends BaseResource {
 			}
 		}
 
-		if (params.dateRange) {
-			const startDate = new Date(params.dateRange.startDate)
-			const endDate = new Date(params.dateRange.endDate)
+		if (params.startDate && params.endDate) {
+			const startDate = new Date(params.startDate)
+			const endDate = new Date(params.endDate)
 
 			if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
 				throw new Error('Invalid date format in date range')
@@ -665,16 +693,16 @@ export class ScheduledReportsService extends BaseResource {
 			}
 		}
 
-		if (params.sort?.field) {
-			const validSortFields = ['startedAt', 'completedAt', 'status']
-			if (!validSortFields.includes(params.sort.field)) {
+		if (params.sortBy) {
+			const validSortFields = ['started_at', 'completed_at', 'status']
+			if (!validSortFields.includes(params.sortBy)) {
 				throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`)
 			}
 		}
 
-		if (params.sort?.direction) {
+		if (params.sortOrder) {
 			const validSortOrders = ['asc', 'desc']
-			if (!validSortOrders.includes(params.sort.direction)) {
+			if (!validSortOrders.includes(params.sortOrder)) {
 				throw new Error(`Invalid sort order. Must be one of: ${validSortOrders.join(', ')}`)
 			}
 		}

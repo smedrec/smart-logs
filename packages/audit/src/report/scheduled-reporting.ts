@@ -219,37 +219,23 @@ export interface ScheduledReportConfig {
 }
 
 interface ListParams {
-	sort?:
-		| {
-				field: 'name' | 'created_at' | 'updated_at' | 'last_run' | 'next_run' | 'execution_count'
-				direction: 'asc' | 'desc'
-		  }
-		| undefined
-	reportType?:
-		| (
-				| 'HIPAA_AUDIT_TRAIL'
-				| 'GDPR_PROCESSING_ACTIVITIES'
-				| 'GENERAL_COMPLIANCE'
-				| 'INTEGRITY_VERIFICATION'
-		  )[]
-		| undefined
-	dateRange?:
-		| {
-				startDate: string
-				endDate: string
-				field: 'created_at' | 'updated_at' | 'last_run' | 'next_run'
-		  }
-		| undefined
-	enabled?: boolean | undefined
-	createdBy?: string[] | undefined
-	tags?: string[] | undefined
-	pagination?:
-		| {
-				limit: number
-				offset: number
-		  }
-		| undefined
-	search?: string | undefined
+	sortBy?: 'name' | 'created_at' | 'updated_at' | 'last_run' | 'next_run' | 'execution_count'
+	sortOrder: 'asc' | 'desc'
+	reportType?: (
+		| 'HIPAA_AUDIT_TRAIL'
+		| 'GDPR_PROCESSING_ACTIVITIES'
+		| 'GENERAL_COMPLIANCE'
+		| 'INTEGRITY_VERIFICATION'
+	)[]
+	startDate?: string
+	endDate?: string
+	rangeBy?: 'created_at' | 'updated_at' | 'last_run' | 'next_run'
+	enabled?: boolean
+	createdBy?: string[]
+	tags?: string[]
+	limit?: number
+	offset?: number
+	search?: string
 }
 
 /**
@@ -457,27 +443,28 @@ export class ScheduledReportingService {
 			query += ` AND created_by = ${params.createdBy}`
 		}
 		// Apply date range filter
-		if (params?.dateRange?.field && params?.dateRange.startDate && params?.dateRange.endDate) {
-			query += ` AND ${params.dateRange.field} >= '${params.dateRange.startDate}' AND ${params.dateRange.field} <= '${params.dateRange.endDate}'`
+		if (params?.rangeBy && params?.startDate && params?.endDate) {
+			query += ` AND ${params.rangeBy} >= '${params.startDate}' AND ${params.rangeBy} <= '${params.endDate}'`
 		}
 		// Add sorting
-		const sortColumn = params?.sort?.field || 'created_at'
-		const sortDirection = params?.sort?.direction || 'desc'
+		const sortColumn = params?.sortBy || 'created_at'
+		const sortDirection = params?.sortOrder || 'desc'
 		query += ` ORDER BY ${sortColumn} ${sortDirection.toUpperCase()}`
 		// Add pagination
-		if (params?.pagination?.limit) {
-			query += ` LIMIT ${params?.pagination.limit}`
+		if (params?.limit) {
+			query += ` LIMIT ${params?.limit}`
 		}
-		if (params?.pagination?.offset) {
-			query += ` OFFSET ${params.pagination.offset}`
+		if (params?.offset) {
+			query += ` OFFSET ${params.offset}`
 		}
 
 		const cacheKey = this.client.generateCacheKey(
 			'get_scheduled_reports',
 			params ? { organizationId, ...params } : { organizationId }
 		)
-		const result = await this.client.executeOptimizedQuery(
+		const result = await this.client.executeMonitoredQuery(
 			async (db) => db.execute(sql.raw(query)),
+			'get_scheduled_reports',
 			{ cacheKey }
 		)
 

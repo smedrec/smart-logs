@@ -2,15 +2,37 @@ import { useAuditContext } from '@/contexts/audit-provider'
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 
-import type { ReportExecution, ScheduledReport } from '@smedrec/audit-client'
-
-export const Route = createFileRoute('/_authenticated/compliance/scheduled-reports')({
+export const Route = createFileRoute('/_authenticated/compliance/scheduled-reports-simple')({
 	component: RouteComponent,
 })
 
+interface SimpleReport {
+	id: string
+	name: string
+	description?: string
+	reportType: string
+	format: string
+	enabled: boolean
+	lastRun?: string
+	nextRun: string
+	executionCount: number
+	successCount: number
+	failureCount: number
+}
+
+interface SimpleExecution {
+	id: string
+	scheduledReportId: string
+	status: string
+	trigger: string
+	scheduledTime: string
+	executionTime?: string
+	duration?: number
+}
+
 function RouteComponent() {
-	const [reports, setReports] = useState<ScheduledReport[]>([])
-	const [executions, setExecutions] = useState<ReportExecution[]>([])
+	const [reports, setReports] = useState<SimpleReport[]>([])
+	const [executions, setExecutions] = useState<SimpleExecution[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const { client } = useAuditContext()
@@ -29,20 +51,27 @@ function RouteComponent() {
 					offset: 0,
 				})
 
+				console.log('Reports response:', reportsResponse)
 				const reportsList = reportsResponse?.data ?? []
 				setReports(reportsList)
 
 				// Get execution history for the first report if available
 				if (reportsList.length > 0) {
-					const firstReport = reportsList[0]
-					const executionsResponse = await client.scheduledReports.getExecutionHistory(
-						firstReport.id,
-						{
-							limit: 5,
-							offset: 0,
-						}
-					)
-					setExecutions(executionsResponse?.data ?? [])
+					try {
+						const firstReport = reportsList[0]
+						const executionsResponse = await client.scheduledReports.getExecutionHistory(
+							firstReport.id,
+							{
+								limit: 5,
+								offset: 0,
+							}
+						)
+						console.log('Executions response:', executionsResponse)
+						setExecutions(executionsResponse?.data ?? [])
+					} catch (execError) {
+						console.warn('Could not load execution history:', execError)
+						// Don't fail the whole component if executions fail
+					}
 				}
 			} catch (err) {
 				console.error('Error loading scheduled reports:', err)
@@ -60,12 +89,22 @@ function RouteComponent() {
 	}
 
 	if (error) {
-		return <div className="p-4 text-red-600">Error: {error}</div>
+		return (
+			<div className="p-4">
+				<div className="text-red-600 mb-4">Error: {error}</div>
+				<button
+					onClick={() => window.location.reload()}
+					className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+				>
+					Retry
+				</button>
+			</div>
+		)
 	}
 
 	return (
 		<div className="flex flex-col gap-6 p-4">
-			<h1 className="text-2xl font-bold">Scheduled Reports</h1>
+			<h1 className="text-2xl font-bold">Scheduled Reports (Simple)</h1>
 
 			{reports.length === 0 ? (
 				<div className="text-gray-500">No scheduled reports found</div>
@@ -97,7 +136,8 @@ function RouteComponent() {
 									</span>
 								</div>
 								<div>
-									<span className="font-medium">Executions:</span> {report.executionCount}
+									<span className="font-medium">Executions:</span> {report.executionCount}(
+									{report.successCount} success, {report.failureCount} failed)
 								</div>
 							</div>
 						</div>
@@ -139,6 +179,19 @@ function RouteComponent() {
 					</div>
 				</div>
 			)}
+
+			<div className="mt-8 p-4 bg-blue-50 rounded-lg">
+				<h3 className="font-semibold text-blue-800 mb-2">Testing the Methods</h3>
+				<p className="text-blue-700 text-sm">
+					This page demonstrates functional versions of the `list()` and `getExecutionHistory()`
+					methods. The methods now use simplified parameters that work with the server API.
+				</p>
+				<div className="mt-2 text-xs text-blue-600">
+					<div>• list() method: Uses basic pagination parameters</div>
+					<div>• getExecutionHistory() method: Uses simplified query parameters</div>
+					<div>• Both methods have fallback error handling</div>
+				</div>
+			</div>
 		</div>
 	)
 }
