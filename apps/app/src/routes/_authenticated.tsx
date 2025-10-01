@@ -68,49 +68,6 @@ export const Route = createFileRoute('/_authenticated')({
 function AuthenticatedLayout() {
 	const { session, isPending } = useAuth()
 	const navigate = useNavigate()
-	/**const [showNewProjectForm, setShowNewProjectForm] = useState(false)
-  const [newProjectName, setNewProjectName] = useState("")
-
-  const { data: projects, isLoading } = useLiveQuery((q) =>
-    q.from({ projectCollection })
-  )
-
-  // Create an initial default project if the user doesn't yet have any.
-  useEffect(() => {
-    if (session && projects && !isLoading) {
-      const hasProject = projects.length > 0
-      if (!hasProject) {
-        projectCollection.insert({
-          id: Math.floor(Math.random() * 100000),
-          name: "Default",
-          description: "Default project",
-          owner_id: session.user.id,
-          shared_user_ids: [],
-          created_at: new Date(),
-        })
-      }
-    }
-  }, [session, projects, isLoading])
-
-  const handleLogout = async () => {
-    await authClient.signOut()
-    navigate({ to: "/login" })
-  }
-
-  const handleCreateProject = () => {
-    if (newProjectName.trim() && session) {
-      projectCollection.insert({
-        id: Math.floor(Math.random() * 100000),
-        name: newProjectName.trim(),
-        description: "",
-        owner_id: session.user.id,
-        shared_user_ids: [],
-        created_at: new Date(),
-      })
-      setNewProjectName("")
-      setShowNewProjectForm(false)
-    }
-  }*/
 
 	if (isPending) {
 		return <Spinner variant="bars" size={64} />

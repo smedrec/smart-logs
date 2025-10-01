@@ -58,36 +58,36 @@ const data = {
 		},
 		{
 			title: 'Compliance',
-			url: '#',
+			url: '/compliance',
 			icon: FileCheck2,
 			items: [
 				{
-					title: 'Hipaa Report',
-					url: '/compliance/hipaa',
-				},
-				{
-					title: 'GDPR Report',
-					url: '/compliance/gdpr',
-				},
-				{
-					title: 'Integrity Report',
-					url: '/compliance/integrity',
-				},
-				{
-					title: 'Export Reports',
-					url: '/compliance/export-reports',
-				},
-				{
-					title: 'Export Events',
-					url: '/compliance/export-events',
+					title: 'Dashboard',
+					url: '/compliance',
 				},
 				{
 					title: 'Scheduled Reports',
 					url: '/compliance/scheduled-reports',
 				},
 				{
+					title: 'Execution History',
+					url: '/compliance/execution-history',
+				},
+				{
 					title: 'Report Templates',
 					url: '/compliance/report-templates',
+				},
+				{
+					title: 'HIPAA Reports',
+					url: '/compliance/hipaa',
+				},
+				{
+					title: 'GDPR Reports',
+					url: '/compliance/gdpr',
+				},
+				{
+					title: 'Integrity Reports',
+					url: '/compliance/integrity',
 				},
 			],
 		},

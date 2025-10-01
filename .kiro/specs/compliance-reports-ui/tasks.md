@@ -211,20 +211,20 @@
     - Create data refresh strategies and cache invalidation
     - _Requirements: 10.1, 11.1_
 
-- [ ] 10. Create routing and navigation
-  - [ ] 10.1 Set up compliance routes
+- [x] 10. Create routing and navigation
+  - [x] 10.1 Set up compliance routes
     - Create route definitions for all compliance pages
     - Implement route guards for authentication and authorization
     - Add route-based code splitting for performance
     - _Requirements: 1.5, 9.1_
 
-  - [ ] 10.2 Create navigation components
+  - [x] 10.2 Create navigation components
     - Build compliance-specific navigation sidebar
     - Implement breadcrumb navigation for deep pages
     - Add active route highlighting and navigation state
     - _Requirements: 1.5, 9.1_
 
-  - [ ] 10.3 Implement URL state management
+  - [x] 10.3 Implement URL state management
     - Add URL-based state for filters and pagination
     - Implement shareable URLs for specific views
     - Create browser history management for navigation

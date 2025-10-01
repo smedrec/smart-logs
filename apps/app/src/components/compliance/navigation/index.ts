@@ -1,8 +1,14 @@
-// Navigation components
-export { SkipLinks, useSkipLinkTarget } from './skip-links'
-export { KeyboardShortcutsDialog } from './keyboard-shortcuts-dialog'
-export { FocusTrap, useFocusTrap } from './focus-trap'
+/**
+ * Compliance Navigation Components
+ *
+ * Centralized exports for all compliance navigation components
+ */
 
-// To be implemented in subsequent tasks:
-// - ComplianceNavigation (./compliance-navigation.tsx)
-// - ComplianceBreadcrumbs (./compliance-breadcrumbs.tsx)
+export { ComplianceNavigation, ComplianceNavigationSidebar } from './ComplianceNavigation'
+export { ComplianceBreadcrumbs, useComplianceBreadcrumbs } from './ComplianceBreadcrumbs'
+export { CompliancePageHeader, ComplianceSectionHeader } from './CompliancePageHeader'
+export {
+	ComplianceHistoryManager,
+	ShareableUrl,
+	BrowserNavigation,
+} from './ComplianceHistoryManager'

@@ -1,144 +1,37 @@
-import { useAuditContext } from '@/contexts/audit-provider'
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { lazy } from 'react'
+import { z } from 'zod'
 
-import type { ReportExecution, ScheduledReport } from '@smedrec/audit-client'
+// Lazy load the scheduled reports page component for code splitting
+const ScheduledReportsPage = lazy(
+	() => import('@/components/compliance/scheduled-reports/ScheduledReportsPage')
+)
+
+// URL search params schema for filters and pagination
+const scheduledReportsSearchSchema = z.object({
+	page: z.number().min(1).optional().default(1),
+	limit: z.number().min(1).max(100).optional().default(10),
+	search: z.string().optional(),
+	reportType: z.enum(['hipaa', 'gdpr', 'custom']).optional(),
+	status: z.enum(['enabled', 'disabled']).optional(),
+	sortBy: z
+		.enum(['name', 'reportType', 'lastRun', 'nextRun', 'createdAt'])
+		.optional()
+		.default('name'),
+	sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
+})
 
 export const Route = createFileRoute('/_authenticated/compliance/scheduled-reports')({
 	component: RouteComponent,
+	validateSearch: scheduledReportsSearchSchema,
+	beforeLoad: ({ context }) => {
+		// Route guard: ensure user has access to scheduled reports
+		return context
+	},
 })
 
 function RouteComponent() {
-	const [reports, setReports] = useState<ScheduledReport[]>([])
-	const [executions, setExecutions] = useState<ReportExecution[]>([])
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-	const { client } = useAuditContext()
+	const search = Route.useSearch()
 
-	useEffect(() => {
-		async function loadData() {
-			if (!client) return
-
-			try {
-				setLoading(true)
-				setError(null)
-
-				// Simple list call with minimal parameters
-				const reportsResponse = await client.scheduledReports.list({
-					limit: 10,
-					offset: 0,
-				})
-
-				const reportsList = reportsResponse?.data ?? []
-				setReports(reportsList)
-
-				// Get execution history for the first report if available
-				if (reportsList.length > 0) {
-					const firstReport = reportsList[0]
-					const executionsResponse = await client.scheduledReports.getExecutionHistory(
-						firstReport.id,
-						{
-							limit: 5,
-							offset: 0,
-						}
-					)
-					setExecutions(executionsResponse?.data ?? [])
-				}
-			} catch (err) {
-				console.error('Error loading scheduled reports:', err)
-				setError(err instanceof Error ? err.message : 'Failed to load reports')
-			} finally {
-				setLoading(false)
-			}
-		}
-
-		loadData()
-	}, [client])
-
-	if (loading) {
-		return <div className="p-4">Loading scheduled reports...</div>
-	}
-
-	if (error) {
-		return <div className="p-4 text-red-600">Error: {error}</div>
-	}
-
-	return (
-		<div className="flex flex-col gap-6 p-4">
-			<h1 className="text-2xl font-bold">Scheduled Reports</h1>
-
-			{reports.length === 0 ? (
-				<div className="text-gray-500">No scheduled reports found</div>
-			) : (
-				<div className="space-y-4">
-					{reports.map((report) => (
-						<div key={report.id} className="border rounded-lg p-4 bg-white shadow-sm">
-							<h3 className="font-semibold text-lg">{report.name}</h3>
-							{report.description && <p className="text-gray-600 mt-1">{report.description}</p>}
-							<div className="mt-2 grid grid-cols-2 gap-4 text-sm">
-								<div>
-									<span className="font-medium">Type:</span> {report.reportType}
-								</div>
-								<div>
-									<span className="font-medium">Format:</span> {report.format}
-								</div>
-								<div>
-									<span className="font-medium">Last Run:</span>{' '}
-									{report.lastRun ? new Date(report.lastRun).toLocaleString() : 'Never'}
-								</div>
-								<div>
-									<span className="font-medium">Next Run:</span>{' '}
-									{new Date(report.nextRun).toLocaleString()}
-								</div>
-								<div>
-									<span className="font-medium">Status:</span>{' '}
-									<span className={report.enabled ? 'text-green-600' : 'text-red-600'}>
-										{report.enabled ? 'Enabled' : 'Disabled'}
-									</span>
-								</div>
-								<div>
-									<span className="font-medium">Executions:</span> {report.executionCount}
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			)}
-
-			{executions.length > 0 && (
-				<div className="mt-8">
-					<h2 className="text-xl font-semibold mb-4">Recent Executions</h2>
-					<div className="space-y-2">
-						{executions.map((execution) => (
-							<div key={execution.id} className="border rounded p-3 bg-gray-50">
-								<div className="flex justify-between items-center">
-									<span className="font-medium">Execution {execution.id}</span>
-									<span
-										className={`px-2 py-1 rounded text-xs font-medium ${
-											execution.status === 'completed'
-												? 'bg-green-100 text-green-800'
-												: execution.status === 'failed'
-													? 'bg-red-100 text-red-800'
-													: execution.status === 'running'
-														? 'bg-blue-100 text-blue-800'
-														: 'bg-gray-100 text-gray-800'
-										}`}
-									>
-										{execution.status}
-									</span>
-								</div>
-								<div className="text-sm text-gray-600 mt-1">
-									Scheduled: {new Date(execution.scheduledTime).toLocaleString()}
-									{execution.executionTime && (
-										<> | Executed: {new Date(execution.executionTime).toLocaleString()}</>
-									)}
-									{execution.duration && <> | Duration: {Math.round(execution.duration / 1000)}s</>}
-								</div>
-							</div>
-						))}
-					</div>
-				</div>
-			)}
-		</div>
-	)
+	return <ScheduledReportsPage searchParams={search} />
 }

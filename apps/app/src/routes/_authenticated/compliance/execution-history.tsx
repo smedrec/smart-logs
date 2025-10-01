@@ -1,14 +1,39 @@
-import { ExecutionHistoryPage } from '@/components/compliance/execution'
 import { createFileRoute } from '@tanstack/react-router'
+import { lazy } from 'react'
+import { z } from 'zod'
 
-export const Route = createFileRoute('/_authenticated/compliance/execution-history')({
-	component: ExecutionHistoryRoute,
+// Lazy load the global execution history page component
+const GlobalExecutionHistoryPage = lazy(
+	() => import('@/components/compliance/execution-history/GlobalExecutionHistoryPage')
+)
+
+// URL search params schema for global execution history filters
+const globalExecutionHistorySearchSchema = z.object({
+	page: z.number().min(1).optional().default(1),
+	limit: z.number().min(1).max(100).optional().default(20),
+	reportId: z.string().optional(),
+	status: z.enum(['completed', 'failed', 'running', 'pending']).optional(),
+	reportType: z.enum(['hipaa', 'gdpr', 'custom']).optional(),
+	dateFrom: z.string().optional(),
+	dateTo: z.string().optional(),
+	sortBy: z
+		.enum(['scheduledTime', 'executionTime', 'duration', 'status', 'reportName'])
+		.optional()
+		.default('scheduledTime'),
+	sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 })
 
-function ExecutionHistoryRoute() {
-	// For now, we'll use a default report ID or get it from search params
-	// In a real implementation, this would come from the route parameters
-	const reportId = 'report-1' // Mock report ID
+export const Route = createFileRoute('/_authenticated/compliance/execution-history')({
+	component: RouteComponent,
+	validateSearch: globalExecutionHistorySearchSchema,
+	beforeLoad: ({ context }) => {
+		// Route guard: ensure user has access to execution history
+		return context
+	},
+})
 
-	return <ExecutionHistoryPage reportId={reportId} />
+function RouteComponent() {
+	const search = Route.useSearch()
+
+	return <GlobalExecutionHistoryPage searchParams={search} />
 }

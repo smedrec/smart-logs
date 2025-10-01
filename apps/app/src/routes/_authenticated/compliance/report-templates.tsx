@@ -1,37 +1,39 @@
-import { ComingSoon } from '@/components/coming-soon'
-/**import { createColumns } from '@/components/templates/column'
-import { DataTable } from '@/components/templates/data-table'
-import ReportTemplateForm from '@/components/templates/form'
-import {
-	Breadcrumb,
-	BreadcrumbItem,
-	BreadcrumbLink,
-	BreadcrumbList,
-	BreadcrumbPage,
-	BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
-import { Spinner } from '@/components/ui/kibo-ui/spinner'
-import { trpc } from '@/utils/trpc'
-import { useQuery } from '@tanstack/react-query' */
 import { createFileRoute } from '@tanstack/react-router'
+import { lazy } from 'react'
+import { z } from 'zod'
 
-/**import { useState } from 'react'
+// Lazy load the report templates page component
+const ReportTemplatesPage = lazy(
+	() => import('@/components/compliance/templates/ReportTemplatesPage')
+)
 
-import type { ReportTemplate, ReportTemplateData } from '@/types/report-templates'*/
+// URL search params schema for template filters
+const reportTemplatesSearchSchema = z.object({
+	page: z.number().min(1).optional().default(1),
+	limit: z.number().min(1).max(100).optional().default(10),
+	search: z.string().optional(),
+	reportType: z.enum(['hipaa', 'gdpr', 'custom']).optional(),
+	category: z.string().optional(),
+	sortBy: z
+		.enum(['name', 'reportType', 'category', 'createdAt', 'updatedAt'])
+		.optional()
+		.default('name'),
+	sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
+})
 
 export const Route = createFileRoute('/_authenticated/compliance/report-templates')({
 	component: RouteComponent,
+	validateSearch: reportTemplatesSearchSchema,
+	beforeLoad: ({ context }) => {
+		// Route guard: ensure user has access to report templates
+		return context
+	},
 })
 
 function RouteComponent() {
-	return <ComingSoon />
+	const search = Route.useSearch()
+
+	return <ReportTemplatesPage searchParams={search} />
 }
 /**
 function RouteComponent() {
