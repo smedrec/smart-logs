@@ -15,7 +15,12 @@ import {
 /**
  * Report types
  */
-export const ReportTypeSchema = z.enum(['hipaa', 'gdpr', 'integrity', 'custom'])
+export const ReportTypeSchema = z.enum([
+	'HIPAA_AUDIT_TRAIL',
+	'GDPR_PROCESSING_ACTIVITIES',
+	'GENERAL_COMPLIANCE',
+	'INTEGRITY_VERIFICATION',
+])
 export type ReportType = z.infer<typeof ReportTypeSchema>
 
 /**
@@ -48,10 +53,8 @@ export const ReportCriteriaSchema = z.object({
 	dataClassifications: z.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'])).optional(),
 	statuses: z.array(z.enum(['attempt', 'success', 'failure'])).optional(),
 	verifiedOnly: z.boolean().default(false).optional(),
-	includeSuccessfulEvents: z.boolean().default(true).optional(),
-	includeFailedEvents: z.boolean().default(true).optional(),
-	includeAttemptEvents: z.boolean().default(false).optional(),
-	customFilters: z.record(z.unknown()).optional(),
+	includeIntegrityFailures: z.boolean().default(true).optional(),
+	//customFilters: z.record(z.string(), z.any()).optional(),
 	limit: z.number().int().min(1).max(10000).optional(),
 	offset: z.number().int().min(0).optional(),
 	sortBy: z.enum(['timestamp', 'status']).optional(),
@@ -65,7 +68,7 @@ export type ReportCriteria = z.infer<typeof ReportCriteriaSchema>
 export const ReportMetadataSchema = z.object({
 	generatedBy: z.string().min(1),
 	generatedAt: z.string().datetime(),
-	reportId: z.string().uuid(),
+	reportId: z.string(),
 	version: z.string().min(1),
 	dataRange: DateRangeFilterSchema,
 	totalEvents: z.number().int().min(0),
@@ -105,7 +108,7 @@ export type HIPAAComplianceStatus = z.infer<typeof HIPAAComplianceStatusSchema>
  * Simplified event structure for compliance reports
  */
 export const ComplianceReportEventSchema = z.object({
-	id: z.string().uuid(),
+	id: z.number().optional(),
 	timestamp: z.string().datetime(),
 	principalId: z.string().min(1),
 	organizationId: z.string().min(1),
@@ -117,7 +120,7 @@ export const ComplianceReportEventSchema = z.object({
 	dataClassification: DataClassificationSchema,
 	sessionContext: z
 		.object({
-			ipAddress: z.string().ip(),
+			ipAddress: z.string(), //.ip(),
 			userAgent: z.string().min(1),
 			sessionId: z.string().min(1),
 		})
@@ -135,10 +138,10 @@ export const HIPAASectionSchema = z.object({
 	title: z.string().min(1),
 	description: z.string().min(1),
 	status: HIPAAComplianceStatusSchema,
-	events: z.array(z.string().uuid()),
+	events: z.array(z.string()),
 	violations: z.array(
 		z.object({
-			eventId: z.string().uuid(),
+			eventId: z.string(),
 			violationType: z.string().min(1),
 			severity: z.enum(['low', 'medium', 'high', 'critical']),
 			description: z.string().min(1),
@@ -154,8 +157,8 @@ export type HIPAASection = z.infer<typeof HIPAASectionSchema>
  * HIPAA report
  */
 export const HIPAAReportSchema = z.object({
-	id: z.string().uuid(),
-	type: z.literal('hipaa'),
+	id: z.string(),
+	type: z.literal('HIPAA_AUDIT_TRAIL'),
 	generatedAt: z.string().datetime(),
 	criteria: ReportCriteriaSchema,
 	summary: z.object({
@@ -207,7 +210,7 @@ export type GDPRDataSubjectRight = z.infer<typeof GDPRDataSubjectRightSchema>
  * GDPR processing activity
  */
 export const GDPRProcessingActivitySchema = z.object({
-	id: z.string().uuid(),
+	id: z.string(),
 	name: z.string().min(1),
 	purpose: z.string().min(1),
 	lawfulBasis: GDPRLawfulBasisSchema,
@@ -248,7 +251,7 @@ export type GDPRSection = z.infer<typeof GDPRSectionSchema>
  */
 export const GDPRReportSchema = z.object({
 	id: z.string(),
-	type: z.literal('gdpr'),
+	type: z.literal('GDPR_PROCESSING_ACTIVITIES'),
 	generatedAt: z.string().datetime(),
 	criteria: ReportCriteriaSchema,
 	summary: z.object({

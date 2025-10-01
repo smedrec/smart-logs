@@ -31,8 +31,42 @@ import { createMetricsAPI } from './metrics-api'
 import { createObservabilityAPI } from './observability-api'
 import { createOrganizationAPI } from './organization-api'
 import { createPerformanceAPI } from './performance-api'
+import { createscheduledReportAPI } from './scheduled-report-api'
 
 import type { HonoEnv } from '@/lib/hono/context'
+
+/**
+ * Report types
+ */
+export const ReportTypeSchema = z.enum([
+	'HIPAA_AUDIT_TRAIL',
+	'GDPR_PROCESSING_ACTIVITIES',
+	'GENERAL_COMPLIANCE',
+	'INTEGRITY_VERIFICATION',
+])
+/**
+ * Report format
+ */
+export const ReportFormatSchema = z.enum(['pdf', 'html', 'csv', 'json', 'xlsx', 'xml'])
+/**
+ * Pagination parameters with validation
+ */
+export const PaginationParamsSchema = z.object({
+	limit: z.number().int().min(1).max(1000).default(50),
+	offset: z.number().int().min(0).default(0),
+})
+/**
+ * Date range filter with validation
+ */
+export const DateRangeFilterSchema = z
+	.object({
+		startDate: z.string().datetime('Invalid start date format'),
+		endDate: z.string().datetime('Invalid end date format'),
+	})
+	.refine((data) => new Date(data.startDate) <= new Date(data.endDate), {
+		message: 'Start date must be before or equal to end date',
+		path: ['endDate'],
+	})
 
 /**
  * Create the main REST API router with OpenAPI documentation
@@ -214,6 +248,10 @@ Pagination information is included in the response:
 				description: 'Compliance reporting and data export operations',
 			},
 			{
+				name: 'Scheduled Repotys',
+				description: 'Schedule reports',
+			},
+			{
 				name: 'Metrics',
 				description: 'System metrics and monitoring operations',
 			},
@@ -260,6 +298,7 @@ Pagination information is included in the response:
 	// Authentication middleware for protected routes
 	app.use('/audit/*', requireAuthOrApiKey)
 	app.use('/compliance/*', requireAuthOrApiKey)
+	app.use('/scheduled-reports/*', requireAuthOrApiKey)
 	app.use('/metrics/*', requireAuthOrApiKey)
 	app.use('/observability/*', requireAuthOrApiKey)
 	app.use('/performance/*', requireAuthOrApiKey)
@@ -269,6 +308,7 @@ Pagination information is included in the response:
 	// Organization access control for audit and compliance endpoints
 	app.use('/audit/*', requireOrganizationAccess())
 	app.use('/compliance/*', requireOrganizationAccess())
+	app.use('/scheduled-reports/*', requireOrganizationAccess())
 	app.use('/functions/*', requireOrganizationAccess())
 	app.use('/organization/*', requireOrganizationAccess())
 
@@ -280,6 +320,7 @@ Pagination information is included in the response:
 	// Mount API routes
 	app.route('/audit', createAuditAPI())
 	app.route('/compliance', createComplianceAPI())
+	app.route('/scheduled-reports', createscheduledReportAPI())
 	app.route('/health', createHealthAPI()) // Health check endpoints (no authentication required)
 	app.route('/metrics', createMetricsAPI())
 	app.route('/observability', createObservabilityAPI())

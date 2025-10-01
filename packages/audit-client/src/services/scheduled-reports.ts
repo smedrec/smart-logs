@@ -62,7 +62,7 @@ export class ScheduledReportsService extends BaseResource {
 
 		// Validate response structure
 		assertType(response, isObject, 'Invalid paginated scheduled reports response from server')
-		assertDefined(response.reports, 'Paginated scheduled reports response missing reports array')
+		assertDefined(response.data, 'Paginated scheduled reports response missing reports array')
 		assertDefined(response.pagination, 'Paginated scheduled reports response missing pagination')
 
 		return response
@@ -198,7 +198,7 @@ export class ScheduledReportsService extends BaseResource {
 
 		// Validate response structure
 		assertType(response, isObject, 'Invalid paginated executions response from server')
-		assertDefined(response.executions, 'Paginated executions response missing executions array')
+		assertDefined(response.data, 'Paginated executions response missing executions array')
 		assertDefined(response.pagination, 'Paginated executions response missing pagination')
 
 		return response

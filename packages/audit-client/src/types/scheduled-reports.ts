@@ -295,7 +295,7 @@ export const CreateScheduledReportInputSchema = z.object({
 	createdBy: z.string().min(1),
 	updatedBy: z.string().min(1),
 	runId: z.string().optional(),
-	tags: z.array(z.string()).default([]),
+	tags: z.array(z.string()), //.default([]),
 	metadata: z.record(z.unknown()).optional(),
 })
 export type CreateScheduledReportInput = z.infer<typeof CreateScheduledReportInputSchema>
@@ -317,7 +317,7 @@ export const UpdateScheduledReportInputSchema = z.object({
 	updatedBy: z.string().min(1),
 	runId: z.string().optional(),
 	tags: z.array(z.string()).optional(),
-	metadata: z.record(z.unknown()).optional(),
+	metadata: z.record(z.string(), z.any()).optional(),
 })
 export type UpdateScheduledReportInput = z.infer<typeof UpdateScheduledReportInputSchema>
 
@@ -449,7 +449,7 @@ export type ExecutionHistoryParams = z.infer<typeof ExecutionHistoryParamsSchema
  * Paginated executions
  */
 export const PaginatedExecutionsSchema = z.object({
-	executions: z.array(ReportExecutionSchema),
+	data: z.array(ReportExecutionSchema),
 	pagination: PaginationMetadataSchema,
 	summary: z
 		.object({
@@ -478,7 +478,7 @@ export const ListScheduledReportsParamsSchema = z.object({
 	search: z.string().optional(),
 	dateRange: z
 		.object({
-			field: z.enum(['createdAt', 'updatedAt', 'lastRun', 'nextRun']),
+			field: z.enum(['created_at', 'updated_at', 'last_run', 'next_run']),
 			startDate: z.string().datetime(),
 			endDate: z.string().datetime(),
 		})
@@ -488,11 +488,11 @@ export const ListScheduledReportsParamsSchema = z.object({
 		.object({
 			field: z.enum([
 				'name',
-				'createdAt',
-				'updatedAt',
-				'lastExecuted',
-				'nextExecution',
-				'executionCount',
+				'created_at',
+				'updated_at',
+				'last_run',
+				'next_run',
+				'execution_count',
 			]),
 			direction: z.enum(['asc', 'desc']).default('desc'),
 		})
@@ -504,7 +504,7 @@ export type ListScheduledReportsParams = z.infer<typeof ListScheduledReportsPara
  * Paginated scheduled reports
  */
 export const PaginatedScheduledReportsSchema = z.object({
-	reports: z.array(ScheduledReportSchema),
+	data: z.array(ScheduledReportSchema),
 	pagination: PaginationMetadataSchema,
 	summary: z
 		.object({

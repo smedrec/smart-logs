@@ -197,6 +197,7 @@ export interface NotificationConfig {
 export interface ScheduledReportConfig {
 	id: string
 	name: string
+	organizationId: string
 	description?: string
 	templateId?: string
 	reportType: ReportTemplate['reportType']
@@ -215,6 +216,40 @@ export interface ScheduledReportConfig {
 	tags?: string[]
 	metadata?: Record<string, any>
 	version?: number
+}
+
+interface ListParams {
+	sort?:
+		| {
+				field: 'name' | 'created_at' | 'updated_at' | 'last_run' | 'next_run' | 'execution_count'
+				direction: 'asc' | 'desc'
+		  }
+		| undefined
+	reportType?:
+		| (
+				| 'HIPAA_AUDIT_TRAIL'
+				| 'GDPR_PROCESSING_ACTIVITIES'
+				| 'GENERAL_COMPLIANCE'
+				| 'INTEGRITY_VERIFICATION'
+		  )[]
+		| undefined
+	dateRange?:
+		| {
+				startDate: string
+				endDate: string
+				field: 'created_at' | 'updated_at' | 'last_run' | 'next_run'
+		  }
+		| undefined
+	enabled?: boolean | undefined
+	createdBy?: string[] | undefined
+	tags?: string[] | undefined
+	pagination?:
+		| {
+				limit: number
+				offset: number
+		  }
+		| undefined
+	search?: string | undefined
 }
 
 /**
@@ -245,9 +280,7 @@ export class ScheduledReportingService {
 	 * Create a new scheduled report configuration
 	 */
 	async createScheduledReport(
-		config: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun' | 'version'> & {
-			organizationId: string
-		}
+		config: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun' | 'version'>
 	): Promise<ScheduledReportConfig> {
 		const reportId = this.generateId('report')
 		const nextRun = this.calculateNextRun(config.schedule)
@@ -353,6 +386,7 @@ export class ScheduledReportingService {
 			id: updated.id,
 			name: updated.name,
 			description: updated.description || undefined,
+			organizationId: updated.organizationId,
 			reportType: updated.reportType as ReportTemplate['reportType'],
 			criteria: updated.criteria as ReportCriteria,
 			format: updated.format as ReportFormat,
@@ -408,45 +442,53 @@ export class ScheduledReportingService {
 	/**
 	 * Get all scheduled report configurations
 	 */
-	async getScheduledReports(organizationId?: string): Promise<ScheduledReportConfig[]> {
-		const records = await this.client.executeOptimizedQuery(
-			async (db) => {
-				const query = db.select().from(scheduledReports)
+	async getScheduledReports(
+		organizationId: string,
+		params?: ListParams
+	): Promise<ScheduledReportConfig[]> {
+		let query = `SELECT * FROM scheduled_reports WHERE organization_id = '${organizationId}'`
+		if (params?.enabled !== undefined) {
+			query += query + ` AND enabled = 'true'`
+		}
+		if (params?.reportType && params.reportType.length > 0) {
+			query += ` AND reportType IN (${params.reportType.map((type) => `'${type}'`).join(',')}))`
+		}
+		if (params?.createdBy) {
+			query += ` AND created_by = ${params.createdBy}`
+		}
+		// Apply date range filter
+		if (params?.dateRange?.field && params?.dateRange.startDate && params?.dateRange.endDate) {
+			query += ` AND ${params.dateRange.field} >= '${params.dateRange.startDate}' AND ${params.dateRange.field} <= '${params.dateRange.endDate}'`
+		}
+		// Add sorting
+		const sortColumn = params?.sort?.field || 'created_at'
+		const sortDirection = params?.sort?.direction || 'desc'
+		query += ` ORDER BY ${sortColumn} ${sortDirection.toUpperCase()}`
+		// Add pagination
+		if (params?.pagination?.limit) {
+			query += ` LIMIT ${params?.pagination.limit}`
+		}
+		if (params?.pagination?.offset) {
+			query += ` OFFSET ${params.pagination.offset}`
+		}
 
-				return organizationId
-					? await query.where(eq(scheduledReports.organizationId, organizationId))
-					: await query.limit(100)
-			},
-			{ cacheKey: `scheduled-reports-${organizationId || 'all'}` }
+		const cacheKey = this.client.generateCacheKey(
+			'get_scheduled_reports',
+			params ? { organizationId, ...params } : { organizationId }
+		)
+		const result = await this.client.executeOptimizedQuery(
+			async (db) => db.execute(sql.raw(query)),
+			{ cacheKey }
 		)
 
-		return records.map((record) => ({
-			id: record.id,
-			name: record.name,
-			description: record.description || undefined,
-			reportType: record.reportType as ReportTemplate['reportType'],
-			criteria: record.criteria as ReportCriteria,
-			format: record.format as ReportFormat,
-			schedule: record.schedule as ScheduledReportConfig['schedule'],
-			delivery: record.delivery as ScheduledReportConfig['delivery'],
-			export: record.export as ScheduledReportConfig['export'],
-			notification: record.notification as ScheduledReportConfig['notification'],
-			enabled: record.enabled === 'true',
-			lastRun: record.lastRun || undefined,
-			nextRun: record.nextRun || undefined,
-			runId: record.runId || undefined,
-			tags: (record.tags as ScheduledReportConfig['tags']) || [],
-			metadata: (record.metadata as ScheduledReportConfig['metadata']) || undefined,
-			version: record.version,
-			createdAt: record.createdAt,
-			createdBy: record.createdBy,
-		}))
+		const records = result || []
+		return records.map(this.mapDatabaseScheduledReportToScheduledReport)
 	}
 
 	/**
 	 * Get a specific scheduled report configuration
 	 */
-	async getScheduledReport(reportId: string): Promise<ScheduledReportConfig | null> {
+	async getScheduledReport(reportId: string): Promise<(ScheduledReportConfig & {}) | null> {
 		const records = await this.client.executeOptimizedQuery(
 			(db) => db.select().from(scheduledReports).where(eq(scheduledReports.id, reportId)),
 			{ cacheKey: `${reportId}` }
@@ -461,6 +503,7 @@ export class ScheduledReportingService {
 			id: record.id,
 			name: record.name,
 			description: record.description || undefined,
+			organizationId: record.organizationId,
 			reportType: record.reportType as ReportTemplate['reportType'],
 			criteria: record.criteria as ReportCriteria,
 			format: record.format as ReportFormat,
@@ -477,6 +520,7 @@ export class ScheduledReportingService {
 			version: record.version,
 			createdAt: record.createdAt,
 			createdBy: record.createdBy,
+			//updatedBy: record.updatedBy || undefined,
 		}
 	}
 
@@ -758,7 +802,10 @@ export class ScheduledReportingService {
 			throw new Error(`Report template not found: ${templateId}`)
 		}
 
-		const reportConfig: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun' | 'version'> & {
+		const reportConfig: Omit<
+			ScheduledReportConfig,
+			'id' | 'createdAt' | 'updatedAt' | 'nextRun' | 'version'
+		> & {
 			organizationId: string
 		} = {
 			...overrides,
@@ -816,6 +863,8 @@ export class ScheduledReportingService {
 			},
 			enabled: overrides.enabled !== undefined ? overrides.enabled : true,
 			createdBy: overrides.createdBy || 'system',
+			tags: overrides.tags || template.tags || [],
+			metadata: overrides.metadata || {},
 		}
 
 		return this.createScheduledReport(reportConfig)
@@ -1150,5 +1199,51 @@ export class ScheduledReportingService {
 
 	private generateId(prefix: string): string {
 		return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+	}
+
+	/**
+	 * Map database audit log record to AuditLog interface
+	 */
+	private mapDatabaseScheduledReportToScheduledReport(scheduledReport: any): ScheduledReportConfig {
+		return {
+			id: scheduledReport.id,
+			name: scheduledReport.name,
+			description: scheduledReport.description || undefined,
+			organizationId: scheduledReport.organizationId,
+			templateId: scheduledReport.templateId || undefined,
+			format: scheduledReport.format as ReportFormat,
+			enabled: scheduledReport.enabled,
+			reportType: scheduledReport.reportType,
+			criteria:
+				typeof scheduledReport.criteria === 'string'
+					? JSON.parse(scheduledReport.criteria)
+					: scheduledReport.criteria,
+			delivery:
+				typeof scheduledReport.delivery === 'string'
+					? JSON.parse(scheduledReport.delivery)
+					: scheduledReport.delivery,
+			export:
+				typeof scheduledReport.export === 'string'
+					? JSON.parse(scheduledReport.export)
+					: scheduledReport.export,
+			schedule:
+				typeof scheduledReport.schedule === 'string'
+					? JSON.parse(scheduledReport.schedule)
+					: scheduledReport.schedule,
+			notification:
+				typeof scheduledReport.notification === 'string'
+					? JSON.parse(scheduledReport.notification)
+					: scheduledReport.notification.recipients,
+			tags: scheduledReport.tags,
+			metadata:
+				typeof scheduledReport.metadata === 'string'
+					? JSON.parse(scheduledReport.metadata)
+					: scheduledReport.metadata,
+			createdAt: scheduledReport.createdAt,
+			lastRun: scheduledReport.lastRun,
+			nextRun: scheduledReport.nextRun,
+			version: scheduledReport.version,
+			createdBy: scheduledReport.createdBy,
+		}
 	}
 }
