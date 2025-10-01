@@ -11,7 +11,11 @@
 		"dev": "vite --port=3001",
 		"serve": "vite preview",
 		"start": "vite",
-		"tauri": "tauri"
+		"tauri": "tauri",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:ui": "vitest --ui",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@daveyplate/better-auth-ui": "^3.2.5",
@@ -68,6 +72,7 @@
 		"postcss": "^8.5.6",
 		"tailwindcss": "^4.1.13",
 		"typescript": "^5.8.2",
-		"vite": "^7.1.7"
+		"vite": "^7.1.7",
+		"vitest": "^3.2.4"
 	}
 }
