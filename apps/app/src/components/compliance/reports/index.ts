@@ -1,5 +1,5 @@
-// Reports management components - to be implemented in subsequent tasks
-// Directory structure ready for:
-// - ReportsDataTable (./reports-data-table.tsx)
-// - ReportCard (./report-card.tsx)
-// - BulkActions (./bulk-actions.tsx)
+// Reports management components
+export { ReportsDataTable } from './reports-data-table'
+export { ReportsFilters } from './reports-filters'
+export { BulkActions, useBulkActions } from './bulk-actions'
+export { ReportCard, ReportCardsGrid } from './report-card'

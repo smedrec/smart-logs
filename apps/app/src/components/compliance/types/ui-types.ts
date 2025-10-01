@@ -24,6 +24,7 @@ export interface ScheduledReportUI extends ScheduledReport {
 	isLoading?: boolean
 	hasErrors?: boolean
 	lastExecutionStatus?: ExecutionStatus
+	nextExecution?: string
 	nextExecutionFormatted?: string
 	isSelected?: boolean
 }
