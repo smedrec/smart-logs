@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils'
-import { ReactNode } from 'react'
 
 import { useResponsive } from '../hooks/use-responsive'
 
+import type { ReactNode } from 'react'
 import type { Breakpoint } from '../hooks/use-responsive'
 
 export interface ResponsiveContainerProps {

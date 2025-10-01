@@ -2,9 +2,11 @@ import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { Grid, List, Table } from 'lucide-react'
-import { ReactNode, useState } from 'react'
+import { useState } from 'react'
 
 import { useResponsive } from '../hooks/use-responsive'
+
+import type { ReactNode } from 'react'
 
 export type ViewMode = 'table' | 'cards' | 'list'
 
