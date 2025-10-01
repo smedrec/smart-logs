@@ -94,6 +94,14 @@ export interface UIError {
 	details?: Record<string, any>
 }
 
+export interface ValidationError {
+	field: string
+	message: string
+	code?: string
+	severity?: 'error' | 'warning' | 'info'
+	suggestions?: string[]
+}
+
 // Dashboard interfaces
 export interface DashboardStats {
 	totalReports: number

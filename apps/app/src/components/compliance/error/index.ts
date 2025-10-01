@@ -1,6 +1,5 @@
-// Error handling components - to be implemented in subsequent tasks
-// Directory structure ready for:
-// - ErrorBoundary (./error-boundary.tsx)
-// - ErrorAlert (./error-alert.tsx)
-// - LoadingStates (./loading-states.tsx)
-// - ValidationFeedback (./validation-feedback.tsx)
+// Error handling and user feedback components
+export * from './error-boundary'
+export * from './error-alert'
+export * from './loading-states'
+export * from './validation-feedback'
