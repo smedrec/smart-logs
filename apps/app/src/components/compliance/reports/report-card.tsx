@@ -28,6 +28,10 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { useResponsive, useTouchFriendly } from '../hooks/use-responsive'
+import { formatDateForScreenReader, generateAriaLabel } from '../utils/screen-reader-utils'
+import { VisuallyHidden } from '../utils/visually-hidden'
+
 import type { ReportType, ScheduledReportUI } from '../types'
 
 interface ReportCardProps {
@@ -116,6 +120,8 @@ export function ReportCard({
 	className,
 }: ReportCardProps) {
 	const [isExpanded, setIsExpanded] = React.useState(false)
+	const { isMobile, isTablet } = useResponsive()
+	const { getTouchTargetSize, getTouchSpacing, shouldUseTouchOptimizations } = useTouchFriendly()
 
 	const reportTypeConfig = reportTypeConfigs[report.reportType as keyof typeof reportTypeConfigs]
 	const statusConfig = report.lastExecutionStatus
@@ -127,18 +133,29 @@ export function ReportCard({
 
 	return (
 		<Card
-			className={cn('transition-all duration-200', isSelected && 'ring-2 ring-primary', className)}
+			className={cn(
+				'transition-all duration-200',
+				isSelected && 'ring-2 ring-primary',
+				shouldUseTouchOptimizations && 'active:scale-[0.98]',
+				isMobile && 'shadow-sm hover:shadow-md',
+				className
+			)}
 		>
-			<CardHeader className="pb-3">
-				<div className="flex items-start justify-between gap-3">
+			<CardHeader className={cn('pb-3', shouldUseTouchOptimizations && 'p-4')}>
+				<div
+					className={cn(
+						'flex items-start justify-between',
+						shouldUseTouchOptimizations ? getTouchSpacing() : 'gap-3'
+					)}
+				>
 					{/* Selection and Type */}
 					<div className="flex items-start gap-3 flex-1 min-w-0">
 						{showSelection && (
 							<Checkbox
 								checked={isSelected}
 								onCheckedChange={onSelectionChange}
-								className="mt-1"
-								aria-label={`Select ${report.name}`}
+								className={cn('mt-1', shouldUseTouchOptimizations && getTouchTargetSize('sm'))}
+								aria-label={generateAriaLabel.tableAction('Select', report.name, 'report')}
 							/>
 						)}
 
@@ -149,18 +166,42 @@ export function ReportCard({
 
 						{/* Report Info */}
 						<div className="flex-1 min-w-0">
-							<div className="flex items-start justify-between gap-2">
+							<div
+								className={cn(
+									'flex items-start justify-between',
+									isMobile ? 'flex-col gap-2' : 'gap-2'
+								)}
+							>
 								<div className="min-w-0 flex-1">
-									<h3 className="font-semibold text-base leading-tight truncate">{report.name}</h3>
+									<h3
+										className={cn(
+											'font-semibold leading-tight truncate',
+											isMobile ? 'text-sm' : 'text-base'
+										)}
+									>
+										{report.name}
+									</h3>
 									{report.description && (
-										<p className="text-muted-foreground text-sm mt-1 line-clamp-2">
+										<p
+											className={cn(
+												'text-muted-foreground mt-1 line-clamp-2',
+												isMobile ? 'text-xs' : 'text-sm'
+											)}
+										>
 											{report.description}
 										</p>
 									)}
 								</div>
 
 								{/* Status Badge */}
-								<Badge variant={report.enabled ? 'default' : 'secondary'} className="shrink-0">
+								<Badge
+									variant={report.enabled ? 'default' : 'secondary'}
+									className={cn('shrink-0', isMobile && 'text-xs px-2 py-1 self-start')}
+									aria-label={generateAriaLabel.reportStatus(
+										report.enabled ? 'enabled' : 'disabled',
+										report.name
+									)}
+								>
 									{report.enabled ? 'Enabled' : 'Disabled'}
 								</Badge>
 							</div>
@@ -177,9 +218,17 @@ export function ReportCard({
 					{/* Actions Menu */}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0">
-								<span className="sr-only">Open menu</span>
-								<MoreHorizontal className="size-4" />
+							<Button
+								variant="ghost"
+								size="sm"
+								className={cn(
+									'h-8 w-8 p-0 shrink-0',
+									shouldUseTouchOptimizations && getTouchTargetSize('sm')
+								)}
+								aria-label={`More actions for ${report.name}`}
+							>
+								<VisuallyHidden>Open menu for {report.name}</VisuallyHidden>
+								<MoreHorizontal className="size-4" aria-hidden="true" />
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
@@ -208,9 +257,9 @@ export function ReportCard({
 				</div>
 			</CardHeader>
 
-			<CardContent className="pt-0">
+			<CardContent className={cn('pt-0', shouldUseTouchOptimizations && 'px-4 pb-4')}>
 				{/* Quick Info */}
-				<div className="grid grid-cols-2 gap-4 mb-4">
+				<div className={cn('grid gap-4 mb-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
 					{/* Schedule */}
 					<div className="space-y-1">
 						<div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -228,9 +277,16 @@ export function ReportCard({
 							<Calendar className="size-4" />
 							<span>Next Run</span>
 						</div>
-						<p className="text-sm font-medium">
+						<p
+							className={cn('font-medium', isMobile ? 'text-xs' : 'text-sm')}
+							aria-label={
+								report.nextExecution
+									? `Next execution: ${formatDateForScreenReader(report.nextExecution, { includeTime: true })}`
+									: 'Manual execution only'
+							}
+						>
 							{report.nextExecution
-								? format(new Date(report.nextExecution), 'MMM dd, HH:mm')
+								? format(new Date(report.nextExecution), isMobile ? 'MMM dd' : 'MMM dd, HH:mm')
 								: 'Manual only'}
 						</p>
 					</div>
@@ -312,25 +368,59 @@ export function ReportCard({
 						</div>
 
 						{/* Action Buttons */}
-						<div className="flex gap-2 pt-2">
-							<Button variant="outline" size="sm" onClick={onView} className="flex-1">
-								<FileText className="mr-2 size-4" />
+						<div
+							className={cn(
+								'flex pt-2',
+								isMobile ? 'flex-col gap-2' : 'gap-2',
+								shouldUseTouchOptimizations && getTouchSpacing()
+							)}
+						>
+							<Button
+								variant="outline"
+								size={isMobile ? 'default' : 'sm'}
+								onClick={onView}
+								className={cn(
+									'flex-1 justify-center',
+									shouldUseTouchOptimizations && getTouchTargetSize('md')
+								)}
+								aria-label={generateAriaLabel.tableAction('View', report.name, 'report')}
+							>
+								<FileText className={cn('size-4', isMobile ? 'mr-2' : 'mr-1')} aria-hidden="true" />
 								View
 							</Button>
-							<Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
-								<Settings className="mr-2 size-4" />
+							<Button
+								variant="outline"
+								size={isMobile ? 'default' : 'sm'}
+								onClick={onEdit}
+								className={cn(
+									'flex-1 justify-center',
+									shouldUseTouchOptimizations && getTouchTargetSize('md')
+								)}
+								aria-label={generateAriaLabel.tableAction('Edit', report.name, 'report')}
+							>
+								<Settings className={cn('size-4', isMobile ? 'mr-2' : 'mr-1')} aria-hidden="true" />
 								Edit
 							</Button>
 							<Button
 								variant="default"
-								size="sm"
+								size={isMobile ? 'default' : 'sm'}
 								onClick={onExecute}
 								disabled={!report.enabled}
-								className="flex-1"
+								className={cn(
+									'flex-1 justify-center',
+									shouldUseTouchOptimizations && getTouchTargetSize('md')
+								)}
+								aria-label={generateAriaLabel.tableAction('Execute', report.name, 'report')}
+								aria-describedby={!report.enabled ? `${report.id}-disabled-reason` : undefined}
 							>
-								<Play className="mr-2 size-4" />
+								<Play className={cn('size-4', isMobile ? 'mr-2' : 'mr-1')} aria-hidden="true" />
 								Execute
 							</Button>
+							{!report.enabled && (
+								<VisuallyHidden id={`${report.id}-disabled-reason`}>
+									Report is disabled and cannot be executed
+								</VisuallyHidden>
+							)}
 						</div>
 					</CollapsibleContent>
 				</Collapsible>
@@ -367,10 +457,23 @@ export function ReportCardsGrid({
 	loading = false,
 	className,
 }: ReportCardsGridProps) {
+	const { isMobile, isTablet } = useResponsive()
+
+	// Responsive grid columns
+	const getGridColumns = () => {
+		if (isMobile) return 'grid-cols-1'
+		if (isTablet) return 'grid-cols-2'
+		return 'grid-cols-3'
+	}
+
 	if (loading) {
 		return (
-			<div className={cn('grid gap-4 sm:grid-cols-2 lg:grid-cols-3', className)}>
-				{Array.from({ length: 6 }).map((_, i) => (
+			<div
+				className={cn('grid gap-4', getGridColumns(), className)}
+				role="status"
+				aria-label="Loading reports"
+			>
+				{Array.from({ length: isMobile ? 3 : 6 }).map((_, i) => (
 					<Card key={i} className="animate-pulse">
 						<CardHeader>
 							<div className="flex items-start gap-3">
@@ -383,7 +486,7 @@ export function ReportCardsGrid({
 						</CardHeader>
 						<CardContent>
 							<div className="space-y-3">
-								<div className="grid grid-cols-2 gap-4">
+								<div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-2')}>
 									<div className="h-3 bg-muted rounded" />
 									<div className="h-3 bg-muted rounded" />
 								</div>
@@ -398,10 +501,20 @@ export function ReportCardsGrid({
 
 	if (reports.length === 0) {
 		return (
-			<div className="flex flex-col items-center justify-center py-12 text-center">
-				<FileText className="size-12 text-muted-foreground mb-4" />
-				<h3 className="text-lg font-semibold mb-2">No reports found</h3>
-				<p className="text-muted-foreground max-w-sm">
+			<div
+				className={cn(
+					'flex flex-col items-center justify-center text-center',
+					isMobile ? 'py-8 px-4' : 'py-12'
+				)}
+			>
+				<FileText
+					className={cn('text-muted-foreground mb-4', isMobile ? 'size-8' : 'size-12')}
+					aria-hidden="true"
+				/>
+				<h3 className={cn('font-semibold mb-2', isMobile ? 'text-base' : 'text-lg')}>
+					No reports found
+				</h3>
+				<p className={cn('text-muted-foreground max-w-sm', isMobile ? 'text-sm' : 'text-base')}>
 					Create your first compliance report to get started with automated reporting.
 				</p>
 			</div>
@@ -409,7 +522,11 @@ export function ReportCardsGrid({
 	}
 
 	return (
-		<div className={cn('grid gap-4 sm:grid-cols-2 lg:grid-cols-3', className)}>
+		<div
+			className={cn('grid gap-4', getGridColumns(), className)}
+			role="grid"
+			aria-label={`${reports.length} compliance reports`}
+		>
 			{reports.map((report) => (
 				<ReportCard
 					key={report.id}

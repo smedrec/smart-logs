@@ -37,6 +37,14 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { useAriaLiveAnnouncer } from '../utils/aria-live-region'
+import {
+	ARIA_DESCRIPTIONS,
+	createTableAttributes,
+	formatDateForScreenReader,
+	generateAriaLabel,
+} from '../utils/screen-reader-utils'
+import { VisuallyHidden } from '../utils/visually-hidden'
 import { BulkActions } from './bulk-actions'
 import { ReportsFilters } from './reports-filters'
 
@@ -105,6 +113,24 @@ export function ReportsDataTable({
 	const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
 	const [sorting, setSorting] = React.useState<SortingState>([])
 
+	// ARIA live announcements for screen readers
+	const { announce, LiveRegion } = useAriaLiveAnnouncer()
+
+	// Announce data changes to screen readers
+	React.useEffect(() => {
+		if (!loading && data.length > 0) {
+			announce(`${data.length} compliance reports loaded`)
+		}
+	}, [data.length, loading, announce])
+
+	// Announce selection changes
+	React.useEffect(() => {
+		const selectedCount = Object.keys(rowSelection).length
+		if (selectedCount > 0) {
+			announce(`${selectedCount} reports selected`)
+		}
+	}, [rowSelection, announce])
+
 	// Define table columns
 	const columns: ColumnDef<ScheduledReportUI>[] = React.useMemo(
 		() => [
@@ -116,19 +142,30 @@ export function ReportsDataTable({
 							table.getIsAllPageRowsSelected() ||
 							(table.getIsSomePageRowsSelected() && 'indeterminate')
 						}
-						onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-						aria-label="Select all"
+						onCheckedChange={(value) => {
+							table.toggleAllPageRowsSelected(!!value)
+							const action = value ? 'selected' : 'deselected'
+							announce(`All reports ${action}`)
+						}}
+						aria-label={`Select all ${data.length} reports`}
 						className="translate-y-[2px]"
 					/>
 				),
-				cell: ({ row }) => (
-					<Checkbox
-						checked={row.getIsSelected()}
-						onCheckedChange={(value) => row.toggleSelected(!!value)}
-						aria-label="Select row"
-						className="translate-y-[2px]"
-					/>
-				),
+				cell: ({ row }) => {
+					const report = row.original
+					return (
+						<Checkbox
+							checked={row.getIsSelected()}
+							onCheckedChange={(value) => {
+								row.toggleSelected(!!value)
+								const action = value ? 'selected' : 'deselected'
+								announce(`Report ${report.name} ${action}`)
+							}}
+							aria-label={`Select report ${report.name}`}
+							className="translate-y-[2px]"
+						/>
+					)
+				},
 				enableSorting: false,
 				enableHiding: false,
 			},
@@ -139,9 +176,17 @@ export function ReportsDataTable({
 					const report = row.original
 					return (
 						<div className="flex flex-col gap-1">
-							<div className="font-medium">{report.name}</div>
+							<div className="font-medium" id={`report-name-${report.id}`}>
+								{report.name}
+							</div>
 							{report.description && (
-								<div className="text-muted-foreground text-sm">{report.description}</div>
+								<div
+									className="text-muted-foreground text-sm"
+									id={`report-description-${report.id}`}
+									aria-describedby={`report-name-${report.id}`}
+								>
+									{report.description}
+								</div>
 							)}
 						</div>
 					)
@@ -175,8 +220,15 @@ export function ReportsDataTable({
 				header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
 				cell: ({ row }) => {
 					const enabled = row.getValue('enabled') as boolean
+					const report = row.original
 					return (
-						<Badge variant={enabled ? 'default' : 'secondary'}>
+						<Badge
+							variant={enabled ? 'default' : 'secondary'}
+							aria-label={generateAriaLabel.reportStatus(
+								enabled ? 'enabled' : 'disabled',
+								report.name
+							)}
+						>
 							{enabled ? 'Enabled' : 'Disabled'}
 						</Badge>
 					)
@@ -207,14 +259,28 @@ export function ReportsDataTable({
 				header: ({ column }) => <DataTableColumnHeader column={column} title="Next Run" />,
 				cell: ({ row }) => {
 					const nextExecution = row.original.nextExecution
+					const report = row.original
+
 					if (!nextExecution) {
-						return <span className="text-muted-foreground">Manual only</span>
+						return (
+							<span
+								className="text-muted-foreground"
+								aria-label={`${report.name} is manual execution only`}
+							>
+								Manual only
+							</span>
+						)
 					}
+
+					const formattedDate = formatDateForScreenReader(nextExecution, { includeTime: true })
 
 					return (
 						<div className="flex items-center gap-2">
-							<Calendar className="size-4" />
-							<span className="text-sm">
+							<Calendar className="size-4" aria-hidden="true" />
+							<span
+								className="text-sm"
+								aria-label={`Next execution for ${report.name}: ${formattedDate}`}
+							>
 								{format(new Date(nextExecution), 'MMM dd, yyyy HH:mm')}
 							</span>
 						</div>
@@ -270,38 +336,59 @@ export function ReportsDataTable({
 				cell: ({ row }) => {
 					const report = row.original
 					return (
-						<div className="flex items-center gap-2">
+						<div
+							className="flex items-center gap-2"
+							role="group"
+							aria-label={`Actions for ${report.name}`}
+						>
 							<Button
 								variant="ghost"
 								size="sm"
 								onClick={() => onReportView?.(report.id)}
 								className="h-8 w-8 p-0"
+								aria-label={generateAriaLabel.tableAction('View', report.name, 'report')}
 							>
-								<span className="sr-only">View report</span>
-								<FileText className="size-4" />
+								<VisuallyHidden>View report {report.name}</VisuallyHidden>
+								<FileText className="size-4" aria-hidden="true" />
 							</Button>
 							<Button
 								variant="ghost"
 								size="sm"
 								onClick={() => onReportEdit?.(report.id)}
 								className="h-8 w-8 p-0"
+								aria-label={generateAriaLabel.tableAction('Edit', report.name, 'report')}
 							>
-								<span className="sr-only">Edit report</span>
-								<Settings className="size-4" />
+								<VisuallyHidden>Edit report {report.name}</VisuallyHidden>
+								<Settings className="size-4" aria-hidden="true" />
 							</Button>
 							<Button
 								variant="ghost"
 								size="sm"
-								onClick={() => onReportExecute?.(report.id)}
+								onClick={() => {
+									onReportExecute?.(report.id)
+									announce(`Executing report ${report.name}`)
+								}}
 								disabled={!report.enabled}
 								className="h-8 w-8 p-0"
+								aria-label={generateAriaLabel.tableAction('Execute', report.name, 'report')}
+								aria-describedby={!report.enabled ? `${report.id}-disabled-reason` : undefined}
 							>
-								<span className="sr-only">Execute report</span>
-								<Play className="size-4" />
+								<VisuallyHidden>Execute report {report.name}</VisuallyHidden>
+								<Play className="size-4" aria-hidden="true" />
 							</Button>
-							<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-								<span className="sr-only">More actions</span>
-								<MoreHorizontal className="size-4" />
+							{!report.enabled && (
+								<VisuallyHidden id={`${report.id}-disabled-reason`}>
+									Report is disabled and cannot be executed
+								</VisuallyHidden>
+							)}
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-8 w-8 p-0"
+								aria-label={`More actions for ${report.name}`}
+							>
+								<VisuallyHidden>More actions for {report.name}</VisuallyHidden>
+								<MoreHorizontal className="size-4" aria-hidden="true" />
 							</Button>
 						</div>
 					)
@@ -373,7 +460,17 @@ export function ReportsDataTable({
 
 			{/* Table */}
 			<div className="rounded-md border">
-				<Table>
+				<Table
+					{...createTableAttributes(
+						ARIA_DESCRIPTIONS.REPORT_TABLE,
+						sorting[0]?.id,
+						sorting[0]?.desc ? 'desc' : 'asc'
+					)}
+				>
+					<caption className="sr-only">
+						{ARIA_DESCRIPTIONS.REPORT_TABLE}.{data.length} reports total.
+						{Object.keys(rowSelection).length} selected.
+					</caption>
 					<TableHeader>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow key={headerGroup.id}>
@@ -392,8 +489,13 @@ export function ReportsDataTable({
 							<TableRow>
 								<TableCell colSpan={columns.length} className="h-24 text-center">
 									<div className="flex items-center justify-center">
-										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-										<span className="ml-2">Loading reports...</span>
+										<div
+											className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"
+											aria-hidden="true"
+										></div>
+										<span className="ml-2" aria-live="polite">
+											{generateAriaLabel.loadingState('compliance reports')}
+										</span>
 									</div>
 								</TableCell>
 							</TableRow>
@@ -415,8 +517,10 @@ export function ReportsDataTable({
 							<TableRow>
 								<TableCell colSpan={columns.length} className="h-24 text-center">
 									<div className="flex flex-col items-center justify-center">
-										<FileText className="size-8 text-muted-foreground mb-2" />
-										<p className="text-muted-foreground">No reports found.</p>
+										<FileText className="size-8 text-muted-foreground mb-2" aria-hidden="true" />
+										<p className="text-muted-foreground" role="status">
+											No compliance reports found.
+										</p>
 										<p className="text-muted-foreground text-sm">
 											Create your first compliance report to get started.
 										</p>
@@ -430,6 +534,9 @@ export function ReportsDataTable({
 
 			{/* Pagination */}
 			<DataTablePagination table={table} />
+
+			{/* ARIA Live Region for announcements */}
+			<LiveRegion />
 		</div>
 	)
 }
