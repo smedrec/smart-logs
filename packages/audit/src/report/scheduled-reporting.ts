@@ -10,7 +10,7 @@
  * Requirements: 4.1, 4.4, 8.1
  */
 
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, is, lte, sql } from 'drizzle-orm'
 import { Inngest } from 'inngest'
 
 import {
@@ -68,6 +68,28 @@ export interface ReportExecution {
 	error?: Error | string
 }
 
+export interface TemplateConfiguration {
+	sections: {
+		id: string
+		title: string
+		required: boolean
+		fields: string[]
+		description?: string
+		filters?: Record<string, unknown>
+	}[]
+	formatting?: {
+		includeHeader: boolean
+		includeFooter: boolean
+		includeToc: boolean
+		pageNumbers: boolean
+		watermark?: string
+	}
+	branding?: {
+		logo?: string
+		colors?: Record<string, string>
+		fonts?: Record<string, string>
+	}
+}
 /**
  * Report template for reusable configurations
  */
@@ -75,20 +97,29 @@ export interface ReportTemplate {
 	id: string
 	name: string
 	description?: string
+	category: 'hipaa' | 'gdpr' | 'custom' | 'privacy' | 'security' | 'audit'
+	isPublic: boolean
 	reportType:
 		| 'HIPAA_AUDIT_TRAIL'
 		| 'GDPR_PROCESSING_ACTIVITIES'
 		| 'GENERAL_COMPLIANCE'
 		| 'INTEGRITY_VERIFICATION'
-	defaultCriteria: Partial<ReportCriteria>
+		| 'CUSTOM_REPORT'
 	defaultFormat: ReportFormat
-	defaultExportConfig: Partial<ExportConfig>
+	defaultCriteria?: Partial<ReportCriteria>
+	defaultExportConfig?: Partial<ExportConfig>
+	defaultDeliveryConfig?: Partial<DeliveryConfig>
+	defaultNotificationConfig?: Partial<NotificationConfig>
 	tags: string[]
+	isActive: boolean
+	isDefault: boolean
+	configuration: TemplateConfiguration
+	version: number
+	usageCount: number
 	createdAt: string
 	createdBy: string
 	updatedAt: string
 	updatedBy: string
-	isActive: boolean
 }
 
 /**
@@ -666,7 +697,9 @@ export class ScheduledReportingService {
 	 * Create a report template
 	 */
 	async createReportTemplate(
-		template: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'> & { organizationId: string }
+		template: Omit<ReportTemplate, 'id' | 'version' | 'usageCount' | 'createdAt' | 'updatedAt'> & {
+			organizationId: string
+		}
 	): Promise<ReportTemplate> {
 		const templateId = this.generateId('template')
 		const now = new Date().toISOString()
@@ -677,12 +710,17 @@ export class ScheduledReportingService {
 			name: template.name,
 			description: template.description || null,
 			organizationId: template.organizationId,
+			category: template.category,
+			isPublic: template.isPublic ? 'true' : 'false',
 			reportType: template.reportType,
-			defaultCriteria: template.defaultCriteria,
 			defaultFormat: template.defaultFormat,
-			defaultExportConfig: template.defaultExportConfig,
+			defaultCriteria: template.defaultCriteria || null,
+			defaultExportConfig: template.defaultExportConfig || null,
+			defaultDeliveryConfig: template.defaultDeliveryConfig || null,
+			defaultNotificationConfig: template.defaultNotificationConfig || null,
 			tags: template.tags,
 			isActive: template.isActive ? 'true' : 'false',
+			isDefault: template.isDefault ? 'true' : 'false',
 			createdBy: template.createdBy,
 			updatedBy: template.updatedBy,
 		}
@@ -692,6 +730,8 @@ export class ScheduledReportingService {
 		return {
 			...template,
 			id: templateId,
+			version: 1,
+			usageCount: 0,
 			createdAt: now,
 			updatedAt: now,
 		}
@@ -726,16 +766,25 @@ export class ScheduledReportingService {
 			id: record.id,
 			name: record.name,
 			description: record.description || undefined,
+			category: record.category as ReportTemplate['category'],
+			isPublic: record.isPublic === 'true',
 			reportType: record.reportType as ReportTemplate['reportType'],
-			defaultCriteria: record.defaultCriteria as Partial<ReportCriteria>,
 			defaultFormat: record.defaultFormat as ReportFormat,
-			defaultExportConfig: record.defaultExportConfig as Partial<ExportConfig>,
+			defaultCriteria: (record.defaultCriteria as Partial<ReportCriteria>) || undefined,
+			defaultExportConfig: (record.defaultExportConfig as Partial<ExportConfig>) || undefined,
+			defaultDeliveryConfig: (record.defaultDeliveryConfig as DeliveryConfig) || undefined,
+			defaultNotificationConfig:
+				(record.defaultNotificationConfig as Partial<NotificationConfig>) || undefined,
 			tags: (record.tags as string[]) || [],
+			isActive: record.isActive === 'true',
+			isDefault: record.isDefault === 'true',
+			configuration: record.configuration as TemplateConfiguration,
+			version: record.version,
+			usageCount: record.usageCount,
 			createdAt: record.createdAt,
 			createdBy: record.createdBy,
 			updatedAt: record.updatedAt,
 			updatedBy: record.updatedBy || '',
-			isActive: record.isActive === 'true',
 		}))
 	}
 
@@ -764,16 +813,25 @@ export class ScheduledReportingService {
 			id: record.id,
 			name: record.name,
 			description: record.description || undefined,
+			category: record.category as ReportTemplate['category'],
+			isPublic: record.isPublic === 'true',
 			reportType: record.reportType as ReportTemplate['reportType'],
-			defaultCriteria: record.defaultCriteria as Partial<ReportCriteria>,
 			defaultFormat: record.defaultFormat as ReportFormat,
-			defaultExportConfig: record.defaultExportConfig as Partial<ExportConfig>,
+			defaultCriteria: (record.defaultCriteria as Partial<ReportCriteria>) || undefined,
+			defaultExportConfig: (record.defaultExportConfig as Partial<ExportConfig>) || undefined,
+			defaultDeliveryConfig: (record.defaultDeliveryConfig as DeliveryConfig) || undefined,
+			defaultNotificationConfig:
+				(record.defaultNotificationConfig as Partial<NotificationConfig>) || undefined,
 			tags: (record.tags as string[]) || [],
+			isActive: record.isActive === 'true',
+			isDefault: record.isDefault === 'true',
+			configuration: record.configuration as TemplateConfiguration,
+			version: record.version,
+			usageCount: record.usageCount,
 			createdAt: record.createdAt,
 			createdBy: record.createdBy,
 			updatedAt: record.updatedAt,
 			updatedBy: record.updatedBy || '',
-			isActive: record.isActive === 'true',
 		}
 	}
 

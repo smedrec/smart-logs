@@ -7,6 +7,11 @@ import {
 	PaginationParamsSchema,
 	QueryFilterSchema,
 } from './api'
+import {
+	DeliveryConfigSchema,
+	ExportConfigSchema,
+	NotificationConfigSchema,
+} from './scheduled-reports'
 
 // ============================================================================
 // Compliance Report Types
@@ -20,6 +25,7 @@ export const ReportTypeSchema = z.enum([
 	'GDPR_PROCESSING_ACTIVITIES',
 	'GENERAL_COMPLIANCE',
 	'INTEGRITY_VERIFICATION',
+	'CUSTOM_REPORT',
 ])
 export type ReportType = z.infer<typeof ReportTypeSchema>
 
@@ -551,18 +557,25 @@ export const ReportTemplateSchema = z.object({
 	id: z.string(),
 	name: z.string().min(1),
 	description: z.string().optional(),
-	category: z.string().min(1),
-	type: ReportTypeSchema,
-	version: z.string().min(1),
-	isDefault: z.boolean().default(false),
-	outputFormats: z.enum(['pdf', 'html', 'csv', 'json', 'xml']).default('pdf'),
+	organizationId: z.string().min(1),
+	category: z.enum(['hipaa', 'gdpr', 'custom', 'privacy', 'security', 'audit']),
+	isPublic: z.boolean(),
+	reportType: ReportTypeSchema,
+	defaultFormat: ReportFormatSchema, //.default('pdf'),
+	defaultCriteria: ReportCriteriaSchema.partial().optional(),
+	defaultExport: ExportConfigSchema.partial().optional(),
+	defaultDelivery: DeliveryConfigSchema.optional(),
+	defaultNotifications: NotificationConfigSchema.partial().optional(),
+	tags: z.array(z.string().min(1)).optional(),
+	isActive: z.boolean(),
+	isDefault: z.boolean(), //.default(false),
 	configuration: z.object({
 		sections: z.array(
 			z.object({
 				id: z.string().min(1),
 				title: z.string().min(1),
 				description: z.string().optional(),
-				required: z.boolean().default(true),
+				required: z.boolean(), //.default(true),
 				fields: z.array(z.string().min(1)),
 				filters: z.record(z.unknown()).optional(),
 			})
@@ -584,12 +597,44 @@ export const ReportTemplateSchema = z.object({
 			})
 			.optional(),
 	}),
+	version: z.string().min(1),
+	usageCount: z.number().int().min(0),
 	createdAt: z.string().datetime(),
 	updatedAt: z.string().datetime(),
 	createdBy: z.string().min(1),
+	updatedBy: z.string().optional(),
 })
 export type ReportTemplate = z.infer<typeof ReportTemplateSchema>
 
+const ReportTemplateConfigurationSchema = z.object({
+	sections: z.array(
+		z.object({
+			id: z.string().min(1),
+			title: z.string().min(1),
+			description: z.string().optional(),
+			required: z.boolean(), //.default(true),
+			fields: z.array(z.string().min(1)),
+			filters: z.record(z.unknown()).optional(),
+		})
+	),
+	formatting: z
+		.object({
+			includeHeader: z.boolean().default(true),
+			includeFooter: z.boolean().default(true),
+			includeToc: z.boolean().default(true),
+			pageNumbers: z.boolean().default(true),
+			watermark: z.string().optional(),
+		})
+		.optional(),
+	branding: z
+		.object({
+			logo: z.string().url().optional(),
+			colors: z.record(z.string()).optional(),
+			fonts: z.record(z.string()).optional(),
+		})
+		.optional(),
+})
+export type ReportTemplateConfiguration = z.infer<typeof ReportTemplateConfigurationSchema>
 // ============================================================================
 // Type Guards
 // ============================================================================

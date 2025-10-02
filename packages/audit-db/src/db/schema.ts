@@ -502,12 +502,20 @@ export const reportTemplates = pgTable(
 		name: varchar('name', { length: 255 }).notNull(),
 		description: text('description'),
 		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		category: varchar('category', { length: 50 }).notNull(), // Report category
+		isPublic: varchar('is_public', { length: 10 }).notNull().default('false'),
 		reportType: varchar('report_type', { length: 100 }).notNull(), // HIPAA_AUDIT_TRAIL, GDPR_PROCESSING_ACTIVITIES, etc.
-		defaultCriteria: jsonb('default_criteria').notNull(), // Default ReportCriteria as JSON
 		defaultFormat: varchar('default_format', { length: 50 }).notNull(), // Default ReportFormat
-		defaultExportConfig: jsonb('default_export_config').notNull(), // Default ExportConfig as JSON
+		defaultCriteria: jsonb('default_criteria'), // Default ReportCriteria as JSON
+		defaultExportConfig: jsonb('default_export_config'), // Default ExportConfig as JSON
+		defaultDeliveryConfig: jsonb('default_delivery_config'), // Default DeliveryConfig as JSON
+		defaultNotificationConfig: jsonb('default_notifications_config'), // Default NotificationConfig as JSON
 		tags: jsonb('tags').notNull().default('[]'), // Array of tags
 		isActive: varchar('is_active', { length: 10 }).notNull().default('true'),
+		isDefault: varchar('is_default', { length: 10 }).notNull().default('false'),
+		configuration: jsonb('configuration'), // Additional template configuration
+		version: integer('version').notNull().default(1), // Version control for concurrency
+		usageCount: integer('usage_count').notNull().default(0), // Usage count for analytics
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
 			.notNull()
 			.defaultNow(),
@@ -521,6 +529,9 @@ export const reportTemplates = pgTable(
 		return [
 			// Primary indexes for multi-organizational queries
 			index('report_templates_organization_id_idx').on(table.organizationId),
+			index('report_templates_category_idx').on(table.category),
+			index('report_templates_is_public_idx').on(table.isPublic),
+			index('report_templates_is_default_default_idx').on(table.isDefault),
 			index('report_templates_report_type_idx').on(table.reportType),
 			index('report_templates_is_active_idx').on(table.isActive),
 			index('report_templates_created_at_idx').on(table.createdAt),
@@ -528,7 +539,9 @@ export const reportTemplates = pgTable(
 			index('report_templates_name_idx').on(table.name),
 
 			// Composite indexes for common queries
+			index('report_templates_org_public_idx').on(table.organizationId, table.isPublic),
 			index('report_templates_org_active_idx').on(table.organizationId, table.isActive),
+			index('report_templates_org_default_idx').on(table.organizationId, table.isDefault),
 			index('report_templates_org_type_idx').on(table.organizationId, table.reportType),
 			index('report_templates_active_type_idx').on(table.isActive, table.reportType),
 

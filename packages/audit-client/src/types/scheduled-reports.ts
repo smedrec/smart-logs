@@ -227,6 +227,25 @@ export const DeliveryConfigSchema = z
 export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>
 
 /**
+ * Export configuration schema
+ */
+
+export const ExportConfigSchema = z.object({
+	format: ReportFormatSchema,
+	includeMetadata: z.boolean().optional(), //.default(true),
+	includeIntegrityReport: z.boolean().optional(), //.default(false),
+	compression: z.enum(['none', 'gzip', 'zip', 'bzip2']).optional(), //.default('none'),
+	encryption: z
+		.object({
+			enabled: z.boolean(), //.default(false),
+			algorithm: z.string().optional(),
+			keyId: z.string().optional(),
+		})
+		.optional(),
+})
+export type ExportConfig = z.infer<typeof ExportConfigSchema>
+
+/**
  * Notification configuration
  */
 export const NotificationConfigSchema = z.object({
@@ -253,7 +272,7 @@ export const ScheduledReportSchema = z.object({
 	format: ReportFormatSchema,
 	schedule: ScheduleConfigSchema,
 	delivery: DeliveryConfigSchema,
-	export: ExportResultSchema,
+	export: ExportConfigSchema,
 	notifications: NotificationConfigSchema.optional(),
 
 	// Status and metadata
@@ -290,7 +309,7 @@ export const CreateScheduledReportInputSchema = z.object({
 	format: ReportFormatSchema,
 	schedule: ScheduleConfigSchema,
 	delivery: DeliveryConfigSchema,
-	export: ExportResultSchema,
+	export: ExportConfigSchema,
 	notifications: NotificationConfigSchema.optional(),
 	createdBy: z.string().min(1),
 	updatedBy: z.string().min(1),
@@ -312,7 +331,7 @@ export const UpdateScheduledReportInputSchema = z.object({
 	format: ReportFormatSchema.optional(),
 	schedule: ScheduleConfigSchema.optional(),
 	delivery: DeliveryConfigSchema.optional(),
-	export: ExportResultSchema.optional(),
+	export: ExportConfigSchema.optional(),
 	notifications: NotificationConfigSchema.optional(),
 	updatedBy: z.string().min(1),
 	runId: z.string().optional(),
@@ -408,7 +427,7 @@ export const ReportExecutionSchema = z.object({
 		.optional(),
 
 	// Metadata
-	/**executedBy: z.string().optional(),
+	//executedBy: z.string().optional(),
 	metadata: z.record(z.unknown()).optional(),
 	logs: z
 		.array(
@@ -419,7 +438,7 @@ export const ReportExecutionSchema = z.object({
 				details: z.record(z.unknown()).optional(),
 			})
 		)
-		.optional(),*/
+		.optional(),
 })
 export type ReportExecution = z.infer<typeof ReportExecutionSchema>
 
@@ -472,6 +491,7 @@ export const ListScheduledReportsParamsSchema = z.object({
 				'GDPR_PROCESSING_ACTIVITIES',
 				'GENERAL_COMPLIANCE',
 				'INTEGRITY_VERIFICATION',
+				'CUSTOM_REPORT',
 			])
 		)
 		.optional(),

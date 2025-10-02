@@ -219,7 +219,10 @@ export class ComplianceService extends BaseResource {
 	 * Create new report template
 	 */
 	async createReportTemplate(
-		template: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>
+		template: Omit<
+			ReportTemplate,
+			'id' | 'organizationId' | 'version' | 'usageCount' | 'createdAt' | 'createdBy' | 'updatedAt'
+		>
 	): Promise<ReportTemplate> {
 		this.validateReportTemplate(template)
 
@@ -423,7 +426,10 @@ export class ComplianceService extends BaseResource {
 	 * Validate report template
 	 */
 	private validateReportTemplate(
-		template: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>
+		template: Omit<
+			ReportTemplate,
+			'id' | 'organizationId' | 'version' | 'usageCount' | 'createdAt' | 'createdBy' | 'updatedAt'
+		>
 	): void {
 		if (!template.name || template.name.trim().length === 0) {
 			throw new Error('Template name is required')
@@ -433,22 +439,20 @@ export class ComplianceService extends BaseResource {
 			throw new Error('Template category is required')
 		}
 
-		const validCategories = ['hipaa', 'gdpr', 'custom', 'security', 'audit']
+		const validCategories = ['hipaa', 'gdpr', 'custom', 'privacy', 'security', 'audit']
 		if (!validCategories.includes(template.category)) {
 			throw new Error(`Invalid template category. Must be one of: ${validCategories.join(', ')}`)
 		}
 
-		if (!template.outputFormats || template.outputFormats.length === 0) {
-			throw new Error('At least one output format is required')
+		if (!template.defaultFormat) {
+			throw new Error('At least one format is required')
 		}
 
 		const validFormats = ['json', 'csv', 'pdf', 'xlsx']
-		for (const format of template.outputFormats) {
-			if (!validFormats.includes(format)) {
-				throw new Error(
-					`Invalid output format: ${format}. Must be one of: ${validFormats.join(', ')}`
-				)
-			}
+		if (!validFormats.includes(template.defaultFormat)) {
+			throw new Error(
+				`Invalid format: ${template.defaultFormat}. Must be one of: ${validFormats.join(', ')}`
+			)
 		}
 	}
 

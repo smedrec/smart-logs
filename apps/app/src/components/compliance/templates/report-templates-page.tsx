@@ -77,7 +77,7 @@ export function ReportTemplatesPage({ searchParams }: ReportTemplatesPageProps) 
 				name: 'Standard HIPAA Audit',
 				description: 'Comprehensive HIPAA compliance audit template with all required sections',
 				reportType: 'HIPAA_AUDIT_TRAIL',
-				category: 'Healthcare',
+				category: 'hippa',
 				isPublic: true,
 				createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 90), // 90 days ago
 				updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // 30 days ago
@@ -90,7 +90,7 @@ export function ReportTemplatesPage({ searchParams }: ReportTemplatesPageProps) 
 				name: 'GDPR Data Processing Report',
 				description: 'Template for GDPR data processing activities reporting',
 				reportType: 'GDPR_PROCESSING_ACTIVITIES',
-				category: 'Privacy',
+				category: 'privacy',
 				isPublic: true,
 				createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 120), // 120 days ago
 				updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15), // 15 days ago
@@ -103,7 +103,7 @@ export function ReportTemplatesPage({ searchParams }: ReportTemplatesPageProps) 
 				name: 'Custom Integrity Check',
 				description: 'Custom template for data integrity verification with advanced parameters',
 				reportType: 'INTEGRITY_VERIFICATION',
-				category: 'Security',
+				category: 'security',
 				isPublic: false,
 				createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60), // 60 days ago
 				updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // 5 days ago

@@ -33,13 +33,15 @@ const reportConfigurationSchema = z.object({
 		'HIPAA_AUDIT_TRAIL',
 		'GDPR_PROCESSING_ACTIVITIES',
 		'INTEGRITY_VERIFICATION',
+		'GENERAL_COMPLIANCE',
+		'CUSTOM_REPORT',
 	] as const),
 	criteria: z.object({
 		dateRange: z.object({
 			startDate: z.string(),
 			endDate: z.string(),
 		}),
-		filters: z.record(z.any()).optional(),
+		filters: z.record(z.string(), z.any()).optional(),
 	}),
 	schedule: z.object({
 		cronExpression: z.string().min(1, 'Schedule is required'),
@@ -59,7 +61,7 @@ const reportConfigurationSchema = z.object({
 		webhook: z
 			.object({
 				url: z.string().url(),
-				headers: z.record(z.string()).optional(),
+				headers: z.record(z.string(), z.string()).optional(),
 				method: z.enum(['POST', 'PUT'] as const),
 			})
 			.optional(),
