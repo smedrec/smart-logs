@@ -31,6 +31,8 @@ import {
 } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
+import { ExportButton } from '../export'
+
 import type {
 	ExecutionDetailsUI,
 	ExecutionHistoryFilters,
@@ -392,10 +394,57 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 			{/* Executions List */}
 			<Card>
 				<CardHeader>
-					<CardTitle>Executions ({pagination.total})</CardTitle>
-					<CardDescription>
-						Recent report executions with status and performance metrics
-					</CardDescription>
+					<div className="flex items-center justify-between">
+						<div>
+							<CardTitle>Executions ({pagination.total})</CardTitle>
+							<CardDescription>
+								Recent report executions with status and performance metrics
+							</CardDescription>
+						</div>
+						<ExportButton
+							type="executions"
+							data={executions}
+							availableColumns={[
+								{ key: 'id', label: 'Execution ID', description: 'Unique execution identifier' },
+								{ key: 'status', label: 'Status', description: 'Execution status' },
+								{ key: 'startedAt', label: 'Started At', description: 'When execution started' },
+								{
+									key: 'completedAt',
+									label: 'Completed At',
+									description: 'When execution completed',
+								},
+								{
+									key: 'duration',
+									label: 'Duration',
+									description: 'Execution duration in milliseconds',
+								},
+								{
+									key: 'recordsProcessed',
+									label: 'Records Processed',
+									description: 'Number of records processed',
+								},
+								{
+									key: 'outputSize',
+									label: 'Output Size',
+									description: 'Size of generated output in bytes',
+								},
+								{
+									key: 'errorMessage',
+									label: 'Error Message',
+									description: 'Error message if execution failed',
+								},
+								{
+									key: 'triggeredBy',
+									label: 'Triggered By',
+									description: 'User or system that triggered execution',
+								},
+							]}
+							onExport={async (options) => {
+								console.log('Exporting execution history with options:', options)
+								// TODO: Implement actual export logic
+							}}
+						/>
+					</div>
 				</CardHeader>
 				<CardContent>
 					{loading ? (

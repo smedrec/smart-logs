@@ -48,6 +48,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { ExportButton } from '../export'
+
 interface ScheduledReport {
 	id: string
 	name: string
@@ -220,17 +222,43 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 
 	return (
 		<div className="flex flex-col gap-6 p-6">
-			<CompliancePageHeader
-				title="Scheduled Reports"
-				description="Manage automated compliance reports and their execution schedules"
-				actions={[
-					{
-						label: 'Create Report',
-						href: '/compliance/scheduled-reports/create',
-						icon: Plus,
-					},
-				]}
-			/>
+			<div className="flex items-center justify-between">
+				<CompliancePageHeader
+					title="Scheduled Reports"
+					description="Manage automated compliance reports and their execution schedules"
+					actions={[
+						{
+							label: 'Create Report',
+							href: '/compliance/scheduled-reports/create',
+							icon: Plus,
+						},
+					]}
+				/>
+				<ExportButton
+					type="reports"
+					data={reports}
+					availableColumns={[
+						{ key: 'name', label: 'Report Name', description: 'Name of the scheduled report' },
+						{ key: 'reportType', label: 'Report Type', description: 'Type of compliance report' },
+						{ key: 'status', label: 'Status', description: 'Report status (enabled/disabled)' },
+						{ key: 'schedule', label: 'Schedule', description: 'Cron expression for scheduling' },
+						{ key: 'nextRun', label: 'Next Run', description: 'Next scheduled execution time' },
+						{ key: 'lastRun', label: 'Last Run', description: 'Last execution time' },
+						{ key: 'lastStatus', label: 'Last Status', description: 'Status of last execution' },
+						{ key: 'createdBy', label: 'Created By', description: 'User who created the report' },
+						{ key: 'createdAt', label: 'Created Date', description: 'When the report was created' },
+						{
+							key: 'updatedAt',
+							label: 'Updated Date',
+							description: 'When the report was last updated',
+						},
+					]}
+					onExport={async (options) => {
+						console.log('Exporting scheduled reports with options:', options)
+						// TODO: Implement actual export logic
+					}}
+				/>
+			</div>
 
 			{/* Filters */}
 			<Card>

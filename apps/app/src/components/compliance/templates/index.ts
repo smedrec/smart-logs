@@ -1,1 +1,5 @@
 export { ReportTemplatesPage } from './report-templates-page'
+export { TemplateForm } from './template-form'
+export { TemplateVersionManager } from './template-version-manager'
+export { TemplateSharingManager } from './template-sharing-manager'
+export type * from './template-types'
