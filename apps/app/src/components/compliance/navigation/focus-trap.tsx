@@ -1,6 +1,8 @@
-import { ReactNode, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { useFocusManagement } from '../hooks'
+
+import type { ReactNode } from 'react'
 
 export interface FocusTrapProps {
 	children: ReactNode
