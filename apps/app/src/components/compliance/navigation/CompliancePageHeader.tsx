@@ -55,7 +55,7 @@ export function CompliancePageHeader({
 			{/* Breadcrumbs */}
 			<div className="flex items-center justify-between">
 				{showBreadcrumbs && <ComplianceBreadcrumbs className="text-sm text-muted-foreground" />}
-				<KeyboardShortcutsDialog shortcuts={shortcuts} />
+				{shortcuts.length > 0 && <KeyboardShortcutsDialog shortcuts={shortcuts} />}
 			</div>
 			{/* Header content */}
 			<div className="flex items-start justify-between gap-4">
