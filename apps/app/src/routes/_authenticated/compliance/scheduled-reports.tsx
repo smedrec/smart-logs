@@ -3,8 +3,10 @@ import { lazy } from 'react'
 import { z } from 'zod'
 
 // Lazy load the scheduled reports page component for code splitting
-const ScheduledReportsPage = lazy(
-	() => import('@/components/compliance/scheduled-reports/ScheduledReportsPage')
+const ScheduledReportsPage = lazy(() =>
+	import('@/components/compliance/reports').then((module) => ({
+		default: module.ScheduledReportsPage,
+	}))
 )
 
 // URL search params schema for filters and pagination

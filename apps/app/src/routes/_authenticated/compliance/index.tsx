@@ -2,8 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { lazy } from 'react'
 
 // Lazy load the compliance dashboard component for code splitting
-const ComplianceDashboard = lazy(
-	() => import('@/components/compliance/dashboard/ComplianceDashboard')
+const ComplianceDashboard = lazy(() =>
+	import('@/components/compliance/dashboard').then((module) => ({
+		default: module.ComplianceDashboard,
+	}))
 )
 
 export const Route = createFileRoute('/_authenticated/compliance/')({

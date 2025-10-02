@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useRef } from 'react'
 
-import { useFocusManagement } from '../hooks/use-keyboard-navigation'
+import { useFocusManagement } from '../hooks'
 
 export interface FocusTrapProps {
 	children: ReactNode

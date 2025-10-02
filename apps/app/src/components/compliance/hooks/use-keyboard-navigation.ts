@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 
-export interface KeyboardShortcut {
+interface KeyboardShortcut {
 	key: string
 	ctrlKey?: boolean
 	altKey?: boolean
@@ -25,22 +25,24 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions = {}
 	const elementRef = useRef<HTMLElement>(null)
 
 	const handleKeyDown = useCallback(
-		(event: KeyboardEvent) => {
+		(event: Event) => {
 			if (!enabled) return
+
+			const keyboardEvent = event as KeyboardEvent
 
 			const matchingShortcut = shortcuts.find((shortcut) => {
 				return (
-					shortcut.key.toLowerCase() === event.key.toLowerCase() &&
-					!!shortcut.ctrlKey === event.ctrlKey &&
-					!!shortcut.altKey === event.altKey &&
-					!!shortcut.shiftKey === event.shiftKey &&
-					!!shortcut.metaKey === event.metaKey
+					shortcut.key.toLowerCase() === keyboardEvent.key.toLowerCase() &&
+					!!shortcut.ctrlKey === keyboardEvent.ctrlKey &&
+					!!shortcut.altKey === keyboardEvent.altKey &&
+					!!shortcut.shiftKey === keyboardEvent.shiftKey &&
+					!!shortcut.metaKey === keyboardEvent.metaKey
 				)
 			})
 
 			if (matchingShortcut) {
 				if (matchingShortcut.preventDefault !== false) {
-					event.preventDefault()
+					keyboardEvent.preventDefault()
 				}
 				matchingShortcut.action()
 			}
@@ -176,3 +178,6 @@ export const COMPLIANCE_SHORTCUTS = {
 	SAVE: { key: 's', ctrlKey: true, description: 'Save current form' },
 	CANCEL: { key: 'Escape', description: 'Cancel current action' },
 } as const
+
+// Re-export the interface to ensure it's available
+export type { KeyboardShortcut }

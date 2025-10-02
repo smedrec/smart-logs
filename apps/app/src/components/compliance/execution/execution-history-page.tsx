@@ -45,7 +45,9 @@ interface ExecutionHistoryPageProps {
 
 export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 	const navigate = useNavigate()
-	const params = useParams({ from: '/compliance/scheduled-reports/$reportId/executions' })
+	const params = useParams({
+		from: '/_authenticated/compliance/scheduled-reports/$reportId/executions',
+	})
 	const { client, isConnected } = useAuditContext()
 
 	// State management

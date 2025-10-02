@@ -84,7 +84,7 @@ export function useUrlState<T extends Record<string, unknown>>(config: UrlStateC
 	// Update single parameter
 	const setParam = useCallback(
 		<K extends keyof T>(key: K, value: T[K], options: { replace?: boolean } = {}) => {
-			setUrlState({ [key]: value } as Partial<T>, options)
+			setUrlState({ [key]: value } as unknown as Partial<T>, options)
 		},
 		[setUrlState]
 	)

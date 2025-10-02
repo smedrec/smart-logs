@@ -3,8 +3,10 @@ import { lazy } from 'react'
 import { z } from 'zod'
 
 // Lazy load the execution history page component
-const ExecutionHistoryPage = lazy(
-	() => import('@/components/compliance/execution-history/ExecutionHistoryPage')
+const ExecutionHistoryPage = lazy(() =>
+	import('@/components/compliance/execution').then((module) => ({
+		default: module.ExecutionHistoryPage,
+	}))
 )
 
 // URL search params schema for execution history filters
@@ -38,7 +40,6 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
 	const { reportId } = Route.useParams()
-	const search = Route.useSearch()
 
-	return <ExecutionHistoryPage reportId={reportId} searchParams={search} />
+	return <ExecutionHistoryPage reportId={reportId} />
 }

@@ -12,6 +12,9 @@ import { Link } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 
 import { ComplianceBreadcrumbs } from './ComplianceBreadcrumbs'
+import { KeyboardShortcutsDialog } from './keyboard-shortcuts-dialog'
+
+import type { KeyboardShortcut } from '../hooks/use-keyboard-navigation'
 
 interface PageAction {
 	label: string
@@ -26,6 +29,7 @@ interface CompliancePageHeaderProps {
 	title: string
 	description?: string
 	actions?: PageAction[]
+	shortcuts?: KeyboardShortcut[]
 	showBreadcrumbs?: boolean
 	showBackButton?: boolean
 	backButtonHref?: string
@@ -38,6 +42,7 @@ export function CompliancePageHeader({
 	title,
 	description,
 	actions = [],
+	shortcuts = [],
 	showBreadcrumbs = true,
 	showBackButton = false,
 	backButtonHref,
@@ -48,8 +53,10 @@ export function CompliancePageHeader({
 	return (
 		<div className={cn('space-y-4', className)}>
 			{/* Breadcrumbs */}
-			{showBreadcrumbs && <ComplianceBreadcrumbs className="text-sm text-muted-foreground" />}
-
+			<div className="flex items-center justify-between">
+				{showBreadcrumbs && <ComplianceBreadcrumbs className="text-sm text-muted-foreground" />}
+				<KeyboardShortcutsDialog shortcuts={shortcuts} />
+			</div>
 			{/* Header content */}
 			<div className="flex items-start justify-between gap-4">
 				<div className="space-y-1 flex-1">

@@ -2,8 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { lazy } from 'react'
 
 // Lazy load the report details page component
-const ReportDetailsPage = lazy(
-	() => import('@/components/compliance/report-details/ReportDetailsPage')
+const ReportDetailsPage = lazy(() =>
+	import('@/components/compliance/reports').then((module) => ({
+		default: module.ReportDetailsPage,
+	}))
 )
 
 export const Route = createFileRoute('/_authenticated/compliance/scheduled-reports/$reportId/')({

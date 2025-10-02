@@ -1,15 +1,19 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { lazy } from 'react'
 import { z } from 'zod'
 
 // Lazy load the report configuration form component
-const ReportConfigurationForm = lazy(
-	() => import('@/components/compliance/forms/ReportConfigurationForm')
+const ReportConfigurationForm = lazy(() =>
+	import('@/components/compliance/forms').then((module) => ({
+		default: module.ReportConfigurationForm,
+	}))
 )
 
 // URL search params schema for pre-filling form data
 const createReportSearchSchema = z.object({
-	reportType: z.enum(['hipaa', 'gdpr', 'custom']).optional(),
+	reportType: z
+		.enum(['HIPAA_AUDIT_TRAIL', 'GDPR_PROCESSING_ACTIVITIES', 'INTEGRITY_VERIFICATION'])
+		.optional(),
 	template: z.string().optional(),
 })
 
@@ -24,14 +28,27 @@ export const Route = createFileRoute('/_authenticated/compliance/scheduled-repor
 
 function RouteComponent() {
 	const search = Route.useSearch()
+	const navigate = useNavigate()
+
+	const handleSubmit = async (data: any) => {
+		// TODO: Implement report creation logic
+		console.log('Creating report:', data)
+		// Navigate back to reports list after successful creation
+		navigate({ to: '/compliance/scheduled-reports' })
+	}
+
+	const handleCancel = () => {
+		navigate({ to: '/compliance/scheduled-reports' })
+	}
 
 	return (
 		<ReportConfigurationForm
 			mode="create"
 			initialData={{
 				reportType: search.reportType,
-				template: search.template,
 			}}
+			onSubmit={handleSubmit}
+			onCancel={handleCancel}
 		/>
 	)
 }

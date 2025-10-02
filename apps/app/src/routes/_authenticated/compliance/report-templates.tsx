@@ -3,8 +3,10 @@ import { lazy } from 'react'
 import { z } from 'zod'
 
 // Lazy load the report templates page component
-const ReportTemplatesPage = lazy(
-	() => import('@/components/compliance/templates/ReportTemplatesPage')
+const ReportTemplatesPage = lazy(() =>
+	import('@/components/compliance/templates').then((module) => ({
+		default: module.ReportTemplatesPage,
+	}))
 )
 
 // URL search params schema for template filters

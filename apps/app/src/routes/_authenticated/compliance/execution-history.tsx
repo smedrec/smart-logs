@@ -2,9 +2,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { lazy } from 'react'
 import { z } from 'zod'
 
-// Lazy load the global execution history page component
-const GlobalExecutionHistoryPage = lazy(
-	() => import('@/components/compliance/execution-history/GlobalExecutionHistoryPage')
+// Lazy load the report configuration form component
+const GlobalExecutionHistoryPage = lazy(() =>
+	import('@/components/compliance/execution').then((module) => ({
+		default: module.GlobalExecutionHistoryPage,
+	}))
 )
 
 // URL search params schema for global execution history filters

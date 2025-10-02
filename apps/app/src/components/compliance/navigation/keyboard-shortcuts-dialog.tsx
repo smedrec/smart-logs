@@ -11,7 +11,7 @@ import {
 import { HelpCircle, Keyboard } from 'lucide-react'
 import { useState } from 'react'
 
-import { KeyboardShortcut } from '../hooks/use-keyboard-navigation'
+import type { KeyboardShortcut } from '../hooks'
 
 export interface KeyboardShortcutsDialogProps {
 	shortcuts: KeyboardShortcut[]

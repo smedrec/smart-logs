@@ -11,6 +11,133 @@ interface DashboardStatsProps {
 	className?: string
 }
 
+interface ScheduledReport {
+	id: string
+	name: string
+	description?: string
+	reportType: 'HIPAA_AUDIT_TRAIL' | 'GDPR_PROCESSING_ACTIVITIES' | 'INTEGRITY_VERIFICATION'
+	format: 'PDF' | 'CSV' | 'JSON'
+	enabled: boolean
+	lastRun?: Date
+	nextRun: Date
+	executionCount: number
+	createdAt: Date
+	createdBy: string
+}
+
+interface ExecutionRecord {
+	id: string
+	reportId: string
+	reportName: string
+	reportType: 'HIPAA_AUDIT_TRAIL' | 'GDPR_PROCESSING_ACTIVITIES' | 'INTEGRITY_VERIFICATION'
+	status: 'completed' | 'failed' | 'running' | 'pending'
+	scheduledTime: Date
+	executionTime?: Date
+	duration?: number
+	recordsProcessed?: number
+	outputSize?: number
+	outputFormat: 'PDF' | 'CSV' | 'JSON'
+	triggeredBy: 'system' | 'user' | 'schedule'
+	errorMessage?: string
+}
+
+const mockReports: ScheduledReport[] = [
+	{
+		id: 'report-1',
+		name: 'Monthly HIPAA Audit',
+		description: 'Comprehensive HIPAA compliance audit report',
+		reportType: 'HIPAA_AUDIT_TRAIL',
+		format: 'PDF',
+		enabled: true,
+		lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+		nextRun: new Date(Date.now() + 1000 * 60 * 60 * 24 * 29), // 29 days from now
+		executionCount: 12,
+		createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365), // 1 year ago
+		createdBy: 'admin@example.com',
+	},
+	{
+		id: 'report-2',
+		name: 'GDPR Processing Activities',
+		description: 'Weekly GDPR processing activities report',
+		reportType: 'GDPR_PROCESSING_ACTIVITIES',
+		format: 'CSV',
+		enabled: true,
+		lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 1 week ago
+		nextRun: new Date(Date.now() + 1000 * 60 * 60 * 24), // 1 day from now
+		executionCount: 52,
+		createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365), // 1 year ago
+		createdBy: 'compliance@example.com',
+	},
+	{
+		id: 'report-3',
+		name: 'Data Integrity Check',
+		description: 'Daily data integrity verification report',
+		reportType: 'INTEGRITY_VERIFICATION',
+		format: 'JSON',
+		enabled: false,
+		lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
+		nextRun: new Date(Date.now() + 1000 * 60 * 60 * 24), // 1 day from now
+		executionCount: 90,
+		createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 180), // 6 months ago
+		createdBy: 'security@example.com',
+	},
+]
+
+const mockExecutions: ExecutionRecord[] = [
+	{
+		id: 'exec-1',
+		reportId: 'report-1',
+		reportName: 'Monthly HIPAA Audit',
+		reportType: 'HIPAA_AUDIT_TRAIL',
+		status: 'completed',
+		scheduledTime: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+		executionTime: new Date(Date.now() - 1000 * 60 * 60 * 2 + 1000 * 60 * 2), // started 2 hours ago, ran for 2 minutes
+		duration: 120000, // 2 minutes
+		recordsProcessed: 1250,
+		outputSize: 2048576, // 2MB
+		outputFormat: 'PDF',
+		triggeredBy: 'schedule',
+	},
+	{
+		id: 'exec-2',
+		reportId: 'report-2',
+		reportName: 'GDPR Processing Activities',
+		reportType: 'GDPR_PROCESSING_ACTIVITIES',
+		status: 'completed',
+		scheduledTime: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
+		executionTime: new Date(Date.now() - 1000 * 60 * 60 * 6 + 1000 * 60 * 3), // started 6 hours ago, ran for 3 minutes
+		duration: 180000, // 3 minutes
+		recordsProcessed: 890,
+		outputSize: 1536000, // 1.5MB
+		outputFormat: 'CSV',
+		triggeredBy: 'user',
+	},
+	{
+		id: 'exec-3',
+		reportId: 'report-3',
+		reportName: 'Data Integrity Check',
+		reportType: 'INTEGRITY_VERIFICATION',
+		status: 'failed',
+		scheduledTime: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
+		executionTime: new Date(Date.now() - 1000 * 60 * 60 * 12 + 1000 * 30), // started 12 hours ago, failed after 30 seconds
+		duration: 30000, // 30 seconds
+		outputFormat: 'JSON',
+		triggeredBy: 'schedule',
+		errorMessage: 'Database connection timeout',
+	},
+	{
+		id: 'exec-4',
+		reportId: 'report-1',
+		reportName: 'Monthly HIPAA Audit',
+		reportType: 'HIPAA_AUDIT_TRAIL',
+		status: 'running',
+		scheduledTime: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
+		executionTime: new Date(Date.now() - 1000 * 60 * 5), // started 5 minutes ago
+		outputFormat: 'PDF',
+		triggeredBy: 'user',
+	},
+]
+
 export function DashboardStats({ className }: DashboardStatsProps) {
 	const { client, isConnected } = useAuditContext()
 	const [stats, setStats] = useState<DashboardStatsType | null>(null)
@@ -29,7 +156,7 @@ export function DashboardStats({ className }: DashboardStatsProps) {
 			setError(null)
 
 			// Fetch scheduled reports to calculate stats
-			const reportsResponse = await client.scheduledReports.list({
+			/**const reportsResponse = await client.scheduledReports.list({
 				page: 1,
 				pageSize: 100, // Get all reports for stats calculation
 			})
@@ -41,7 +168,10 @@ export function DashboardStats({ className }: DashboardStatsProps) {
 			})
 
 			const reports = reportsResponse.data || []
-			const executions = executionsResponse.data || []
+			const executions = executionsResponse.data || []*/
+
+			const reports = mockReports
+			const executions = mockExecutions
 
 			// Calculate stats
 			const totalReports = reports.length

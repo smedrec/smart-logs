@@ -75,9 +75,12 @@ export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProp
 				limit: 50, // Get more reports to filter enabled ones
 				offset: 0,
 				enabled: true, // Only get enabled reports
+				sortBy: 'next_run',
+				// Sort by next run time
+				sortOrder: 'asc', // Ascending order (soonest first)
 			})
 
-			const enabledReports = (response.data || [])
+			/**const enabledReports = (response.data || [])
 				.map((report) => {
 					const nextExecution = calculateNextExecution(
 						report.schedule?.cronExpression || '0 0 * * *'
@@ -94,9 +97,9 @@ export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProp
 					if (!b.nextExecutionTime) return -1
 					return new Date(a.nextExecutionTime).getTime() - new Date(b.nextExecutionTime).getTime()
 				})
-				.slice(0, maxItems)
+				.slice(0, maxItems)*/
 
-			setReports(enabledReports)
+			setReports(response.data || [])
 		} catch (err) {
 			console.error('Failed to fetch upcoming reports:', err)
 			setError(err instanceof Error ? err.message : 'Failed to fetch reports')
@@ -143,8 +146,12 @@ export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProp
 			HIPAA_AUDIT_TRAIL: 'bg-blue-100 text-blue-800',
 			GDPR_PROCESSING_ACTIVITIES: 'bg-green-100 text-green-800',
 			INTEGRITY_VERIFICATION: 'bg-purple-100 text-purple-800',
+			GENERAL_COMPLIANCE: 'bg-yellow-100 text-red-800',
 		}
 
+		if (reportType === undefined) {
+			return <Badge variant="outline">Unknown</Badge>
+		}
 		return (
 			<Badge variant="outline" className={colors[reportType as keyof typeof colors] || ''}>
 				{reportType.replace(/_/g, ' ')}

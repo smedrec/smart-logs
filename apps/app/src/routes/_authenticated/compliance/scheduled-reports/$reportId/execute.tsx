@@ -2,8 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { lazy } from 'react'
 
 // Lazy load the manual execution page component
-const ManualExecutionPage = lazy(
-	() => import('@/components/compliance/manual-execution/ManualExecutionPage')
+const ManualExecutionPage = lazy(() =>
+	import('@/components/compliance/manual').then((module) => ({
+		default: module.ManualExecutionPage,
+	}))
 )
 
 export const Route = createFileRoute(

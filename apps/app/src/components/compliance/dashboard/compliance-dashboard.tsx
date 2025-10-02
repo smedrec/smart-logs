@@ -1,9 +1,8 @@
-import { Card } from '@/components/ui/card'
-import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
+import { CompliancePageHeader } from '@/components/compliance/navigation'
+import { Plus } from 'lucide-react'
 import React from 'react'
 
-import { COMPLIANCE_SHORTCUTS, useKeyboardNavigation } from '../hooks/use-keyboard-navigation'
-import { KeyboardShortcutsDialog } from '../navigation/keyboard-shortcuts-dialog'
+import { COMPLIANCE_SHORTCUTS, useKeyboardNavigation } from '../hooks'
 import { SkipLinks, useSkipLinkTarget } from '../navigation/skip-links'
 import { DashboardStats } from './dashboard-stats'
 import { RecentExecutions } from './recent-executions'
@@ -15,11 +14,6 @@ interface ComplianceDashboardProps {
 }
 
 export function ComplianceDashboard({ className }: ComplianceDashboardProps) {
-	const breadcrumbItems = [
-		{ label: 'Compliance', href: '/compliance' },
-		{ label: 'Dashboard', href: '/compliance/dashboard' },
-	]
-
 	// Keyboard shortcuts for dashboard
 	const shortcuts = [
 		{
@@ -45,23 +39,31 @@ export function ComplianceDashboard({ className }: ComplianceDashboardProps) {
 	const mainContentProps = useSkipLinkTarget('main-content')
 
 	return (
-		<div className={`space-y-6 ${className || ''}`} ref={ref}>
+		<div
+			className={`flex flex-col gap-6 p-6 ${className || ''}`}
+			ref={ref as React.RefObject<HTMLDivElement>}
+		>
 			{/* Skip Links for Accessibility */}
 			<SkipLinks />
 
-			{/* Navigation and Breadcrumbs */}
-			<div className="flex flex-col space-y-4">
-				<div className="flex items-center justify-between">
-					<PageBreadcrumb items={breadcrumbItems} />
-					<KeyboardShortcutsDialog shortcuts={shortcuts} />
-				</div>
-				<div className="flex flex-col space-y-2" {...mainContentProps}>
-					<h1 className="text-3xl font-bold tracking-tight">Compliance Dashboard</h1>
-					<p className="text-muted-foreground">
-						Monitor compliance reports, executions, and system health
-					</p>
-				</div>
-			</div>
+			{/* Compliance Page Header */}
+			<CompliancePageHeader
+				title="Dashboard"
+				description="Monitor compliance reports, executions, and system health"
+				actions={[
+					{
+						label: 'Create Report',
+						href: '/compliance/scheduled-reports/create',
+						icon: Plus,
+					},
+					{
+						label: 'View All Reports',
+						href: '/compliance/scheduled-reports',
+						variant: 'outline',
+					},
+				]}
+				shortcuts={shortcuts}
+			/>
 
 			{/* Dashboard Grid Layout */}
 			<div className="grid gap-6">
