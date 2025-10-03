@@ -7,14 +7,7 @@
  * Requirements: 5.1, 5.2
  */
 
-import { useAuditContext } from '@/contexts/audit-provider'
-import { AlertApiService, AlertApiServiceError } from '@/lib/services/alert-api'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
-
-import type { AlertStatistics, AlertUI } from '@/components/alerts/types/alert-types'
 import {
-	alertQueryKeys,
 	type AlertActionRequest,
 	type AlertActionResponse,
 	type AlertBulkActionRequest,
@@ -22,6 +15,12 @@ import {
 	type AlertListRequest,
 	type AlertListResponse,
 } from '@/components/alerts/types/api-types'
+import { useAuditContext } from '@/contexts/audit-provider'
+import { AlertApiService, AlertApiServiceError } from '@/lib/services/alert-api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
+
+import type { AlertStatistics, AlertUI } from '@/components/alerts/types/alert-types'
 import type { AlertFilters } from '@/components/alerts/types/filter-types'
 
 /**

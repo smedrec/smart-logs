@@ -22,6 +22,17 @@ import {
 } from 'lucide-react'
 import React, { useState } from 'react'
 
+import {
+	createAlertExpandableAttributes,
+	formatAlertTimeForScreenReader,
+	generateAlertAriaLabel,
+} from '../utils/alert-screen-reader-utils'
+import {
+	AlertSeverityDescription,
+	AlertStatusDescription,
+	AlertVisuallyHidden,
+} from '../utils/alert-visually-hidden'
+
 import type { Alert, AlertSeverity, AlertStatus } from '@/lib/types/alert'
 
 export interface AlertCardProps {
@@ -141,25 +152,45 @@ export function AlertCard({
 		onAlertAction?.(alert.id, action)
 	}
 
+	// Generate accessibility attributes
+	const expandableAttrs = createAlertExpandableAttributes(isExpanded, alert.id, 'details')
+	const cardAriaLabel = generateAlertAriaLabel.alertStatus(alert)
+
 	return (
 		<Card
 			className={cn(
-				'transition-all duration-200 hover:shadow-md border-l-4',
+				'transition-all duration-200 hover:shadow-md border-l-4 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
 				getSeverityColor(alert.severity),
 				onAlertClick && 'cursor-pointer',
 				draggable && 'cursor-move',
 				className
 			)}
 			onClick={handleCardClick}
+			onKeyDown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault()
+					handleCardClick()
+				}
+			}}
 			draggable={draggable}
+			tabIndex={onAlertClick ? 0 : undefined}
+			role={onAlertClick ? 'button' : 'article'}
+			aria-label={cardAriaLabel}
+			data-alert-id={alert.id}
+			data-alert-card
 		>
 			{!compact && (
 				<CardHeader className="pb-2">
 					<div className="flex items-start justify-between">
 						<div className="flex items-center space-x-2">
 							{getSeverityIcon(alert.severity)}
-							<Badge variant={getSeverityBadgeVariant(alert.severity)} className="text-xs">
+							<Badge
+								variant={getSeverityBadgeVariant(alert.severity)}
+								className="text-xs"
+								aria-label={generateAlertAriaLabel.severityBadge(alert.severity)}
+							>
 								{alert.severity.toUpperCase()}
+								<AlertSeverityDescription severity={alert.severity} />
 							</Badge>
 						</div>
 
@@ -171,33 +202,54 @@ export function AlertCard({
 										size="sm"
 										className="h-6 w-6 p-0"
 										onClick={(e) => e.stopPropagation()}
+										aria-label={`Actions for ${alert.severity} alert: ${alert.title}`}
 									>
 										<MoreVertical className="h-3 w-3" />
+										<AlertVisuallyHidden>More actions</AlertVisuallyHidden>
 									</Button>
 								</DropdownMenuTrigger>
-								<DropdownMenuContent align="end" className="w-40">
-									<DropdownMenuItem onClick={() => handleAction('acknowledge')}>
-										<Eye className="h-3 w-3 mr-2" />
+								<DropdownMenuContent
+									align="end"
+									className="w-40"
+									role="menu"
+									aria-label="Alert actions"
+								>
+									<DropdownMenuItem
+										onClick={() => handleAction('acknowledge')}
+										role="menuitem"
+										aria-label={generateAlertAriaLabel.alertAction('view', alert)}
+									>
+										<Eye className="h-3 w-3 mr-2" aria-hidden="true" />
 										View Details
 									</DropdownMenuItem>
 									<DropdownMenuSeparator />
 									{alert.status === 'active' && (
-										<DropdownMenuItem onClick={() => handleAction('acknowledge')}>
-											<Check className="h-3 w-3 mr-2" />
+										<DropdownMenuItem
+											onClick={() => handleAction('acknowledge')}
+											role="menuitem"
+											aria-label={generateAlertAriaLabel.alertAction('acknowledge', alert)}
+										>
+											<Check className="h-3 w-3 mr-2" aria-hidden="true" />
 											Acknowledge
 										</DropdownMenuItem>
 									)}
 									{(alert.status === 'active' || alert.status === 'acknowledged') && (
-										<DropdownMenuItem onClick={() => handleAction('resolve')}>
-											<CheckCircle className="h-3 w-3 mr-2" />
+										<DropdownMenuItem
+											onClick={() => handleAction('resolve')}
+											role="menuitem"
+											aria-label={generateAlertAriaLabel.alertAction('resolve', alert)}
+										>
+											<CheckCircle className="h-3 w-3 mr-2" aria-hidden="true" />
 											Resolve
 										</DropdownMenuItem>
 									)}
 									<DropdownMenuItem
 										onClick={() => handleAction('dismiss')}
 										className="text-destructive focus:text-destructive"
+										role="menuitem"
+										aria-label={generateAlertAriaLabel.alertAction('dismiss', alert)}
 									>
-										<X className="h-3 w-3 mr-2" />
+										<X className="h-3 w-3 mr-2" aria-hidden="true" />
 										Dismiss
 									</DropdownMenuItem>
 								</DropdownMenuContent>
@@ -227,12 +279,19 @@ export function AlertCard({
 
 					<div className="flex items-center space-x-1 ml-2">
 						{getStatusIcon(alert.status)}
-						<span className="text-xs text-muted-foreground capitalize">{alert.status}</span>
+						<span
+							className="text-xs text-muted-foreground capitalize"
+							aria-label={generateAlertAriaLabel.statusBadge(alert.status)}
+						>
+							{alert.status}
+							<AlertStatusDescription status={alert.status} />
+						</span>
 					</div>
 				</div>
 
 				{/* Alert Description */}
 				<p
+					id={`alert-${alert.id}-description`}
 					className={cn(
 						'text-muted-foreground mb-3',
 						compact ? 'text-xs line-clamp-2' : 'text-sm line-clamp-3'
@@ -244,8 +303,15 @@ export function AlertCard({
 				{/* Alert Metadata */}
 				<div className="space-y-2">
 					<div className="flex items-center justify-between text-xs text-muted-foreground">
-						<span className="truncate">{alert.source}</span>
-						<span>{formatTimestamp(alert.timestamp)}</span>
+						<span className="truncate" aria-label={`Alert source: ${alert.source}`}>
+							{alert.source}
+						</span>
+						<time
+							dateTime={alert.timestamp.toISOString()}
+							aria-label={formatAlertTimeForScreenReader(alert.timestamp, { context: 'created' })}
+						>
+							{formatTimestamp(alert.timestamp)}
+						</time>
 					</div>
 
 					{/* Tags */}
@@ -266,7 +332,11 @@ export function AlertCard({
 
 					{/* Expanded Details */}
 					{isExpanded && !compact && (
-						<div className="pt-3 border-t space-y-2">
+						<div
+							{...expandableAttrs.content}
+							className="pt-3 border-t space-y-2"
+							aria-label="Alert details"
+						>
 							{alert.acknowledgedBy && (
 								<div className="text-xs text-muted-foreground">
 									<strong>Acknowledged:</strong> {alert.acknowledgedBy} on{' '}

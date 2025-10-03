@@ -14,7 +14,9 @@ import {
 	Search,
 	XCircle,
 } from 'lucide-react'
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+
+import { ALERT_SHORTCUTS, useAlertFocusManagement } from '../hooks/use-alert-keyboard-navigation'
 
 import type { AlertSeverity, AlertStatus } from '@/components/alerts/types/alert-types'
 import type { AlertFilters } from '@/components/alerts/types/filter-types'
@@ -63,6 +65,10 @@ export function AlertList({
 }: AlertListProps) {
 	const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'timestamp', direction: 'desc' })
 	const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set())
+	const [selectedAlertIndex, setSelectedAlertIndex] = useState<number>(-1)
+
+	const { containerRef, focusFirst, focusNext, focusPrevious, handleArrowNavigation } =
+		useAlertFocusManagement()
 
 	// Sort alerts based on current sort configuration
 	const sortedAlerts = useMemo(() => {
@@ -96,6 +102,97 @@ export function AlertList({
 			return newSet
 		})
 	}
+
+	const handleAlertKeyDown = useCallback(
+		(event: React.KeyboardEvent, alert: Alert, index: number) => {
+			switch (event.key) {
+				case 'Enter':
+				case ' ':
+					event.preventDefault()
+					onAlertSelect(alert)
+					break
+				case 'ArrowDown':
+					event.preventDefault()
+					if (index < sortedAlerts.length - 1) {
+						const nextAlert = document.querySelector(
+							`[data-alert-id="${sortedAlerts[index + 1].id}"]`
+						) as HTMLElement
+						nextAlert?.focus()
+						setSelectedAlertIndex(index + 1)
+					}
+					break
+				case 'ArrowUp':
+					event.preventDefault()
+					if (index > 0) {
+						const prevAlert = document.querySelector(
+							`[data-alert-id="${sortedAlerts[index - 1].id}"]`
+						) as HTMLElement
+						prevAlert?.focus()
+						setSelectedAlertIndex(index - 1)
+					}
+					break
+				case 'Home':
+					event.preventDefault()
+					if (sortedAlerts.length > 0) {
+						const firstAlert = document.querySelector(
+							`[data-alert-id="${sortedAlerts[0].id}"]`
+						) as HTMLElement
+						firstAlert?.focus()
+						setSelectedAlertIndex(0)
+					}
+					break
+				case 'End':
+					event.preventDefault()
+					if (sortedAlerts.length > 0) {
+						const lastIndex = sortedAlerts.length - 1
+						const lastAlert = document.querySelector(
+							`[data-alert-id="${sortedAlerts[lastIndex].id}"]`
+						) as HTMLElement
+						lastAlert?.focus()
+						setSelectedAlertIndex(lastIndex)
+					}
+					break
+				case 'Escape':
+					event.preventDefault()
+					setSelectedAlertIndex(-1)
+					const container = containerRef.current
+					if (container) {
+						container.focus()
+					}
+					break
+			}
+		},
+		[sortedAlerts, onAlertSelect, containerRef]
+	)
+
+	// Handle keyboard navigation for the container
+	useEffect(() => {
+		const container = containerRef.current
+		if (!container) return
+
+		const handleContainerKeyDown = (event: KeyboardEvent) => {
+			handleArrowNavigation(event)
+
+			// Handle specific alert list shortcuts
+			switch (event.key) {
+				case 'j':
+					event.preventDefault()
+					focusNext()
+					break
+				case 'k':
+					event.preventDefault()
+					focusPrevious()
+					break
+				case 'Home':
+					event.preventDefault()
+					focusFirst()
+					break
+			}
+		}
+
+		container.addEventListener('keydown', handleContainerKeyDown)
+		return () => container.removeEventListener('keydown', handleContainerKeyDown)
+	}, [handleArrowNavigation, focusNext, focusPrevious, focusFirst])
 
 	const getSeverityIcon = (severity: AlertSeverity) => {
 		switch (severity) {
@@ -221,19 +318,29 @@ export function AlertList({
 	}
 
 	const AlertListContent = () => (
-		<div className="space-y-2">
-			{sortedAlerts.map((alert) => {
+		<div className="space-y-2" role="list" aria-label="Alert list">
+			{sortedAlerts.map((alert, index) => {
 				const isExpanded = expandedAlerts.has(alert.id)
+				const isSelected = selectedAlertIndex === index
 
 				return (
 					<Card
 						key={alert.id}
 						className={cn(
-							'transition-all duration-200 hover:shadow-md cursor-pointer',
+							'transition-all duration-200 hover:shadow-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
 							alert.severity === 'critical' && 'border-l-4 border-l-destructive',
-							alert.severity === 'high' && 'border-l-4 border-l-orange-500'
+							alert.severity === 'high' && 'border-l-4 border-l-orange-500',
+							isSelected && 'ring-2 ring-primary ring-offset-2'
 						)}
 						onClick={() => onAlertSelect(alert)}
+						onKeyDown={(e) => handleAlertKeyDown(e, alert, index)}
+						tabIndex={0}
+						role="listitem"
+						data-alert-id={alert.id}
+						data-alert-card
+						aria-label={`Alert: ${alert.title}, severity: ${alert.severity}, status: ${alert.status}`}
+						aria-expanded={isExpanded}
+						aria-describedby={`alert-${alert.id}-description`}
 					>
 						<CardContent className="p-4">
 							<div className="flex items-start space-x-4">
@@ -264,7 +371,10 @@ export function AlertList({
 									</div>
 
 									{/* Alert Description */}
-									<p className={cn('text-sm text-muted-foreground', !isExpanded && 'line-clamp-2')}>
+									<p
+										id={`alert-${alert.id}-description`}
+										className={cn('text-sm text-muted-foreground', !isExpanded && 'line-clamp-2')}
+									>
 										{alert.description}
 									</p>
 
@@ -286,7 +396,12 @@ export function AlertList({
 
 									{/* Expanded Details */}
 									{isExpanded && (
-										<div className="mt-4 pt-4 border-t space-y-2">
+										<div
+											id={`alert-${alert.id}-details`}
+											className="mt-4 pt-4 border-t space-y-2"
+											role="region"
+											aria-label="Alert details"
+										>
 											{alert.acknowledgedBy && (
 												<p className="text-xs text-muted-foreground">
 													Acknowledged by {alert.acknowledgedBy} on{' '}
@@ -318,6 +433,10 @@ export function AlertList({
 										e.stopPropagation()
 										toggleAlertExpansion(alert.id)
 									}}
+									aria-label={isExpanded ? 'Collapse alert details' : 'Expand alert details'}
+									aria-expanded={isExpanded}
+									aria-controls={`alert-${alert.id}-details`}
+									data-alert-action
 								>
 									{isExpanded ? (
 										<ChevronUp className="h-4 w-4" />
@@ -334,9 +453,19 @@ export function AlertList({
 	)
 
 	return (
-		<div className={className}>
+		<div
+			ref={containerRef}
+			className={className}
+			tabIndex={-1}
+			role="region"
+			aria-label="Alert list with keyboard navigation"
+		>
 			{/* Sort Controls */}
-			<div className="flex items-center justify-between mb-4">
+			<div
+				className="flex items-center justify-between mb-4"
+				role="toolbar"
+				aria-label="Alert list controls"
+			>
 				<div className="flex items-center space-x-2">
 					<span className="text-sm text-muted-foreground">
 						{sortedAlerts.length} alert{sortedAlerts.length !== 1 ? 's' : ''}
