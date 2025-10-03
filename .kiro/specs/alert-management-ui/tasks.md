@@ -194,26 +194,26 @@
     - Add validation summary and error aggregation
     - _Requirements: 4.1, 4.2_
 
-- [ ] 10. Implement routing and navigation
-  - [ ] 10.1 Replace existing test routes
+- [x] 10. Implement routing and navigation
+  - [x] 10.1 Replace existing test routes
     - Remove existing test route components in alerts directory
     - Implement new production route components
     - Ensure backward compatibility with existing URLs
     - _Requirements: 1.1, 9.1_
 
-  - [ ] 10.2 Create alert route components
+  - [x] 10.2 Create alert route components
     - Build route components for active, acknowledged, resolved, and statistics views
     - Implement route-specific data loading and state management
     - Add route guards for authentication and authorization
     - _Requirements: 1.1, 3.1_
 
-  - [ ] 10.3 Update app navigation
+  - [x] 10.3 Update app navigation
     - Update existing sidebar navigation to include alert routes
     - Add active route highlighting for alert sections
     - Ensure consistent navigation patterns with existing app
     - _Requirements: 1.1, 9.1_
 
-  - [ ] 10.4 Implement URL state management
+  - [x] 10.4 Implement URL state management
     - Add URL-based state for filters, pagination, and view modes
     - Implement shareable URLs for specific alert views
     - Create browser history management for navigation

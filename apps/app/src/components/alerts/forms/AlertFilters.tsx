@@ -1,22 +1,34 @@
 'use client'
 
+import { AlertSeverity, AlertStatus, AlertType } from '@/components/alerts/types/alert-types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select'
 import { TagsInput } from '@/components/ui/tags-input'
-import { AlertFilters, AlertSeverity, AlertStatus, AlertType } from '@/lib/types/alert'
 import { cn } from '@/lib/utils'
 import { Search, X } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
+
+import type { AlertFilters } from '@/components/alerts/types/filter-types'
 
 interface AlertFiltersProps {
 	/** Current filter values */
 	filters: AlertFilters
 	/** Callback when filters change */
 	onFiltersChange: (filters: AlertFilters) => void
+	/** Available filter options */
+	availableFilters: any[]
+	/** Reset callback */
+	onReset: () => void
 	/** Available sources for filtering */
 	availableSources?: string[]
 	/** Available tags for filtering */
@@ -36,6 +48,8 @@ interface AlertFiltersProps {
 export function AlertFilters({
 	filters,
 	onFiltersChange,
+	availableFilters,
+	onReset,
 	availableSources = [],
 	availableTags = [],
 	collapsed = false,
@@ -77,7 +91,7 @@ export function AlertFilters({
 			const newValues = checked
 				? [...currentValues, value]
 				: currentValues.filter((v) => v !== value)
-			
+
 			handleFilterChange(key, newValues.length > 0 ? newValues : undefined)
 		},
 		[localFilters, handleFilterChange]
@@ -101,12 +115,12 @@ export function AlertFilters({
 		const emptyFilters: AlertFilters = {}
 		setLocalFilters(emptyFilters)
 		setSearchValue('')
-		onFiltersChange(emptyFilters)
-	}, [onFiltersChange])
+		onReset()
+	}, [onReset])
 
 	const hasActiveFilters = Object.values(localFilters).some(
-		(value) => value !== undefined && value !== null && 
-		(Array.isArray(value) ? value.length > 0 : true)
+		(value) =>
+			value !== undefined && value !== null && (Array.isArray(value) ? value.length > 0 : true)
 	)
 
 	const MultiSelectFilter = ({
@@ -121,7 +135,7 @@ export function AlertFilters({
 		placeholder: string
 	}) => {
 		const selectedValues = (localFilters[filterKey] as string[]) || []
-		
+
 		return (
 			<div className="space-y-2">
 				<Label className="text-sm font-medium">{label}</Label>
@@ -133,11 +147,11 @@ export function AlertFilters({
 					}}
 				>
 					<SelectTrigger className="w-full">
-						<SelectValue placeholder={
-							selectedValues.length > 0 
-								? `${selectedValues.length} selected`
-								: placeholder
-						} />
+						<SelectValue
+							placeholder={
+								selectedValues.length > 0 ? `${selectedValues.length} selected` : placeholder
+							}
+						/>
 					</SelectTrigger>
 					<SelectContent>
 						{options.map((option) => {
@@ -146,10 +160,7 @@ export function AlertFilters({
 								<SelectItem
 									key={option.value}
 									value={option.value}
-									className={cn(
-										'flex items-center justify-between',
-										isSelected && 'bg-accent'
-									)}
+									className={cn('flex items-center justify-between', isSelected && 'bg-accent')}
 								>
 									<span>{option.label}</span>
 									{isSelected && <span className="ml-2">✓</span>}
@@ -193,12 +204,7 @@ export function AlertFilters({
 					Filters {hasActiveFilters && `(${Object.keys(localFilters).length})`}
 				</Button>
 				{hasActiveFilters && (
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={clearAllFilters}
-						className="h-8 px-2"
-					>
+					<Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-8 px-2">
 						Clear all
 					</Button>
 				)}
@@ -213,12 +219,7 @@ export function AlertFilters({
 					<CardTitle className="text-lg">Filters</CardTitle>
 					<div className="flex items-center gap-2">
 						{hasActiveFilters && (
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={clearAllFilters}
-								className="h-8 px-2"
-							>
+							<Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-8 px-2">
 								Clear all
 							</Button>
 						)}

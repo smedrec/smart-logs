@@ -11,7 +11,7 @@ import {
 	SidebarMenuItem,
 	SidebarRail,
 } from '@/components/ui/sidebar'
-import { Link } from '@tanstack/react-router'
+import { Link, useLocation } from '@tanstack/react-router'
 import {
 	BookOpen,
 	Bot,
@@ -26,102 +26,111 @@ import * as React from 'react'
 import { ApiStatus } from './api-status'
 import { NavOrganizations } from './nav-organizations'
 
-const data = {
-	navMain: [
-		{
-			title: 'Alerts',
-			url: '#',
-			icon: CircleAlert,
-			isActive: true,
-			items: [
-				{
-					title: 'Board',
-					url: '/alerts/board',
-				},
-				{
-					title: 'Active',
-					url: '/alerts/active',
-				},
-				{
-					title: 'Acknowledged',
-					url: '/alerts/acknowledged',
-				},
-				{
-					title: 'Resolved',
-					url: '/alerts/resolved',
-				},
-				{
-					title: 'Statistics',
-					url: '/alerts/statistics',
-				},
-			],
-		},
-		{
-			title: 'Compliance',
-			url: '/compliance',
-			icon: FileCheck2,
-			items: [
-				{
-					title: 'Dashboard',
-					url: '/compliance',
-				},
-				{
-					title: 'Scheduled Reports',
-					url: '/compliance/scheduled-reports',
-				},
-				{
-					title: 'Execution History',
-					url: '/compliance/execution-history',
-				},
-				{
-					title: 'Report Templates',
-					url: '/compliance/report-templates',
-				},
-				{
-					title: 'HIPAA Reports',
-					url: '/compliance/hipaa',
-				},
-				{
-					title: 'GDPR Reports',
-					url: '/compliance/gdpr',
-				},
-				{
-					title: 'Integrity Reports',
-					url: '/compliance/integrity',
-				},
-			],
-		},
-		{
-			title: 'Settings',
-			url: '#',
-			icon: Settings2,
-			items: [
-				{
-					title: 'Account',
-					url: '/settings/account',
-				},
-				{
-					title: 'Organization',
-					url: '/settings/organization',
-				},
-				{
-					title: 'Staff',
-					url: '/settings/staff',
-				},
-				{
-					title: 'Security',
-					url: '/settings/security',
-				},
-				{
-					title: 'Billing',
-					url: '/settings/billing',
-				},
-			],
-		},
-	],
-}
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+	const location = useLocation()
+
+	// Determine which section is active based on current path
+	const isAlertsActive = location.pathname.startsWith('/alerts')
+	const isComplianceActive = location.pathname.startsWith('/compliance')
+	const isSettingsActive = location.pathname.startsWith('/settings')
+
+	const data = {
+		navMain: [
+			{
+				title: 'Alerts',
+				url: '#',
+				icon: CircleAlert,
+				isActive: isAlertsActive,
+				items: [
+					{
+						title: 'Board',
+						url: '/alerts/board',
+					},
+					{
+						title: 'Active',
+						url: '/alerts/active',
+					},
+					{
+						title: 'Acknowledged',
+						url: '/alerts/acknowledged',
+					},
+					{
+						title: 'Resolved',
+						url: '/alerts/resolved',
+					},
+					{
+						title: 'Statistics',
+						url: '/alerts/statistics',
+					},
+				],
+			},
+			{
+				title: 'Compliance',
+				url: '/compliance',
+				icon: FileCheck2,
+				isActive: isComplianceActive,
+				items: [
+					{
+						title: 'Dashboard',
+						url: '/compliance',
+					},
+					{
+						title: 'Scheduled Reports',
+						url: '/compliance/scheduled-reports',
+					},
+					{
+						title: 'Execution History',
+						url: '/compliance/execution-history',
+					},
+					{
+						title: 'Report Templates',
+						url: '/compliance/report-templates',
+					},
+					{
+						title: 'HIPAA Reports',
+						url: '/compliance/hipaa',
+					},
+					{
+						title: 'GDPR Reports',
+						url: '/compliance/gdpr',
+					},
+					{
+						title: 'Integrity Reports',
+						url: '/compliance/integrity',
+					},
+				],
+			},
+			{
+				title: 'Settings',
+				url: '#',
+				icon: Settings2,
+				isActive: isSettingsActive,
+				items: [
+					{
+						title: 'Account',
+						url: '/settings/account',
+					},
+					{
+						title: 'Organization',
+						url: '/settings/organization',
+					},
+					{
+						title: 'Staff',
+						url: '/settings/staff',
+					},
+					{
+						title: 'Security',
+						url: '/settings/security',
+					},
+					{
+						title: 'Billing',
+						url: '/settings/billing',
+					},
+				],
+			},
+		],
+	}
+
 	return (
 		<Sidebar collapsible="icon" {...props}>
 			<SidebarHeader>

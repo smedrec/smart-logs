@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { BarChart3, Filter, LayoutGrid, List, RefreshCw, Settings } from 'lucide-react'
 import React, { useState } from 'react'
 
-import type { AlertFilters } from '@/lib/types/alert'
+import type { AlertFilters } from '@/components/alerts/types/filter-types'
 
 export interface AlertDashboardProps {
 	/** Initial filters to apply to the dashboard */

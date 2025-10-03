@@ -16,7 +16,9 @@ import {
 } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
-import type { Alert, AlertFilters, AlertSeverity, AlertStatus } from '@/lib/types/alert'
+import type { AlertSeverity, AlertStatus } from '@/components/alerts/types/alert-types'
+import type { AlertFilters } from '@/components/alerts/types/filter-types'
+import type { Alert } from '@/lib/collections'
 
 export interface AlertListProps {
 	/** Array of alerts to display */

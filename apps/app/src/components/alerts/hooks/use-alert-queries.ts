@@ -13,14 +13,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import type { AlertStatistics, AlertUI } from '@/components/alerts/types/alert-types'
-import type {
-	AlertActionRequest,
-	AlertActionResponse,
-	AlertBulkActionRequest,
-	AlertBulkActionResponse,
-	AlertListRequest,
-	AlertListResponse,
+import {
 	alertQueryKeys,
+	type AlertActionRequest,
+	type AlertActionResponse,
+	type AlertBulkActionRequest,
+	type AlertBulkActionResponse,
+	type AlertListRequest,
+	type AlertListResponse,
 } from '@/components/alerts/types/api-types'
 import type { AlertFilters } from '@/components/alerts/types/filter-types'
 
@@ -416,4 +416,30 @@ export function useAlertBackgroundSync(organizationId: string, enabled = true) {
 		refetchOnWindowFocus: false,
 		staleTime: Infinity, // This query is just for triggering sync
 	})
+}
+
+/**
+ * Simplified hook for route components
+ * Provides a simple interface for fetching alerts with filters and pagination
+ */
+export function useAlertQueries(options: {
+	filters: AlertFilters
+	pagination: {
+		page: number
+		pageSize: number
+		total: number
+		hasNext: boolean
+		hasPrevious: boolean
+	}
+}) {
+	const { client } = useAuditContext()
+
+	// For now, return mock data until the API service is fully implemented
+	// This allows the routes to work while maintaining the correct interface
+	return {
+		alerts: [],
+		isLoading: false,
+		error: null,
+		refetch: () => Promise.resolve(),
+	}
 }

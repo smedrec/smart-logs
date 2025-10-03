@@ -1,3 +1,5 @@
+import { AlertErrorBoundary } from '@/components/alerts/error/AlertErrorBoundary'
+import { AlertPage } from '@/components/alerts/layout/AlertPage'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
@@ -53,116 +55,138 @@ function RouteComponent() {
 		if (isConnected) {
 			getStats()
 		}
-	}, [])
+	}, [client, isConnected])
 
 	return (
-		<div className="flex flex-1 flex-col gap-4 p-4">
-			<PageBreadcrumb link="Alerts" page="Statistics" />
-			<div className="min-h-[100vh] flex-1 rounded-xl md:min-h-min">
-				{isLoading ? (
-					<div className="flex flex-1 items-center justify-center">
-						<Spinner variant="bars" size={64} />
+		<AlertErrorBoundary>
+			<AlertPage>
+				<div className="flex flex-1 flex-col gap-4 p-4">
+					<PageBreadcrumb link="Alerts" page="Statistics" />
+					<div className="min-h-[100vh] flex-1 rounded-xl md:min-h-min">
+						{isLoading ? (
+							<div className="flex flex-1 items-center justify-center">
+								<Spinner variant="bars" size={64} />
+							</div>
+						) : (
+							<>
+								<div className="grid auto-rows-min gap-4 md:grid-cols-3">
+									<div className="aspect-video rounded-xl">
+										<Card key="total" className="group hover:shadow-lg transition-all duration-200">
+											<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+												<CardTitle className="text-sm font-medium text-muted-foreground">
+													Total
+												</CardTitle>
+											</CardHeader>
+											<CardContent className="pt-0">
+												<div className="text-3xl font-bold mb-2">{statistics?.total}</div>
+												<p className="text-sm text-muted-foreground leading-relaxed">
+													Total Alerts
+												</p>
+											</CardContent>
+										</Card>
+									</div>
+									<div className="aspect-video rounded-xl">
+										<Card
+											key="active"
+											className="group hover:shadow-lg transition-all duration-200"
+										>
+											<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+												<CardTitle className="text-sm font-medium text-muted-foreground">
+													Active
+												</CardTitle>
+											</CardHeader>
+											<CardContent className="pt-0">
+												<div className="text-3xl font-bold mb-2">{statistics?.active}</div>
+												<p className="text-sm text-muted-foreground leading-relaxed">
+													Active Alerts
+												</p>
+											</CardContent>
+										</Card>
+									</div>
+									<div className="aspect-video rounded-xl">
+										<Card
+											key="resolved"
+											className="group hover:shadow-lg transition-all duration-200"
+										>
+											<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+												<CardTitle className="text-sm font-medium text-muted-foreground">
+													Resolved
+												</CardTitle>
+											</CardHeader>
+											<CardContent className="pt-0">
+												<div className="text-3xl font-bold mb-2">{statistics?.resolved}</div>
+												<p className="text-sm text-muted-foreground leading-relaxed">
+													Resolved Alerts
+												</p>
+											</CardContent>
+										</Card>
+									</div>
+								</div>
+								<div className="grid auto-rows-min gap-4 md:grid-cols-2">
+									<div className="aspect-video rounded-xl">
+										<Card className="flex flex-col">
+											<CardHeader className="items-center pb-0">
+												<CardTitle>By Severity</CardTitle>
+											</CardHeader>
+											<CardContent className="flex-1 pb-0">
+												<ChartContainer
+													config={bySeverityChartConfig}
+													className="mx-auto aspect-square max-h-[250px]"
+												>
+													<PieChart>
+														<ChartTooltip
+															cursor={false}
+															content={<ChartTooltipContent hideLabel />}
+														/>
+														<Pie
+															data={severityData}
+															dataKey="value"
+															nameKey="severity"
+															innerRadius={60}
+														/>
+													</PieChart>
+												</ChartContainer>
+											</CardContent>
+											<CardFooter className="flex-col gap-2 text-sm">
+												<div className="text-muted-foreground leading-none">
+													Showing total alerts for the last 6 months
+												</div>
+											</CardFooter>
+										</Card>
+									</div>
+									<div className="aspect-video rounded-xl">
+										<Card className="flex flex-col">
+											<CardHeader className="items-center pb-0">
+												<CardTitle>By Type</CardTitle>
+											</CardHeader>
+											<CardContent className="flex-1 pb-0">
+												<ChartContainer
+													config={byTypeChartConfig}
+													className="mx-auto aspect-square max-h-[250px]"
+												>
+													<PieChart>
+														<ChartTooltip
+															cursor={false}
+															content={<ChartTooltipContent hideLabel />}
+														/>
+														<Pie data={typeData} dataKey="value" nameKey="type" innerRadius={60} />
+													</PieChart>
+												</ChartContainer>
+											</CardContent>
+											<CardFooter className="flex-col gap-2 text-sm">
+												<div className="text-muted-foreground leading-none">
+													Showing total alerts for the last 6 months
+												</div>
+											</CardFooter>
+										</Card>
+									</div>
+								</div>
+							</>
+						)}
 					</div>
-				) : (
-					<>
-						<div className="grid auto-rows-min gap-4 md:grid-cols-3">
-							<div className="aspect-video rounded-xl">
-								<Card key="total" className="group hover:shadow-lg transition-all duration-200">
-									<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-										<CardTitle className="text-sm font-medium text-muted-foreground">
-											Total
-										</CardTitle>
-									</CardHeader>
-									<CardContent className="pt-0">
-										<div className="text-3xl font-bold mb-2">{statistics?.total}</div>
-										<p className="text-sm text-muted-foreground leading-relaxed">Total Alerts</p>
-									</CardContent>
-								</Card>
-							</div>
-							<div className="aspect-video rounded-xl">
-								<Card key="total" className="group hover:shadow-lg transition-all duration-200">
-									<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-										<CardTitle className="text-sm font-medium text-muted-foreground">
-											Active
-										</CardTitle>
-									</CardHeader>
-									<CardContent className="pt-0">
-										<div className="text-3xl font-bold mb-2">{statistics?.active}</div>
-										<p className="text-sm text-muted-foreground leading-relaxed">Active Alerts</p>
-									</CardContent>
-								</Card>
-							</div>
-							<div className="aspect-video rounded-xl">
-								<Card key="total" className="group hover:shadow-lg transition-all duration-200">
-									<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-										<CardTitle className="text-sm font-medium text-muted-foreground">
-											Resolved
-										</CardTitle>
-									</CardHeader>
-									<CardContent className="pt-0">
-										<div className="text-3xl font-bold mb-2">{statistics?.resolved}</div>
-										<p className="text-sm text-muted-foreground leading-relaxed">Resolved Alerts</p>
-									</CardContent>
-								</Card>
-							</div>
-						</div>
-						<div className="grid auto-rows-min gap-4 md:grid-cols-2">
-							<div className="aspect-video rounded-xl">
-								<Card className="flex flex-col">
-									<CardHeader className="items-center pb-0">
-										<CardTitle>By Severity</CardTitle>
-									</CardHeader>
-									<CardContent className="flex-1 pb-0">
-										<ChartContainer
-											config={bySeverityChartConfig}
-											className="mx-auto aspect-square max-h-[250px]"
-										>
-											<PieChart>
-												<ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-												<Pie
-													data={severityData}
-													dataKey="value"
-													nameKey="severity"
-													innerRadius={60}
-												/>
-											</PieChart>
-										</ChartContainer>
-									</CardContent>
-									<CardFooter className="flex-col gap-2 text-sm">
-										<div className="text-muted-foreground leading-none">
-											Showing total alerts for the last 6 months
-										</div>
-									</CardFooter>
-								</Card>
-							</div>
-							<div className="aspect-video rounded-xl">
-								<Card className="flex flex-col">
-									<CardHeader className="items-center pb-0">
-										<CardTitle>By Type</CardTitle>
-									</CardHeader>
-									<CardContent className="flex-1 pb-0">
-										<ChartContainer
-											config={byTypeChartConfig}
-											className="mx-auto aspect-square max-h-[250px]"
-										>
-											<PieChart>
-												<ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-												<Pie data={typeData} dataKey="value" nameKey="type" innerRadius={60} />
-											</PieChart>
-										</ChartContainer>
-									</CardContent>
-									<CardFooter className="flex-col gap-2 text-sm">
-										<div className="text-muted-foreground leading-none">
-											Showing total alerts for the last 6 months
-										</div>
-									</CardFooter>
-								</Card>
-							</div>
-						</div>
-					</>
-				)}
-			</div>
-		</div>
+				</div>
+			</AlertPage>
+		</AlertErrorBoundary>
 	)
 }
 
