@@ -4,26 +4,10 @@ import { NavUser } from './auth/nav-user'
 import { ModeToggle } from './mode-toggle'
 
 export default function Header() {
-	const links = [{ to: '/', label: 'Home' }] as const
-
 	return (
-		<div>
-			<div className="flex flex-row items-center justify-between px-2 py-1">
-				<nav className="flex gap-4 text-lg">
-					{links.map(({ to, label }) => {
-						return (
-							<Link key={to} to={to}>
-								{label}
-							</Link>
-						)
-					})}
-				</nav>
-				<div className="flex items-center gap-2">
-					<ModeToggle />
-					<NavUser />
-				</div>
-			</div>
-			<hr />
+		<div className="flex grow justify-end gap-2 p-3">
+			<ModeToggle />
+			<NavUser />
 		</div>
 	)
 }

@@ -1,5 +1,6 @@
 import { AppSidebar } from '@/components/app-sidebar'
 import { NavUser } from '@/components/auth/nav-user'
+import Header from '@/components/header'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
@@ -86,10 +87,7 @@ function AuthenticatedLayout() {
 						<SidebarTrigger className="-ml-1" />
 						<Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
 					</div>
-					<div className="flex grow justify-end gap-2 p-3">
-						<ModeToggle />
-						<NavUser />
-					</div>
+					<Header />
 				</header>
 				<Outlet />
 			</SidebarInset>
