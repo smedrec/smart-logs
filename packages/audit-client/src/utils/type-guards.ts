@@ -50,14 +50,13 @@ import type {
 } from '../types/presets'
 import type {
 	CreateScheduledReportInput,
-	ExecutionStatus,
-	ExecutionTrigger,
 	PaginatedExecutions,
 	ReportExecution,
 	ScheduledReport,
 	ScheduleFrequency,
 	UpdateScheduledReportInput,
 } from '../types/scheduled-reports'
+import type { ExecutionStatus, ExecutionTrigger } from '../types/shared-schemas'
 import type {
 	ContentType,
 	Email,

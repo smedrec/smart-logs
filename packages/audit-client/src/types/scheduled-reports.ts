@@ -2,11 +2,17 @@ import { z } from 'zod'
 
 import { ExportResultSchema, PaginationMetadataSchema, PaginationParamsSchema } from './api'
 import {
+	DeliveryConfigSchema as BaseDeliveryConfigSchema,
+	DeliveryStatusSchema,
+	ExecutionStatusSchema,
+	ExecutionTriggerSchema,
+	ExportConfigSchema,
 	IntegrityVerificationReportSchema,
+	NotificationConfigSchema,
 	ReportCriteriaSchema,
 	ReportFormatSchema,
 	ReportTypeSchema,
-} from './compliance'
+} from './shared-schemas'
 
 // ============================================================================
 // Scheduled Report Types
@@ -112,9 +118,9 @@ export const ScheduleConfigSchema = z
 export type ScheduleConfig = z.infer<typeof ScheduleConfigSchema>
 
 /**
- * Delivery configuration
+ * Full delivery configuration (extends the basic one from shared-schemas)
  */
-export const DeliveryConfigSchema = z
+export const FullDeliveryConfigSchema = z
 	.object({
 		method: z.enum(['email', 'webhook', 'sftp', 'storage', 'download']),
 
@@ -224,39 +230,12 @@ export const DeliveryConfigSchema = z
 			message: 'Missing required fields for the selected delivery method',
 		}
 	)
-export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>
+export type DeliveryConfig = z.infer<typeof FullDeliveryConfigSchema>
 
-/**
- * Export configuration schema
- */
+// Export the full schema as DeliveryConfigSchema for backward compatibility
+export const DeliveryConfigSchema = FullDeliveryConfigSchema
 
-export const ExportConfigSchema = z.object({
-	format: ReportFormatSchema,
-	includeMetadata: z.boolean().optional(), //.default(true),
-	includeIntegrityReport: z.boolean().optional(), //.default(false),
-	compression: z.enum(['none', 'gzip', 'zip', 'bzip2']).optional(), //.default('none'),
-	encryption: z
-		.object({
-			enabled: z.boolean(), //.default(false),
-			algorithm: z.string().optional(),
-			keyId: z.string().optional(),
-		})
-		.optional(),
-})
-export type ExportConfig = z.infer<typeof ExportConfigSchema>
-
-/**
- * Notification configuration
- */
-export const NotificationConfigSchema = z.object({
-	recipients: z.array(z.string().email()),
-	onSuccess: z.boolean(), //.default(false),
-	onFailure: z.boolean(), //.default(true),
-	onSkip: z.boolean(), //.default(false),
-	includeReport: z.boolean(), //.default(false),
-	customMessage: z.string().optional(),
-})
-export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
+// Export and Notification configs are now imported from shared-schemas
 
 /**
  * Scheduled report
@@ -343,32 +322,6 @@ export type UpdateScheduledReportInput = z.infer<typeof UpdateScheduledReportInp
 // ============================================================================
 // Execution Types
 // ============================================================================
-
-/**
- * Execution status
- */
-export const ExecutionStatusSchema = z.enum([
-	'pending',
-	'running',
-	'completed',
-	'failed',
-	'cancelled',
-	'skipped',
-	'timeout',
-])
-export type ExecutionStatus = z.infer<typeof ExecutionStatusSchema>
-
-/**
- * Execution trigger
- */
-export const ExecutionTriggerSchema = z.enum(['scheduled', 'manual', 'api', 'retry', 'catchup'])
-export type ExecutionTrigger = z.infer<typeof ExecutionTriggerSchema>
-
-/**
- * Delivery Status
- */
-export const DeliveryStatusSchema = z.enum(['pending', 'delivered', 'failed', 'skipped'])
-export type DeliveryStatus = z.infer<typeof DeliveryStatusSchema>
 
 /**
  * Delivery attempt record

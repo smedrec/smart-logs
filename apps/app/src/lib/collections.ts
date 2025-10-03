@@ -26,6 +26,25 @@ const AlertSchema = z.object({
 	updated_at: z.iso.datetime(),
 })
 
+const ExecutionSchema = z.object({
+	id: z.string(),
+	scheduled_report_id: z.string(),
+	organization_id: z.string(),
+	run_id: z.string(),
+	scheduled_time: z.iso.datetime(),
+	execution_time: z.iso.datetime().optional(),
+	status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED']),
+	trigger: z.enum(['SCHEDULE', 'MANUAL']),
+	duration: z.number().optional(),
+	records_processed: z.number().optional(),
+	export_results: z.string().optional(),
+	integrity_report: z.string().optional(),
+	delivery_attempts: z.array(z.unknown()).optional(),
+	created_at: z.iso.datetime(),
+})
+
+export type Execution = z.infer<typeof ExecutionSchema>
+
 export type Alert = z.infer<typeof AlertSchema>
 
 export const recentAlertsCollection = (activeOrganizationId: string) =>
@@ -43,6 +62,24 @@ export const recentAlertsCollection = (activeOrganizationId: string) =>
 			},
 			getKey: (item) => item.id,
 			schema: AlertSchema,
+		})
+	)
+
+export const recentExecutionsCollection = (activeOrganizationId: string) =>
+	createCollection(
+		electricCollectionOptions({
+			id: 'sync-recent-executions',
+			shapeOptions: {
+				url: 'https://electric.smedrec.qzz.io/v1/shape',
+				params: {
+					table: 'report_executions',
+					where: `
+          organization_id = '${activeOrganizationId}'
+        `,
+				},
+			},
+			getKey: (item) => item.id,
+			schema: ExecutionSchema,
 		})
 	)
 

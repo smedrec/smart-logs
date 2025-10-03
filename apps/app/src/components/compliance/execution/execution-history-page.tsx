@@ -108,8 +108,8 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 					id: '1',
 					reportId: filters.reportId || 'report-1',
 					status: 'completed' as ExecutionStatus,
-					startedAt: new Date(Date.now() - 3600000).toISOString(),
-					completedAt: new Date(Date.now() - 3000000).toISOString(),
+					scheduledTime: new Date(Date.now() - 3600000).toISOString(),
+					executionTime: new Date(Date.now() - 3000000).toISOString(),
 					duration: 600000,
 					recordsProcessed: 1250,
 					outputSize: 2048576,
@@ -124,10 +124,10 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 					id: '2',
 					reportId: filters.reportId || 'report-1',
 					status: 'failed' as ExecutionStatus,
-					startedAt: new Date(Date.now() - 7200000).toISOString(),
-					completedAt: new Date(Date.now() - 6600000).toISOString(),
+					scheduledTime: new Date(Date.now() - 7200000).toISOString(),
+					executionTime: new Date(Date.now() - 6600000).toISOString(),
 					duration: 600000,
-					error: 'Database connection timeout',
+					error: { code: '500', message: 'Database connection timeout' },
 					triggeredBy: 'user',
 					metadata: {
 						reportType: 'HIPAA_AUDIT_TRAIL',
@@ -138,7 +138,7 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 					id: '3',
 					reportId: filters.reportId || 'report-1',
 					status: 'running' as ExecutionStatus,
-					startedAt: new Date(Date.now() - 300000).toISOString(),
+					scheduledTime: new Date(Date.now() - 300000).toISOString(),
 					triggeredBy: 'schedule',
 					metadata: {
 						reportType: 'HIPAA_AUDIT_TRAIL',
@@ -172,12 +172,20 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 			const mockDetails: ExecutionDetailsUI = {
 				...executions.find((e) => e.id === executionId)!,
 				logs: [
-					'2024-01-15 10:00:00 - Starting report execution',
-					'2024-01-15 10:00:05 - Connecting to database',
-					'2024-01-15 10:00:10 - Executing query for date range',
-					'2024-01-15 10:05:30 - Processing 1250 records',
-					'2024-01-15 10:08:45 - Generating PDF report',
-					'2024-01-15 10:10:00 - Report generation completed',
+					{ message: 'Starting report execution', level: 'info', timestamp: '2024-01-15 10:00:00' },
+					{ message: 'Connecting to database', level: 'info', timestamp: '2024-01-15 10:00:05' },
+					{
+						message: 'Executing query for date range',
+						level: 'info',
+						timestamp: '2024-01-15 10:00:10',
+					},
+					{ message: 'Processing 1250 records', level: 'info', timestamp: '2024-01-15 10:05:30' },
+					{ message: 'Generating PDF report', level: 'info', timestamp: '2024-01-15 10:08:45' },
+					{
+						message: 'Report generation completed',
+						level: 'info',
+						timestamp: '2024-01-15 10:10:00',
+					},
 				],
 				metrics: {
 					recordsProcessed: 1250,
@@ -202,6 +210,7 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 			pending: { icon: ClockIcon, variant: 'outline' as const, color: 'text-yellow-600' },
 			cancelled: { icon: XCircleIcon, variant: 'outline' as const, color: 'text-gray-600' },
 			timeout: { icon: AlertCircleIcon, variant: 'destructive' as const, color: 'text-orange-600' },
+			skipped: { icon: EyeIcon, variant: 'outline' as const, color: 'text-gray-600' },
 		}
 
 		const config = statusConfig[status] || statusConfig.pending
@@ -331,6 +340,8 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 								<SelectItem value="running">Running</SelectItem>
 								<SelectItem value="pending">Pending</SelectItem>
 								<SelectItem value="cancelled">Cancelled</SelectItem>
+								<SelectItem value="timeout">Timeout</SelectItem>
+								<SelectItem value="skipped">Skipped</SelectItem>
 							</SelectContent>
 						</Select>
 
@@ -470,7 +481,7 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 											<div>
 												<p className="font-medium">Execution {execution.id}</p>
 												<p className="text-sm text-muted-foreground">
-													Started {format(new Date(execution.startedAt), 'PPp')}
+													Started {format(new Date(execution.scheduledTime), 'PPp')}
 												</p>
 											</div>
 										</div>
@@ -508,7 +519,7 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 
 									{execution.error && (
 										<div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded text-sm text-destructive">
-											<strong>Error:</strong> {execution.error}
+											<strong>Error:</strong> {JSON.stringify(execution.error)}
 										</div>
 									)}
 								</div>
@@ -588,14 +599,16 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 
 									<div>
 										<label className="text-sm font-medium">Started At</label>
-										<p className="mt-1">{format(new Date(selectedExecution.startedAt), 'PPp')}</p>
+										<p className="mt-1">
+											{format(new Date(selectedExecution.scheduledTime), 'PPp')}
+										</p>
 									</div>
 
 									<div>
 										<label className="text-sm font-medium">Completed At</label>
 										<p className="mt-1">
-											{selectedExecution.completedAt
-												? format(new Date(selectedExecution.completedAt), 'PPp')
+											{selectedExecution.scheduledTime
+												? format(new Date(selectedExecution.scheduledTime), 'PPp')
 												: 'N/A'}
 										</p>
 									</div>

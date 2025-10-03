@@ -186,6 +186,8 @@ export {
 // Compliance Service exports
 export {
 	ComplianceService,
+	type ComplianceReportEvent,
+	type ReportType,
 	type ReportCriteria,
 	type ReportMetadata,
 	type HIPAASection,
@@ -214,6 +216,7 @@ export {
 	type PaginatedScheduledReports,
 	type ReportExecution,
 	type ExecutionHistoryParams,
+	type ExecutionStatus,
 	type PaginatedExecutions,
 } from './services'
 
@@ -286,6 +289,9 @@ export * from './services'
 
 // Utils exports (will be implemented in later tasks)
 export * from './utils'
+
+// Export all types
+export * from './types'
 
 // Export Schemas for the generated types
 export {

@@ -54,7 +54,11 @@ interface ScheduledReport {
 	id: string
 	name: string
 	description?: string
-	reportType: 'HIPAA_AUDIT_TRAIL' | 'GDPR_PROCESSING_ACTIVITIES' | 'INTEGRITY_VERIFICATION'
+	reportType:
+		| 'HIPAA_AUDIT_TRAIL'
+		| 'GDPR_PROCESSING_ACTIVITIES'
+		| 'INTEGRITY_VERIFICATION'
+		| 'CUSTOM_REPORT'
 	format: 'PDF' | 'CSV' | 'JSON'
 	enabled: boolean
 	lastRun?: Date
@@ -141,6 +145,8 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 				return 'GDPR Processing'
 			case 'INTEGRITY_VERIFICATION':
 				return 'Integrity Check'
+			case 'CUSTOM_REPORT':
+				return 'Custom Report'
 			default:
 				return type
 		}
@@ -154,6 +160,8 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 				return 'secondary'
 			case 'INTEGRITY_VERIFICATION':
 				return 'outline'
+			case 'CUSTOM_REPORT':
+				return 'destructive'
 			default:
 				return 'default'
 		}
@@ -287,7 +295,8 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 								<SelectItem value="all">All Types</SelectItem>
 								<SelectItem value="hipaa">HIPAA Audit</SelectItem>
 								<SelectItem value="gdpr">GDPR Processing</SelectItem>
-								<SelectItem value="custom">Integrity Check</SelectItem>
+								<SelectItem value="integrity">Integrity Check</SelectItem>
+								<SelectItem value="custom">Custom Reports</SelectItem>
 							</SelectContent>
 						</Select>
 

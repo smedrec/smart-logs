@@ -41,7 +41,11 @@ interface ScheduledReport {
 	id: string
 	name: string
 	description?: string
-	reportType: 'HIPAA_AUDIT_TRAIL' | 'GDPR_PROCESSING_ACTIVITIES' | 'INTEGRITY_VERIFICATION'
+	reportType:
+		| 'HIPAA_AUDIT_TRAIL'
+		| 'GDPR_PROCESSING_ACTIVITIES'
+		| 'INTEGRITY_VERIFICATION'
+		| 'CUSTOM_REPORT'
 	format: 'PDF' | 'CSV' | 'JSON'
 	enabled: boolean
 	lastRun?: Date
@@ -145,6 +149,8 @@ export function ReportDetailsPage({ reportId }: ReportDetailsPageProps) {
 				return 'GDPR Processing Activities'
 			case 'INTEGRITY_VERIFICATION':
 				return 'Data Integrity Verification'
+			case 'CUSTOM_REPORT':
+				return 'Custom Report'
 			default:
 				return type
 		}

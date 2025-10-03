@@ -9,46 +9,23 @@ import {
 } from './api'
 import {
 	DeliveryConfigSchema,
+	ExecutionStatusSchema,
 	ExportConfigSchema,
 	NotificationConfigSchema,
-} from './scheduled-reports'
+	ReportFormatSchema,
+	ReportStatusSchema,
+	ReportTypeSchema,
+} from './shared-schemas'
 
 // ============================================================================
 // Compliance Report Types
 // ============================================================================
 
-/**
- * Report types
- */
-export const ReportTypeSchema = z.enum([
-	'HIPAA_AUDIT_TRAIL',
-	'GDPR_PROCESSING_ACTIVITIES',
-	'GENERAL_COMPLIANCE',
-	'INTEGRITY_VERIFICATION',
-	'CUSTOM_REPORT',
-])
-export type ReportType = z.infer<typeof ReportTypeSchema>
+// Import types from shared-schemas to avoid circular imports
+export type { ReportType, ReportFormat, ReportStatus, ExecutionStatus } from './shared-schemas'
 
 /**
- * Report status
- */
-export const ReportStatusSchema = z.enum([
-	'pending',
-	'processing',
-	'completed',
-	'failed',
-	'cancelled',
-])
-export type ReportStatus = z.infer<typeof ReportStatusSchema>
-
-/**
- * Report format
- */
-export const ReportFormatSchema = z.enum(['pdf', 'html', 'csv', 'json', 'xlsx', 'xml'])
-export type ReportFormat = z.infer<typeof ReportFormatSchema>
-
-/**
- * Report criteria with validation
+ * Report criteria with validation (extended version)
  */
 export const ReportCriteriaSchema = z.object({
 	dateRange: DateRangeFilterSchema,
@@ -582,10 +559,10 @@ export const ReportTemplateSchema = z.object({
 		),
 		formatting: z
 			.object({
-				includeHeader: z.boolean().default(true),
-				includeFooter: z.boolean().default(true),
-				includeToc: z.boolean().default(true),
-				pageNumbers: z.boolean().default(true),
+				includeHeader: z.boolean(), //.default(true),
+				includeFooter: z.boolean(), //.default(true),
+				includeToc: z.boolean(), //.default(true),
+				pageNumbers: z.boolean(), //.default(true),
 				watermark: z.string().optional(),
 			})
 			.optional(),

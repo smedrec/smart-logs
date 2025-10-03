@@ -1,3 +1,5 @@
+import { type ExecutionStatus } from '../types/shared-schemas'
+
 // Service layer exports
 // This file will export all service classes
 
@@ -25,6 +27,8 @@ export {
 export { ComplianceService, type ReportDownloadOptions } from './compliance'
 
 export {
+	type ReportType,
+	type ComplianceReportEvent,
 	type ReportCriteria,
 	type ReportMetadata,
 	type HIPAASection,
@@ -129,3 +133,10 @@ export {
 	type ReadinessStatus,
 	type VersionInfo,
 } from '../types/health'
+
+export {
+	type ExecutionStatus,
+	type ExecutionTrigger,
+	type ReportStatus,
+	type ReportFormat,
+} from '../types/shared-schemas'

@@ -12,7 +12,12 @@ const ReportConfigurationForm = lazy(() =>
 // URL search params schema for pre-filling form data
 const createReportSearchSchema = z.object({
 	reportType: z
-		.enum(['HIPAA_AUDIT_TRAIL', 'GDPR_PROCESSING_ACTIVITIES', 'INTEGRITY_VERIFICATION'])
+		.enum([
+			'HIPAA_AUDIT_TRAIL',
+			'GDPR_PROCESSING_ACTIVITIES',
+			'INTEGRITY_VERIFICATION',
+			'CUSTOM_REPORT',
+		])
 		.optional(),
 	template: z.string().optional(),
 })

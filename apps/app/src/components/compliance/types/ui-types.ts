@@ -1,22 +1,11 @@
 import type {
 	CreateScheduledReportInput,
+	ExecutionStatus,
 	ReportExecution,
+	ReportType,
 	ScheduledReport,
 	UpdateScheduledReportInput,
 } from '@smedrec/audit-client'
-
-// Define types that are not exported from the main audit client
-export type ReportType =
-	| 'HIPAA_AUDIT_TRAIL'
-	| 'GDPR_PROCESSING_ACTIVITIES'
-	| 'INTEGRITY_VERIFICATION'
-export type ExecutionStatus =
-	| 'pending'
-	| 'running'
-	| 'completed'
-	| 'failed'
-	| 'cancelled'
-	| 'timeout'
 
 // UI-enhanced scheduled report interface
 export interface ScheduledReportUI extends ScheduledReport {
@@ -130,7 +119,7 @@ export interface ExecutionHistoryFilters {
 }
 
 export interface ExecutionDetailsUI extends ReportExecution {
-	logs?: string[]
+	//logs?: string[]
 	metrics?: {
 		recordsProcessed: number
 		fileSize: number

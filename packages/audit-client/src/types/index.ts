@@ -43,7 +43,6 @@ import type {
 import type {
 	CreateScheduledReportInput,
 	DeliveryAttempt,
-	DeliveryStatus,
 	PaginatedExecutions,
 	ReportExecution,
 	ScheduledReport,
@@ -74,6 +73,10 @@ export * from './health'
 
 // Re-export utility types
 export * from './utils'
+
+// Re-export shared schemas
+export type { DeliveryStatus, ExecutionStatus } from './shared-schemas'
+//export * from './shared-schemas'
 
 /**
  * Union type for all report types

@@ -23,7 +23,7 @@ const scheduledReportsSearchSchema = z.object({
 	sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
 })
 
-export const Route = createFileRoute('/_authenticated/compliance/scheduled-reports')({
+export const Route = createFileRoute('/_authenticated/compliance/scheduled-reports/')({
 	component: RouteComponent,
 	validateSearch: scheduledReportsSearchSchema,
 	beforeLoad: ({ context }) => {
