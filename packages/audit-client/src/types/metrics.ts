@@ -432,13 +432,13 @@ export type UsageMetrics = z.infer<typeof UsageMetricsSchema>
 /**
  * Alert severity levels
  */
-export const AlertSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
+export const AlertSeveritySchema = z.enum(['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
 export type AlertSeverity = z.infer<typeof AlertSeveritySchema>
 
 /**
  * Alert status
  */
-export const AlertStatusSchema = z.enum(['active', 'acknowledged', 'resolved', 'suppressed'])
+export const AlertStatusSchema = z.enum(['active', 'acknowledged', 'resolved', 'dismissed'])
 export type AlertStatus = z.infer<typeof AlertStatusSchema>
 
 /**
@@ -450,6 +450,7 @@ export const AlertTypeSchema = z.enum([
 	'PERFORMANCE',
 	'SYSTEM',
 	'METRICS',
+	'CUSTOM',
 ])
 export type AlertType = z.infer<typeof AlertTypeSchema>
 

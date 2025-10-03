@@ -2,8 +2,16 @@ import { electricCollectionOptions } from '@tanstack/electric-db-collection'
 import { createCollection, createOptimisticAction } from '@tanstack/react-db'
 import { z } from 'zod'
 
-const AlertSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
-const AlertTypeSchema = z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM'])
+const AlertSeveritySchema = z.enum(['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
+const AlertTypeSchema = z.enum([
+	'SECURITY',
+	'COMPLIANCE',
+	'PERFORMANCE',
+	'SYSTEM',
+	'METRICS',
+	'CUSTOM',
+])
+const AlertStatusSchema = z.enum(['active', 'acknowledged', 'resolved', 'dismissed'])
 
 const AlertSchema = z.object({
 	id: z.string(),
@@ -13,6 +21,7 @@ const AlertSchema = z.object({
 	title: z.string().min(1),
 	description: z.string(),
 	source: z.string(),
+	status: AlertStatusSchema,
 	correlationId: z.string().optional(),
 	metadata: z.record(z.string(), z.any()).optional(),
 	acknowledged: z.string().default('false'),
@@ -22,6 +31,7 @@ const AlertSchema = z.object({
 	resolved_at: z.iso.datetime().optional(),
 	resolved_by: z.string().optional(),
 	resolutionNotes: z.string().optional(),
+	tags: z.array(z.string()).optional(),
 	created_at: z.iso.datetime(),
 	updated_at: z.iso.datetime(),
 })

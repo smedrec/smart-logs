@@ -56,6 +56,7 @@ export interface AlertHandler {
 		resolvedBy: string,
 		resolutionData?: AlertResolution
 	): Promise<{ success: boolean }>
+	dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }>
 	getActiveAlerts(organizationId?: string): Promise<Alert[]>
 	numberOfActiveAlerts(organizationId?: string): Promise<number>
 	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
@@ -432,6 +433,7 @@ export class MonitoringService {
 			description: pattern.description,
 			timestamp: pattern.timestamp,
 			source: 'audit-monitoring',
+			status: 'active',
 			metadata: {
 				patternType: pattern.type,
 				eventCount: pattern.events.length,
@@ -519,6 +521,7 @@ export class MonitoringService {
 				title: alert.title,
 				description: alert.description,
 				source: alert.source,
+				status: alert.status,
 			})
 
 			// For critical alerts, you might want to send immediate notifications
@@ -531,7 +534,7 @@ export class MonitoringService {
 					headers: {
 						Authorization: `Bearer ${this.config.notification.credentials.secret}`,
 						Title: alert.title,
-						Tags: `warning,${alert.type},${alert.severity},${alert.source}`,
+						Tags: `warning,${alert.type},${alert.severity},${alert.source},${alert.status}`,
 					},
 				})
 			}
@@ -554,6 +557,7 @@ export class MonitoringService {
 			title: alert.title,
 			description: alert.description,
 			source: alert.source,
+			status: alert.status,
 			metadata: alert.metadata,
 		})
 		fetch(`${this.config.notification.url}/${alert.metadata.organizationId}`, {
@@ -563,7 +567,7 @@ export class MonitoringService {
 				Authorization: `Bearer ${this.config.notification.credentials.secret}`,
 				Title: alert.title,
 				Priority: '5',
-				Tags: `warning,${alert.type},${alert.severity},${alert.source}`,
+				Tags: `warning,${alert.type},${alert.severity},${alert.source},${alert.status}`,
 			},
 		})
 	}
@@ -617,6 +621,7 @@ export class MonitoringService {
 			active: 0,
 			acknowledged: 0,
 			resolved: 0,
+			dismissed: 0,
 			bySeverity: {
 				LOW: 0,
 				MEDIUM: 0,
@@ -630,6 +635,8 @@ export class MonitoringService {
 				SYSTEM: 0,
 				METRICS: 0,
 			},
+			bySource: {},
+			trends: [],
 		}
 	}
 
@@ -640,6 +647,7 @@ export class MonitoringService {
 		const alert = this.alerts.find((a) => a.id === alertId)
 		if (alert) {
 			alert.resolved = true
+			alert.status = 'resolved'
 			alert.resolvedAt = new Date().toISOString()
 			alert.resolvedBy = resolvedBy
 
@@ -661,6 +669,7 @@ export class MonitoringService {
 		const alert = this.alerts.find((a) => a.id === alertId)
 		if (alert) {
 			alert.acknowledged = true
+			alert.status = 'acknowledged'
 			alert.acknowledgedAt = new Date().toISOString()
 			alert.acknowledgedBy = acknowledgedBy
 
@@ -1352,6 +1361,11 @@ export class ConsoleAlertHandler implements AlertHandler {
 		return { success: true }
 	}
 
+	async dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }> {
+		console.log(`✅ Alert ${alertId} dismissed by ${dismissedBy}`)
+		return { success: true }
+	}
+
 	async getActiveAlerts(organizationId?: string): Promise<Alert[]> {
 		// Console handler doesn't store alerts
 		console.log(
@@ -1380,6 +1394,7 @@ export class ConsoleAlertHandler implements AlertHandler {
 			active: 0,
 			acknowledged: 0,
 			resolved: 0,
+			dismissed: 0,
 			bySeverity: {
 				LOW: 0,
 				MEDIUM: 0,
@@ -1393,6 +1408,8 @@ export class ConsoleAlertHandler implements AlertHandler {
 				SYSTEM: 0,
 				METRICS: 0,
 			},
+			bySource: {},
+			trends: [],
 		}
 	}
 }

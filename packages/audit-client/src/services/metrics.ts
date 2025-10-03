@@ -1,3 +1,6 @@
+import z from 'zod'
+import { ZodNumberFormat } from 'zod/v4'
+
 import { BaseResource } from '../core/base-resource'
 import {
 	ConnectionOptions,
@@ -96,8 +99,15 @@ export interface AlertStatistics {
 	active: number
 	acknowledged: number
 	resolved: number
+	dismissed: number
 	bySeverity: Record<AlertSeverity, number>
 	byType: Record<AlertType, number>
+	bySource: Record<string, number>
+	trends: {
+		period: string
+		created: number
+		resolved: number
+	}[]
 }
 
 /**

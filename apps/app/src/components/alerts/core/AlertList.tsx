@@ -63,7 +63,7 @@ export function AlertList({
 	virtualScrolling = false,
 	maxHeight = '600px',
 }: AlertListProps) {
-	const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'timestamp', direction: 'desc' })
+	const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
 	const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set())
 	const [selectedAlertIndex, setSelectedAlertIndex] = useState<number>(-1)
 
@@ -78,6 +78,7 @@ export function AlertList({
 			const aValue = a[sortConfig.key]
 			const bValue = b[sortConfig.key]
 
+			if (!aValue || !bValue) return 0
 			if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
 			if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
 			return 0
@@ -196,15 +197,15 @@ export function AlertList({
 
 	const getSeverityIcon = (severity: AlertSeverity) => {
 		switch (severity) {
-			case 'critical':
+			case 'CRITICAL':
 				return <AlertTriangle className="h-4 w-4 text-destructive" />
-			case 'high':
+			case 'HIGH':
 				return <AlertTriangle className="h-4 w-4 text-orange-500" />
-			case 'medium':
+			case 'MEDIUM':
 				return <Clock className="h-4 w-4 text-yellow-500" />
-			case 'low':
+			case 'LOW':
 				return <Clock className="h-4 w-4 text-blue-500" />
-			case 'info':
+			case 'INFO':
 				return <Clock className="h-4 w-4 text-gray-500" />
 			default:
 				return <Clock className="h-4 w-4" />
@@ -228,15 +229,15 @@ export function AlertList({
 
 	const getSeverityBadgeVariant = (severity: AlertSeverity) => {
 		switch (severity) {
-			case 'critical':
+			case 'CRITICAL':
 				return 'destructive'
-			case 'high':
+			case 'HIGH':
 				return 'secondary'
-			case 'medium':
+			case 'MEDIUM':
 				return 'outline'
-			case 'low':
+			case 'LOW':
 				return 'outline'
-			case 'info':
+			case 'INFO':
 				return 'outline'
 			default:
 				return 'outline'
@@ -328,8 +329,8 @@ export function AlertList({
 						key={alert.id}
 						className={cn(
 							'transition-all duration-200 hover:shadow-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-							alert.severity === 'critical' && 'border-l-4 border-l-destructive',
-							alert.severity === 'high' && 'border-l-4 border-l-orange-500',
+							alert.severity === 'CRITICAL' && 'border-l-4 border-l-destructive',
+							alert.severity === 'HIGH' && 'border-l-4 border-l-orange-500',
 							isSelected && 'ring-2 ring-primary ring-offset-2'
 						)}
 						onClick={() => onAlertSelect(alert)}
@@ -345,7 +346,9 @@ export function AlertList({
 						<CardContent className="p-4">
 							<div className="flex items-start space-x-4">
 								{/* Severity Icon */}
-								<div className="flex-shrink-0 mt-0.5">{getSeverityIcon(alert.severity)}</div>
+								<div className="flex-shrink-0 mt-0.5">
+									{getSeverityIcon(alert.severity as AlertSeverity)}
+								</div>
 
 								{/* Alert Content */}
 								<div className="flex-1 min-w-0">
@@ -353,16 +356,19 @@ export function AlertList({
 										<div className="flex-1 min-w-0">
 											<h4 className="text-sm font-medium truncate">{alert.title}</h4>
 											<p className="text-xs text-muted-foreground mt-1">
-												{alert.source} • {formatTimestamp(alert.timestamp)}
+												{alert.source} • {alert.created_at}
 											</p>
 										</div>
 
 										<div className="flex items-center space-x-2 ml-4">
-											<Badge variant={getSeverityBadgeVariant(alert.severity)} className="text-xs">
+											<Badge
+												variant={getSeverityBadgeVariant(alert.severity as AlertSeverity)}
+												className="text-xs"
+											>
 												{alert.severity}
 											</Badge>
 											<div className="flex items-center space-x-1">
-												{getStatusIcon(alert.status)}
+												{getStatusIcon(alert.status as AlertStatus)}
 												<span className="text-xs text-muted-foreground capitalize">
 													{alert.status}
 												</span>
@@ -379,7 +385,7 @@ export function AlertList({
 									</p>
 
 									{/* Tags */}
-									{alert.tags.length > 0 && (
+									{alert.tags && alert.tags.length > 0 && (
 										<div className="flex flex-wrap gap-1 mt-2">
 											{alert.tags.slice(0, isExpanded ? undefined : 3).map((tag) => (
 												<Badge key={tag} variant="outline" className="text-xs">
@@ -402,16 +408,15 @@ export function AlertList({
 											role="region"
 											aria-label="Alert details"
 										>
-											{alert.acknowledgedBy && (
+											{alert.acknowledged_by && (
 												<p className="text-xs text-muted-foreground">
-													Acknowledged by {alert.acknowledgedBy} on{' '}
-													{formatTimestamp(alert.acknowledgedAt!)}
+													Acknowledged by {alert.acknowledged_by} on {alert.acknowledged_at}
 												</p>
 											)}
-											{alert.resolvedBy && (
+											{alert.resolved_by && (
 												<div className="space-y-1">
 													<p className="text-xs text-muted-foreground">
-														Resolved by {alert.resolvedBy} on {formatTimestamp(alert.resolvedAt!)}
+														Resolved by {alert.resolved_by} on {alert.resolved_at}
 													</p>
 													{alert.resolutionNotes && (
 														<p className="text-xs text-muted-foreground">
@@ -476,11 +481,11 @@ export function AlertList({
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={() => handleSort('timestamp')}
+						onClick={() => handleSort('created_at')}
 						className="text-xs"
 					>
 						Sort by Date
-						{sortConfig.key === 'timestamp' &&
+						{sortConfig.key === 'created_at' &&
 							(sortConfig.direction === 'asc' ? (
 								<ChevronUp className="h-3 w-3 ml-1" />
 							) : (

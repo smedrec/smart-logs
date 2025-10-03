@@ -12,6 +12,7 @@ export {
 	SimpleAlertTableToolbar,
 	CompactAlertTableToolbar,
 } from './AlertTableToolbar'
+export { AlertStatistics } from './AlertStatistics'
 
 // Re-export types
 export type { AlertDataTableProps, AlertDataTableRef } from './AlertDataTable'

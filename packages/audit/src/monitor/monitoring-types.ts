@@ -68,12 +68,17 @@ export interface HealthStatus {
 /**
  * Alert severity levels
  */
-export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+export type AlertSeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
 /**
  * Alert types for categorization
  */
-export type AlertType = 'SECURITY' | 'COMPLIANCE' | 'PERFORMANCE' | 'SYSTEM' | 'METRICS'
+export type AlertType = 'SECURITY' | 'COMPLIANCE' | 'PERFORMANCE' | 'SYSTEM' | 'METRICS' | 'CUSTOM'
+
+/**
+ * Alert status
+ */
+export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'dismissed'
 
 /**
  * Alert interface
@@ -86,6 +91,7 @@ export interface Alert {
 	description: string
 	timestamp: string
 	source: string
+	status: AlertStatus
 	metadata: Record<string, any>
 	acknowledged: boolean
 	acknowledgedAt?: string
@@ -94,6 +100,7 @@ export interface Alert {
 	resolvedAt?: string
 	resolvedBy?: string
 	correlationId?: string
+	tags: string[]
 }
 
 /**
@@ -111,8 +118,15 @@ export interface AlertStatistics {
 	active: number
 	acknowledged: number
 	resolved: number
+	dismissed: number
 	bySeverity: Record<AlertSeverity, number>
 	byType: Record<AlertType, number>
+	bySource: Record<string, number>
+	trends: {
+		period: string
+		created: number
+		resolved: number
+	}[]
 }
 
 export interface RequestMetrics {

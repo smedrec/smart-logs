@@ -98,6 +98,7 @@ const AlertSchema = z.object({
 	description: z.string(),
 	timestamp: z.string().datetime(),
 	source: z.string(),
+	status: z.enum(['active', 'acknowledged', 'resolved', 'dismissed']),
 	acknowledged: z.boolean(),
 	resolved: z.boolean(),
 	metadata: z.record(z.string(), z.any()).optional(),
@@ -116,6 +117,7 @@ const AlertQuerySchema = z.object({
 	severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
 	type: z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS']).optional(),
 	source: z.string().optional(),
+	status: z.enum(['active', 'acknowledged', 'resolved', 'dismissed']).optional(),
 	limit: z
 		.string()
 		.optional()

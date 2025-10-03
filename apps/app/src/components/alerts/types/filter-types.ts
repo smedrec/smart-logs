@@ -16,8 +16,8 @@ export interface AlertFilters {
 	}
 	search?: string
 	tags?: string[]
-	acknowledgedBy?: string[]
-	resolvedBy?: string[]
+	acknowledged_by?: string[]
+	resolved_by?: string[]
 }
 
 // Filter option for dropdowns and multi-selects
@@ -51,7 +51,7 @@ export interface SavedFilter {
 
 // Sort configuration
 export interface AlertSort {
-	field: keyof AlertFilters | 'timestamp' | 'title' | 'severity' | 'status'
+	field: keyof AlertFilters | 'created_at' | 'title' | 'severity' | 'status'
 	direction: 'asc' | 'desc'
 }
 

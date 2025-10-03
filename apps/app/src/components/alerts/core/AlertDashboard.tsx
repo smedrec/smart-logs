@@ -2,17 +2,27 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuditContext } from '@/contexts/audit-provider'
+import { authStateCollection } from '@/lib/auth-client'
+import { recentAlertsCollection } from '@/lib/collections'
 import { cn } from '@/lib/utils'
+import { useLiveQuery } from '@tanstack/react-db'
 import { BarChart3, Filter, LayoutGrid, List, RefreshCw, Settings } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
+import { AlertStatistics } from '../data/AlertStatistics'
 import { ALERT_SHORTCUTS, useAlertKeyboardNavigation } from '../hooks/use-alert-keyboard-navigation'
+import { useAlertStatistics } from '../hooks/use-alert-queries'
 import { useAlertDashboardLayout, useAlertTouchFriendly } from '../hooks/use-alert-responsive'
 import { AlertResponsiveContainer, AlertResponsiveGrid } from '../layout/alert-responsive-container'
 import AlertKeyboardShortcutsDialog from '../navigation/alert-keyboard-shortcuts-dialog'
 import AlertSkipLinks, { AlertSkipTarget } from '../navigation/alert-skip-links'
+import AlertList from './AlertList'
 
 import type { AlertFilters } from '@/components/alerts/types/filter-types'
+import type { Alert } from '@/lib/collections'
+import type { AlertStatistics as AlertStatisticsType } from '@smedrec/audit-client'
 
 export interface AlertDashboardProps {
 	/** Initial filters to apply to the dashboard */
@@ -41,6 +51,15 @@ export function AlertDashboard({
 	const [currentView, setCurrentView] = useState<'list' | 'board' | 'statistics'>(view)
 	const [isRefreshing, setIsRefreshing] = useState(false)
 	const [showShortcuts, setShowShortcuts] = useState(false)
+	//const [statistics, setStatistics] = useState<AlertStatisticsType | null>(null)
+	const { client, isConnected } = useAuditContext()
+
+	const activeOrganizationId = authStateCollection.get('auth')?.session.activeOrganizationId
+	const alertsCollection = recentAlertsCollection(activeOrganizationId)
+	const { data: statistics } = useAlertStatistics(activeOrganizationId)
+	const { data: alerts, isLoading } = useLiveQuery((q) =>
+		q.from({ alert: alertsCollection }).orderBy(({ alert }) => alert.created_at, 'desc')
+	)
 
 	// Responsive layout hooks
 	const { headerLayout, actionButtonsLayout, spacing, isMobile, isTablet } =
@@ -267,7 +286,7 @@ export function AlertDashboard({
 								aria-label="5 critical alerts"
 							>
 								<span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
-								<span>5 Critical</span>
+								<span>{statistics?.bySeverity.CRITICAL} Critical</span>
 							</Badge>
 							<Badge
 								variant="secondary"
@@ -275,7 +294,7 @@ export function AlertDashboard({
 								aria-label="12 high priority alerts"
 							>
 								<span className="h-2 w-2 rounded-full bg-orange-500" aria-hidden="true" />
-								<span>12 High</span>
+								<span>{statistics?.bySeverity.HIGH} High</span>
 							</Badge>
 							<Badge
 								variant="outline"
@@ -283,7 +302,7 @@ export function AlertDashboard({
 								aria-label="23 active alerts"
 							>
 								<span className="h-2 w-2 rounded-full bg-blue-500" aria-hidden="true" />
-								<span>23 Active</span>
+								<span>{statistics?.active} Active</span>
 							</Badge>
 						</div>
 					</div>
@@ -302,13 +321,23 @@ export function AlertDashboard({
 										<CardTitle className="flex items-center justify-between">
 											<span>Alert List</span>
 											<Badge variant="outline" aria-label="Total of 40 alerts">
-												40 alerts
+												{alerts.length} alerts
 											</Badge>
 										</CardTitle>
 									</CardHeader>
 									<CardContent>
 										{/* AlertList component will be rendered here */}
 										<div className="text-center py-8 text-muted-foreground">
+											{/*<AlertList
+												alerts={alerts}
+												filters={undefined}
+												onFilterChange={function (filters: AlertFilters): void {
+													throw new Error('Function not implemented.')
+												}}
+												onAlertSelect={function (alert: Alert): void {
+													throw new Error('Function not implemented.')
+												}}
+											/>*/}
 											Alert list component will be implemented in the next subtask
 										</div>
 									</CardContent>
@@ -340,7 +369,7 @@ export function AlertDashboard({
 									<CardHeader className="pb-3">
 										<CardTitle className="text-sm font-medium flex items-center justify-between">
 											<span>Active</span>
-											<Badge variant="destructive">23</Badge>
+											<Badge variant="destructive">{statistics?.active}</Badge>
 										</CardTitle>
 									</CardHeader>
 									<CardContent className="space-y-2">
@@ -355,7 +384,7 @@ export function AlertDashboard({
 									<CardHeader className="pb-3">
 										<CardTitle className="text-sm font-medium flex items-center justify-between">
 											<span>Acknowledged</span>
-											<Badge variant="secondary">12</Badge>
+											<Badge variant="secondary">{statistics?.acknowledged}</Badge>
 										</CardTitle>
 									</CardHeader>
 									<CardContent className="space-y-2">
@@ -369,7 +398,7 @@ export function AlertDashboard({
 									<CardHeader className="pb-3">
 										<CardTitle className="text-sm font-medium flex items-center justify-between">
 											<span>Resolved</span>
-											<Badge variant="outline">45</Badge>
+											<Badge variant="outline">{statistics?.resolved}</Badge>
 										</CardTitle>
 									</CardHeader>
 									<CardContent className="space-y-2">
@@ -383,13 +412,11 @@ export function AlertDashboard({
 									<CardHeader className="pb-3">
 										<CardTitle className="text-sm font-medium flex items-center justify-between">
 											<span>Dismissed</span>
-											<Badge variant="outline">8</Badge>
+											<Badge variant="outline">{statistics?.dismissed}</Badge>
 										</CardTitle>
 									</CardHeader>
 									<CardContent className="space-y-2">
-										<div className="text-center py-4 text-sm text-muted-foreground">
-											Alert cards will be implemented in subtask 3.3
-										</div>
+										<div className="text-center py-4 text-sm text-muted-foreground"></div>
 									</CardContent>
 								</Card>
 							</AlertResponsiveGrid>
@@ -401,50 +428,6 @@ export function AlertDashboard({
 							role="tabpanel"
 							aria-labelledby="statistics-tab"
 						>
-							<AlertResponsiveGrid
-								columns={{
-									sm: 1,
-									md: 2,
-									lg: 3,
-									xl: 3,
-								}}
-								gap={{
-									sm: 'gap-3',
-									md: 'gap-4',
-									lg: 'gap-4',
-								}}
-							>
-								<Card>
-									<CardHeader className="pb-2">
-										<CardTitle className="text-sm font-medium">Total Alerts</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div className="text-2xl font-bold">88</div>
-										<p className="text-xs text-muted-foreground">+12% from last week</p>
-									</CardContent>
-								</Card>
-
-								<Card>
-									<CardHeader className="pb-2">
-										<CardTitle className="text-sm font-medium">Critical Alerts</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div className="text-2xl font-bold text-destructive">5</div>
-										<p className="text-xs text-muted-foreground">-2 from yesterday</p>
-									</CardContent>
-								</Card>
-
-								<Card>
-									<CardHeader className="pb-2">
-										<CardTitle className="text-sm font-medium">Response Time</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div className="text-2xl font-bold">4.2m</div>
-										<p className="text-xs text-muted-foreground">Average response time</p>
-									</CardContent>
-								</Card>
-							</AlertResponsiveGrid>
-
 							{/* Statistics charts will be implemented in later tasks */}
 							<Card>
 								<CardHeader>
@@ -452,7 +435,7 @@ export function AlertDashboard({
 								</CardHeader>
 								<CardContent>
 									<div className="text-center py-8 text-muted-foreground">
-										Statistics charts will be implemented in task 12.4
+										<AlertStatistics alerts={alerts} />
 									</div>
 								</CardContent>
 							</Card>

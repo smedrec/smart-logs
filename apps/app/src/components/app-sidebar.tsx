@@ -58,10 +58,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						title: 'Resolved',
 						url: '/alerts/resolved',
 					},
-					{
-						title: 'Statistics',
-						url: '/alerts/statistics',
-					},
 				],
 			},
 			{

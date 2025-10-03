@@ -12,7 +12,13 @@ import {
 } from '@repo/audit-db'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import type { Alert, AlertSeverity, AlertStatistics, AlertType } from './monitoring-types.js'
+import type {
+	Alert,
+	AlertSeverity,
+	AlertStatistics,
+	AlertStatus,
+	AlertType,
+} from './monitoring-types.js'
 import type { AlertHandler } from './monitoring.js'
 
 /**
@@ -26,6 +32,7 @@ interface DatabaseAlert {
 	title: string
 	description: string
 	source: string
+	status: string
 	correlation_id: string | null
 	metadata: any
 	acknowledged: string
@@ -49,6 +56,7 @@ export interface AlertQueryFilters {
 	severity?: AlertSeverity
 	type?: AlertType
 	source?: string
+	status?: AlertStatus
 	limit?: number
 	offset?: number
 	sortBy?: 'createdAt' | 'updatedAt' | 'severity'
@@ -83,6 +91,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 	public handlerName(): string {
 		return this.name
 	}
+
 	/**
 	 * Send (persist) alert to database
 	 */
@@ -95,9 +104,9 @@ export class DatabaseAlertHandler implements AlertHandler {
 			await this.db.execute(sql`
 				INSERT INTO alerts (
 					id, organization_id, severity, type, title, description, source,
-					correlation_id, metadata, resolved, resolved_at, resolved_by,
+					status, correlation_id, metadata, resolved, resolved_at, resolved_by,
 					acknowledged, acknowledged_at, acknowledged_by,
-					resolution_notes, created_at, updated_at
+					resolution_notes, tags, created_at, updated_at
 				) VALUES (
 					${alert.id},
 					${alert.metadata.organizationId as string},
@@ -106,6 +115,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 					${alert.title},
 					${alert.description},
 					${alert.source},
+					${alert.status || 'active'},
 					${alert.correlationId || null},
 					${JSON.stringify(alert.metadata)},
 					${alert.acknowledged ? 'true' : 'false'},
@@ -115,6 +125,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 					${alert.resolvedAt || null},
 					${alert.resolvedBy || null},
 					${null},
+					${JSON.stringify(alert.tags || [])},
 					${alert.timestamp},
 					${alert.timestamp}
 				)
@@ -134,6 +145,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			const result = await this.db.execute(sql`
 				UPDATE alerts 
 				SET 
+					status = 'acknowledged',
 					acknowledged = 'true',
 					acknowledged_at = ${now},
 					acknowledged_by = ${acknowledgedBy},
@@ -166,6 +178,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			const result = await this.db.execute(sql`
 				UPDATE alerts 
 				SET 
+					status = 'resolved',
 					resolved = 'true',
 					resolved_at = ${now},
 					resolved_by = ${resolutionData?.resolvedBy || resolvedBy},
@@ -211,6 +224,35 @@ export class DatabaseAlertHandler implements AlertHandler {
 			return rows.map(this.mapDatabaseAlertToAlert)
 		} catch (error) {
 			throw new Error(`Failed to retrieve active alerts: ${error}`)
+		}
+	}
+
+	/**
+	 * Dismiss Alert
+	 */
+	async dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }> {
+		const now = new Date().toISOString()
+
+		try {
+			const result = await this.db.execute(sql`
+				UPDATE alerts
+				SET
+					status = 'dismissed',
+					resolved = 'true',
+					resolved_at = ${now},
+					resolved_by = ${dismissedBy},
+					updated_at = ${now}
+				WHERE id = ${alertId}
+				RETURNING id
+			`)
+
+			// Check if any rows were affected by the UPDATE
+			if (result.length === 0) {
+				throw new Error(`Alert with ID ${alertId} not found`)
+			}
+			return { success: true }
+		} catch (error) {
+			throw new Error(`Failed to dismiss alert in database: ${error}`)
 		}
 	}
 
@@ -263,6 +305,10 @@ export class DatabaseAlertHandler implements AlertHandler {
 				query += ` AND source = '${filters.source}'`
 			}
 
+			if (filters.status) {
+				query += ` AND status = '${filters.status}'`
+			}
+
 			// Add sorting
 			const sortColumn = filters.sortBy || 'createdAt'
 			const sortDirection = filters.sortOrder || 'desc'
@@ -280,6 +326,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 						WHEN 'HIGH' THEN 2 
 						WHEN 'MEDIUM' THEN 3 
 						WHEN 'LOW' THEN 4 
+						WHEN 'INFO' THEN 5
 					END ${sortDirection.toUpperCase()}`
 					break
 				default:
@@ -345,15 +392,21 @@ export class DatabaseAlertHandler implements AlertHandler {
 					COUNT(CASE WHEN acknowledged = 'true' THEN 1 END) as acknowledged,
 					COUNT(CASE WHEN resolved = 'false' THEN 1 END) as active,
 					COUNT(CASE WHEN resolved = 'true' THEN 1 END) as resolved,
+					COUNT(CASE WHEN status = 'dismissed' THEN 1 END) as dismissed,
 					COUNT(CASE WHEN severity = 'LOW' THEN 1 END) as low_severity,
 					COUNT(CASE WHEN severity = 'MEDIUM' THEN 1 END) as medium_severity,
 					COUNT(CASE WHEN severity = 'HIGH' THEN 1 END) as high_severity,
 					COUNT(CASE WHEN severity = 'CRITICAL' THEN 1 END) as critical_severity,
+					COUNT(CASE WHEN severity = 'INFO' THEN 1 END) as info_severity,
 					COUNT(CASE WHEN type = 'SECURITY' THEN 1 END) as security_type,
 					COUNT(CASE WHEN type = 'COMPLIANCE' THEN 1 END) as compliance_type,
 					COUNT(CASE WHEN type = 'PERFORMANCE' THEN 1 END) as performance_type,
 					COUNT(CASE WHEN type = 'SYSTEM' THEN 1 END) as system_type,
-					COUNT(CASE WHEN type = 'METRICS' THEN 1 END) as metrics_type
+					COUNT(CASE WHEN type = 'METRICS' THEN 1 END) as metrics_type,
+					COUNT(CASE WHEN type = 'CUSTOM' THEN 1 END) as custom_type,
+					COUNT(CASE WHEN source = 'health-monitor' THEN 1 END) as health_monitor_source,
+					COUNT(CASE WHEN source = 'performance-monitor' THEN 1 END) as performance_monitor_source,
+					COUNT(CASE WHEN source = 'audit-monitoring' THEN 1 END) as audit_monitoring_source
 				FROM alerts
 			`
 		if (organizationId !== undefined) {
@@ -369,16 +422,43 @@ export class DatabaseAlertHandler implements AlertHandler {
 			const rows = result || []
 			const row = rows[0]
 
+			// Calculate trent last mont
+
+			const lastMonth = new Date()
+			lastMonth.setMonth(lastMonth.getMonth() - 1)
+			const lastMonthQuery = `
+					SELECT
+						COUNT(*) as total,
+						COUNT(CASE WHEN resolved = 'true' THEN 1 END) as resolved
+					FROM alerts
+					WHERE organization_id = '${organizationId}'
+					AND created_at >= '${lastMonth.toISOString()}'
+				`
+			const lastMonthResult = await this.client.executeMonitoredQuery(
+				(db) => db.execute(sql.raw(lastMonthQuery)),
+				'get_alert_statistics_last_month',
+				{ cacheKey: `get_alert_statistics_last_month_${organizationId}` }
+			)
+			const lastMonthRows = lastMonthResult || []
+			const lastMonthRow = lastMonthRows[0]
+
+			row.trentLastMonth = {
+				total: parseInt(lastMonthRow.total as string),
+				resolved: parseInt(lastMonthRow.resolved as string),
+			}
+
 			return {
 				total: parseInt(row.total as string),
 				active: parseInt(row.active as string),
 				acknowledged: parseInt(row.acknowledged as string),
 				resolved: parseInt(row.resolved as string),
+				dismissed: parseInt(row.dismissed as string),
 				bySeverity: {
 					LOW: parseInt(row.low_severity as string),
 					MEDIUM: parseInt(row.medium_severity as string),
 					HIGH: parseInt(row.high_severity as string),
 					CRITICAL: parseInt(row.critical_severity as string),
+					INFO: parseInt(row.info_severity as string),
 				},
 				byType: {
 					SECURITY: parseInt(row.security_type as string),
@@ -386,7 +466,20 @@ export class DatabaseAlertHandler implements AlertHandler {
 					PERFORMANCE: parseInt(row.performance_type as string),
 					SYSTEM: parseInt(row.system_type as string),
 					METRICS: parseInt(row.metrics_type as string),
+					CUSTOM: parseInt(row.custom_type as string),
 				},
+				bySource: {
+					HEALTH_MONITOR: parseInt(row.health_monitor_source as string),
+					PERFORMANCE_MONITOR: parseInt(row.performance_monitor_source as string),
+					AUDIT_MONITORING: parseInt(row.audit_monitoring_source as string),
+				},
+				trends: [
+					{
+						period: 'last 30 days',
+						created: parseInt(lastMonthRow.total as string),
+						resolved: parseInt(lastMonthRow.resolved as string),
+					},
+				],
 			}
 		} catch (error) {
 			throw new Error(`Failed to retrieve alert statistics: ${error}`)
@@ -427,6 +520,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			description: dbAlert.description,
 			timestamp: dbAlert.created_at,
 			source: dbAlert.source,
+			status: dbAlert.status as AlertStatus,
 			metadata: {
 				...(typeof dbAlert.metadata === 'string' ? JSON.parse(dbAlert.metadata) : dbAlert.metadata),
 				organizationId: dbAlert.organization_id,
@@ -438,6 +532,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 			resolvedAt: dbAlert.resolved_at || undefined,
 			resolvedBy: dbAlert.resolved_by || undefined,
 			correlationId: dbAlert.correlation_id || undefined,
+			tags: dbAlert.tags || undefined,
 		}
 	}
 }

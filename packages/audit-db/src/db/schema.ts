@@ -66,6 +66,8 @@ export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'PHI'
 
 type AuditEventStatus = 'attempt' | 'success' | 'failure'
 
+type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'dismissed'
+
 const DEFAULT_VALIDATION_CONFIG = {
 	maxStringLength: 10000,
 	allowedDataClassifications: ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'],
@@ -383,6 +385,7 @@ export const alerts = pgTable(
 		title: varchar('title', { length: 500 }).notNull(),
 		description: text('description').notNull(),
 		source: varchar('source', { length: 100 }).notNull(), // Component that generated the alert
+		status: varchar('status', { length: 20 }).$type<AlertStatus>().notNull().default('active'), // OPEN, ACKNOWLEDGED, RESOLVED
 		correlationId: varchar('correlation_id', { length: 255 }), // Link to related events
 		metadata: jsonb('metadata').notNull().default('{}'), // Additional alert context
 		acknowledged: varchar('acknowledged', { length: 10 }).notNull().default('false'), // Boolean as string
@@ -392,6 +395,7 @@ export const alerts = pgTable(
 		resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'string' }),
 		resolvedBy: varchar('resolved_by', { length: 255 }), // User who resolved the alert
 		resolutionNotes: text('resolution_notes'), // Optional notes about resolution
+		tags: jsonb('tags').notNull().default('[]'), // Array of tags for categorization
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
 			.notNull()
 			.defaultNow(),
@@ -401,13 +405,6 @@ export const alerts = pgTable(
 	},
 	(table) => {
 		return [
-			// Primary indexes for multi-organizational queries
-			index('alerts_organization_id_idx').on(table.organizationId),
-			index('alerts_organization_acknowledged_idx').on(table.organizationId, table.acknowledged),
-			index('alerts_organization_resolved_idx').on(table.organizationId, table.resolved),
-			index('alerts_organization_severity_idx').on(table.organizationId, table.severity),
-			index('alerts_organization_type_idx').on(table.organizationId, table.type),
-
 			// Performance indexes
 			index('alerts_created_at_idx').on(table.createdAt),
 			index('alerts_updated_at_idx').on(table.updatedAt),
@@ -416,9 +413,37 @@ export const alerts = pgTable(
 			index('alerts_severity_idx').on(table.severity),
 			index('alerts_type_idx').on(table.type),
 			index('alerts_source_idx').on(table.source),
+			index('alerts_status_idx').on(table.status),
 			index('alerts_correlation_id_idx').on(table.correlationId),
 
+			// Primary indexes for multi-organizational queries
+			index('alerts_organization_id_idx').on(table.organizationId),
+			index('alerts_organization_acknowledged_idx').on(table.organizationId, table.acknowledged),
+			index('alerts_organization_resolved_idx').on(table.organizationId, table.resolved),
+			index('alerts_organization_severity_idx').on(table.organizationId, table.severity),
+			index('alerts_organization_type_idx').on(table.organizationId, table.type),
+			index('alerts_organization_source_idx').on(table.organizationId, table.source),
+			index('alerts_organization_status_idx').on(table.organizationId, table.status),
+
+			// Secondary indexes for common queries
+			index('alerts_organization_created_idx').on(table.organizationId, table.createdAt),
+			index('alerts_organization_updated_idx').on(table.organizationId, table.updatedAt),
+			index('alerts_organization_correlation_id_idx').on(table.organizationId, table.correlationId),
+
+			// JSONB indexes for metadata queries
+			index('alerts_metadata_idx').on(sql`(${table.metadata})`),
+
 			// Composite indexes for common queries
+			index('alerts_org_created_status_idx').on(
+				table.organizationId,
+				table.createdAt,
+				table.status
+			),
+			index('alerts_org_created_acknowledged_idx').on(
+				table.organizationId,
+				table.createdAt,
+				table.acknowledged
+			),
 			index('alerts_org_created_resolved_idx').on(
 				table.organizationId,
 				table.createdAt,
