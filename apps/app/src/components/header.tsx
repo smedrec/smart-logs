@@ -1,5 +1,4 @@
 import { useNotifications } from '@/hooks/useNotifications'
-import { Link } from '@tanstack/react-router'
 
 import { NotificationBell } from './alerts/notifications/NotificationBell'
 import { NavUser } from './auth/nav-user'
