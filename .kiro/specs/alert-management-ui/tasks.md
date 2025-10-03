@@ -94,26 +94,26 @@
     - Add user and timestamp tracking for actions
     - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 6. Implement advanced data table functionality
-  - [ ] 6.1 Create AlertDataTable component
+- [x] 6. Implement advanced data table functionality
+  - [x] 6.1 Create AlertDataTable component
     - Build advanced data table using shadcn-ui Table component
     - Implement column sorting, filtering, and resizing
     - Add responsive design with mobile-friendly layouts
     - _Requirements: 1.1, 1.3, 9.1_
 
-  - [ ] 6.2 Create AlertColumns configuration
+  - [x] 6.2 Create AlertColumns configuration
     - Define table column configurations with custom renderers
     - Implement severity and status badge columns
     - Add action column with dropdown menus
     - _Requirements: 1.1, 1.2, 4.1_
 
-  - [ ] 6.3 Create AlertPagination component
+  - [x] 6.3 Create AlertPagination component
     - Implement server-side pagination with page size controls
     - Add pagination info display and navigation controls
     - Create URL state management for pagination
     - _Requirements: 1.3_
 
-  - [ ] 6.4 Create AlertTableToolbar component
+  - [x] 6.4 Create AlertTableToolbar component
     - Build toolbar with search, filters, and view controls
     - Implement export functionality for alert data
     - Add refresh and real-time update controls
