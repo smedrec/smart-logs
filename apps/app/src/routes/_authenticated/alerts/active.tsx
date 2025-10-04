@@ -11,7 +11,7 @@ import { authStateCollection } from '@/lib/auth-client'
 import { recentAlertsCollection } from '@/lib/collections'
 import { eq, useLiveQuery } from '@tanstack/react-db'
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { AlertFilters as AlertFiltersType } from '@/components/alerts/types/filter-types'
 import type { Alert } from '@/lib/collections'
@@ -57,6 +57,17 @@ function RouteComponent() {
 			.where(({ alert }) => eq(alert.resolved, 'false'))
 			.orderBy(({ alert }) => alert.created_at, 'desc')
 	)
+
+	useEffect(() => {
+		if (searchParams.alertId) {
+			const firstAlert = document.querySelector(
+				`[data-alert-id="${searchParams.alertId}"]`
+			) as HTMLElement
+			firstAlert?.focus()
+			setSelectedAlertIndex(0)
+		}
+		document.title = `Active Alerts - SmartLogs`
+	}, [searchParams.alertId])
 
 	// Convert URL params to filters
 	const [filters, setFilters] = useState<AlertFiltersType>(() => {
@@ -155,6 +166,7 @@ function RouteComponent() {
 						virtualScrolling={true}
 						onFilterChange={handleFilterChange}
 						onAlertSelect={handleAlertSelect}
+						alertFocusedId={searchParams.alertId || undefined}
 						loading={isLoading}
 						error={isError ? status : undefined}
 						className="flex-1"

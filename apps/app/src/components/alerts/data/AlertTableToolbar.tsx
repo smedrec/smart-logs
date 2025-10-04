@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 import { Download, Filter, MoreHorizontal, RefreshCw, Search, Settings, X } from 'lucide-react'
 import * as React from 'react'
 
-import type { AlertSeverity, AlertStatus, AlertType } from '@/lib/types/alert'
+import type { AlertSeverity, AlertStatus, AlertType } from '@/components/alerts/types'
 import type { Table } from '@tanstack/react-table'
 
 export interface AlertTableToolbarProps<TData> {
@@ -62,19 +62,19 @@ export interface AlertTableToolbarProps<TData> {
 
 // Default filter options
 const defaultSeverityOptions = [
-	{ label: 'Critical', value: 'critical' as AlertSeverity },
-	{ label: 'High', value: 'high' as AlertSeverity },
-	{ label: 'Medium', value: 'medium' as AlertSeverity },
-	{ label: 'Low', value: 'low' as AlertSeverity },
-	{ label: 'Info', value: 'info' as AlertSeverity },
+	{ label: 'Critical', value: 'CRITICAL' as AlertSeverity },
+	{ label: 'High', value: 'HIGH' as AlertSeverity },
+	{ label: 'Medium', value: 'MEDIUM' as AlertSeverity },
+	{ label: 'Low', value: 'LOW' as AlertSeverity },
+	{ label: 'Info', value: 'INFO' as AlertSeverity },
 ]
 
 const defaultTypeOptions = [
-	{ label: 'Security', value: 'security' as AlertType },
-	{ label: 'Compliance', value: 'compliance' as AlertType },
-	{ label: 'Performance', value: 'performance' as AlertType },
-	{ label: 'System', value: 'system' as AlertType },
-	{ label: 'Custom', value: 'custom' as AlertType },
+	{ label: 'Security', value: 'SECURITY' as AlertType },
+	{ label: 'Compliance', value: 'COMPLIANCE' as AlertType },
+	{ label: 'Performance', value: 'PERFORMANCE' as AlertType },
+	{ label: 'System', value: 'SYSTEM' as AlertType },
+	{ label: 'Custom', value: 'CUSTOM' as AlertType },
 ]
 
 const defaultStatusOptions = [

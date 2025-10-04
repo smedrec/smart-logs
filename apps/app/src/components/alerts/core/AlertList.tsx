@@ -42,6 +42,8 @@ export interface AlertListProps {
 	onFilterChange: (filters: AlertFilters) => void
 	/** Callback when an alert is selected */
 	onAlertSelect: (alert: Alert) => void
+	/** ID of the alert to focus */
+	alertFocusedId?: string | undefined
 	/** Loading state */
 	loading?: boolean
 	/** Error state */
@@ -68,6 +70,7 @@ export function AlertList({
 	filters,
 	onFilterChange,
 	onAlertSelect,
+	alertFocusedId,
 	loading = false,
 	error,
 	className,
@@ -176,6 +179,18 @@ export function AlertList({
 		},
 		[sortedAlerts, onAlertSelect, containerRef]
 	)
+
+	// Focus alert if alertFocusedId prop changes
+	useEffect(() => {
+		if (alertFocusedId) {
+			const alertToFocus = document.querySelector(
+				`[data-alert-id="${alertFocusedId}"]`
+			) as HTMLElement
+			alertToFocus?.focus()
+			const index = sortedAlerts.findIndex((alert) => alert.id === alertFocusedId)
+			setSelectedAlertIndex(index)
+		}
+	}, [alertFocusedId, sortedAlerts])
 
 	// Handle keyboard navigation for the container
 	useEffect(() => {

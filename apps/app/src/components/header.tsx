@@ -1,4 +1,4 @@
-import { useNotifications } from '@/hooks/useNotifications'
+import { useNotifications } from '@/hooks/use-notifications'
 
 import { NotificationBell } from './alerts/notifications/NotificationBell'
 import { NavUser } from './auth/nav-user'

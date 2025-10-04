@@ -25,7 +25,8 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-import type { Alert, AlertSeverity, AlertStatus, AlertType } from '@/lib/types/alert'
+import type { AlertSeverity, AlertStatus, AlertType } from '@/components/alerts/types'
+import type { Alert } from '@/lib/collections'
 import type { ColumnDef } from '@tanstack/react-table'
 
 export interface AlertColumnsConfig {
@@ -60,15 +61,15 @@ export interface AlertColumnsConfig {
  */
 const getSeverityIcon = (severity: AlertSeverity) => {
 	switch (severity) {
-		case 'critical':
+		case 'CRITICAL':
 			return <AlertTriangle className="h-4 w-4 text-destructive" />
-		case 'high':
+		case 'HIGH':
 			return <AlertTriangle className="h-4 w-4 text-orange-500" />
-		case 'medium':
+		case 'MEDIUM':
 			return <Clock className="h-4 w-4 text-yellow-500" />
-		case 'low':
+		case 'LOW':
 			return <Clock className="h-4 w-4 text-blue-500" />
-		case 'info':
+		case 'INFO':
 			return <Clock className="h-4 w-4 text-gray-500" />
 		default:
 			return <Clock className="h-4 w-4" />
@@ -98,15 +99,15 @@ const getStatusIcon = (status: AlertStatus) => {
  */
 const getTypeIcon = (type: AlertType) => {
 	switch (type) {
-		case 'security':
+		case 'SECURITY':
 			return <Shield className="h-4 w-4 text-red-500" />
-		case 'compliance':
+		case 'COMPLIANCE':
 			return <CheckCircle className="h-4 w-4 text-blue-500" />
-		case 'performance':
+		case 'PERFORMANCE':
 			return <Clock className="h-4 w-4 text-orange-500" />
-		case 'system':
+		case 'SYSTEM':
 			return <AlertTriangle className="h-4 w-4 text-purple-500" />
-		case 'custom':
+		case 'CUSTOM':
 			return <Clock className="h-4 w-4 text-gray-500" />
 		default:
 			return <Clock className="h-4 w-4" />
@@ -118,15 +119,15 @@ const getTypeIcon = (type: AlertType) => {
  */
 const getSeverityBadgeVariant = (severity: AlertSeverity) => {
 	switch (severity) {
-		case 'critical':
+		case 'CRITICAL':
 			return 'destructive' as const
-		case 'high':
+		case 'HIGH':
 			return 'secondary' as const
-		case 'medium':
+		case 'MEDIUM':
 			return 'outline' as const
-		case 'low':
+		case 'LOW':
 			return 'outline' as const
-		case 'info':
+		case 'INFO':
 			return 'outline' as const
 		default:
 			return 'outline' as const

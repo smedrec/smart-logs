@@ -42,10 +42,10 @@ import type { AlertPreferences } from '@/components/alerts/types/settings-types'
 const alertPreferencesSchema = z.object({
 	notifications: z.object({
 		enabled: z.boolean(),
-		frequency: z.nativeEnum(NotificationFrequency),
-		severityThreshold: z.nativeEnum(AlertSeverity),
-		types: z.array(z.nativeEnum(AlertType)),
-		channels: z.array(z.nativeEnum(NotificationChannel)),
+		frequency: z.enum(NotificationFrequency),
+		severityThreshold: z.enum(AlertSeverity),
+		types: z.array(z.enum(AlertType)),
+		channels: z.array(z.enum(NotificationChannel)),
 		quietHours: z
 			.object({
 				enabled: z.boolean(),

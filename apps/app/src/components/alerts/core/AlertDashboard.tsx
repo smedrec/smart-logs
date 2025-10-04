@@ -90,6 +90,10 @@ export function AlertDashboard({
 		}
 	}
 
+	const handleAlertAction = (alertId: string, action: string) => {
+		toast.success(`Alert ${alertId} ${action} triggered`)
+	}
+
 	// Keyboard shortcuts for the dashboard
 	const shortcuts = [
 		{
@@ -376,7 +380,11 @@ export function AlertDashboard({
 											{alerts
 												.filter((alert) => alert.resolved === 'false')
 												.map((alert) => (
-													<AlertCard alert={alert} key={alert.id} />
+													<AlertCard
+														alert={alert}
+														onAlertAction={handleAlertAction}
+														key={alert.id}
+													/>
 												))}
 										</div>
 									</CardContent>
@@ -396,7 +404,11 @@ export function AlertDashboard({
 													(alert) => alert.acknowledged === 'true' && alert.resolved === 'false'
 												)
 												.map((alert) => (
-													<AlertCard alert={alert} key={alert.id} />
+													<AlertCard
+														alert={alert}
+														onAlertAction={handleAlertAction}
+														key={alert.id}
+													/>
 												))}
 										</div>
 									</CardContent>
@@ -414,7 +426,11 @@ export function AlertDashboard({
 											{alerts
 												.filter((alert) => alert.resolved === 'true')
 												.map((alert) => (
-													<AlertCard alert={alert} key={alert.id} />
+													<AlertCard
+														alert={alert}
+														onAlertAction={handleAlertAction}
+														key={alert.id}
+													/>
 												))}
 										</div>
 									</CardContent>
@@ -432,7 +448,11 @@ export function AlertDashboard({
 											{alerts
 												.filter((alert) => alert.status === 'dismissed')
 												.map((alert) => (
-													<AlertCard alert={alert} key={alert.id} />
+													<AlertCard
+														alert={alert}
+														onAlertAction={handleAlertAction}
+														key={alert.id}
+													/>
 												))}
 										</div>
 									</CardContent>

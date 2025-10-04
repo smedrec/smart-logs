@@ -4,7 +4,7 @@ import { AlertPage } from '@/components/alerts/layout/AlertPage'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/_authenticated/alerts/board')({
+export const Route = createFileRoute('/_authenticated/alerts/')({
 	component: RouteComponent,
 	validateSearch: (search: Record<string, unknown>) => {
 		return {
@@ -15,11 +15,11 @@ export const Route = createFileRoute('/_authenticated/alerts/board')({
 
 function RouteComponent() {
 	const navigate = useNavigate()
-	const searchParams = useSearch({ from: '/_authenticated/alerts/board' })
+	const searchParams = useSearch({ from: '/_authenticated/alerts/' })
 
 	const handleViewChange = (view: 'list' | 'board' | 'statistics') => {
 		navigate({
-			to: '/alerts/board',
+			to: '/alerts',
 			search: {
 				...searchParams,
 				view,

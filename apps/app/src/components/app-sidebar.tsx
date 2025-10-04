@@ -44,7 +44,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 				items: [
 					{
 						title: 'Board',
-						url: '/alerts/board',
+						url: '/alerts',
 					},
 					{
 						title: 'Active',

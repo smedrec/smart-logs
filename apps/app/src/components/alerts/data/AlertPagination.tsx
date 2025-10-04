@@ -9,8 +9,8 @@ import {
 	SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { useRouter, useSearch } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import * as React from 'react'
 
 import type { Table } from '@tanstack/react-table'
@@ -75,7 +75,7 @@ export function AlertPagination<TData>({
 	},
 }: AlertPaginationProps<TData>) {
 	const router = useRouter()
-	const searchParams = useSearchParams()
+	const searchParams = useSearch()
 
 	const pagination = table.getState().pagination
 	const { pageIndex, pageSize } = pagination

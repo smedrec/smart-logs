@@ -7,7 +7,7 @@ import { AlertDataTable } from './AlertDataTable'
 import { AlertPagination } from './AlertPagination'
 import { AlertTableToolbar } from './AlertTableToolbar'
 
-import type { Alert } from '@/lib/types/alert'
+import type { Alert } from '@/lib/collections'
 
 export interface AlertDataTableExampleProps {
 	/** Alert data to display */
