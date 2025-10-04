@@ -74,7 +74,6 @@ export function AlertList({
 	virtualScrolling = false,
 	maxHeight = '600px',
 }: AlertListProps) {
-	const [open, setOpen] = useState(false)
 	const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
 	const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set())
 	const [selectedAlertIndex, setSelectedAlertIndex] = useState<number>(-1)
@@ -345,7 +344,10 @@ export function AlertList({
 							alert.severity === 'HIGH' && 'border-l-4 border-l-orange-500',
 							isSelected && 'ring-2 ring-primary ring-offset-2'
 						)}
-						onClick={() => setOpen(true)}
+						/**onClick={(e) => {
+							e.stopPropagation()
+							toggleAlertExpansion(alert.id)
+						}}*/
 						onKeyDown={(e) => handleAlertKeyDown(e, alert, index)}
 						tabIndex={0}
 						role="listitem"

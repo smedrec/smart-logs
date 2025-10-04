@@ -1,4 +1,5 @@
-import type { Alert, AlertSeverity, AlertStatus } from '@/lib/types/alert'
+import type { AlertSeverity, AlertStatus } from '@/components/alerts/types'
+import type { Alert } from '@/lib/collections'
 
 /**
  * Utility functions for screen reader accessibility in alert components
@@ -13,9 +14,9 @@ export const generateAlertAriaLabel = {
 	 */
 	alertStatus: (alert: Alert) => {
 		const severityText =
-			alert.severity === 'critical' ? 'critical priority' : `${alert.severity} priority`
+			alert.severity === 'CRITICAL' ? 'critical priority' : `${alert.severity} priority`
 		const statusText = alert.status === 'active' ? 'requires attention' : alert.status
-		const timeText = formatDateForScreenReader(alert.timestamp, { relative: true })
+		const timeText = formatDateForScreenReader(new Date(alert.created_at), { relative: true })
 
 		return `${severityText} alert: ${alert.title}, status: ${statusText}, created ${timeText}`
 	},
@@ -68,11 +69,11 @@ export const generateAlertAriaLabel = {
 	 */
 	severityBadge: (severity: AlertSeverity) => {
 		const descriptions = {
-			critical: 'Critical severity - immediate attention required',
-			high: 'High severity - urgent attention needed',
-			medium: 'Medium severity - attention needed',
-			low: 'Low severity - informational',
-			info: 'Informational - no action required',
+			CRITICAL: 'Critical severity - immediate attention required',
+			HIGH: 'High severity - urgent attention needed',
+			MEDIUM: 'Medium severity - attention needed',
+			LOW: 'Low severity - informational',
+			INFO: 'Informational - no action required',
 		}
 
 		return descriptions[severity] || `${severity} severity`

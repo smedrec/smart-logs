@@ -152,6 +152,7 @@ function RouteComponent() {
 					<AlertList
 						alerts={alerts || []}
 						filters={filters}
+						virtualScrolling={true}
 						onFilterChange={handleFilterChange}
 						onAlertSelect={handleAlertSelect}
 						loading={isLoading}

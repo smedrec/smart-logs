@@ -412,7 +412,6 @@ export function AlertDetails({
 									<div>
 										<p className="text-sm font-medium">Created</p>
 										<p className="text-xs text-muted-foreground">{alert.created_at}</p>
-										<p className="text-xs text-muted-foreground">{alert.created_at}</p>
 									</div>
 								</div>
 

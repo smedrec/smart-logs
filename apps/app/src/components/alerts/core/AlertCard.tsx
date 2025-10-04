@@ -33,7 +33,8 @@ import {
 	AlertVisuallyHidden,
 } from '../utils/alert-visually-hidden'
 
-import type { Alert, AlertSeverity, AlertStatus } from '@/lib/types/alert'
+import type { AlertSeverity, AlertStatus } from '@/components/alerts/types'
+import type { Alert } from '@/lib/collections'
 
 export interface AlertCardProps {
 	/** Alert data to display */
@@ -69,15 +70,15 @@ export function AlertCard({
 
 	const getSeverityColor = (severity: AlertSeverity) => {
 		switch (severity) {
-			case 'critical':
+			case 'CRITICAL':
 				return 'border-l-destructive bg-destructive/5'
-			case 'high':
+			case 'HIGH':
 				return 'border-l-orange-500 bg-orange-50 dark:bg-orange-950/20'
-			case 'medium':
+			case 'MEDIUM':
 				return 'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950/20'
-			case 'low':
+			case 'LOW':
 				return 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/20'
-			case 'info':
+			case 'INFO':
 				return 'border-l-gray-500 bg-gray-50 dark:bg-gray-950/20'
 			default:
 				return 'border-l-gray-300'
@@ -87,15 +88,15 @@ export function AlertCard({
 	const getSeverityIcon = (severity: AlertSeverity) => {
 		const iconClass = 'h-4 w-4'
 		switch (severity) {
-			case 'critical':
+			case 'CRITICAL':
 				return <AlertTriangle className={cn(iconClass, 'text-destructive')} />
-			case 'high':
+			case 'HIGH':
 				return <AlertTriangle className={cn(iconClass, 'text-orange-500')} />
-			case 'medium':
+			case 'MEDIUM':
 				return <AlertCircle className={cn(iconClass, 'text-yellow-500')} />
-			case 'low':
+			case 'LOW':
 				return <Clock className={cn(iconClass, 'text-blue-500')} />
-			case 'info':
+			case 'INFO':
 				return <Clock className={cn(iconClass, 'text-gray-500')} />
 			default:
 				return <Clock className={iconClass} />
@@ -120,9 +121,9 @@ export function AlertCard({
 
 	const getSeverityBadgeVariant = (severity: AlertSeverity) => {
 		switch (severity) {
-			case 'critical':
+			case 'CRITICAL':
 				return 'destructive'
-			case 'high':
+			case 'HIGH':
 				return 'secondary'
 			default:
 				return 'outline'
@@ -160,7 +161,7 @@ export function AlertCard({
 		<Card
 			className={cn(
 				'transition-all duration-200 hover:shadow-md border-l-4 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-				getSeverityColor(alert.severity),
+				getSeverityColor(alert.severity as AlertSeverity),
 				onAlertClick && 'cursor-pointer',
 				draggable && 'cursor-move',
 				className
@@ -183,11 +184,11 @@ export function AlertCard({
 				<CardHeader className="pb-2">
 					<div className="flex items-start justify-between">
 						<div className="flex items-center space-x-2">
-							{getSeverityIcon(alert.severity)}
+							{getSeverityIcon(alert.severity as AlertSeverity)}
 							<Badge
-								variant={getSeverityBadgeVariant(alert.severity)}
+								variant={getSeverityBadgeVariant(alert.severity as AlertSeverity)}
 								className="text-xs"
-								aria-label={generateAlertAriaLabel.severityBadge(alert.severity)}
+								aria-label={generateAlertAriaLabel.severityBadge(alert.severity as AlertSeverity)}
 							>
 								{alert.severity.toUpperCase()}
 								<AlertSeverityDescription severity={alert.severity} />
@@ -269,8 +270,11 @@ export function AlertCard({
 
 						{compact && (
 							<div className="flex items-center space-x-2 mt-1">
-								{getSeverityIcon(alert.severity)}
-								<Badge variant={getSeverityBadgeVariant(alert.severity)} className="text-xs">
+								{getSeverityIcon(alert.severity as AlertSeverity)}
+								<Badge
+									variant={getSeverityBadgeVariant(alert.severity as AlertSeverity)}
+									className="text-xs"
+								>
 									{alert.severity}
 								</Badge>
 							</div>
@@ -278,10 +282,10 @@ export function AlertCard({
 					</div>
 
 					<div className="flex items-center space-x-1 ml-2">
-						{getStatusIcon(alert.status)}
+						{getStatusIcon(alert.status as AlertStatus)}
 						<span
 							className="text-xs text-muted-foreground capitalize"
-							aria-label={generateAlertAriaLabel.statusBadge(alert.status)}
+							aria-label={generateAlertAriaLabel.statusBadge(alert.status as AlertStatus)}
 						>
 							{alert.status}
 							<AlertStatusDescription status={alert.status} />
@@ -307,15 +311,15 @@ export function AlertCard({
 							{alert.source}
 						</span>
 						<time
-							dateTime={alert.timestamp.toISOString()}
-							aria-label={formatAlertTimeForScreenReader(alert.timestamp, { context: 'created' })}
+							dateTime={alert.created_at}
+							aria-label={formatAlertTimeForScreenReader(alert.created_at, { context: 'created' })}
 						>
-							{formatTimestamp(alert.timestamp)}
+							{alert.created_at}
 						</time>
 					</div>
 
 					{/* Tags */}
-					{alert.tags.length > 0 && (
+					{alert.tags && alert.tags.length > 0 && (
 						<div className="flex flex-wrap gap-1">
 							{alert.tags.slice(0, compact ? 2 : 4).map((tag) => (
 								<Badge key={tag} variant="outline" className="text-xs">
@@ -337,28 +341,28 @@ export function AlertCard({
 							className="pt-3 border-t space-y-2"
 							aria-label="Alert details"
 						>
-							{alert.acknowledgedBy && (
+							{alert.acknowledged_by && (
 								<div className="text-xs text-muted-foreground">
-									<strong>Acknowledged:</strong> {alert.acknowledgedBy} on{' '}
+									<strong>Acknowledged:</strong> {alert.acknowledged_by} on{' '}
 									{new Intl.DateTimeFormat('en-US', {
 										month: 'short',
 										day: 'numeric',
 										hour: '2-digit',
 										minute: '2-digit',
-									}).format(new Date(alert.acknowledgedAt!))}
+									}).format(new Date(alert.acknowledged_at!))}
 								</div>
 							)}
 
-							{alert.resolvedBy && (
+							{alert.resolved_by && (
 								<div className="space-y-1">
 									<div className="text-xs text-muted-foreground">
-										<strong>Resolved:</strong> {alert.resolvedBy} on{' '}
+										<strong>Resolved:</strong> {alert.resolved_by} on{' '}
 										{new Intl.DateTimeFormat('en-US', {
 											month: 'short',
 											day: 'numeric',
 											hour: '2-digit',
 											minute: '2-digit',
-										}).format(new Date(alert.resolvedAt!))}
+										}).format(new Date(alert.resolved_at!))}
 									</div>
 									{alert.resolutionNotes && (
 										<div className="text-xs text-muted-foreground">
@@ -369,11 +373,17 @@ export function AlertCard({
 							)}
 
 							{/* Metadata */}
-							{Object.keys(alert.metadata).length > 0 && (
+							{Object.keys(
+								typeof alert.metadata === 'string' ? JSON.parse(alert.metadata) : alert.metadata
+							).length > 0 && (
 								<div className="text-xs text-muted-foreground">
 									<strong>Metadata:</strong>
 									<div className="mt-1 space-y-1">
-										{Object.entries(alert.metadata)
+										{Object.entries(
+											typeof alert.metadata === 'string'
+												? JSON.parse(alert.metadata)
+												: alert.metadata
+										)
 											.slice(0, 3)
 											.map(([key, value]) => (
 												<div key={key} className="flex justify-between">

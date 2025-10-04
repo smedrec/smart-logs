@@ -17,6 +17,7 @@ import { useAlertDashboardLayout, useAlertTouchFriendly } from '../hooks/use-ale
 import { AlertResponsiveContainer, AlertResponsiveGrid } from '../layout/alert-responsive-container'
 import AlertKeyboardShortcutsDialog from '../navigation/alert-keyboard-shortcuts-dialog'
 import AlertSkipLinks, { AlertSkipTarget } from '../navigation/alert-skip-links'
+import AlertCard from './AlertCard'
 import AlertList from './AlertList'
 
 import type { AlertFilters } from '@/components/alerts/types/filter-types'
@@ -372,7 +373,11 @@ export function AlertDashboard({
 									<CardContent className="space-y-2">
 										{/* AlertCard components will be rendered here */}
 										<div className="text-center py-4 text-sm text-muted-foreground">
-											Alert cards will be implemented in subtask 3.3
+											{alerts
+												.filter((alert) => alert.resolved === 'false')
+												.map((alert) => (
+													<AlertCard alert={alert} key={alert.id} />
+												))}
 										</div>
 									</CardContent>
 								</Card>
@@ -386,7 +391,13 @@ export function AlertDashboard({
 									</CardHeader>
 									<CardContent className="space-y-2">
 										<div className="text-center py-4 text-sm text-muted-foreground">
-											Alert cards will be implemented in subtask 3.3
+											{alerts
+												.filter(
+													(alert) => alert.acknowledged === 'true' && alert.resolved === 'false'
+												)
+												.map((alert) => (
+													<AlertCard alert={alert} key={alert.id} />
+												))}
 										</div>
 									</CardContent>
 								</Card>
@@ -400,7 +411,11 @@ export function AlertDashboard({
 									</CardHeader>
 									<CardContent className="space-y-2">
 										<div className="text-center py-4 text-sm text-muted-foreground">
-											Alert cards will be implemented in subtask 3.3
+											{alerts
+												.filter((alert) => alert.resolved === 'true')
+												.map((alert) => (
+													<AlertCard alert={alert} key={alert.id} />
+												))}
 										</div>
 									</CardContent>
 								</Card>
@@ -413,7 +428,13 @@ export function AlertDashboard({
 										</CardTitle>
 									</CardHeader>
 									<CardContent className="space-y-2">
-										<div className="text-center py-4 text-sm text-muted-foreground"></div>
+										<div className="text-center py-4 text-sm text-muted-foreground">
+											{alerts
+												.filter((alert) => alert.status === 'dismissed')
+												.map((alert) => (
+													<AlertCard alert={alert} key={alert.id} />
+												))}
+										</div>
 									</CardContent>
 								</Card>
 							</AlertResponsiveGrid>
