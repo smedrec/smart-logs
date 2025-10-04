@@ -5,6 +5,9 @@ import { useAlertQueries } from '@/components/alerts/hooks/use-alert-queries'
 import { AlertPage } from '@/components/alerts/layout/AlertPage'
 import { AlertStatus } from '@/components/alerts/types/alert-types'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
+import { authStateCollection } from '@/lib/auth-client'
+import { recentAlertsCollection } from '@/lib/collections'
+import { eq, useLiveQuery } from '@tanstack/react-db'
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { useState } from 'react'
 
@@ -29,6 +32,19 @@ export const Route = createFileRoute('/_authenticated/alerts/acknowledged')({
 function RouteComponent() {
 	const navigate = useNavigate()
 	const searchParams = useSearch({ from: '/_authenticated/alerts/acknowledged' })
+	const activeOrganizationId = authStateCollection.get('auth')?.session.activeOrganizationId
+	const alertsCollection = recentAlertsCollection(activeOrganizationId)
+	const {
+		data: alerts,
+		isLoading,
+		isError,
+		status,
+	} = useLiveQuery((q) =>
+		q
+			.from({ alert: alertsCollection })
+			.where(({ alert }) => eq(alert.acknowledged, 'true'))
+			.orderBy(({ alert }) => alert.created_at, 'desc')
+	)
 
 	// Convert URL params to filters
 	const [filters, setFilters] = useState<AlertFiltersType>(() => {
@@ -53,7 +69,7 @@ function RouteComponent() {
 	})
 
 	// Use alert queries hook for data fetching
-	const { alerts, isLoading, error, refetch } = useAlertQueries({
+	/**const { alerts, isLoading, error, refetch } = useAlertQueries({
 		filters,
 		pagination: {
 			page: searchParams.page,
@@ -62,7 +78,7 @@ function RouteComponent() {
 			hasNext: false,
 			hasPrevious: false,
 		},
-	})
+	})*/
 
 	const handleFilterChange = (newFilters: AlertFiltersType) => {
 		setFilters(newFilters)
@@ -109,13 +125,13 @@ function RouteComponent() {
 				<div className="flex flex-1 flex-col gap-4 p-4">
 					<PageBreadcrumb link="Alerts" page="Acknowledged" />
 
-					{/* Filters */}
+					{/* Filters 
 					<AlertFilters
 						filters={filters}
 						onFiltersChange={handleFilterChange}
 						availableFilters={[]}
 						onReset={() => handleFilterChange({ status: [AlertStatus.ACKNOWLEDGED] })}
-					/>
+					/>*/}
 
 					{/* Alert List */}
 					<AlertList
@@ -124,7 +140,7 @@ function RouteComponent() {
 						onFilterChange={handleFilterChange}
 						onAlertSelect={handleAlertSelect}
 						loading={isLoading}
-						error={error ? String(error) : undefined}
+						error={isError ? status : undefined}
 						className="flex-1"
 					/>
 				</div>

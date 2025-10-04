@@ -32,7 +32,8 @@ import {
 } from 'lucide-react'
 import React, { useState } from 'react'
 
-import type { Alert, AlertSeverity, AlertStatus } from '@/lib/types/alert'
+import type { AlertSeverity, AlertStatus } from '@/components/alerts/types'
+import type { Alert } from '@/lib/collections'
 
 export interface AlertDetailsProps {
 	/** Alert data to display */
@@ -73,7 +74,8 @@ export function AlertDetails({
 	const [copiedField, setCopiedField] = useState<string | null>(null)
 
 	// Mock history data - in real implementation, this would come from props or API
-	const alertHistory: AlertHistoryEntry[] = [
+	// Not implemented
+	/*const alertHistory: AlertHistoryEntry[] = [
 		{
 			id: '1',
 			action: 'Created',
@@ -101,19 +103,20 @@ export function AlertDetails({
 					},
 				]
 			: []),
-	]
+	]*/
+	const alertHistory: AlertHistoryEntry[] = []
 
 	const getSeverityColor = (severity: AlertSeverity) => {
 		switch (severity) {
-			case 'critical':
+			case 'CRITICAL':
 				return 'text-destructive border-destructive bg-destructive/10'
-			case 'high':
+			case 'HIGH':
 				return 'text-orange-600 border-orange-500 bg-orange-50 dark:bg-orange-950/20'
-			case 'medium':
+			case 'MEDIUM':
 				return 'text-yellow-600 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20'
-			case 'low':
+			case 'LOW':
 				return 'text-blue-600 border-blue-500 bg-blue-50 dark:bg-blue-950/20'
-			case 'info':
+			case 'INFO':
 				return 'text-gray-600 border-gray-500 bg-gray-50 dark:bg-gray-950/20'
 			default:
 				return 'text-gray-600 border-gray-300'
@@ -123,15 +126,15 @@ export function AlertDetails({
 	const getSeverityIcon = (severity: AlertSeverity) => {
 		const iconClass = 'h-5 w-5'
 		switch (severity) {
-			case 'critical':
+			case 'CRITICAL':
 				return <AlertTriangle className={cn(iconClass, 'text-destructive')} />
-			case 'high':
+			case 'HIGH':
 				return <AlertTriangle className={cn(iconClass, 'text-orange-500')} />
-			case 'medium':
+			case 'MEDIUM':
 				return <Clock className={cn(iconClass, 'text-yellow-500')} />
-			case 'low':
+			case 'LOW':
 				return <Clock className={cn(iconClass, 'text-blue-500')} />
-			case 'info':
+			case 'INFO':
 				return <Clock className={cn(iconClass, 'text-gray-500')} />
 			default:
 				return <Clock className={iconClass} />
@@ -253,7 +256,7 @@ export function AlertDetails({
 						</Button>
 					)}
 					<div className="flex items-center space-x-2">
-						{getSeverityIcon(alert.severity)}
+						{getSeverityIcon(alert.severity as AlertSeverity)}
 						<h1 className="text-2xl font-semibold">Alert Details</h1>
 					</div>
 				</div>
@@ -265,17 +268,20 @@ export function AlertDetails({
 				{/* Main Content */}
 				<div className="lg:col-span-2 space-y-6">
 					{/* Alert Overview */}
-					<Card className={cn('border-l-4', getSeverityColor(alert.severity))}>
+					<Card className={cn('border-l-4', getSeverityColor(alert.severity as AlertSeverity))}>
 						<CardHeader>
 							<div className="flex items-start justify-between">
 								<div className="space-y-2">
 									<div className="flex items-center space-x-2">
-										<Badge variant="outline" className={getSeverityColor(alert.severity)}>
+										<Badge
+											variant="outline"
+											className={getSeverityColor(alert.severity as AlertSeverity)}
+										>
 											{alert.severity.toUpperCase()}
 										</Badge>
 										<Badge variant="secondary">{alert.type.toUpperCase()}</Badge>
 										<div className="flex items-center space-x-1">
-											{getStatusIcon(alert.status)}
+											{getStatusIcon(alert.status as AlertStatus)}
 											<span className="text-sm text-muted-foreground capitalize">
 												{alert.status}
 											</span>
@@ -301,46 +307,50 @@ export function AlertDetails({
 					</Card>
 
 					{/* Alert History */}
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center space-x-2">
-								<History className="h-4 w-4" />
-								<span>Alert History</span>
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<ScrollArea className="h-64">
-								<div className="space-y-4">
-									{alertHistory.map((entry, index) => (
-										<div key={entry.id} className="flex items-start space-x-3">
-											<div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary mt-2" />
-											<div className="flex-1 min-w-0">
-												<div className="flex items-center justify-between">
-													<p className="text-sm font-medium">
-														{entry.action} by {entry.user}
-													</p>
+					{alertHistory.length > 0 && (
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center space-x-2">
+									<History className="h-4 w-4" />
+									<span>Alert History</span>
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<ScrollArea className="h-64">
+									<div className="space-y-4">
+										{alertHistory.map((entry, index) => (
+											<div key={entry.id} className="flex items-start space-x-3">
+												<div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary mt-2" />
+												<div className="flex-1 min-w-0">
+													<div className="flex items-center justify-between">
+														<p className="text-sm font-medium">
+															{entry.action} by {entry.user}
+														</p>
+														<p className="text-xs text-muted-foreground">
+															{formatRelativeTime(entry.timestamp)}
+														</p>
+													</div>
 													<p className="text-xs text-muted-foreground">
-														{formatRelativeTime(entry.timestamp)}
+														{formatTimestamp(entry.timestamp)}
 													</p>
+													{entry.notes && (
+														<p className="text-sm text-muted-foreground mt-1">
+															<strong>Notes:</strong> {entry.notes}
+														</p>
+													)}
 												</div>
-												<p className="text-xs text-muted-foreground">
-													{formatTimestamp(entry.timestamp)}
-												</p>
-												{entry.notes && (
-													<p className="text-sm text-muted-foreground mt-1">
-														<strong>Notes:</strong> {entry.notes}
-													</p>
-												)}
 											</div>
-										</div>
-									))}
-								</div>
-							</ScrollArea>
-						</CardContent>
-					</Card>
+										))}
+									</div>
+								</ScrollArea>
+							</CardContent>
+						</Card>
+					)}
 
 					{/* Metadata */}
-					{Object.keys(alert.metadata).length > 0 && (
+					{Object.keys(
+						typeof alert.metadata === 'string' ? JSON.parse(alert.metadata) : alert.metadata
+					).length > 0 && (
 						<Card>
 							<CardHeader>
 								<CardTitle className="flex items-center justify-between">
@@ -356,7 +366,11 @@ export function AlertDetails({
 							{showMetadata && (
 								<CardContent>
 									<div className="space-y-3">
-										{Object.entries(alert.metadata).map(([key, value]) => (
+										{Object.entries(
+											typeof alert.metadata === 'string'
+												? JSON.parse(alert.metadata)
+												: alert.metadata
+										).map(([key, value]) => (
 											<div
 												key={key}
 												className="flex items-center justify-between py-2 border-b last:border-b-0"
@@ -397,12 +411,8 @@ export function AlertDetails({
 									<Calendar className="h-4 w-4 text-muted-foreground" />
 									<div>
 										<p className="text-sm font-medium">Created</p>
-										<p className="text-xs text-muted-foreground">
-											{formatTimestamp(alert.timestamp)}
-										</p>
-										<p className="text-xs text-muted-foreground">
-											{formatRelativeTime(alert.timestamp)}
-										</p>
+										<p className="text-xs text-muted-foreground">{alert.created_at}</p>
+										<p className="text-xs text-muted-foreground">{alert.created_at}</p>
 									</div>
 								</div>
 
@@ -426,33 +436,29 @@ export function AlertDetails({
 									</div>
 								</div>
 
-								{alert.acknowledgedBy && (
+								{alert.acknowledged_by && (
 									<>
 										<Separator />
 										<div className="flex items-center space-x-2">
 											<User className="h-4 w-4 text-muted-foreground" />
 											<div>
 												<p className="text-sm font-medium">Acknowledged By</p>
-												<p className="text-xs text-muted-foreground">{alert.acknowledgedBy}</p>
-												<p className="text-xs text-muted-foreground">
-													{formatTimestamp(alert.acknowledgedAt!)}
-												</p>
+												<p className="text-xs text-muted-foreground">{alert.acknowledged_by}</p>
+												<p className="text-xs text-muted-foreground">{alert.acknowledged_at}</p>
 											</div>
 										</div>
 									</>
 								)}
 
-								{alert.resolvedBy && (
+								{alert.resolved_by && (
 									<>
 										<Separator />
 										<div className="flex items-center space-x-2">
 											<CheckCircle className="h-4 w-4 text-muted-foreground" />
 											<div>
 												<p className="text-sm font-medium">Resolved By</p>
-												<p className="text-xs text-muted-foreground">{alert.resolvedBy}</p>
-												<p className="text-xs text-muted-foreground">
-													{formatTimestamp(alert.resolvedAt!)}
-												</p>
+												<p className="text-xs text-muted-foreground">{alert.resolved_by}</p>
+												<p className="text-xs text-muted-foreground">{alert.resolved_at}</p>
 											</div>
 										</div>
 									</>
@@ -462,7 +468,7 @@ export function AlertDetails({
 					</Card>
 
 					{/* Tags */}
-					{alert.tags.length > 0 && (
+					{alert.tags && alert.tags.length > 0 && (
 						<Card>
 							<CardHeader>
 								<CardTitle className="text-base">Tags</CardTitle>

@@ -158,6 +158,7 @@ export function performanceMonitoring(options: { threshold?: number; alertOnSlow
 					description: `Request to ${c.req.method} ${c.req.path} took ${duration.toFixed(2)}ms`,
 					timestamp: new Date().toISOString(),
 					source: 'performance-monitor',
+					status: 'active',
 					metadata: {
 						organizationId: c.get('session')?.session.activeOrganizationId || 'system',
 						requestId,
@@ -169,7 +170,9 @@ export function performanceMonitoring(options: { threshold?: number; alertOnSlow
 					},
 					acknowledged: false,
 					resolved: false,
+					tags: ['api', 'performance', 'slow-request'],
 				}
+
 				await monitor.metrics.sendExternalAlert(alert)
 			} catch (alertError) {
 				logger.error(
@@ -288,6 +291,7 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 						description: `Error rate for ${c.req.method} ${c.req.path} is ${(errorRate * 100).toFixed(2)}%`,
 						timestamp: new Date().toISOString(),
 						source: 'error-rate-monitor',
+						status: 'active',
 						metadata: {
 							organizationId: c.get('session')?.session.activeOrganizationId || 'unknown',
 							endpoint: c.req.path,
@@ -298,6 +302,7 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 						},
 						acknowledged: false,
 						resolved: false,
+						tags: ['api', 'error-rate', 'high-error-rate'],
 					}
 					await monitor.metrics.sendExternalAlert(alert)
 				}

@@ -2,7 +2,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useAuditContext } from '@/contexts/audit-provider'
 import { authStateCollection } from '@/lib/auth-client'
 import { recentAlertsCollection } from '@/lib/collections'
 import { cn } from '@/lib/utils'
@@ -51,8 +50,6 @@ export function AlertDashboard({
 	const [currentView, setCurrentView] = useState<'list' | 'board' | 'statistics'>(view)
 	const [isRefreshing, setIsRefreshing] = useState(false)
 	const [showShortcuts, setShowShortcuts] = useState(false)
-	//const [statistics, setStatistics] = useState<AlertStatisticsType | null>(null)
-	const { client, isConnected } = useAuditContext()
 
 	const activeOrganizationId = authStateCollection.get('auth')?.session.activeOrganizationId
 	const alertsCollection = recentAlertsCollection(activeOrganizationId)

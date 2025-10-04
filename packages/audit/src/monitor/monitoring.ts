@@ -442,6 +442,7 @@ export class MonitoringService {
 			},
 			acknowledged: false,
 			resolved: false,
+			tags: ['suspicious-pattern', pattern.type.toLowerCase().replace('_', '-')],
 		}
 	}
 
@@ -627,6 +628,7 @@ export class MonitoringService {
 				MEDIUM: 0,
 				HIGH: 0,
 				CRITICAL: 0,
+				INFO: 0,
 			},
 			byType: {
 				SECURITY: 0,
@@ -634,6 +636,7 @@ export class MonitoringService {
 				PERFORMANCE: 0,
 				SYSTEM: 0,
 				METRICS: 0,
+				CUSTOM: 0,
 			},
 			bySource: {},
 			trends: [],
@@ -1396,6 +1399,7 @@ export class ConsoleAlertHandler implements AlertHandler {
 			resolved: 0,
 			dismissed: 0,
 			bySeverity: {
+				INFO: 0,
 				LOW: 0,
 				MEDIUM: 0,
 				HIGH: 0,
@@ -1407,6 +1411,7 @@ export class ConsoleAlertHandler implements AlertHandler {
 				PERFORMANCE: 0,
 				SYSTEM: 0,
 				METRICS: 0,
+				CUSTOM: 0,
 			},
 			bySource: {},
 			trends: [],

@@ -1,6 +1,16 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+	Drawer,
+	DrawerClose,
+	DrawerContent,
+	DrawerDescription,
+	DrawerFooter,
+	DrawerHeader,
+	DrawerTitle,
+	DrawerTrigger,
+} from '@/components/ui/drawer'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -17,6 +27,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ALERT_SHORTCUTS, useAlertFocusManagement } from '../hooks/use-alert-keyboard-navigation'
+import AlertDetails from './AlertDetails'
 
 import type { AlertSeverity, AlertStatus } from '@/components/alerts/types/alert-types'
 import type { AlertFilters } from '@/components/alerts/types/filter-types'
@@ -63,6 +74,7 @@ export function AlertList({
 	virtualScrolling = false,
 	maxHeight = '600px',
 }: AlertListProps) {
+	const [open, setOpen] = useState(false)
 	const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
 	const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set())
 	const [selectedAlertIndex, setSelectedAlertIndex] = useState<number>(-1)
@@ -333,7 +345,7 @@ export function AlertList({
 							alert.severity === 'HIGH' && 'border-l-4 border-l-orange-500',
 							isSelected && 'ring-2 ring-primary ring-offset-2'
 						)}
-						onClick={() => onAlertSelect(alert)}
+						onClick={() => setOpen(true)}
 						onKeyDown={(e) => handleAlertKeyDown(e, alert, index)}
 						tabIndex={0}
 						role="listitem"
@@ -425,6 +437,7 @@ export function AlertList({
 													)}
 												</div>
 											)}
+											<AlertDetails alert={alert} />
 										</div>
 									)}
 								</div>

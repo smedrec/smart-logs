@@ -1,9 +1,8 @@
+import { useAlertResponsive } from '@/components/alerts/hooks/use-alert-responsive'
 import { cn } from '@/lib/utils'
 import React from 'react'
 
-import { useAlertResponsive } from '../hooks/use-alert-responsive'
-
-import type { AlertBreakpoint } from '../hooks/use-alert-responsive'
+import type { AlertBreakpoint } from '@/components/alerts/hooks/use-alert-responsive'
 
 export interface AlertResponsiveContainerProps {
 	/** Children to render inside the container */
