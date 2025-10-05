@@ -27,6 +27,7 @@ import {
 
 import type {
 	Alert,
+	AlertActionResponse,
 	AlertSeverity,
 	AlertsParams,
 	AlertType,
@@ -302,7 +303,7 @@ export class MetricsService extends BaseResource {
 
 		// Validate response structure
 		assertType(response, isObject, 'Invalid paginated alerts response from server')
-		assertDefined(response.alerts, 'Paginated alerts response missing alerts array')
+		assertDefined(response.data, 'Paginated alerts response missing alerts array')
 		assertDefined(response.pagination, 'Paginated alerts response missing pagination')
 
 		return response
@@ -352,13 +353,11 @@ export class MetricsService extends BaseResource {
 	 * Acknowledge an alert
 	 *
 	 * @param id Alert ID
-	 * @param request Acknowledgment details
-	 * @returns Promise<Alert> Updated alert
+	 * @returns Promise<AlertActionResponse> Acknowledgment result
 	 */
-	async acknowledgeAlert(id: string, request: AcknowledgeAlertRequest): Promise<Alert> {
-		return this.request<Alert>(`/metrics/alerts/${id}/acknowledge`, {
+	async acknowledgeAlert(id: string): Promise<AlertActionResponse> {
+		return this.request<AlertActionResponse>(`/metrics/alerts/${id}/acknowledge`, {
 			method: 'POST',
-			body: request,
 		})
 	}
 
@@ -367,30 +366,24 @@ export class MetricsService extends BaseResource {
 	 *
 	 * @param id Alert ID
 	 * @param request Resolution details
-	 * @returns Promise<Alert> Updated alert
+	 * @returns Promise<AlertActionResponse> Resolution result
 	 */
-	async resolveAlert(id: string, request: ResolveAlertRequest): Promise<Alert> {
-		return this.request<Alert>(`/metrics/alerts/${id}/resolve`, {
+	async resolveAlert(id: string, request: ResolveAlertRequest): Promise<AlertActionResponse> {
+		return this.request<AlertActionResponse>(`/metrics/alerts/${id}/resolve`, {
 			method: 'POST',
 			body: request,
 		})
 	}
 
 	/**
-	 * Suppress an alert temporarily
+	 * Dismiss an alert
 	 *
 	 * @param id Alert ID
-	 * @param duration Suppression duration in minutes
-	 * @param reason Reason for suppression
-	 * @returns Promise<Alert> Updated alert
+	 * @returns Promise<{ success: boolean }> Dismissal result
 	 */
-	async suppressAlert(id: string, duration: number, reason: string): Promise<Alert> {
-		return this.request<Alert>(`/metrics/alerts/${id}/suppress`, {
+	async dismissAlert(id: string): Promise<AlertActionResponse> {
+		return this.request<AlertActionResponse>(`/metrics/alerts/${id}/dismiss`, {
 			method: 'POST',
-			body: {
-				duration,
-				reason,
-			},
 		})
 	}
 

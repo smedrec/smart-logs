@@ -431,7 +431,7 @@ export class MonitoringService {
 			type: 'SECURITY',
 			title: `Suspicious Pattern Detected: ${pattern.type}`,
 			description: pattern.description,
-			timestamp: pattern.timestamp,
+			createdAt: pattern.timestamp,
 			source: 'audit-monitoring',
 			status: 'active',
 			metadata: {
@@ -1350,7 +1350,7 @@ export class ConsoleAlertHandler implements AlertHandler {
 		console.log(`🚨 ALERT [${alert.severity}]: ${alert.title}`)
 		console.log(`   Description: ${alert.description}`)
 		console.log(`   Source: ${alert.source}`)
-		console.log(`   Timestamp: ${alert.timestamp}`)
+		console.log(`   Timestamp: ${alert.createdAt}`)
 		console.log(`   Metadata:`, alert.metadata)
 	}
 

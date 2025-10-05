@@ -92,15 +92,16 @@ const HealthStatusSchema = z.object({
 
 const AlertSchema = z.object({
 	id: z.string(),
-	severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
-	type: z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS']),
+	severity: z.enum(['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+	type: z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS', 'CUSTOM']),
 	title: z.string(),
 	description: z.string(),
-	timestamp: z.string().datetime(),
+	createdAt: z.string().datetime(),
 	source: z.string(),
 	status: z.enum(['active', 'acknowledged', 'resolved', 'dismissed']),
 	acknowledged: z.boolean(),
 	resolved: z.boolean(),
+	tags: z.array(z.string()),
 	metadata: z.record(z.string(), z.any()).optional(),
 })
 
@@ -228,13 +229,15 @@ const getAlertsRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: z.object({
-						alerts: z.array(AlertSchema),
+						data: z.array(AlertSchema),
 						pagination: z.object({
-							total: z.number(),
-							limit: z.number(),
-							offset: z.number(),
+							total: z.number().int().min(0).optional(),
+							limit: z.number().int().min(1).optional(),
+							offset: z.number().int().min(0).optional(),
 							hasNext: z.boolean(),
 							hasPrevious: z.boolean(),
+							nextCursor: z.string().optional(),
+							previousCursor: z.string().optional(),
 						}),
 					}),
 				},
@@ -260,9 +263,9 @@ const getAlertStatisticsRoute = createRoute({
 						active: z.number(),
 						acknowledged: z.number(),
 						resolved: z.number(),
-						bySeverity: z.record(z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']), z.number()),
+						bySeverity: z.record(z.enum(['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']), z.number()),
 						byType: z.record(
-							z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS']),
+							z.enum(['SECURITY', 'COMPLIANCE', 'PERFORMANCE', 'SYSTEM', 'METRICS', 'CUSTOM']),
 							z.number()
 						),
 						recentAlerts: z.array(AlertSchema).optional(),
@@ -321,6 +324,30 @@ const resolveAlertRoute = createRoute({
 	responses: {
 		200: {
 			description: 'Alert resolved successfully',
+			content: {
+				'application/json': {
+					schema: ResultSchema,
+				},
+			},
+		},
+		...openApiErrorResponses,
+	},
+})
+
+const dismissAlertRoute = createRoute({
+	method: 'post',
+	path: '/alerts/{id}/dismiss',
+	tags: ['Alerts'],
+	summary: 'Dismiss an alert',
+	description: 'Dismisses an alert.',
+	request: {
+		params: z.object({
+			id: z.string(),
+		}),
+	},
+	responses: {
+		200: {
+			description: 'Alert dismissed successfully',
 			content: {
 				'application/json': {
 					schema: ResultSchema,
@@ -453,7 +480,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 
 	// Get alerts
 	app.openapi(getAlertsRoute, async (c) => {
-		const { monitor, logger } = c.get('services')
+		const { monitor, performance, logger } = c.get('services')
 		const session = c.get('session')
 		const requestId = c.get('requestId')
 
@@ -481,27 +508,25 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 				...query,
 			})
 
-			const total = alerts.length
-
-			const result = {
-				alerts,
-				pagination: {
-					total,
-					limit: query.limit || 50,
-					offset: query.offset || 0,
-					hasNext: query.offset + query.limit < total,
-					hasPrevious: query.offset > 0,
-				},
-			}
+			const response = performance.createPaginatedResponse(alerts, {
+				limit: query.limit || 50,
+				offset: query.offset || 0,
+			})
 
 			logger.info('Retrieved alerts', {
 				requestId,
 				count: alerts.length,
-				total,
+				total: response.pagination.total,
 				userId: session.session.userId,
 			})
 
-			return c.json(result, 200)
+			return c.json(
+				{
+					data: response.data,
+					pagination: response.pagination,
+				},
+				200
+			)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Failed to get alerts', message, {
@@ -658,6 +683,59 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
 			logger.error('Failed to resolve alert', message, {
+				requestId,
+				alertId: c.req.param('id'),
+				error: message,
+				userId: session?.session.userId,
+			})
+
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+		}
+	})
+
+	// Dismiss alert
+	app.openapi(dismissAlertRoute, async (c) => {
+		const { monitor, logger } = c.get('services')
+		const session = c.get('session')
+		const requestId = c.get('requestId')
+
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+
+		try {
+			const { id } = c.req.valid('param')
+
+			// Acknowledge alert using enhanced alerting service
+			const result = await monitor.alert.dismissAlert(id, session.session.userId)
+
+			if (!alert) {
+				throw new ApiError({
+					code: 'NOT_FOUND',
+					message: 'Alert not found',
+				})
+			}
+
+			logger.info('Alert dismissed', {
+				requestId,
+				alertId: id,
+				userId: session.session.userId,
+			})
+
+			return c.json(result, 200)
+		} catch (error) {
+			if (error instanceof ApiError) {
+				throw error
+			}
+
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error('Failed to dismiss alert', message, {
 				requestId,
 				alertId: c.req.param('id'),
 				error: message,

@@ -94,8 +94,10 @@ export class AlertApiService {
 
 			// Add pagination parameters
 			if (request.pagination) {
-				apiParams.page = request.pagination.page
-				apiParams.pageSize = request.pagination.pageSize
+				const limit = request.pagination.pageSize
+				const offset = (request.pagination.page - 1) * request.pagination.pageSize
+				apiParams.limit = limit
+				apiParams.offset = offset
 			}
 
 			// Execute API call with retry logic
@@ -114,7 +116,7 @@ export class AlertApiService {
 	/**
 	 * Get a specific alert by ID
 	 */
-	async getAlert(id: string): Promise<AlertUI | null> {
+	async getAlert(id: string): Promise<Alert | null> {
 		try {
 			const response = await this.executeWithRetry(
 				() => this.metricsService.getAlert(id),
@@ -125,7 +127,7 @@ export class AlertApiService {
 				return null
 			}
 
-			return this.transformAlertToUI(response)
+			return response
 		} catch (error) {
 			if (this.isNotFoundError(error)) {
 				return null
@@ -172,19 +174,13 @@ export class AlertApiService {
 	 */
 	async acknowledgeAlert(request: AlertActionRequest): Promise<AlertActionResponse> {
 		try {
-			const acknowledgeRequest: AcknowledgeAlertRequest = {
-				acknowledgedBy: request.userId,
-				notes: request.notes,
-			}
-
 			const response = await this.executeWithRetry(
-				() => this.metricsService.acknowledgeAlert(request.alertId, acknowledgeRequest),
+				() => this.metricsService.acknowledgeAlert(request.alertId),
 				'acknowledgeAlert'
 			)
 
 			return {
-				success: true,
-				alert: this.transformAlertToUI(response),
+				success: response.success,
 				message: 'Alert acknowledged successfully',
 				timestamp: new Date(),
 			}
@@ -208,8 +204,7 @@ export class AlertApiService {
 			)
 
 			return {
-				success: true,
-				alert: this.transformAlertToUI(response),
+				success: response.success,
 				message: 'Alert resolved successfully',
 				timestamp: new Date(),
 			}
@@ -225,18 +220,12 @@ export class AlertApiService {
 		try {
 			// Use suppress functionality with default duration
 			const response = await this.executeWithRetry(
-				() =>
-					this.metricsService.suppressAlert(
-						request.alertId,
-						60, // 1 hour default suppression
-						request.notes || 'Alert dismissed by user'
-					),
+				() => this.metricsService.dismissAlert(request.alertId),
 				'dismissAlert'
 			)
 
 			return {
-				success: true,
-				alert: this.transformAlertToUI(response),
+				success: response.success,
 				message: 'Alert dismissed successfully',
 				timestamp: new Date(),
 			}
@@ -335,6 +324,7 @@ export class AlertApiService {
 		}
 
 		if (filters.dateRange) {
+			params.rangeBy = 'created_at'
 			params.startDate = filters.dateRange.start.toISOString()
 			params.endDate = filters.dateRange.end.toISOString()
 		}
@@ -353,13 +343,18 @@ export class AlertApiService {
 		response: PaginatedAlerts,
 		request: AlertListRequest
 	): AlertListResponse {
+		// TODO: The pagaination on UI and the server are incompatibles
+		const page = request.pagination?.page || 1
+		const pageSize = request.pagination?.pageSize || 10
+		const totalPages = Math.ceil(response.pagination.total / pageSize)
+
 		return {
-			alerts: response.alerts.map((alert) => this.transformAlertToUI(alert)),
+			alerts: response.data.map((alert) => this.transformAlertToUI(alert)),
 			pagination: {
-				page: response.pagination.page,
-				pageSize: response.pagination.pageSize,
+				page: page,
+				pageSize: pageSize,
 				total: response.pagination.total,
-				totalPages: response.pagination.totalPages,
+				totalPages: totalPages,
 			},
 			filters: {
 				applied: request.filters || {},
@@ -385,7 +380,7 @@ export class AlertApiService {
 			type: alert.type as any, // Type assertion for enum compatibility
 			status: alert.status as any, // Type assertion for enum compatibility
 			source: alert.source,
-			timestamp: new Date(alert.timestamp),
+			createdAt: new Date(alert.createdAt),
 			acknowledgedAt: alert.acknowledgedAt ? new Date(alert.acknowledgedAt) : undefined,
 			acknowledgedBy: alert.acknowledgedBy,
 			resolvedAt: alert.resolvedAt ? new Date(alert.resolvedAt) : undefined,
@@ -393,7 +388,6 @@ export class AlertApiService {
 			resolutionNotes: alert.resolutionNotes,
 			metadata: alert.metadata || {},
 			tags: alert.tags || [],
-			organizationId: alert.organizationId || 'default',
 			correlationId: alert.correlationId,
 		}
 	}
@@ -457,8 +451,8 @@ export class AlertApiService {
 			return new AlertApiServiceError(
 				message,
 				error.code || 'AUDIT_CLIENT_ERROR',
-				error,
-				error.requestId
+				error
+				//error.requestId
 			)
 		}
 

@@ -53,6 +53,7 @@ export function AlertDataTableExample({
 }: AlertDataTableExampleProps) {
 	const tableRef = React.useRef<any>(null)
 	const [selectedRows, setSelectedRows] = React.useState<Alert[]>([])
+	const [table, setTable] = React.useState<any>(null)
 
 	// Create columns with action handlers
 	const columns = React.useMemo(
@@ -73,25 +74,37 @@ export function AlertDataTableExample({
 		setSelectedRows(rows)
 	}
 
+	// Update table state when data changes or component mounts
+	React.useEffect(() => {
+		// Use a small delay to ensure the table ref is populated
+		const timer = setTimeout(() => {
+			if (tableRef.current?.getTable) {
+				setTable(tableRef.current.getTable())
+			}
+		}, 0)
+
+		return () => clearTimeout(timer)
+	}, [data, loading]) // Re-run when data or loading state changes
+
 	// Handle bulk actions
 	const handleBulkAcknowledge = () => {
 		if (selectedRows.length > 0 && onAcknowledgeAlert) {
 			selectedRows.forEach(onAcknowledgeAlert)
-			tableRef.current?.clearRowSelection()
+			tableRef.current?.clearRowSelection?.()
 		}
 	}
 
 	const handleBulkResolve = () => {
 		if (selectedRows.length > 0 && onResolveAlert) {
 			selectedRows.forEach(onResolveAlert)
-			tableRef.current?.clearRowSelection()
+			tableRef.current?.clearRowSelection?.()
 		}
 	}
 
 	const handleBulkDismiss = () => {
 		if (selectedRows.length > 0 && onDismissAlert) {
 			selectedRows.forEach(onDismissAlert)
-			tableRef.current?.clearRowSelection()
+			tableRef.current?.clearRowSelection?.()
 		}
 	}
 
@@ -99,7 +112,7 @@ export function AlertDataTableExample({
 		<div className="space-y-4">
 			{/* Toolbar */}
 			<AlertTableToolbar
-				table={tableRef.current?.getTable()}
+				table={table}
 				enableSearch={true}
 				enableFiltering={true}
 				enableViewOptions={true}
@@ -163,9 +176,9 @@ export function AlertDataTableExample({
 			/>
 
 			{/* Pagination */}
-			{tableRef.current?.getTable() && (
+			{table && (
 				<AlertPagination
-					table={tableRef.current.getTable()}
+					table={table}
 					enableUrlState={true}
 					showPageSizeSelector={true}
 					showPageInfo={true}

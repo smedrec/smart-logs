@@ -35,12 +35,12 @@ export enum AlertStatus {
 export interface AlertUI {
 	id: string
 	title: string
-	description: string
+	description?: string
 	severity: AlertSeverity
 	type: AlertType
 	status: AlertStatus
 	source: string
-	timestamp: Date
+	createdAt: Date
 	acknowledgedAt?: Date
 	acknowledgedBy?: string
 	resolvedAt?: Date
@@ -48,7 +48,6 @@ export interface AlertUI {
 	resolutionNotes?: string
 	metadata: Record<string, any>
 	tags: string[]
-	organizationId: string
 	correlationId?: string
 }
 

@@ -27,6 +27,7 @@ import type {
 } from './compliance'
 import type {
 	Alert,
+	AlertActionResponse,
 	AuditMetrics,
 	PaginatedAlerts,
 	PerformanceMetrics,

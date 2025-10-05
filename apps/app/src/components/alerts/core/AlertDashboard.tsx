@@ -2,17 +2,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { authStateCollection } from '@/lib/auth-client'
-import { recentAlertsCollection } from '@/lib/collections'
 import { cn } from '@/lib/utils'
-import { useLiveQuery } from '@tanstack/react-db'
 import { BarChart3, Filter, LayoutGrid, List, RefreshCw, Settings } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { AlertStatistics } from '../data/AlertStatistics'
 import { ALERT_SHORTCUTS, useAlertKeyboardNavigation } from '../hooks/use-alert-keyboard-navigation'
-import { useAlertStatistics } from '../hooks/use-alert-queries'
 import { useAlertDashboardLayout, useAlertTouchFriendly } from '../hooks/use-alert-responsive'
 import { AlertResponsiveContainer, AlertResponsiveGrid } from '../layout/alert-responsive-container'
 import AlertKeyboardShortcutsDialog from '../navigation/alert-keyboard-shortcuts-dialog'
@@ -25,6 +21,14 @@ import type { Alert } from '@/lib/collections'
 import type { AlertStatistics as AlertStatisticsType } from '@smedrec/audit-client'
 
 export interface AlertDashboardProps {
+	/** Alerts */
+	alerts: Alert[]
+	/** Alert statistics data */
+	statistics?: AlertStatisticsType
+	/** isLoading */
+	loading?: boolean
+	/** Error status */
+	error?: string
 	/** Initial filters to apply to the dashboard */
 	initialFilters?: AlertFilters
 	/** Initial view mode for the dashboard */
@@ -42,6 +46,10 @@ export interface AlertDashboardProps {
  * Provides navigation, view switching, and responsive grid layout
  */
 export function AlertDashboard({
+	alerts,
+	statistics,
+	loading = false,
+	error,
 	initialFilters,
 	view = 'list',
 	onViewChange,
@@ -49,15 +57,8 @@ export function AlertDashboard({
 	children,
 }: AlertDashboardProps) {
 	const [currentView, setCurrentView] = useState<'list' | 'board' | 'statistics'>(view)
-	const [isRefreshing, setIsRefreshing] = useState(false)
 	const [showShortcuts, setShowShortcuts] = useState(false)
-
-	const activeOrganizationId = authStateCollection.get('auth')?.session.activeOrganizationId
-	const alertsCollection = recentAlertsCollection(activeOrganizationId)
-	const { data: statistics } = useAlertStatistics(activeOrganizationId)
-	const { data: alerts, isLoading } = useLiveQuery((q) =>
-		q.from({ alert: alertsCollection }).orderBy(({ alert }) => alert.created_at, 'desc')
-	)
+	const [filters, setFilters] = useState<AlertFilters>(initialFilters ?? {})
 
 	// Responsive layout hooks
 	const { headerLayout, actionButtonsLayout, spacing, isMobile, isTablet } =
@@ -68,12 +69,6 @@ export function AlertDashboard({
 	const handleViewChange = (newView: 'list' | 'board' | 'statistics') => {
 		setCurrentView(newView)
 		onViewChange?.(newView)
-	}
-
-	const handleRefresh = async () => {
-		setIsRefreshing(true)
-		// Refresh logic will be implemented when API integration is added
-		setTimeout(() => setIsRefreshing(false), 1000)
 	}
 
 	const handleSearchFocus = () => {
@@ -96,10 +91,6 @@ export function AlertDashboard({
 
 	// Keyboard shortcuts for the dashboard
 	const shortcuts = [
-		{
-			...ALERT_SHORTCUTS.REFRESH_ALERTS,
-			action: handleRefresh,
-		},
 		{
 			...ALERT_SHORTCUTS.SEARCH_ALERTS,
 			action: handleSearchFocus,
@@ -176,23 +167,6 @@ export function AlertDashboard({
 							actionButtonsLayout === 'full' && 'space-x-2'
 						)}
 					>
-						<Button
-							variant="outline"
-							size={isMobile ? 'sm' : 'sm'}
-							onClick={handleRefresh}
-							disabled={isRefreshing}
-							className={cn(
-								'flex items-center space-x-2',
-								getTouchTargetSize('md'),
-								getAlertButtonTouchClasses()
-							)}
-							aria-label={`Refresh alerts${isRefreshing ? ' (refreshing...)' : ''}`}
-							title="Ctrl+R to refresh"
-						>
-							<RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
-							{actionButtonsLayout === 'full' && <span className="hidden sm:inline">Refresh</span>}
-						</Button>
-
 						<Button
 							variant="outline"
 							size={isMobile ? 'sm' : 'sm'}
@@ -319,28 +293,21 @@ export function AlertDashboard({
 						>
 							<AlertSkipTarget id="alert-list">
 								<Card>
-									<CardHeader>
-										<CardTitle className="flex items-center justify-between">
-											<span>Alert List</span>
-											<Badge variant="outline" aria-label="Total of 40 alerts">
-												{alerts.length} alerts
-											</Badge>
-										</CardTitle>
-									</CardHeader>
 									<CardContent>
 										{/* AlertList component will be rendered here */}
 										<div className="text-center py-8 text-muted-foreground">
-											{/*<AlertList
+											<AlertList
 												alerts={alerts}
-												filters={undefined}
+												filters={filters}
+												loading={loading}
+												error={error}
 												onFilterChange={function (filters: AlertFilters): void {
 													throw new Error('Function not implemented.')
 												}}
 												onAlertSelect={function (alert: Alert): void {
 													throw new Error('Function not implemented.')
 												}}
-											/>*/}
-											Alert list component will be implemented in the next subtask
+											/>
 										</div>
 									</CardContent>
 								</Card>

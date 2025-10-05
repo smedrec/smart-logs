@@ -24,7 +24,7 @@ import {
 import { Search, X } from 'lucide-react'
 import * as React from 'react'
 
-import type { Alert } from '@/lib/types/alert'
+import type { Alert } from '@/lib/collections'
 import type {
 	ColumnDef,
 	ColumnFiltersState,

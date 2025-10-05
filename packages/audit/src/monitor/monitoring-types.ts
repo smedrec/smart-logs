@@ -89,7 +89,7 @@ export interface Alert {
 	type: AlertType
 	title: string
 	description: string
-	timestamp: string
+	createdAt: string
 	source: string
 	status: AlertStatus
 	metadata: Record<string, any>
@@ -99,6 +99,7 @@ export interface Alert {
 	resolved: boolean
 	resolvedAt?: string
 	resolvedBy?: string
+	resolutionNotes?: string
 	correlationId?: string
 	tags: string[]
 }

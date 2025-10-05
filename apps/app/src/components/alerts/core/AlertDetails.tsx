@@ -54,7 +54,7 @@ interface AlertHistoryEntry {
 	id: string
 	action: string
 	user: string
-	timestamp: Date
+	createdAt: string
 	notes?: string
 }
 
@@ -157,7 +157,7 @@ export function AlertDetails({
 		}
 	}
 
-	const formatTimestamp = (timestamp: Date) => {
+	const formatTimestamp = (date: string) => {
 		return new Intl.DateTimeFormat('en-US', {
 			weekday: 'long',
 			year: 'numeric',
@@ -167,12 +167,12 @@ export function AlertDetails({
 			minute: '2-digit',
 			second: '2-digit',
 			timeZoneName: 'short',
-		}).format(new Date(timestamp))
+		}).format(new Date(date))
 	}
 
-	const formatRelativeTime = (timestamp: Date) => {
+	const formatRelativeTime = (date: string) => {
 		const now = new Date()
-		const alertTime = new Date(timestamp)
+		const alertTime = new Date(date)
 		const diffInMinutes = Math.floor((now.getTime() - alertTime.getTime()) / (1000 * 60))
 
 		if (diffInMinutes < 1) return 'Just now'
@@ -327,11 +327,11 @@ export function AlertDetails({
 															{entry.action} by {entry.user}
 														</p>
 														<p className="text-xs text-muted-foreground">
-															{formatRelativeTime(entry.timestamp)}
+															{formatRelativeTime(entry.createdAt)}
 														</p>
 													</div>
 													<p className="text-xs text-muted-foreground">
-														{formatTimestamp(entry.timestamp)}
+														{formatTimestamp(entry.createdAt)}
 													</p>
 													{entry.notes && (
 														<p className="text-sm text-muted-foreground mt-1">
@@ -411,7 +411,9 @@ export function AlertDetails({
 									<Calendar className="h-4 w-4 text-muted-foreground" />
 									<div>
 										<p className="text-sm font-medium">Created</p>
-										<p className="text-xs text-muted-foreground">{alert.created_at}</p>
+										<p className="text-xs text-muted-foreground">
+											{formatTimestamp(alert.created_at)}
+										</p>
 									</div>
 								</div>
 
@@ -443,7 +445,9 @@ export function AlertDetails({
 											<div>
 												<p className="text-sm font-medium">Acknowledged By</p>
 												<p className="text-xs text-muted-foreground">{alert.acknowledged_by}</p>
-												<p className="text-xs text-muted-foreground">{alert.acknowledged_at}</p>
+												<p className="text-xs text-muted-foreground">
+													{formatTimestamp(alert.acknowledged_at!)}
+												</p>
 											</div>
 										</div>
 									</>
@@ -457,7 +461,9 @@ export function AlertDetails({
 											<div>
 												<p className="text-sm font-medium">Resolved By</p>
 												<p className="text-xs text-muted-foreground">{alert.resolved_by}</p>
-												<p className="text-xs text-muted-foreground">{alert.resolved_at}</p>
+												<p className="text-xs text-muted-foreground">
+													{formatTimestamp(alert.resolved_at!)}
+												</p>
 											</div>
 										</div>
 									</>

@@ -22,7 +22,7 @@ import type { Table } from '@tanstack/react-table'
 
 export interface AlertTableToolbarProps<TData> {
 	/** TanStack Table instance */
-	table: Table<TData>
+	table: Table<TData> | null
 	/** Enable search functionality */
 	enableSearch?: boolean
 	/** Enable filtering */
@@ -108,20 +108,22 @@ export function AlertTableToolbar<TData>({
 }: AlertTableToolbarProps<TData>) {
 	const [searchValue, setSearchValue] = React.useState('')
 
-	const isFiltered = table.getState().columnFilters.length > 0 || searchValue.length > 0
+	const isFiltered = table
+		? table.getState().columnFilters.length > 0 || searchValue.length > 0
+		: false
 
 	// Handle search input change
 	const handleSearchChange = (value: string) => {
 		setSearchValue(value)
-		table.setGlobalFilter(value)
+		table?.setGlobalFilter(value)
 		onSearchChange?.(value)
 	}
 
 	// Handle filter reset
 	const handleResetFilters = () => {
-		table.resetColumnFilters()
+		table?.resetColumnFilters()
 		setSearchValue('')
-		table.setGlobalFilter('')
+		table?.setGlobalFilter('')
 		onSearchChange?.('')
 	}
 
@@ -145,6 +147,40 @@ export function AlertTableToolbar<TData>({
 	const statusOptions = filterOptions?.status || defaultStatusOptions
 	const sourceOptions = filterOptions?.source || []
 
+	// Show limited functionality when table is not available
+	if (!table) {
+		return (
+			<div className={cn('flex items-center justify-between', className)}>
+				<div className="flex flex-1 items-center space-x-2">
+					{enableSearch && (
+						<div className="relative">
+							<Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+							<Input
+								placeholder={searchPlaceholder}
+								disabled
+								className="h-8 w-[150px] lg:w-[250px] pl-8"
+							/>
+						</div>
+					)}
+				</div>
+				<div className="flex items-center space-x-2">
+					{enableRefresh && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={onRefresh}
+							disabled={loading}
+							className="h-8"
+						>
+							<RefreshCw className={cn('mr-2 h-4 w-4', loading && 'animate-spin')} />
+							Refresh
+						</Button>
+					)}
+				</div>
+			</div>
+		)
+	}
+
 	return (
 		<div className={cn('flex items-center justify-between', className)}>
 			<div className="flex flex-1 items-center space-x-2">
@@ -162,7 +198,7 @@ export function AlertTableToolbar<TData>({
 				)}
 
 				{/* Filters */}
-				{enableFiltering && (
+				{enableFiltering && table && (
 					<>
 						{table.getColumn('severity') && (
 							<DataTableFacetedFilter
@@ -268,7 +304,7 @@ export function AlertTableToolbar<TData>({
 				)}
 
 				{/* View options */}
-				{enableViewOptions && <DataTableViewOptions table={table} />}
+				{enableViewOptions && table && <DataTableViewOptions table={table} />}
 
 				{/* More options */}
 				<DropdownMenu>
@@ -285,7 +321,7 @@ export function AlertTableToolbar<TData>({
 							<Filter className="mr-2 h-4 w-4" />
 							Clear Filters
 						</DropdownMenuItem>
-						<DropdownMenuItem onClick={() => table.resetColumnVisibility()}>
+						<DropdownMenuItem onClick={() => table?.resetColumnVisibility()}>
 							<Settings className="mr-2 h-4 w-4" />
 							Reset Columns
 						</DropdownMenuItem>
@@ -339,23 +375,50 @@ export function CompactAlertTableToolbar<TData>({
 	loading,
 	className,
 }: {
-	table: Table<TData>
+	table: Table<TData> | null
 	onRefresh?: () => void
 	loading?: boolean
 	className?: string
 }) {
 	const [searchValue, setSearchValue] = React.useState('')
-	const isFiltered = table.getState().columnFilters.length > 0 || searchValue.length > 0
+	const isFiltered = table
+		? table.getState().columnFilters.length > 0 || searchValue.length > 0
+		: false
 
 	const handleSearchChange = (value: string) => {
 		setSearchValue(value)
-		table.setGlobalFilter(value)
+		table?.setGlobalFilter(value)
 	}
 
 	const handleResetFilters = () => {
-		table.resetColumnFilters()
+		table?.resetColumnFilters()
 		setSearchValue('')
-		table.setGlobalFilter('')
+		table?.setGlobalFilter('')
+	}
+
+	// Show limited functionality when table is not available
+	if (!table) {
+		return (
+			<div className={cn('flex items-center justify-between space-x-2', className)}>
+				<div className="flex flex-1 items-center space-x-2">
+					<div className="relative">
+						<Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+						<Input placeholder="Search..." disabled className="h-8 w-full pl-8" />
+					</div>
+				</div>
+				{onRefresh && (
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={onRefresh}
+						disabled={loading}
+						className="h-8 w-8 p-0"
+					>
+						<RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+					</Button>
+				)}
+			</div>
+		)
 	}
 
 	return (

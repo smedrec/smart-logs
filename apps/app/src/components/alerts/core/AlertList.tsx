@@ -270,13 +270,25 @@ export function AlertList({
 		}
 	}
 
-	const formatTimestamp = (timestamp: Date) => {
+	const formatTimestamp = (date: string) => {
 		return new Intl.DateTimeFormat('en-US', {
 			month: 'short',
 			day: 'numeric',
 			hour: '2-digit',
 			minute: '2-digit',
-		}).format(new Date(timestamp))
+		}).format(new Date(date))
+	}
+
+	const formatRelativeTime = (date: string) => {
+		const now = new Date()
+		const alertTime = new Date(date)
+		const diffInMinutes = Math.floor((now.getTime() - alertTime.getTime()) / (1000 * 60))
+
+		if (diffInMinutes < 1) return 'Just now'
+		if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`
+		if (diffInMinutes < 1440)
+			return `${Math.floor(diffInMinutes / 60)} hour${Math.floor(diffInMinutes / 60) !== 1 ? 's' : ''} ago`
+		return `${Math.floor(diffInMinutes / 1440)} day${Math.floor(diffInMinutes / 1440) !== 1 ? 's' : ''} ago`
 	}
 
 	// Loading skeleton
@@ -385,7 +397,7 @@ export function AlertList({
 										<div className="flex-1 min-w-0">
 											<h4 className="text-sm font-medium truncate">{alert.title}</h4>
 											<p className="text-xs text-muted-foreground mt-1">
-												{alert.source} • {alert.created_at}
+												{alert.source} • {formatRelativeTime(alert.created_at)}
 											</p>
 										</div>
 
@@ -439,13 +451,14 @@ export function AlertList({
 										>
 											{alert.acknowledged_by && (
 												<p className="text-xs text-muted-foreground">
-													Acknowledged by {alert.acknowledged_by} on {alert.acknowledged_at}
+													Acknowledged by {alert.acknowledged_by} on{' '}
+													{formatTimestamp(alert.acknowledged_at!)}
 												</p>
 											)}
 											{alert.resolved_by && (
 												<div className="space-y-1">
 													<p className="text-xs text-muted-foreground">
-														Resolved by {alert.resolved_by} on {alert.resolved_at}
+														Resolved by {alert.resolved_by} on {formatTimestamp(alert.resolved_at!)}
 													</p>
 													{alert.resolutionNotes && (
 														<p className="text-xs text-muted-foreground">
@@ -502,9 +515,12 @@ export function AlertList({
 				aria-label="Alert list controls"
 			>
 				<div className="flex items-center space-x-2">
-					<span className="text-sm text-muted-foreground">
+					<Badge
+						variant="outline"
+						aria-label={`Total of ${sortedAlerts.length} alert${sortedAlerts.length !== 1 ? 's' : ''}`}
+					>
 						{sortedAlerts.length} alert{sortedAlerts.length !== 1 ? 's' : ''}
-					</span>
+					</Badge>
 				</div>
 
 				<div className="flex items-center space-x-2">

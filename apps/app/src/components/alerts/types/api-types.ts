@@ -3,7 +3,7 @@
  */
 
 import type { Alert } from '@/lib/collections'
-import type { AlertAction, AlertBulkAction } from './alert-types'
+import type { AlertAction, AlertBulkAction, AlertUI } from './alert-types'
 import type { AlertFilters, AlertPagination, AlertSort } from './filter-types'
 
 // API request types
@@ -28,7 +28,7 @@ export interface AlertBulkActionRequest {
 
 // API response types
 export interface AlertListResponse {
-	alerts: Alert[]
+	alerts: AlertUI[]
 	pagination: {
 		page: number
 		pageSize: number
@@ -48,7 +48,6 @@ export interface AlertListResponse {
 
 export interface AlertActionResponse {
 	success: boolean
-	alert: Alert
 	message?: string
 	timestamp: Date
 }

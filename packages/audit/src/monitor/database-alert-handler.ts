@@ -118,16 +118,16 @@ export class DatabaseAlertHandler implements AlertHandler {
 					${alert.status || 'active'},
 					${alert.correlationId || null},
 					${JSON.stringify(alert.metadata)},
-					${alert.acknowledged ? 'true' : 'false'},
-					${alert.acknowledgedAt || null},
-					${alert.acknowledgedBy || null},
 					${alert.resolved ? 'true' : 'false'},
 					${alert.resolvedAt || null},
 					${alert.resolvedBy || null},
+					${alert.acknowledged ? 'true' : 'false'},
+					${alert.acknowledgedAt || null},
+					${alert.acknowledgedBy || null},
 					${null},
 					${JSON.stringify(alert.tags || [])},
-					${alert.timestamp},
-					${alert.timestamp}
+					${alert.createdAt},
+					${alert.createdAt}
 				)
 			`)
 		} catch (error) {
@@ -518,21 +518,22 @@ export class DatabaseAlertHandler implements AlertHandler {
 			type: dbAlert.type as AlertType,
 			title: dbAlert.title,
 			description: dbAlert.description,
-			timestamp: dbAlert.created_at,
+			createdAt: dbAlert.created_at,
 			source: dbAlert.source,
 			status: dbAlert.status as AlertStatus,
-			metadata: {
-				...(typeof dbAlert.metadata === 'string' ? JSON.parse(dbAlert.metadata) : dbAlert.metadata),
-				organizationId: dbAlert.organization_id,
-			},
 			acknowledged: dbAlert.acknowledged === 'true',
 			acknowledgedAt: dbAlert.acknowledged_at || undefined,
 			acknowledgedBy: dbAlert.acknowledged_by || undefined,
 			resolved: dbAlert.resolved === 'true',
 			resolvedAt: dbAlert.resolved_at || undefined,
 			resolvedBy: dbAlert.resolved_by || undefined,
+			resolutionNotes: dbAlert.resolution_notes || undefined,
 			correlationId: dbAlert.correlation_id || undefined,
 			tags: dbAlert.tags || undefined,
+			metadata: {
+				...(typeof dbAlert.metadata === 'string' ? JSON.parse(dbAlert.metadata) : dbAlert.metadata),
+				organizationId: dbAlert.organization_id,
+			},
 		}
 	}
 }

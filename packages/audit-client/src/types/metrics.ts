@@ -455,6 +455,15 @@ export const AlertTypeSchema = z.enum([
 export type AlertType = z.infer<typeof AlertTypeSchema>
 
 /**
+ * Alert action response
+ */
+export const AlertActionResponseSchema = z.object({
+	success: z.boolean(),
+	message: z.string().optional(),
+})
+export type AlertActionResponse = z.infer<typeof AlertActionResponseSchema>
+
+/**
  * Alert category
  */
 export const AlertCategorySchema = z.enum([
@@ -491,34 +500,25 @@ export const AlertSchema = z.object({
 	description: z.string().optional(),
 	severity: AlertSeveritySchema,
 	status: AlertStatusSchema,
-	category: AlertCategorySchema,
-
-	// Alert details
-	condition: AlertConditionSchema,
-	currentValue: z.number().optional(),
-	threshold: z.number(),
+	type: AlertTypeSchema,
+	source: z.string(),
 
 	// Timing
-	triggeredAt: z.string().datetime(),
+	createdAt: z.string().datetime(),
 	acknowledgedAt: z.string().datetime().optional(),
 	resolvedAt: z.string().datetime().optional(),
-	lastUpdated: z.string().datetime(),
 
 	// Assignment and tracking
-	assignedTo: z.string().optional(),
+	acknowledged: z.boolean(),
 	acknowledgedBy: z.string().optional(),
+	resolved: z.boolean(),
 	resolvedBy: z.string().optional(),
-	resolution: z.string().optional(),
+	resolutionNotes: z.string().optional(),
 
 	// Metadata
+	correlationId: z.string().optional(),
 	tags: z.array(z.string()).default([]),
-	metadata: z.record(z.unknown()).optional(),
-	relatedAlerts: z.array(z.string().uuid()).optional(),
-
-	// Notification settings
-	notificationsSent: z.number().int().min(0).default(0),
-	lastNotificationSent: z.string().datetime().optional(),
-	suppressNotifications: z.boolean().default(false),
+	metadata: z.record(z.string(), z.any()).optional(),
 })
 export type Alert = z.infer<typeof AlertSchema>
 
@@ -528,24 +528,17 @@ export type Alert = z.infer<typeof AlertSchema>
 export const AlertsParamsSchema = z.object({
 	status: z.array(AlertStatusSchema).optional(),
 	severity: z.array(AlertSeveritySchema).optional(),
-	category: z.array(AlertCategorySchema).optional(),
-	assignedTo: z.array(z.string()).optional(),
+	type: z.array(AlertTypeSchema).optional(),
+	source: z.array(z.string()).optional(),
 	tags: z.array(z.string()).optional(),
-	dateRange: z
-		.object({
-			field: z.enum(['triggeredAt', 'acknowledgedAt', 'resolvedAt', 'lastUpdated']),
-			startDate: z.string().datetime(),
-			endDate: z.string().datetime(),
-		})
-		.optional(),
+	rangeBy: z.enum(['created_at', 'acknowledged_at', 'resolved_at', 'updated_at']).optional(),
+	startDate: z.string().datetime().optional(),
+	endDate: z.string().datetime().optional(),
 	search: z.string().optional(),
-	pagination: PaginationParamsSchema.optional(),
-	sort: z
-		.object({
-			field: z.enum(['triggeredAt', 'severity', 'status', 'title']),
-			direction: z.enum(['asc', 'desc']).default('desc'),
-		})
-		.optional(),
+	limit: z.number().int().min(1).max(1000).optional(),
+	offset: z.number().int().min(0).optional(),
+	sortBy: z.enum(['created_at', 'severity', 'status', 'title']).optional(),
+	sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 })
 export type AlertsParams = z.infer<typeof AlertsParamsSchema>
 
@@ -553,7 +546,7 @@ export type AlertsParams = z.infer<typeof AlertsParamsSchema>
  * Paginated alerts
  */
 export const PaginatedAlertsSchema = z.object({
-	alerts: z.array(AlertSchema),
+	data: z.array(AlertSchema),
 	pagination: PaginationMetadataSchema,
 	summary: z
 		.object({

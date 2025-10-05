@@ -156,7 +156,7 @@ export function performanceMonitoring(options: { threshold?: number; alertOnSlow
 					type: 'PERFORMANCE',
 					title: 'Slow API Request',
 					description: `Request to ${c.req.method} ${c.req.path} took ${duration.toFixed(2)}ms`,
-					timestamp: new Date().toISOString(),
+					createdAt: new Date().toISOString(),
 					source: 'performance-monitor',
 					status: 'active',
 					metadata: {

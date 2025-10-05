@@ -9,7 +9,7 @@ import {
 	SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { useRouter, useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import * as React from 'react'
 
@@ -17,7 +17,7 @@ import type { Table } from '@tanstack/react-table'
 
 export interface AlertPaginationProps<TData> {
 	/** TanStack Table instance */
-	table: Table<TData>
+	table: Table<TData> | null
 	/** Enable URL state management */
 	enableUrlState?: boolean
 	/** Custom page size options */
@@ -74,8 +74,38 @@ export function AlertPagination<TData>({
 		goToLastPage: 'Go to last page',
 	},
 }: AlertPaginationProps<TData>) {
-	const router = useRouter()
-	const searchParams = useSearch()
+	const navigate = useNavigate()
+	const searchParams = useSearch({ strict: false })
+
+	// Handle null table
+	if (!table) {
+		return (
+			<div className={cn('flex items-center justify-between px-2', className)}>
+				<div className="flex-1 text-sm text-muted-foreground">Loading pagination...</div>
+				<div className="flex items-center space-x-6 lg:space-x-8">
+					<div className="flex items-center space-x-2">
+						<p className="text-sm font-medium">{labels.rowsPerPage}</p>
+						<Select disabled>
+							<SelectTrigger className="h-8 w-[70px]">
+								<SelectValue placeholder="25" />
+							</SelectTrigger>
+						</Select>
+					</div>
+					<div className="flex w-[100px] items-center justify-center text-sm font-medium">
+						<span>Page 1 of 1</span>
+					</div>
+					<div className="flex items-center space-x-2">
+						<Button variant="outline" size="icon" className="size-8" disabled>
+							<ChevronLeft className="h-4 w-4" />
+						</Button>
+						<Button variant="outline" size="icon" className="size-8" disabled>
+							<ChevronRight className="h-4 w-4" />
+						</Button>
+					</div>
+				</div>
+			</div>
+		)
+	}
 
 	const pagination = table.getState().pagination
 	const { pageIndex, pageSize } = pagination
@@ -88,28 +118,30 @@ export function AlertPagination<TData>({
 		(newPageIndex?: number, newPageSize?: number) => {
 			if (!enableUrlState) return
 
-			const params = new URLSearchParams(searchParams.toString())
+			const newSearch: Record<string, any> = { ...searchParams }
 
 			if (newPageIndex !== undefined) {
 				if (newPageIndex === 0) {
-					params.delete('page')
+					delete newSearch.page
 				} else {
-					params.set('page', (newPageIndex + 1).toString())
+					newSearch.page = newPageIndex + 1
 				}
 			}
 
 			if (newPageSize !== undefined) {
 				if (newPageSize === 25) {
-					params.delete('pageSize')
+					delete newSearch.pageSize
 				} else {
-					params.set('pageSize', newPageSize.toString())
+					newSearch.pageSize = newPageSize
 				}
 			}
 
-			const newUrl = params.toString() ? `?${params.toString()}` : ''
-			router.push(newUrl, { scroll: false })
+			navigate({
+				search: newSearch as any,
+				replace: true, // Use replace to avoid cluttering browser history
+			})
 		},
-		[enableUrlState, router, searchParams]
+		[enableUrlState, navigate, searchParams]
 	)
 
 	// Handle page size change
@@ -130,25 +162,21 @@ export function AlertPagination<TData>({
 	React.useEffect(() => {
 		if (!enableUrlState) return
 
-		const urlPage = searchParams.get('page')
-		const urlPageSize = searchParams.get('pageSize')
+		const urlPage = searchParams.page ? Number(searchParams.page) - 1 : 0 // Convert to 0-based index
+		const urlPageSize = searchParams.pageSize ? Number(searchParams.pageSize) : 25
 
-		if (urlPage) {
-			const pageIndex = Math.max(0, parseInt(urlPage) - 1)
-			if (pageIndex !== pagination.pageIndex && pageIndex < pageCount) {
-				table.setPageIndex(pageIndex)
-			}
+		// Update table state if URL params differ from current state
+		if (urlPage !== pagination.pageIndex && urlPage >= 0 && urlPage < pageCount) {
+			table.setPageIndex(urlPage)
 		}
 
-		if (urlPageSize) {
-			const pageSize = parseInt(urlPageSize)
-			if (pageSizeOptions.includes(pageSize) && pageSize !== pagination.pageSize) {
-				table.setPageSize(pageSize)
-			}
+		if (pageSizeOptions.includes(urlPageSize) && urlPageSize !== pagination.pageSize) {
+			table.setPageSize(urlPageSize)
 		}
 	}, [
 		enableUrlState,
-		searchParams,
+		searchParams.page,
+		searchParams.pageSize,
 		table,
 		pagination.pageIndex,
 		pagination.pageSize,
@@ -280,7 +308,7 @@ export function SimpleAlertPagination<TData>({
 	table,
 	className,
 }: {
-	table: Table<TData>
+	table: Table<TData> | null
 	className?: string
 }) {
 	return (
@@ -302,9 +330,25 @@ export function CompactAlertPagination<TData>({
 	table,
 	className,
 }: {
-	table: Table<TData>
+	table: Table<TData> | null
 	className?: string
 }) {
+	if (!table) {
+		return (
+			<div className={cn('flex items-center justify-between px-2', className)}>
+				<div className="text-sm text-muted-foreground">Loading...</div>
+				<div className="flex items-center space-x-2">
+					<Button variant="outline" size="sm" disabled>
+						Previous
+					</Button>
+					<Button variant="outline" size="sm" disabled>
+						Next
+					</Button>
+				</div>
+			</div>
+		)
+	}
+
 	const pagination = table.getState().pagination
 	const { pageIndex } = pagination
 	const pageCount = table.getPageCount()
