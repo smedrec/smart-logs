@@ -10,7 +10,19 @@
 - [compliance.ts](file://apps/server/src/routers/compliance.ts)
 - [compliance.test.ts](file://packages/audit-sdk/src/__tests__/compliance.test.ts)
 - [gdpr-integration.test.ts](file://packages/audit-db/src/__tests__/gdpr-integration.test.ts)
+- [report-configuration-form.tsx](file://apps/app/src/components/compliance/forms/report-configuration-form.tsx) - *Updated in recent commit*
+- [report-templates-page.tsx](file://apps/app/src/components/compliance/templates/report-templates-page.tsx) - *Updated in recent commit*
+- [execution-history-page.tsx](file://apps/app/src/components/compliance/execution/execution-history-page.tsx) - *Updated in recent commit*
+- [report-details-page.tsx](file://apps/app/src/components/compliance/reports/report-details-page.tsx) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+- Added documentation for new report types: GENERAL_COMPLIANCE and CUSTOM_REPORT
+- Updated report configuration form documentation to reflect new report type options
+- Enhanced report templates page documentation with new report type categories
+- Added execution history and report details page updates for new report types
+- Updated scheduled reporting system section with new report type support
+- Maintained consistency with existing GDPR compliance workflows and data subject rights handling
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -327,6 +339,22 @@ MoreReports --> |No| Wait
 
 **Section sources**
 - [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L0-L200)
+
+### New Report Types Support
+The system now supports additional report types to accommodate various compliance needs:
+
+**Available Report Types**
+- **HIPAA_AUDIT_TRAIL**: HIPAA-specific audit trail reports
+- **GDPR_PROCESSING_ACTIVITIES**: GDPR-specific data processing reports
+- **GENERAL_COMPLIANCE**: General compliance reports for standard requirements
+- **CUSTOM_REPORT**: Custom reports for specific organizational needs
+- **INTEGRITY_VERIFICATION**: Data integrity verification reports
+
+These report types are now available in the report configuration form and templates page, allowing users to select the appropriate report type based on their compliance requirements.
+
+**Section sources**
+- [report-configuration-form.tsx](file://apps/app/src/components/compliance/forms/report-configuration-form.tsx#L81-L573)
+- [report-templates-page.tsx](file://apps/app/src/components/compliance/templates/report-templates-page.tsx#L82-L936)
 
 ## Common Compliance Issues
 

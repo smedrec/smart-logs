@@ -2,14 +2,26 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [main.tsx](file://apps/web/src/main.tsx)
-- [route.tsx](file://apps/web/src/routes/dashboard/route.tsx)
-- [trpc.ts](file://apps/web/src/utils/trpc.ts)
-- [index.ts](file://apps/server/src/routers/index.ts)
-- [events.ts](file://apps/server/src/routers/events.ts)
-- [event-calendar.tsx](file://apps/web/src/components/event-calendar/event-calendar.tsx)
-- [use-event.ts](file://apps/web/src/hooks/use-event.ts)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx) - *Updated in recent commit*
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx) - *Updated in recent commit*
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx) - *Updated in recent commit*
+- [AlertColumns.tsx](file://apps\app\src\components\alerts\data\AlertColumns.tsx) - *Updated in recent commit*
+- [AlertStatistics.tsx](file://apps\app\src\components\alerts\data\AlertStatistics.tsx) - *Updated in recent commit*
+- [use-alert-queries.ts](file://apps\app\src\components\alerts\hooks\use-alert-queries.ts) - *Updated in recent commit*
+- [alert-api.ts](file://apps\app\src\lib\services\alert-api.ts) - *Updated in recent commit*
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts) - *Updated in recent commit*
+- [api-types.ts](file://apps\app\src\components\alerts\types\api-types.ts) - *Updated in recent commit*
+- [collections.ts](file://apps\app\src\lib\collections.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated alert management components to reflect recent changes in functionality and architecture
+- Added documentation for new features including real-time queries, keyboard navigation, and advanced alert interactions
+- Enhanced component descriptions for AlertDashboard, AlertCard, and AlertList with detailed implementation details
+- Updated data flow documentation to reflect integration with real-time queries and tRPC
+- Added new sections for AlertStatistics component and keyboard navigation system
+- Revised architecture diagrams to reflect updated component relationships
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -189,54 +201,232 @@ end
 **Section sources**
 - [route.tsx](file://apps/web/src/routes/dashboard/route.tsx#L1-L52)
 
-### Event Calendar Component
-The event calendar component provides a flexible interface for viewing audit events across different time periods. It uses a state management pattern with Zustand to manage the current view mode and date.
+### Alert Dashboard Component
+The AlertDashboard component provides a comprehensive interface for managing system alerts with multiple view modes and responsive design. It integrates keyboard navigation, real-time queries, and advanced filtering capabilities.
 
 ```mermaid
 classDiagram
-class EventCalendar {
-+events : Events[]
-+initialDate : Date
--viewMode : string
--currentView : string
--daysCount : number
-+renderCalendarView() : ReactNode
+class AlertDashboard {
++alerts : Alert[]
++statistics : AlertStatistics
++loading : boolean
++error : string
++initialFilters : AlertFilters
++view : 'list' | 'board' | 'statistics'
++onViewChange : function
++className : string
++children : ReactNode
 }
-class EventCalendarDay {
-+events : Events[]
-+currentDate : Date
+class AlertDashboardProps {
++alerts : Alert[]
++statistics : AlertStatistics
++loading : boolean
++error : string
++initialFilters : AlertFilters
++view : 'list' | 'board' | 'statistics'
++onViewChange : function
++className : string
++children : ReactNode
 }
-class EventCalendarWeek {
-+events : Events[]
-+currentDate : Date
+class AlertCard {
++alert : Alert
++onAlertClick : function
++onAlertAction : function
++compact : boolean
++showActions : boolean
++className : string
++draggable : boolean
 }
-class EventCalendarMonth {
-+events : Events[]
-+baseDate : Date
+class AlertList {
++alerts : Alert[]
++filters : AlertFilters
++onFilterChange : function
++onAlertSelect : function
++alertFocusedId : string
++loading : boolean
++error : string
++className : string
++virtualScrolling : boolean
++maxHeight : string
 }
-class EventCalendarYear {
-+events : Events[]
-+currentDate : Date
+class AlertStatistics {
++statistics : AlertStatistics
++alerts : Alert[]
++onRefresh : function
++onExport : function
++loading : boolean
++className : string
 }
-class EventsList {
-+events : Events[]
-+currentDate : Date
-}
-EventCalendar --> EventCalendarDay : "renders when currentView is 'day'"
-EventCalendar --> EventCalendarWeek : "renders when currentView is 'week'"
-EventCalendar --> EventCalendarMonth : "renders when currentView is 'month'"
-EventCalendar --> EventCalendarYear : "renders when currentView is 'year'"
-EventCalendar --> EventsList : "renders when viewMode is 'list'"
-EventCalendar --> useEventCalendarStore : "uses for state management"
+AlertDashboard --> AlertCard : "renders in board view"
+AlertDashboard --> AlertList : "renders in list view"
+AlertDashboard --> AlertStatistics : "renders in statistics view"
+AlertDashboard --> useAlertDashboardLayout : "uses for responsive design"
+AlertDashboard --> useAlertTouchFriendly : "uses for touch-friendly design"
+AlertDashboard --> useAlertKeyboardNavigation : "uses for keyboard shortcuts"
 ```
 
 **Diagram sources**
-- [event-calendar.tsx](file://apps/web/src/components/event-calendar/event-calendar.tsx#L1-L66)
-- [use-event.ts](file://apps/web/src/hooks/use-event.ts)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx)
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx)
+- [AlertStatistics.tsx](file://apps\app\src\components\alerts\data\AlertStatistics.tsx)
 
 **Section sources**
-- [event-calendar.tsx](file://apps/web/src/components/event-calendar/event-calendar.tsx#L1-L66)
-- [use-event.ts](file://apps/web/src/hooks/use-event.ts)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx)
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx)
+- [AlertStatistics.tsx](file://apps\app\src\components\alerts\data\AlertStatistics.tsx)
+
+### Alert Card Component
+The AlertCard component displays individual alerts with severity indicators, status badges, and quick actions. It supports both compact and expanded layouts with responsive design and accessibility features.
+
+```mermaid
+classDiagram
+class AlertCard {
++alert : Alert
++onAlertClick : function
++onAlertAction : function
++compact : boolean
++showActions : boolean
++className : string
++draggable : boolean
+}
+class Alert {
++id : string
++title : string
++description : string
++severity : AlertSeverity
++type : AlertType
++status : AlertStatus
++source : string
++created_at : Date
++acknowledged_by : string
++acknowledged_at : Date
++resolved_by : string
++resolved_at : Date
++resolutionNotes : string
++metadata : Record<string, any>
++tags : string[]
+}
+class AlertSeverity {
++CRITICAL
++HIGH
++MEDIUM
++LOW
++INFO
+}
+class AlertStatus {
++active
++acknowledged
++resolved
++dismissed
+}
+AlertCard --> Alert : "displays"
+AlertCard --> AlertSeverity : "uses for styling"
+AlertCard --> AlertStatus : "uses for styling"
+AlertCard --> createAlertExpandableAttributes : "uses for accessibility"
+AlertCard --> generateAlertAriaLabel : "uses for accessibility"
+```
+
+**Diagram sources**
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
+- [collections.ts](file://apps\app\src\lib\collections.ts)
+
+**Section sources**
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
+- [collections.ts](file://apps\app\src\lib\collections.ts)
+
+### Alert List Component
+The AlertList component displays alerts in a scrollable list format with sorting, filtering, and virtualization capabilities. It supports keyboard navigation and accessibility features for improved user experience.
+
+```mermaid
+classDiagram
+class AlertList {
++alerts : Alert[]
++filters : AlertFilters
++onFilterChange : function
++onAlertSelect : function
++alertFocusedId : string
++loading : boolean
++error : string
++className : string
++virtualScrolling : boolean
++maxHeight : string
+}
+class AlertFilters {
++severity : string[]
++status : string[]
++type : string[]
++source : string[]
++dateRange : { start : Date, end : Date }
++search : string
+}
+class SortConfig {
++key : keyof Alert
++direction : 'asc' | 'desc'
+}
+AlertList --> Alert : "displays"
+AlertList --> AlertFilters : "uses for filtering"
+AlertList --> SortConfig : "uses for sorting"
+AlertList --> useAlertFocusManagement : "uses for keyboard navigation"
+AlertList --> AlertDetails : "uses for expanded details"
+```
+
+**Diagram sources**
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
+- [filter-types.ts](file://apps\app\src\components\alerts\types\filter-types.ts)
+
+**Section sources**
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
+- [filter-types.ts](file://apps\app\src\components\alerts\types\filter-types.ts)
+
+### Alert Statistics Component
+The AlertStatistics component provides visual analytics for alert data with customizable charts, time periods, and export functionality. It supports multiple chart types and interactive filtering.
+
+```mermaid
+classDiagram
+class AlertStatistics {
++statistics : AlertStatistics
++alerts : Alert[]
++onRefresh : function
++onExport : function
++loading : boolean
++className : string
+}
+class AlertStatisticsData {
++total : number
++active : number
++acknowledged : number
++resolved : number
++dismissed : number
++bySeverity : Record<AlertSeverity, number>
++byType : Record<AlertType, number>
++bySource : Record<string, number>
++trends : { period : string, created : number, resolved : number }[]
+}
+class ChartConfig {
++type : ChartType
++dataKey : string
++title : string
+}
+AlertStatistics --> AlertStatisticsData : "displays"
+AlertStatistics --> ChartConfig : "uses for rendering"
+AlertStatistics --> TimePeriod : "uses for filtering"
+AlertStatistics --> ChartType : "uses for visualization"
+AlertStatistics --> MetricType : "uses for data selection"
+```
+
+**Diagram sources**
+- [AlertStatistics.tsx](file://apps\app\src\components\alerts\data\AlertStatistics.tsx)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
+
+**Section sources**
+- [AlertStatistics.tsx](file://apps\app\src\components\alerts\data\AlertStatistics.tsx)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
 
 ## Data Flow and API Integration
 The Web Application uses tRPC for type-safe communication between the frontend and backend, ensuring that API calls are properly typed and validated. The tRPC client is configured in `trpc.ts` and provides a proxy interface for calling backend procedures.
@@ -314,6 +504,44 @@ AppRouter --> complianceRouter : "contains"
 - [index.ts](file://apps/server/src/routers/index.ts#L1-L24)
 - [events.ts](file://apps/server/src/routers/events.ts#L1-L1360)
 
+### Alert Data Flow
+The alert management system implements a comprehensive data flow with real-time queries, optimistic updates, and caching strategies to ensure responsive user experience.
+
+```mermaid
+sequenceDiagram
+participant Frontend
+participant AlertQuery
+participant AlertApiService
+participant Backend
+participant Database
+Frontend->>AlertQuery : useAlerts(request, options)
+AlertQuery->>AlertApiService : getAlerts(request)
+AlertApiService->>Backend : metricsService.getAlerts(params)
+Backend->>Database : Query alerts with filters
+Database-->>Backend : Return paginated alerts
+Backend-->>AlertApiService : Return alerts response
+AlertApiService-->>AlertQuery : Return transformed alerts
+AlertQuery-->>Frontend : Return alerts with loading state
+Frontend->>AlertQuery : useAlertAction().acknowledge(request)
+AlertQuery->>AlertApiService : acknowledgeAlert(request)
+AlertApiService->>Backend : metricsService.acknowledgeAlert(id)
+Backend->>Database : Update alert status
+Database-->>Backend : Return updated alert
+Backend-->>AlertApiService : Return success response
+AlertApiService-->>AlertQuery : Return action response
+AlertQuery-->>Frontend : Invalidate queries and update cache
+```
+
+**Diagram sources**
+- [use-alert-queries.ts](file://apps\app\src\components\alerts\hooks\use-alert-queries.ts)
+- [alert-api.ts](file://apps\app\src\lib\services\alert-api.ts)
+- [metrics.ts](file://packages\audit-client\src\services\metrics.ts)
+
+**Section sources**
+- [use-alert-queries.ts](file://apps\app\src\components\alerts\hooks\use-alert-queries.ts)
+- [alert-api.ts](file://apps\app\src\lib\services\alert-api.ts)
+- [metrics.ts](file://packages\audit-client\src\services\metrics.ts)
+
 ## Technology Stack and Design Decisions
 
 ### Frontend Technology Stack
@@ -351,6 +579,10 @@ Several key design decisions were made to ensure the application is maintainable
 4. **Authentication and Authorization**: The application implements robust authentication and authorization mechanisms to protect sensitive audit data.
 
 5. **Performance Optimization**: The use of React Query for data caching, HTTP batch links for tRPC, and database query optimization ensures good performance.
+
+6. **Real-time Updates**: The integration of real-time queries with React Query enables immediate feedback for user actions without full page reloads.
+
+7. **Accessibility**: Comprehensive keyboard navigation, ARIA labels, and screen reader support ensure the application is accessible to all users.
 
 ## Security and Authentication
 The Web Application implements a comprehensive security model to protect sensitive audit and compliance data. Authentication is handled through a dedicated auth package, and authorization is enforced at both the application and API levels.
@@ -407,6 +639,7 @@ The frontend implements several performance optimizations:
 - **Batched Requests**: tRPC's HTTP batch link combines multiple requests into a single HTTP call.
 - **Memoization**: React's useMemo and useCallback hooks prevent unnecessary re-renders.
 - **Virtualization**: Large lists are virtualized to improve rendering performance.
+- **Optimistic Updates**: Alert actions use optimistic updates to provide immediate feedback before server confirmation.
 
 ### Backend Performance
 The backend implements several performance optimizations:

@@ -2,16 +2,23 @@
 
 <cite>
 **Referenced Files in This Document**  
-- [alerts.tsx](file://apps/web/src/components/alerts/data-table.tsx)
-- [data-table-resolved.tsx](file://apps/web/src/components/alerts/data-table-resolved.tsx)
-- [columns.tsx](file://apps/web/src/components/alerts/columns.tsx)
-- [form.tsx](file://apps/web/src/components/alerts/form.tsx)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [audit-client.ts](file://apps/web/src/lib/audit-client.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
-- [cleanup-old-alerts.ts](file://apps/inngest/src/inngest/functions/alerts/cleanup-old-alerts.ts)
+- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx) - *Updated in recent commit*
+- [AlertList.tsx](file://apps/app/src/components/alerts/core/AlertList.tsx) - *Updated in recent commit*
+- [AlertCard.tsx](file://apps/app/src/components/alerts/core/AlertCard.tsx) - *Updated in recent commit*
+- [AlertColumns.tsx](file://apps/app/src/components/alerts/data/AlertColumns.tsx) - *Updated in recent commit*
+- [alert.ts](file://apps/app/src/lib/types/alert.ts) - *Updated alert type definitions*
+- [collections.ts](file://apps/app/src/lib/collections.ts) - *Updated collection schema*
+- [alert-types.ts](file://apps/app/src/components/alerts/types/alert-types.ts) - *Updated enum definitions*
 </cite>
+
+## Update Summary
+**Changes Made**  
+- Updated alert property names from `timestamp` to `created_at` and `acknowledgedBy` to `acknowledged_by` across all components
+- Refactored alert severity, status, and type enums to use uppercase constants
+- Integrated AlertCard component into dashboard board view
+- Removed deprecated /alerts/board route
+- Updated field names to use snake_case convention (`acknowledged_by` instead of `acknowledgedBy`)
+- Enhanced real-time query integration for live alert updates
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -67,13 +74,13 @@ Function --> Audit
 ```
 
 **Diagram sources**
-- [apps/web/src/components/alerts](file://apps/web/src/components/alerts)
+- [apps/app/src/components/alerts](file://apps/app/src/components/alerts)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 - [apps/inngest/src/inngest/functions/alerts](file://apps/inngest/src/inngest/functions/alerts)
 - [packages/audit](file://packages/audit)
 
 **Section sources**
-- [apps/web/src/components/alerts](file://apps/web/src/components/alerts)
+- [apps/app/src/components/alerts](file://apps/app/src/components/alerts)
 - [apps/server/src/routers](file://apps/server/src/routers)
 - [packages/audit](file://packages/audit)
 
@@ -81,7 +88,7 @@ Function --> Audit
 The Alert Management system consists of several core components that work together to provide a complete alerting solution. The frontend includes data tables for displaying active and resolved alerts, form components for alert creation, and column definitions for table rendering. The backend provides tRPC routers for API endpoints, monitoring services for alert generation, and background functions for alert cleanup.
 
 **Section sources**
-- [apps/web/src/components/alerts](file://apps/web/src/components/alerts)
+- [apps/app/src/components/alerts](file://apps/app/src/components/alerts)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 - [packages/audit/src/monitor](file://packages/audit/src/monitor)
 
@@ -119,14 +126,14 @@ UI-->>User : Show success
 ```
 
 **Diagram sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 - [packages/audit/src/monitor/monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 
 ## Detailed Component Analysis
 
 ### Alert Data Table Components
-The alert display system is implemented using two main data table components: one for active alerts and another for resolved alerts. These components use a shared column configuration and leverage a common data fetching mechanism through the audit client.
+The alert display system is implemented using two main data table components: one for active alerts and another for resolved alerts. These components use a shared column configuration and leverage a common data fetching mechanism through the audit client. The system has been updated to use `created_at` instead of `timestamp` for consistency with backend naming conventions.
 
 ```mermaid
 classDiagram
@@ -148,7 +155,7 @@ class AlertColumns {
 +id : ColumnDef
 +severity : ColumnDef
 +message : ColumnDef
-+createdAt : ColumnDef
++created_at : ColumnDef
 +status : ColumnDef
 +actions : ColumnDef
 +getColumns() : ColumnDef[]
@@ -160,17 +167,17 @@ ResolvedAlertsTable --> AuditClient : "depends on"
 ```
 
 **Diagram sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
-- [apps/web/src/components/alerts/data-table-resolved.tsx](file://apps/web/src/components/alerts/data-table-resolved.tsx)
-- [apps/web/src/components/alerts/columns.tsx](file://apps/web/src/components/alerts/columns.tsx)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
+- [apps/app/src/components/alerts/data-table-resolved.tsx](file://apps/app/src/components/alerts/data-table-resolved.tsx)
+- [apps/app/src/components/alerts/columns.tsx](file://apps/app/src/components/alerts/columns.tsx)
 
 **Section sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
-- [apps/web/src/components/alerts/data-table-resolved.tsx](file://apps/web/src/components/alerts/data-table-resolved.tsx)
-- [apps/web/src/components/alerts/columns.tsx](file://apps/web/src/components/alerts/columns.tsx)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
+- [apps/app/src/components/alerts/data-table-resolved.tsx](file://apps/app/src/components/alerts/data-table-resolved.tsx)
+- [apps/app/src/components/alerts/columns.tsx](file://apps/app/src/components/alerts/columns.tsx)
 
 ### Alert Form Component
-The alert creation form provides a user interface for manually creating new alerts. It includes validation logic and integrates with the audit client to submit new alerts to the backend system.
+The alert creation form provides a user interface for manually creating new alerts. It includes validation logic and integrates with the audit client to submit new alerts to the backend system. The form has been updated to use consistent field naming conventions with the backend.
 
 ```mermaid
 flowchart TD
@@ -192,14 +199,14 @@ HandleError --> UserInput
 ```
 
 **Diagram sources**
-- [apps/web/src/components/alerts/form.tsx](file://apps/web/src/components/alerts/form.tsx)
-- [apps/web/src/lib/audit-client.ts](file://apps/web/src/lib/audit-client.ts)
+- [apps/app/src/components/alerts/form.tsx](file://apps/app/src/components/alerts/form.tsx)
+- [apps/app/src/lib/audit-client.ts](file://apps/app/src/lib/audit-client.ts)
 
 **Section sources**
-- [apps/web/src/components/alerts/form.tsx](file://apps/web/src/components/alerts/form.tsx)
+- [apps/app/src/components/alerts/form.tsx](file://apps/app/src/components/alerts/form.tsx)
 
 ## Alert Creation and Resolution Workflow
-The alert management system supports both automated and manual alert creation, with a well-defined workflow for alert resolution. When an alert is created, it transitions through various states from active to resolved, with proper audit logging at each step.
+The alert management system supports both automated and manual alert creation, with a well-defined workflow for alert resolution. When an alert is created, it transitions through various states from active to resolved, with proper audit logging at each step. The system now uses uppercase constants for alert severity, status, and type enums.
 
 ```mermaid
 stateDiagram-v2
@@ -225,16 +232,16 @@ end note
 ```
 
 **Diagram sources**
-- [apps/web/src/components/alerts/form.tsx](file://apps/web/src/components/alerts/form.tsx)
+- [apps/app/src/components/alerts/form.tsx](file://apps/app/src/components/alerts/form.tsx)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 - [packages/audit/src/monitor/database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 
 **Section sources**
-- [apps/web/src/components/alerts/form.tsx](file://apps/web/src/components/alerts/form.tsx)
+- [apps/app/src/components/alerts/form.tsx](file://apps/app/src/components/alerts/form.tsx)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 
 ## Data Fetching and State Management
-The Alert Management system uses tRPC for data fetching, providing type-safe API communication between the frontend and backend. The audit client encapsulates all API calls, ensuring consistent error handling and authentication.
+The Alert Management system uses tRPC for data fetching, providing type-safe API communication between the frontend and backend. The audit client encapsulates all API calls, ensuring consistent error handling and authentication. The system has been updated to use real-time queries for live data updates.
 
 ```mermaid
 sequenceDiagram
@@ -257,16 +264,16 @@ Client-->>UI : Update state
 ```
 
 **Diagram sources**
-- [apps/web/src/lib/audit-client.ts](file://apps/web/src/lib/audit-client.ts)
+- [apps/app/src/lib/audit-client.ts](file://apps/app/src/lib/audit-client.ts)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [apps/web/src/utils/trpc.ts](file://apps/web/src/utils/trpc.ts)
+- [apps/app/src/utils/trpc.ts](file://apps/app/src/utils/trpc.ts)
 
 **Section sources**
-- [apps/web/src/lib/audit-client.ts](file://apps/web/src/lib/audit-client.ts)
+- [apps/app/src/lib/audit-client.ts](file://apps/app/src/lib/audit-client.ts)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 
 ## Filtering, Sorting, and Pagination
-The alert tables support comprehensive data manipulation features including filtering, sorting, and pagination. These features are implemented consistently across both active and resolved alert views, with parameters passed through the tRPC API to the backend.
+The alert tables support comprehensive data manipulation features including filtering, sorting, and pagination. These features are implemented consistently across both active and resolved alert views, with parameters passed through the tRPC API to the backend. The system now sorts by `created_at` field and uses snake_case for all field names.
 
 ```mermaid
 flowchart TD
@@ -284,16 +291,16 @@ K --> L["Enable bookmarking/shareable links"]
 ```
 
 **Diagram sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
-- [apps/web/src/lib/searchParams.ts](file://apps/web/src/lib/searchParams.ts)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
+- [apps/app/src/lib/searchParams.ts](file://apps/app/src/lib/searchParams.ts)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 
 **Section sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
-- [apps/web/src/lib/searchParams.ts](file://apps/web/src/lib/searchParams.ts)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
+- [apps/app/src/lib/searchParams.ts](file://apps/app/src/lib/searchParams.ts)
 
 ## Real-Time Updates and Notification Handling
-The system handles real-time updates through a combination of polling and background processing. While WebSockets are not explicitly implemented, the architecture supports frequent polling to ensure users see the latest alert status.
+The system handles real-time updates through a combination of polling and background processing. While WebSockets are not explicitly implemented, the architecture supports frequent polling to ensure users see the latest alert status. The system has been enhanced with real-time query integration for live updates.
 
 ```mermaid
 sequenceDiagram
@@ -321,16 +328,16 @@ Server-->>Client : Next poll returns updated data
 ```
 
 **Diagram sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
 - [packages/audit/src/monitor/monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 
 **Section sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
 - [packages/audit/src/monitor/monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
 
 ## Performance Optimization
-The Alert Management system implements several performance optimizations to handle large volumes of alerts efficiently. These include database indexing, query optimization, and client-side caching strategies.
+The Alert Management system implements several performance optimizations to handle large volumes of alerts efficiently. These include database indexing, query optimization, and client-side caching strategies. The system uses consistent field naming (`created_at`, `acknowledged_by`) for better query performance.
 
 ```mermaid
 graph TD
@@ -364,7 +371,7 @@ M --> O
 - [packages/audit-db/src/cache/redis-query-cache.ts](file://packages/audit-db/src/cache/redis-query-cache.ts)
 
 ## Error Handling and Audit Client Integration
-The system implements robust error handling through the audit client, which wraps all API calls with consistent error management. This ensures that users receive meaningful feedback when operations fail.
+The system implements robust error handling through the audit client, which wraps all API calls with consistent error management. This ensures that users receive meaningful feedback when operations fail. The client has been updated to handle the new field naming conventions.
 
 ```mermaid
 sequenceDiagram
@@ -390,12 +397,12 @@ end
 ```
 
 **Diagram sources**
-- [apps/web/src/lib/audit-client.ts](file://apps/web/src/lib/audit-client.ts)
+- [apps/app/src/lib/audit-client.ts](file://apps/app/src/lib/audit-client.ts)
 - [apps/server/src/lib/errors/unified-handler.ts](file://apps/server/src/lib/errors/unified-handler.ts)
 - [packages/audit/src/error/error-handling.ts](file://packages/audit/src/error/error-handling.ts)
 
 **Section sources**
-- [apps/web/src/lib/audit-client.ts](file://apps/web/src/lib/audit-client.ts)
+- [apps/app/src/lib/audit-client.ts](file://apps/app/src/lib/audit-client.ts)
 - [apps/server/src/lib/errors/unified-handler.ts](file://apps/server/src/lib/errors/unified-handler.ts)
 
 ## Background Jobs and Alert Lifecycle Management
@@ -443,7 +450,7 @@ This section addresses common issues encountered when working with the Alert Man
 - **Background cleanup not running**: Check Inngest dashboard for function execution history and verify the schedule is properly configured.
 
 **Section sources**
-- [apps/web/src/components/alerts/data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
+- [apps/app/src/components/alerts/data-table.tsx](file://apps/app/src/components/alerts/data-table.tsx)
 - [apps/server/src/routers/alerts.ts](file://apps/server/src/routers/alerts.ts)
 - [apps/inngest/src/inngest/functions/alerts/cleanup-old-alerts.ts](file://apps/inngest/src/inngest/functions/alerts/cleanup-old-alerts.ts)
 

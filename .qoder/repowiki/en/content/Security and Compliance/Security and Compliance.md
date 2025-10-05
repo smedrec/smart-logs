@@ -16,6 +16,10 @@
 - [crypto.ts](file://packages/audit/src/crypto.ts) - *Updated in recent commit*
 - [audit-api.ts](file://apps/server/src/routes/audit-api.ts) - *Updated in recent commit*
 - [audit-events.ts](file://apps/server/src/lib/graphql/resolvers/audit-events.ts) - *Updated in recent commit*
+- [execution-history-page.tsx](file://apps/app/src/components/compliance/execution/execution-history-page.tsx) - *Updated in recent commit*
+- [report-details-page.tsx](file://apps/app/src/components/compliance/reports/report-details-page.tsx) - *Updated in recent commit*
+- [export-button.tsx](file://apps/app/src/components/compliance/export/export-button.tsx) - *Updated in recent commit*
+- [CompliancePageHeader.tsx](file://apps/app/src/components/compliance/navigation/CompliancePageHeader.tsx) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
@@ -36,6 +40,11 @@
 - Added new section on pseudonymization of audit events
 - Updated pseudonymization strategies section with database schema changes
 - Added documentation for unique constraint on original_id in pseudonym mapping table
+- Added documentation for custom report type implementation and enhanced execution statuses
+- Updated compliance reporting section with details on custom report types and execution history
+- Added new section on data export functionality with advanced export options
+- Updated UI components documentation for compliance reporting and export features
+- Added documentation for keyboard shortcuts dialog in compliance UI
 - Maintained existing structure while incorporating new pseudonymization features
 
 ## Table of Contents
@@ -424,6 +433,91 @@ J --> K["Generate alert if needed"]
 
 The system provides comprehensive compliance reporting and data export capabilities for regulatory requirements.
 
+### Custom Report Types and Execution Statuses
+The system now supports custom report types and enhanced execution statuses for more flexible compliance reporting. The `CUSTOM_REPORT` type allows organizations to define their own report configurations and criteria.
+
+```mermaid
+sequenceDiagram
+participant Admin as "Administrator"
+participant ReportService as "ComplianceReportingService"
+participant DB as "Database"
+participant Scheduler as "Inngest Scheduler"
+Admin->>ReportService : configureScheduledReport()
+ReportService->>DB : Store in scheduledReports table
+Scheduler->>ReportService : triggerScheduledReport()
+ReportService->>DB : Query events with criteria
+DB-->>ReportService : Return audit events
+ReportService->>ReportService : generateCustomReport()
+ReportService->>ReportService : generateIntegrityVerificationReport()
+ReportService->>Admin : Deliver report via email/webhook
+Note over ReportService : Reports can be scheduled<br/>daily, weekly, monthly,<br/>or quarterly
+```
+
+The execution history page now displays enhanced status information including running, pending, cancelled, timeout, and skipped statuses. This provides better visibility into report execution states.
+
+**Section sources**
+- [execution-history-page.tsx](file://apps/app/src/components/compliance/execution/execution-history-page.tsx#L47-L671)
+- [report-details-page.tsx](file://apps/app/src/components/compliance/reports/report-details-page.tsx#L77-L482)
+- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L200-L300)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L274-L1293)
+
+### Data Export Implementation
+The system implements comprehensive data export functionality with both quick export options and advanced export capabilities. The export button component provides a dropdown menu with recommended formats and an option for advanced export configuration.
+
+```mermaid
+flowchart TD
+A([Export Request]) --> B["exportUserData(request)"]
+B --> C["Query auditLog table"]
+C --> D["Format as JSON/CSV/XML/PDF"]
+D --> E["Include metadata"]
+E --> F["Log export activity"]
+F --> G["Return GDPRDataExport"]
+G --> H["Download or Email"]
+Note over D: Supports JSON, CSV, XML, and PDF<br/>formats with optional metadata
+```
+
+The advanced export manager allows users to select specific columns, include headers and metadata, and track export job progress. Export jobs are displayed with status indicators showing processing, completed, failed, and cancelled states.
+
+```mermaid
+classDiagram
+class ExportManager {
++type : ExportType
++data : any[]
++onExport : (options : ExportOptions) => Promise<void>
++availableColumns : Array<{key : string, label : string, description? : string}>
++defaultOptions : Partial<ExportOptions>
+}
+class ExportJob {
++id : string
++type : ExportType
++format : ExportFormat
++status : 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
++progress : number
++createdAt : Date
++completedAt? : Date
++downloadUrl? : string
++fileName : string
++fileSize? : number
++error? : string
++options : ExportOptions
+}
+class ExportOptions {
++format : ExportFormat
++includeHeaders : boolean
++includeMetadata : boolean
++columns? : string[]
++customFields? : string[]
+}
+ExportManager --> ExportJob : "manages"
+ExportManager --> ExportOptions : "configures"
+```
+
+**Section sources**
+- [export-button.tsx](file://apps/app/src/components/compliance/export/export-button.tsx#L74-L244)
+- [export-manager.tsx](file://apps/app/src/components/compliance/export/export-manager.tsx#L482-L645)
+- [data-export.ts](file://packages/audit/src/report/data-export.ts#L86-L586)
+- [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L0-L775)
+
 ### Usage Patterns for Compliance Reporting
 The reporting system supports various compliance reporting use cases with configurable criteria and delivery options.
 
@@ -447,24 +541,6 @@ Note over ReportService : Reports can be scheduled<br/>daily, weekly, monthly,<b
 **Section sources**
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L200-L300)
 - [schema.ts](file://packages/audit-db/src/db/schema.ts#L500-L550)
-
-### Data Export Implementation
-The GDPR data export feature provides data subject access requests in multiple formats with metadata preservation.
-
-```mermaid
-flowchart TD
-A([Export Request]) --> B["exportUserData(request)"]
-B --> C["Query auditLog table"]
-C --> D["Format as JSON/CSV/XML"]
-D --> E["Include metadata"]
-E --> F["Log export activity"]
-F --> G["Return GDPRDataExport"]
-G --> H["Download or Email"]
-Note over D: Supports JSON, CSV, and XML<br/>formats with optional metadata
-```
-
-**Section sources**
-- [gdpr-compliance.ts](file://packages/audit/src/gdpr/gdpr-compliance.ts#L180-L250)
 
 ## Relationships Between Compliance Modules
 

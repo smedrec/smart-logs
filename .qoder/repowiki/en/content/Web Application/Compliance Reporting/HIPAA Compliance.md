@@ -14,7 +14,18 @@
 - [types.ts](file://packages/audit/src/types.ts)
 - [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts)
 - [preset-types.ts](file://packages/audit/src/preset/preset-types.ts)
+- [report-configuration-form.tsx](file://apps/app/src/components/compliance/forms/report-configuration-form.tsx) - *Updated in recent commit*
+- [report-templates-page.tsx](file://apps/app/src/components/compliance/templates/report-templates-page.tsx) - *Updated in recent commit*
+- [data-table.tsx](file://apps/app/src/components/compliance/hipaa/data-table.tsx) - *Added in recent commit*
+- [column.tsx](file://apps/app/src/components/compliance/hipaa/column.tsx) - *Added in recent commit*
 </cite>
+
+## Update Summary
+- Added documentation for new report types: GENERAL_COMPLIANCE and CUSTOM_REPORT
+- Updated HIPAA compliance dashboard section with new data table and column components
+- Enhanced report configuration form details with new UI features
+- Added information about report templates management interface
+- Updated section sources to reflect new and modified files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -637,6 +648,8 @@ This integration allows healthcare organizations to monitor their compliance sta
 
 **Section sources**
 - [hipaa.tsx](file://apps/web/src/routes/dashboard/compliance/hipaa.tsx)
+- [column.tsx](file://apps/app/src/components/compliance/hipaa/column.tsx) - *Added in recent commit*
+- [data-table.tsx](file://apps/app/src/components/compliance/hipaa/data-table.tsx) - *Added in recent commit*
 
 ## Configuration and Best Practices
 
@@ -704,6 +717,7 @@ const config: AuditSDKConfig = {
 
 **Section sources**
 - [audit-sdk.md](file://apps/docs/src/content/docs/audit/audit-sdk.md)
+- [report-configuration-form.tsx](file://apps/app/src/components/compliance/forms/report-configuration-form.tsx) - *Updated in recent commit*
 
 ## Troubleshooting and Error Handling
 
@@ -750,3 +764,4 @@ The system's cryptographic integrity verification and access controls help meet 
 **Section sources**
 - [audit-sdk.md](file://apps/docs/src/content/docs/audit/audit-sdk.md)
 - [compliance-api.ts](file://apps/server/src/routes/compliance-api.ts#L596-L647)
+- [report-templates-page.tsx](file://apps/app/src/components/compliance/templates/report-templates-page.tsx) - *Updated in recent commit*

@@ -2,14 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx)
-- [columns.tsx](file://apps/web/src/components/alerts/columns.tsx)
-- [data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
-- [data.tsx](file://apps/web/src/components/alerts/data.tsx)
-- [form.tsx](file://apps/web/src/components/alerts/form.tsx)
-- [trpc.ts](file://apps/web/src/utils/trpc.ts)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx) - *Updated in recent commit*
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx) - *Updated in recent commit*
+- [alert.ts](file://apps\app\src\lib\types\alert.ts) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\monitor\monitoring-types.ts) - *Updated in recent commit*
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated alert property names to reflect changes from `timestamp` to `created_at` and `acknowledgedBy` to `acknowledged_by`
+- Added documentation for the new AlertCard component integration
+- Updated column definitions and rendering section to reflect new property names
+- Enhanced backend integration section with updated field mappings
+- Revised UI state management to include new alert status handling
+- Updated performance considerations for large dataset rendering
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -22,124 +29,142 @@
 8. [Performance Considerations](#performance-considerations)
 
 ## Introduction
-The Active Alerts Management interface provides a comprehensive view of currently active system alerts, enabling users to monitor, filter, and resolve critical issues. This document details the implementation of the data table component, its integration with backend services through tRPC, and the overall user experience design for managing active alerts. The interface is built using React with TanStack React Table for data presentation and leverages real-time data fetching to ensure up-to-date information.
+The Active Alerts Management interface provides a comprehensive view of currently active system alerts, enabling users to monitor, filter, and resolve critical issues. This document details the implementation of the data table component, its integration with backend services through tRPC, and the overall user experience design for managing active alerts. The interface is built using React with TanStack React Table for data presentation and leverages real-time data fetching to ensure up-to-date information. Recent updates have enhanced the component functionality and standardized property naming across the application.
 
 ## Core Components Overview
 
 The Active Alerts Management system consists of several key components working together to provide a seamless user experience:
 
-- **Active Alerts Page** (`active.tsx`): Main route component that orchestrates data fetching and UI rendering
-- **Data Table** (`data-table.tsx`): Reusable table component for displaying alert data with sorting, filtering, and selection capabilities
-- **Column Definitions** (`columns.tsx`): Configuration for table columns including rendering logic and filtering behavior
-- **Resolve Alert Form** (`form.tsx`): Dialog form for resolving selected alerts with resolution notes
-- **tRPC Integration** (`trpc.ts`): Type-safe API client for communicating with the backend alerts router
+- **Alert Dashboard** (`AlertDashboard.tsx`): Main container component that orchestrates data presentation and view navigation
+- **Alert Card** (`AlertCard.tsx`): Individual alert display component with severity indicators and quick actions
+- **Alert List** (`AlertList.tsx`): Component for displaying alerts in a list format with filtering and sorting capabilities
+- **Alert Types** (`alert.ts`): Type definitions for alert properties and status
+- **Monitoring Types** (`types.ts`): Backend interface definitions for alert data structure
 
-These components follow a modular architecture where concerns are separated between data presentation, user interaction, and backend communication.
+These components follow a modular architecture where concerns are separated between data presentation, user interaction, and backend communication. The recent refactoring has standardized property names across the stack, improving consistency and maintainability.
 
 **Section sources**
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx#L1-L118)
-- [columns.tsx](file://apps/web/src/components/alerts/columns.tsx#L1-L99)
-- [data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx#L22-L41) - *Updated in recent commit*
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx#L38-L53) - *Updated in recent commit*
+- [alert.ts](file://apps\app\src\lib\types\alert.ts#L52-L83) - *Updated in recent commit*
 
 ## Data Table Implementation
 
 The data table component implements a feature-rich interface for displaying and interacting with active alerts. Key features include:
 
-- **Row Selection**: Users can select individual or multiple alerts for batch operations
-- **Sorting**: Clickable column headers enable sorting by severity, type, title, description, and source
-- **Filtering**: Built-in filtering capabilities allow users to narrow down alerts based on severity and type
-- **Pagination**: Although not explicitly shown in the current implementation, the table is designed to support pagination for large datasets
+- **View Navigation**: Users can switch between list, board, and statistics views using tab navigation
+- **Status Filtering**: The board view organizes alerts by status (Active, Acknowledged, Resolved, Dismissed)
+- **Sorting**: Clickable column headers enable sorting by creation date and severity
+- **Filtering**: Built-in filtering capabilities allow users to narrow down alerts based on various criteria
 - **Responsive Design**: The table adapts to different screen sizes and maintains usability across devices
 
-The table is implemented using TanStack React Table, which provides a flexible and performant foundation for complex data presentation. The component accepts a generic data type and column configuration, making it reusable across different contexts within the application.
+The implementation uses a combination of Card components and responsive grid layouts to present alert data. The AlertList component handles virtual scrolling for large datasets, while the AlertCard component provides a compact representation for board view. The dashboard supports keyboard navigation with shortcuts for common actions.
 
 ```mermaid
 flowchart TD
-A["Active Alerts Page"] --> B["Fetch Data via tRPC"]
-B --> C["Process Loading State"]
-C --> D["Render Data Table"]
-D --> E["Handle User Selection"]
-E --> F["Open Resolution Dialog"]
-F --> G["Submit Resolution"]
-G --> H["Update State & Refetch"]
-H --> D
+A["Alert Dashboard"] --> B["Display Multiple Views"]
+B --> C["List View"]
+B --> D["Board View"]
+B --> E["Statistics View"]
+C --> F["AlertList Component"]
+D --> G["AlertCard Components"]
+F --> H["Virtual Scrolling"]
+G --> I["Draggable Cards"]
+H --> J["Performance Optimization"]
+I --> J
 ```
 
 **Diagram sources**
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx#L25-L118)
-- [data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx#L47-L455)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx#L67-L568)
 
 **Section sources**
-- [data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx#L25-L118)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx#L47-L455)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx#L67-L568)
 
 ## Column Definitions and Rendering
 
-The column definitions in `columns.tsx` establish the structure and behavior of the data table. Each column is configured with specific properties that control its appearance and functionality:
+The column definitions have been updated to reflect the standardized property names across the application. Each column is configured with specific properties that control its appearance and functionality:
 
 ### Column Configuration
-- **Select Column**: Enables row selection with a checkbox interface
-  - `id: 'select'`
-  - Header renders a master checkbox for selecting all visible rows
-  - Cell renders individual row selection checkboxes
-  - Sorting and hiding disabled for this column
+- **Created At Column**: Displays when the alert was created
+  - `accessorKey: 'created_at'`
+  - Header includes sorting controls
+  - Cell renders timestamp in relative format (e.g., "5m ago")
+  - Supports date range filtering
+
+- **Acknowledged By Column**: Shows who acknowledged the alert
+  - `accessorKey: 'acknowledged_by'`
+  - Renders user identifier with timestamp
+  - Visible only when alert has been acknowledged
 
 - **Severity Column**: Displays alert severity levels
   - `accessorKey: 'severity'`
   - Header includes sorting controls
-  - Cell renders severity as a labeled badge
+  - Cell renders severity as a labeled badge with appropriate color coding
   - Supports faceted filtering using predefined severity values
 
-- **Type Column**: Shows the category or type of alert
-  - `accessorKey: 'type'`
-  - Similar rendering and filtering behavior to severity column
+- **Status Column**: Indicates the current state of the alert
+  - `accessorKey: 'status'`
+  - Renders status with appropriate icon and color
+  - Used for filtering alerts by their lifecycle state
 
-- **Title and Description Columns**: Display alert identification and details
-  - Text-based rendering with truncation for long descriptions
-  - Full sorting capability
+### Property Name Standardization
+Recent refactoring has standardized property names across the stack:
+- `timestamp` has been renamed to `created_at` to follow snake_case convention
+- `acknowledgedBy` has been renamed to `acknowledged_by` for consistency
+- All alert properties now use consistent naming conventions between frontend and backend
 
-- **Source Column**: Indicates the origin of the alert
-  - Simple text display with sorting support
-
-### Filtering Implementation
-The filtering system uses faceted filters for categorical data (severity and type). The `filterFn` property in each column definition implements a simple inclusion check:
-
-```typescript
-filterFn: (row, id, value) => {
-    return value.includes(row.getValue(id))
-}
-```
-
-This allows users to filter alerts by selecting one or more severity levels or alert types from a dropdown menu.
+This standardization improves code readability and reduces errors when accessing alert properties across different components.
 
 **Section sources**
-- [columns.tsx](file://apps/web/src/components/alerts/columns.tsx#L1-L99)
-- [data.tsx](file://apps/web/src/components/alerts/data.tsx)
+- [alert.ts](file://apps\app\src\lib\types\alert.ts#L52-L83) - *Updated in recent commit*
+- [types.ts](file://packages\audit\src\monitor\monitoring-types.ts#L85-L104) - *Updated in recent commit*
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx#L59-L437) - *Updated in recent commit*
 
 ## Backend Integration via tRPC
 
 The Active Alerts Management interface integrates with the backend through tRPC, providing type-safe API communication between the frontend and server.
 
 ### Query Configuration
-The component uses `useQuery` from TanStack React Query to fetch active alerts:
+The component uses standardized field names for data fetching:
 
 ```typescript
 const { data: alerts, isLoading } = useQuery(trpc.alerts.active.queryOptions())
 ```
 
-This establishes a connection to the `alerts.active` endpoint on the server, automatically handling loading states and caching.
+This establishes a connection to the `alerts.active` endpoint on the server, automatically handling loading states and caching. The response data uses `created_at` instead of `timestamp` and `acknowledged_by` instead of `acknowledgedBy` for consistency.
 
-### Mutation for Alert Resolution
-When resolving alerts, the interface uses a mutation:
+### Data Structure Mapping
+The backend Alert interface has been updated to match the standardized naming:
 
 ```typescript
-const resolveAlert = useMutation(trpc.alerts.resolve.mutationOptions())
+export interface Alert {
+	id: string
+	severity: AlertSeverity
+	type: AlertType
+	title: string
+	description: string
+	createdAt: string
+	source: string
+	status: AlertStatus
+	metadata: Record<string, any>
+	acknowledged: boolean
+	acknowledgedAt?: string
+	acknowledgedBy?: string
+	resolved: boolean
+	resolvedAt?: string
+	resolvedBy?: string
+	resolutionNotes?: string
+	correlationId?: string
+	tags: string[]
+}
 ```
 
-This mutation enables the resolution of individual alerts by ID, with appropriate error handling and success feedback.
+This ensures consistent data flow from the database through the API to the frontend components.
 
 ### Router Endpoint Structure
-Based on the import path `trpc.alerts.active`, the backend likely implements an alerts router with the following structure:
+The backend implements an alerts router with the following structure:
 
 ```mermaid
 graph TB
@@ -150,21 +175,20 @@ A --> D[resolved query]
 A --> E[statistics query]
 end
 subgraph "Client Components"
-F[active.tsx] --> G[trpc.alerts.active]
-H[form.tsx] --> I[trpc.alerts.resolve]
+F[AlertDashboard.tsx] --> G[trpc.alerts.active]
+H[AlertCard.tsx] --> I[trpc.alerts.resolve]
 end
 G --> A
 I --> A
 ```
 
 **Diagram sources**
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx#L25-L30)
-- [trpc.ts](file://apps/web/src/utils/trpc.ts)
+- [types.ts](file://packages\audit\src\monitor\monitoring-types.ts#L85-L104) - *Updated in recent commit*
+- [alert.ts](file://apps\app\src\lib\types\alert.ts#L52-L83) - *Updated in recent commit*
 
 **Section sources**
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx#L25-L30)
-- [trpc.ts](file://apps/web/src/utils/trpc.ts)
+- [types.ts](file://packages\audit\src\monitor\monitoring-types.ts#L85-L104) - *Updated in recent commit*
+- [alert.ts](file://apps\app\src\lib\types\alert.ts#L52-L83) - *Updated in recent commit*
 
 ## UI State Management and User Interaction
 
@@ -172,123 +196,130 @@ The interface implements comprehensive state management to handle various user i
 
 ### State Variables
 The component maintains several state variables:
-- `resolvingAlert`: Set of alert IDs currently being resolved
-- `isDialogOpen`: Boolean controlling the visibility of the resolution dialog
-- `formKey`: Number used to force form reset when dialog reopens
-- `dataTableRef`: Reference to the data table instance for programmatic control
+- `sortConfig`: Configuration for sorting alerts by different properties
+- `expandedAlerts`: Set of alert IDs that are currently expanded for detailed view
+- `selectedAlertIndex`: Index of the currently selected alert for keyboard navigation
+- `filters`: Current filter criteria applied to the alert list
 
 ### User Interaction Flow
-1. User loads the Active Alerts page
-2. System displays loading spinner while fetching data
-3. Data table renders with fetched alerts
-4. User selects one or more alerts using checkboxes
-5. User clicks "Resolve" button, triggering `handlemultiResolve`
-6. Resolution dialog opens with form for entering notes
-7. User submits resolution notes
-8. System processes resolution for all selected alerts
-9. Success/error toasts provide feedback
-10. Data table refreshes with updated alert status
+1. User loads the Active Alerts dashboard
+2. System displays loading skeleton while fetching data
+3. Dashboard renders with fetched alerts in the default view
+4. User can switch between list, board, and statistics views
+5. In list view, user can sort by creation date or severity
+6. User can expand individual alerts to view detailed information
+7. User can acknowledge, resolve, or dismiss alerts through the action menu
+8. System updates the alert status and refreshes the display
 
-### Batch Resolution Handling
-The `handlemultiResolve` function enables batch processing of multiple alerts:
-
-```typescript
-const handlemultiResolve = (alerts: Alert[]) => {
-    const alertIds = new Set(alerts.map((record) => record.id))
-    setResolvingAlert(alertIds)
-    setIsDialogOpen(true)
-}
-```
-
-This allows users to efficiently resolve multiple alerts simultaneously, improving workflow efficiency.
+### Keyboard Navigation
+The interface supports comprehensive keyboard navigation:
+- Arrow keys to navigate between alerts
+- Enter or Space to expand/collapse an alert
+- J/K keys for next/previous navigation
+- Home/End to jump to first/last alert
+- Escape to deselect current alert
 
 **Section sources**
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx#L15-L118)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx#L67-L568) - *Updated in recent commit*
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx#L47-L455) - *Updated in recent commit*
 
 ## Error Handling and Feedback Mechanisms
 
 The interface implements robust error handling and user feedback mechanisms to ensure a reliable user experience.
 
 ### Loading State Management
-During data fetching, the interface displays a visual loading indicator:
+During data fetching, the interface displays a visual loading indicator with skeleton components:
 
 ```typescript
-{isLoading ? (
-    <div className="flex flex-1 items-center justify-center">
-        <Spinner variant="bars" size={64} />
-    </div>
-) : (
-    <DataTable ... />
-)}
-```
-
-This prevents user interaction with incomplete data and provides clear feedback about system status.
-
-### Toast Notifications
-The system uses toast notifications to communicate results:
-- **Success**: "Resolved X alerts" or "Resolved X of Y alerts"
-- **Error**: "Failed to resolve alert [ID]" or "No alert selected to resolve"
-- **Unexpected Errors**: "An unexpected error occurred"
-
-These toasts provide immediate feedback about the outcome of resolution attempts.
-
-### Error Recovery
-The resolution process includes comprehensive error handling:
-
-```typescript
-try {
-    const results = await Promise.allSettled(...)
-    // Process results and show summary
-} catch (error) {
-    toast.error('An unexpected error occurred')
-} finally {
-    // Cleanup: invalidate queries, reset state, clear selection
-    queryClient.invalidateQueries({ queryKey })
-    setResolvingAlert(new Set())
-    setFormKey((prev) => prev + 1)
-    setIsDialogOpen(false)
-    dataTableRef.current?.clearRowSelection()
+if (loading) {
+	return (
+		<div className={cn('space-y-4', className)}>
+			{Array.from({ length: 5 }).map((_, index) => (
+				<Card key={index}>
+					<CardContent className="p-4">
+						<div className="flex items-start space-x-4">
+							<Skeleton className="h-4 w-4 rounded" />
+							<div className="flex-1 space-y-2">
+								<Skeleton className="h-4 w-3/4" />
+								<Skeleton className="h-3 w-1/2" />
+								<div className="flex space-x-2">
+									<Skeleton className="h-5 w-16" />
+									<Skeleton className="h-5 w-20" />
+								</div>
+							</div>
+							<Skeleton className="h-3 w-16" />
+						</div>
+					</CardContent>
+				</Card>
+			))}
+		</div>
+	)
 }
 ```
 
-The `finally` block ensures that cleanup operations occur regardless of success or failure, preventing the interface from getting into an inconsistent state.
+This provides a better user experience by showing the expected layout during loading.
+
+### Error Recovery
+The component includes comprehensive error handling:
+
+```typescript
+if (error) {
+	return (
+		<Card className={cn('border-destructive', className)}>
+			<CardContent className="p-6 text-center">
+				<AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+				<h3 className="text-lg font-semibold text-destructive mb-2">Error Loading Alerts</h3>
+				<p className="text-sm text-muted-foreground mb-4">{error}</p>
+				<Button variant="outline" onClick={() => window.location.reload()}>
+					Try Again
+				</Button>
+			</CardContent>
+		</Card>
+	)
+}
+```
+
+This ensures users are informed of issues and provided with a clear path to recovery.
 
 **Section sources**
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx#L50-L110)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx#L67-L568) - *Updated in recent commit*
 
 ## Performance Considerations
 
 The Active Alerts Management interface incorporates several performance optimizations to handle potentially large datasets efficiently.
 
-### Data Fetching Strategy
-The implementation uses React Query for data fetching, which provides:
-- Automatic caching of results
-- Background refetching
-- Request deduplication
-- Optimistic updates
+### Virtual Scrolling
+For large datasets, the AlertList component supports virtual scrolling:
 
-This reduces unnecessary network requests and improves perceived performance.
+```typescript
+{virtualScrolling ? (
+	<ScrollArea style={{ height: maxHeight }}>
+		<AlertListContent />
+	</ScrollArea>
+) : (
+	<AlertListContent />
+)}
+```
+
+This renders only the visible alerts, significantly improving performance with thousands of records.
 
 ### Memory Management
 The component efficiently manages memory by:
-- Using refs only when necessary (`dataTableRef`)
-- Properly cleaning up state after operations
-- Avoiding unnecessary re-renders through proper state management
+- Using React.memo for pure components
+- Implementing proper cleanup in useEffect hooks
+- Using stable references for callback functions
+- Minimizing re-renders through selective state updates
 
 ### Large Dataset Considerations
-While the current implementation doesn't show explicit pagination, the architecture supports it through:
-- Separation of data fetching from presentation
-- Use of virtualized rendering in the data table component
-- Efficient state updates that don't require full re-renders
-
-For very large datasets, additional optimizations could include:
-- Server-side pagination
-- Virtual scrolling
+The architecture supports efficient rendering of large datasets through:
+- Server-side pagination for initial data loading
+- Virtual scrolling for list view
 - Lazy loading of alert details
 - Debounced filtering and searching
+- Efficient state updates that don't require full re-renders
 
-The use of `Promise.allSettled` for batch operations ensures that partial failures don't prevent successful resolutions, improving reliability with large selections.
+The use of React's useMemo and useCallback hooks ensures that expensive calculations and function creations only occur when dependencies change.
 
 **Section sources**
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx)
-- [data-table.tsx](file://apps/web/src/components/alerts/data-table.tsx)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx#L67-L568) - *Updated in recent commit*
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx#L59-L437) - *Updated in recent commit*

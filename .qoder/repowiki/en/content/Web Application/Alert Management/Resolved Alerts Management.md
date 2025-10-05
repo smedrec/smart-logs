@@ -2,14 +2,27 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [data-table-resolved.tsx](file://apps/web/src/components/alerts/data-table-resolved.tsx)
-- [columns.tsx](file://apps/web/src/components/alerts/columns.tsx)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [resolved.tsx](file://apps/web/src/routes/dashboard/alerts/resolved.tsx)
-- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx)
-- [form.tsx](file://apps/web/src/components/alerts/form.tsx)
-- [types.ts](file://apps/server/src/lib/graphql/types.ts)
+- [data-table-resolved.tsx](file://apps/web/src/components/alerts/data-table-resolved.tsx) - *Updated in recent commit*
+- [columns.tsx](file://apps/web/src/components/alerts/columns.tsx) - *Updated in recent commit*
+- [alerts.ts](file://apps/server/src/routers/alerts.ts) - *Updated in recent commit*
+- [resolved.tsx](file://apps/web/src/routes/dashboard/alerts/resolved.tsx) - *Updated in recent commit*
+- [active.tsx](file://apps/web/src/routes/dashboard/alerts/active.tsx) - *Updated in recent commit*
+- [form.tsx](file://apps/web/src/components/alerts/form.tsx) - *Updated in recent commit*
+- [types.ts](file://apps/server/src/lib/graphql/types.ts) - *Updated in recent commit*
+- [AlertCard.tsx](file://apps/app/src/components/alerts/core/AlertCard.tsx) - *Added in recent commit*
+- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx) - *Added in recent commit*
+- [AlertList.tsx](file://apps/app/src/components/alerts/core/AlertList.tsx) - *Added in recent commit*
+- [alert.ts](file://apps/app/src/lib/types/alert.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated property names in Alert interface from `timestamp` to `created_at` and `acknowledgedBy` to `acknowledged_by` across all components
+- Added new AlertCard, AlertDashboard, and AlertList components to the documentation
+- Updated resolution metadata section to reflect new property naming conventions
+- Added documentation for new dashboard component with board view functionality
+- Updated state transition section to reflect changes in alert property naming
+- Added new diagram for AlertCard component structure
 
 ## Table of Contents
 1. [Resolved Alerts Data Table Implementation](#resolved-alerts-data-table-implementation)
@@ -20,6 +33,7 @@
 6. [Data Consistency and Audit Logging](#data-consistency-and-audit-logging)
 7. [Bulk Resolution Operations](#bulk-resolution-operations)
 8. [Cleanup of Old Resolved Alerts](#cleanup-of-old-resolved-alerts)
+9. [New Alert Components](#new-alert-components)
 
 ## Resolved Alerts Data Table Implementation
 
@@ -103,16 +117,16 @@ tRPC-->>Frontend : Resolve query with alerts
 
 ## Resolution Metadata Display and Validation
 
-Resolution metadata is captured and displayed through a structured process that ensures data integrity and provides auditability. The metadata includes the resolution timestamp (`resolvedAt`), the resolver ID (`resolvedBy`), and optional resolution notes.
+Resolution metadata is captured and displayed through a structured process that ensures data integrity and provides auditability. The metadata includes the resolution timestamp (`resolved_at`), the resolver ID (`resolved_by`), and optional resolution notes.
 
 The `Alert` interface, defined in `types.ts`, includes optional fields for resolution metadata:
-- `resolvedAt?: string`: ISO timestamp when the alert was resolved
-- `resolvedBy?: string`: User ID of the person who resolved the alert
-- `resolution?: string`: Optional notes explaining how the alert was resolved
+- `resolved_at?: string`: ISO timestamp when the alert was resolved
+- `resolved_by?: string`: User ID of the person who resolved the alert
+- `resolution_notes?: string`: Optional notes explaining how the alert was resolved
 
 When resolving an alert, the frontend collects resolution notes through a form component that uses React Hook Form with Zod validation. The form schema validates that resolution notes are provided as a string, though they remain optional in the backend implementation.
 
-The resolution process validates that the user is authenticated by checking the session context before allowing the resolution action. The backend automatically captures the `resolvedBy` field from the session and sets the `resolvedAt` timestamp when the alert is resolved.
+The resolution process validates that the user is authenticated by checking the session context before allowing the resolution action. The backend automatically captures the `resolved_by` field from the session and sets the `resolved_at` timestamp when the alert is resolved.
 
 ```mermaid
 classDiagram
@@ -122,12 +136,12 @@ class Alert {
 +severity : AlertSeverity
 +title : string
 +description : string
-+createdAt : string
-+acknowledgedAt? : string
-+resolvedAt? : string
-+acknowledgedBy? : string
-+resolvedBy? : string
-+resolution? : string
++created_at : string
++acknowledged_at? : string
++resolved_at? : string
++acknowledged_by? : string
++resolved_by? : string
++resolution_notes? : string
 +metadata? : Record<string, any>
 }
 class ResolveAlertForm {
@@ -171,7 +185,7 @@ ResolutionForm->>ActiveAlerts : Call handleResolve with notes
 ActiveAlerts->>tRPC : resolve.mutateAsync for each alert
 tRPC->>Backend : POST /trpc/alerts.resolve
 Backend->>Backend : Validate user authentication
-Backend->>Backend : Update alert with resolvedAt, resolvedBy, resolution
+Backend->>Backend : Update alert with resolved_at, resolved_by, resolution_notes
 Backend-->>tRPC : Return success/failure
 tRPC-->>ActiveAlerts : Resolve/reject promises
 ActiveAlerts->>ActiveAlerts : Show summary toast
@@ -262,3 +276,74 @@ This functionality helps maintain system performance by preventing the accumulat
 - [data-table-resolved.tsx](file://apps/web/src/components/alerts/data-table-resolved.tsx#L0-L170)
 - [alerts.ts](file://apps/server/src/routers/alerts.ts#L172-L231)
 - [resolved.tsx](file://apps/web/src/routes/dashboard/alerts/resolved.tsx#L0-L34)
+
+## New Alert Components
+
+The alert management system has been enhanced with new components that provide improved user experience and accessibility. These components include AlertCard, AlertDashboard, and AlertList, which work together to create a comprehensive alert management interface.
+
+### AlertCard Component
+
+The AlertCard component provides a compact representation of an alert with key information and quick actions. It displays the alert title, description, severity, status, and source, along with timestamps for creation and resolution.
+
+```mermaid
+classDiagram
+class AlertCard {
++alert : Alert
++onAlertClick : (alert : Alert) => void
++onAlertAction : (alertId : string, action : 'acknowledge' | 'resolve' | 'dismiss') => void
++compact : boolean
++showActions : boolean
++className : string
++draggable : boolean
++isExpanded : boolean
++getSeverityColor(severity : AlertSeverity) : string
++getSeverityIcon(severity : AlertSeverity) : JSX.Element
++getStatusIcon(status : AlertStatus) : JSX.Element
++getSeverityBadgeVariant(severity : AlertSeverity) : string
++formatTimestamp(timestamp : Date) : string
++handleCardClick() : void
++handleAction(action : 'acknowledge' | 'resolve' | 'dismiss') : void
+}
+class Alert {
++id : string
++title : string
++description : string
++severity : AlertSeverity
++type : AlertType
++status : AlertStatus
++source : string
++created_at : string
++acknowledged_at? : string
++resolved_at? : string
++acknowledged_by? : string
++resolved_by? : string
++resolution_notes? : string
++metadata : Record<string, any>
++tags : string[]
+}
+AlertCard --> Alert : "displays"
+```
+
+**Diagram sources**
+- [AlertCard.tsx](file://apps/app/src/components/alerts/core/AlertCard.tsx#L0-L440)
+
+**Section sources**
+- [AlertCard.tsx](file://apps/app/src/components/alerts/core/AlertCard.tsx#L0-L440)
+
+### AlertDashboard Component
+
+The AlertDashboard component provides a comprehensive view of all alerts with multiple display options. It supports list, board, and statistics views, allowing users to choose the most appropriate visualization for their needs.
+
+The board view organizes alerts by status (Active, Acknowledged, Resolved, Dismissed) in separate columns, providing a Kanban-style interface for managing alert workflows. The list view displays alerts in a traditional table format with sorting and filtering capabilities.
+
+**Section sources**
+- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx#L0-L458)
+
+### AlertList Component
+
+The AlertList component displays alerts in a scrollable list format with support for virtualization when dealing with large datasets. It includes sorting controls for date and severity, and displays a count of total alerts.
+
+The component supports keyboard navigation with shortcuts (j/k for navigation, Enter for selection) and provides expandable details for each alert. When expanded, additional information such as acknowledgment and resolution details are displayed.
+
+**Section sources**
+- [AlertList.tsx](file://apps/app/src/components/alerts/core/AlertList.tsx#L0-L571)

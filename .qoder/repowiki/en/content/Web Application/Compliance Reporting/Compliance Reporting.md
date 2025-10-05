@@ -12,7 +12,20 @@
 - [scheduled-reports.tsx](file://apps/web/src/routes/dashboard/compliance/scheduled-reports.tsx)
 - [report-templates.tsx](file://apps/web/src/routes/dashboard/compliance/report-templates.tsx)
 - [export-reports.tsx](file://apps/web/src/routes/dashboard/compliance/export-reports.tsx)
+- [report-type-selector.tsx](file://apps/app/src/components/compliance/forms/report-type-selector.tsx) - *Updated in recent commit*
+- [report-details-page.tsx](file://apps/app/src/components/compliance/reports/report-details-page.tsx) - *Updated in recent commit*
+- [execution-history-page.tsx](file://apps/app/src/components/compliance/execution/execution-history-page.tsx) - *Updated in recent commit*
+- [types.ts](file://packages/audit/src/report/types.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated report types to include CUSTOM_REPORT and GENERAL_COMPLIANCE
+- Added new section on Custom Report Type and Execution Statuses
+- Updated Report Type Selector component documentation
+- Enhanced execution history and report details documentation
+- Updated type definitions for compliance reporting
+- Added new diagram for custom report workflow
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -23,7 +36,7 @@
 6. [Backend Compliance Services](#backend-compliance-services)
 7. [Data Retention and Anonymization](#data-retention-and-anonymization)
 8. [Audit Trail and Regulatory Deadline Management](#audit-trail-and-regulatory-deadline-management)
-9. [Custom Report Templates and Automated Compliance Checks](#custom-report-templates-and-automated-compliance-checks)
+9. [Custom Report Type and Execution Statuses](#custom-report-type-and-execution-statuses)
 10. [Troubleshooting Common Issues](#troubleshooting-common-issues)
 
 ## Introduction
@@ -45,6 +58,8 @@ class ComplianceReportingService {
 +generateHIPAAReport(criteria) HIPAAComplianceReport
 +generateGDPRReport(criteria) GDPRComplianceReport
 +generateIntegrityVerificationReport(criteria) IntegrityVerificationReport
++generateCustomReport(criteria) CustomComplianceReport
++generateGeneralComplianceReport(criteria) GeneralComplianceReport
 +getEvents(criteria) AuditLogEvent[]
 }
 class ScheduledReportingService {
@@ -734,113 +749,168 @@ M --> J
 - [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L600-L650)
 - [scheduled-reports.tsx](file://apps/web/src/routes/dashboard/compliance/scheduled-reports.tsx#L25-L80)
 
-## Custom Report Templates and Automated Compliance Checks
+## Custom Report Type and Execution Statuses
 
-The system supports custom report templates and automated compliance checks to meet specific organizational requirements.
+The system now supports custom report types and enhanced execution statuses to provide greater flexibility in compliance reporting.
 
-### Report Template Management
+### Custom Report Type Implementation
 
-The `ReportTemplate` interface defines reusable report configurations:
+The `ReportTypeSchema` has been updated to include 'GENERAL_COMPLIANCE' and 'CUSTOM_REPORT' types:
 
 ```typescript
-interface ReportTemplate {
+export const ReportTypeSchema = z.enum([
+	'HIPAA_AUDIT_TRAIL',
+	'GDPR_PROCESSING_ACTIVITIES',
+	'GENERAL_COMPLIANCE',
+	'INTEGRITY_VERIFICATION',
+	'CUSTOM_REPORT',
+])
+```
+
+The `ComplianceReportingService` now includes methods for generating custom and general compliance reports:
+
+```typescript
+async generateCustomReport(criteria: ReportCriteria): Promise<CustomComplianceReport> {
+  const events = await this.getEvents(criteria)
+  const baseReport = await this.generateComplianceReport(events, criteria, 'CUSTOM_REPORT')
+  
+  // Apply custom report logic
+  const customMetrics = this.generateCustomMetrics(events)
+  const customSections = this.generateCustomSections(events)
+  
+  return {
+    ...baseReport,
+    reportType: 'CUSTOM_REPORT',
+    customMetrics,
+    customSections,
+  }
+}
+
+async generateGeneralComplianceReport(criteria: ReportCriteria): Promise<GeneralComplianceReport> {
+  const events = await this.getEvents(criteria)
+  const baseReport = await this.generateComplianceReport(events, criteria, 'GENERAL_COMPLIANCE')
+  
+  // Apply general compliance logic
+  const generalMetrics = this.generateGeneralMetrics(events)
+  const riskAssessment = this.performRiskAssessment(events)
+  
+  return {
+    ...baseReport,
+    reportType: 'GENERAL_COMPLIANCE',
+    generalMetrics,
+    riskAssessment,
+  }
+}
+```
+
+### Report Type Selector Component
+
+The `ReportTypeSelector` component has been updated to include the new report types:
+
+```mermaid
+classDiagram
+class ReportTypeSelector {
++reportTypes : ReportTypeOption[]
++selectedType : ReportType
++render() JSX.Element
+}
+class ReportTypeOption {
++value : ReportType
++label : string
++description : string
++icon : React.ComponentType
++features : string[]
++compliance : string[]
++dataTypes : string[]
++helpText : string
+}
+ReportTypeSelector --> ReportTypeOption : "contains"
+```
+
+**Diagram sources**
+- [report-type-selector.tsx](file://apps/app/src/components/compliance/forms/report-type-selector.tsx#L20-L150)
+
+**Section sources**
+- [report-type-selector.tsx](file://apps/app/src/components/compliance/forms/report-type-selector.tsx#L20-L150)
+- [types.ts](file://packages/audit/src/report/types.ts#L23-L23)
+
+### Enhanced Execution Statuses
+
+The execution history page now displays enhanced status information for report executions:
+
+```typescript
+interface ReportExecution {
   id: string
-  name: string
-  description?: string
-  reportType: 'HIPAA_AUDIT_TRAIL' | 'GDPR_PROCESSING_ACTIVITIES' | 'GENERAL_COMPLIANCE' | 'INTEGRITY_VERIFICATION'
-  defaultCriteria: Partial<ReportCriteria>
-  defaultFormat: ReportFormat
-  defaultExportConfig: Partial<ExportConfig>
-  tags: string[]
-  createdAt: string
-  createdBy: string
-  updatedAt: string
-  updatedBy: string
-  isActive: boolean
+  reportId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'timeout' | 'skipped'
+  scheduledTime: string
+  executionTime?: string
+  duration?: number
+  recordsProcessed?: number
+  outputSize?: number
+  outputFormat: ReportFormat
+  triggeredBy: 'system' | 'user' | 'schedule'
+  error?: {
+    code: string
+    message: string
+  }
+  metadata: {
+    reportType: ReportType
+    version: string
+  }
 }
 ```
 
-### Creating Reports from Templates
+The `ExecutionHistoryPage` component displays execution details with status badges and performance metrics:
 
-The `createReportFromTemplate` method allows users to create scheduled reports based on predefined templates:
-
-```typescript
-async createReportFromTemplate(
-  templateId: string,
-  overrides: Partial<ScheduledReportConfig> & { organizationId: string }
-): Promise<ScheduledReportConfig> {
-  const template = await this.getReportTemplate(templateId)
-  if (!template) {
-    throw new Error(`Report template not found: ${templateId}`)
-  }
-
-  const reportConfig: Omit<ScheduledReportConfig, 'id' | 'createdAt' | 'nextRun'> & {
-    organizationId: string
-  } = {
-    ...overrides,
-    name: overrides.name || `${template.name} - ${new Date().toISOString().split('T')[0]}`,
-    description: overrides.description || template.description,
-    organizationId: overrides.organizationId,
-    templateId,
-    reportType: template.reportType,
-    criteria: {
-      ...template.defaultCriteria,
-      ...overrides.criteria,
-    } as ReportCriteria,
-    format: overrides.format || template.defaultFormat,
-    schedule: overrides.schedule || {
-      frequency: 'monthly',
-      dayOfMonth: 1,
-      time: '09:00',
-      timezone: 'UTC',
-    },
-    delivery: overrides.delivery || {
-      method: 'email',
-      recipients: [],
-    },
-    export: overrides.export || {
-      format: 'json',
-      includeMetadata: true,
-      includeIntegrityReport: false,
-    },
-    enabled: overrides.enabled !== undefined ? overrides.enabled : true,
-    createdBy: overrides.createdBy || 'system',
-  }
-
-  return this.createScheduledReport(reportConfig)
-}
+```mermaid
+sequenceDiagram
+participant User as "User Interface"
+participant Page as "ExecutionHistoryPage"
+participant Client as "Audit Client"
+User->>Page : View execution history
+Page->>Client : fetchExecutions()
+Client-->>Page : Return execution records
+Page->>Page : Render execution list
+Page->>Page : Display status badges
+Page->>Page : Show performance metrics
+Page-->>User : Display execution history
 ```
 
-### Automated Compliance Checks
+**Diagram sources**
+- [execution-history-page.tsx](file://apps/app/src/components/compliance/execution/execution-history-page.tsx#L100-L200)
 
-The system can be configured to perform automated compliance checks at regular intervals:
+**Section sources**
+- [execution-history-page.tsx](file://apps/app/src/components/compliance/execution/execution-history-page.tsx#L100-L200)
+- [report-details-page.tsx](file://apps/app/src/components/compliance/reports/report-details-page.tsx#L50-L100)
 
-```typescript
-async processDueReports(): Promise<ReportExecution[]> {
-  const now = new Date().toISOString()
+### Custom Report Workflow
 
-  // Find all enabled reports that are due for execution
-  const dueRecords = await this.db
-    .select()
-    .from(this.scheduledReports)
-    .where(
-      and(eq(this.scheduledReports.enabled, 'true'), lte(this.scheduledReports.nextRun, now))
-    )
+The custom report generation workflow supports template-based configuration and execution:
 
-  const executions: ReportExecution[] = []
-
-  for (const record of dueRecords) {
-    try {
-      const execution = await this.executeReport(record.id)
-      executions.push(execution)
-    } catch (error) {
-      console.error(`Failed to execute scheduled report ${record.id}:`, error)
-    }
-  }
-
-  return executions
-}
+```mermaid
+sequenceDiagram
+participant User as "User Interface"
+participant Form as "ReportConfigurationForm"
+participant Service as "ComplianceReportingService"
+participant DB as "Audit Database"
+User->>Form : Select CUSTOM_REPORT type
+Form->>Form : Display custom report options
+User->>Form : Configure custom report
+Form->>Service : generateCustomReport(criteria)
+Service->>DB : Query audit logs
+DB-->>Service : Return events
+Service->>Service : Apply custom logic
+Service-->>Form : Return custom report
+Form-->>User : Display custom report
 ```
+
+**Diagram sources**
+- [report-details-page.tsx](file://apps/app/src/components/compliance/reports/report-details-page.tsx#L150-L200)
+
+**Section sources**
+- [report-details-page.tsx](file://apps/app/src/components/compliance/reports/report-details-page.tsx#L150-L200)
+- [compliance-reporting.ts](file://packages/audit/src/report/compliance-reporting.ts#L260-L300)
 
 ## Troubleshooting Common Issues
 

@@ -28,6 +28,12 @@
 - [cleanup-old-alerts.ts](file://apps\server\src\lib\inngest\functions\alerts\cleanup-old-alerts.ts) - *Updated in recent commit*
 - [sendEmail.ts](file://apps\server\src\lib\inngest\functions\emails\sendEmail.ts) - *Updated in recent commit*
 - [connection.ts](file://packages\redis-client\src\connection.ts) - *Updated in recent commit*
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx) - *Updated in recent commit*
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx) - *Updated in recent commit*
+- [AlertDetails.tsx](file://apps\app\src\components\alerts\core\AlertDetails.tsx) - *Updated in recent commit*
+- [alert.ts](file://apps\app\src\lib\types\alert.ts) - *Updated in recent commit*
+- [collections.ts](file://apps\app\src\lib\collections.ts) - *Updated in recent commit*
+- [types.ts](file://apps\server\src\lib\graphql\types.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
@@ -40,6 +46,11 @@
 - Updated Section sources to include newly analyzed files
 - Added Redis connection error handling and logging improvements from recent commits
 - Updated error handling documentation to reflect enhanced logging practices in Inngest functions
+- Updated Alert Management API documentation to reflect breaking changes in alert properties
+- Added documentation for the removal of /alerts/board route
+- Updated alert property names from timestamp to created_at and acknowledgedBy to acknowledged_by
+- Added new section for Alert Management API with updated field mappings
+- Updated request/response examples to reflect new alert field names
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -57,6 +68,7 @@
 13. [Enhanced Structured Logging System](#enhanced-structured-logging-system)
 14. [KMS Integration and Enhanced OTLP Exporter](#kms-integration-and-enhanced-otlp-exporter)
 15. [Request and Response Examples](#request-and-response-examples)
+16. [Alert Management API](#alert-management-api)
 
 ## Introduction
 The SMEDREC Audit System REST API provides comprehensive access to healthcare audit functionality through a well-structured RESTful interface. The API supports audit event management, compliance reporting, system monitoring, and observability features. Built on Hono with OpenAPI documentation, the API follows modern REST principles with robust security, rate limiting, and error handling.
@@ -975,3 +987,105 @@ curl -X POST https://api.smedrec.com/api/v1/organization/role \
 - [audit-api.ts](file://apps\server\src\routes\audit-api.ts#L0-L199)
 - [health-api.ts](file://apps\server\src\routes\health-api.ts#L0-L199)
 - [organization-api.ts](file://apps\server\src\routes\organization-api.ts#L1-L222)
+
+## Alert Management API
+The Alert Management API provides endpoints for managing system alerts with updated field mappings and route changes.
+
+### Base Path
+`/api/v1/alerts`
+
+### Alert Object Structure
+The alert object has been updated with new field names to improve consistency and clarity:
+
+**Updated Field Mappings**:
+- `timestamp` → `created_at` (ISO 8601 formatted string)
+- `acknowledgedBy` → `acknowledged_by` (string)
+- `acknowledgedAt` → `acknowledged_at` (ISO 8601 formatted string)
+- `resolvedBy` → `resolved_by` (string)
+- `resolvedAt` → `resolved_at` (ISO 8601 formatted string)
+
+**Alert Schema**:
+```json
+{
+  "id": "alrt_123",
+  "title": "High CPU Usage",
+  "description": "CPU usage has exceeded 90% for the past 5 minutes",
+  "severity": "HIGH",
+  "type": "PERFORMANCE",
+  "status": "active",
+  "source": "system-monitor",
+  "created_at": "2024-01-01T10:00:00.000Z",
+  "acknowledged_at": "2024-01-01T10:05:00.000Z",
+  "acknowledged_by": "usr_456",
+  "resolved_at": "2024-01-01T10:15:00.000Z",
+  "resolved_by": "usr_789",
+  "resolutionNotes": "Restarted monitoring service",
+  "metadata": {
+    "cpu_usage": 95,
+    "process_count": 150
+  },
+  "tags": ["performance", "system"]
+}
+```
+
+### Route Changes
+The `/alerts/board` route has been removed as part of the UI refactoring. The primary alert endpoints are now:
+
+- `GET /alerts`: List all alerts (replaces board view functionality)
+- `GET /alerts/{id}`: Get specific alert details
+- `POST /alerts/{id}/acknowledge`: Acknowledge an alert
+- `POST /alerts/{id}/resolve`: Resolve an alert
+- `POST /alerts/{id}/dismiss`: Dismiss an alert
+
+### Query Parameters
+The alert listing endpoint supports the following query parameters for filtering and sorting:
+
+- `severity`: Filter by alert severity (CRITICAL, HIGH, MEDIUM, LOW, INFO)
+- `type`: Filter by alert type (SYSTEM, SECURITY, PERFORMANCE, COMPLIANCE, CUSTOM)
+- `status`: Filter by alert status (active, acknowledged, resolved, dismissed)
+- `source`: Filter by source system
+- `startDate`, `endDate`: Time range filtering by created_at
+- `limit`: Items per page (default: 50, maximum: 100)
+- `offset`: Items to skip
+- `sortField`: Field to sort by (created_at, severity, status)
+- `sortDirection`: Sort direction (asc, desc)
+
+### Response Format
+The alert listing endpoint returns a paginated response:
+
+```json
+{
+  "alerts": [
+    {
+      "id": "alrt_123",
+      "title": "Security Breach Attempt",
+      "description": "Multiple failed login attempts detected",
+      "severity": "CRITICAL",
+      "type": "SECURITY",
+      "status": "active",
+      "source": "auth-service",
+      "created_at": "2024-01-01T09:30:00.000Z",
+      "metadata": {
+        "ip_address": "192.168.1.100",
+        "attempt_count": 15
+      },
+      "tags": ["security", "login"]
+    }
+  ],
+  "pagination": {
+    "total": 25,
+    "limit": 50,
+    "offset": 0,
+    "hasNext": false,
+    "hasPrevious": false
+  }
+}
+```
+
+**Section sources**
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx#L1-L459)
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx#L1-L572)
+- [AlertDetails.tsx](file://apps\app\src\components\alerts\core\AlertDetails.tsx#L1-L520)
+- [alert.ts](file://apps\app\src\lib\types\alert.ts#L52-L83)
+- [collections.ts](file://apps\app\src\lib\collections.ts#L57-L57)
+- [types.ts](file://apps\server\src\lib\graphql\types.ts#L254-L267)

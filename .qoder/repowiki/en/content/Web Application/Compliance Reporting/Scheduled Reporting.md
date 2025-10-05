@@ -2,10 +2,19 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts)
-- [scheduled-reports.ts](file://apps/server/src/lib/graphql/resolvers/scheduled-reports.ts)
-- [scheduled-reporting.test.ts](file://packages/audit/src/__tests__/scheduled-reporting.test.ts)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts) - *Updated with enhanced scheduling options*
+- [scheduled-report-api.ts](file://apps/server/src/routes/scheduled-report-api.ts) - *Enhanced API with execution history support*
+- [scheduled-reports.tsx](file://apps/app/src/routes/_authenticated/compliance/scheduled-reports/index.tsx) - *Updated UI implementation*
+- [executions.tsx](file://apps/app/src/routes/_authenticated/compliance/scheduled-reports/$reportId/executions.tsx) - *New execution history component*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated scheduling configuration with advanced recurrence options
+- Added execution history functionality and API endpoints
+- Enhanced delivery configuration with detailed retry and notification settings
+- Updated UI route structure to support execution history
+- Added new section on execution history monitoring
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -15,8 +24,9 @@
 5. [GraphQL API Interface](#graphql-api-interface)
 6. [Report Templates and Configuration](#report-templates-and-configuration)
 7. [Error Handling and Monitoring](#error-handling-and-monitoring)
-8. [Testing and Validation](#testing-and-validation)
-9. [Best Practices and Recommendations](#best-practices-and-recommendations)
+8. [Execution History and Monitoring](#execution-history-and-monitoring)
+9. [Testing and Validation](#testing-and-validation)
+10. [Best Practices and Recommendations](#best-practices-and-recommendations)
 
 ## Introduction
 
@@ -60,11 +70,11 @@ B --> F
 
 **Diagram sources**
 - [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts)
-- [scheduled-reports.ts](file://apps/server/src/lib/graphql/resolvers/scheduled-reports.ts)
+- [scheduled-report-api.ts](file://apps/server/src/routes/scheduled-report-api.ts)
 
 **Section sources**
 - [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts)
-- [scheduled-reports.ts](file://apps/server/src/lib/graphql/resolvers/scheduled-reports.ts)
+- [scheduled-report-api.ts](file://apps/server/src/routes/scheduled-report-api.ts)
 
 ## Report Scheduling and Execution
 
@@ -77,32 +87,54 @@ The `calculateNextRun` method determines when a report should next execute based
 ```typescript
 private calculateNextRun(schedule: ScheduledReportConfig['schedule']): string {
     const now = new Date()
-    const [hours, minutes] = schedule.time.split(':').map(Number)
-    
+    const hours = schedule.hour
+    const minutes = schedule.minute
+
     let nextRun = new Date(now)
     nextRun.setHours(hours, minutes, 0, 0)
-    
+
+    if (schedule.timezone) {
+        // Note: Proper timezone handling would require a library like 'luxon' or 'date-fns-tz'
+        // This is a placeholder implementation assuming server is in UTC
+        // In production, convert 'nextRun' to the specified timezone
+    }
+
+    // If the time has already passed today, move to the next occurrence
     if (nextRun <= now) {
         switch (schedule.frequency) {
+            case 'hourly':
+                nextRun.setHours(nextRun.getHours() + 1)
+                break
             case 'daily':
                 nextRun.setDate(nextRun.getDate() + 1)
                 break
-            case 'weekly':
-                const targetDay = schedule.dayOfWeek || 1
-                const currentDay = nextRun.getDay()
+            case 'weekly': {
+                const targetDay = Number(schedule.dayOfWeek ?? 0) // Default to Sunday
+                const currentDay = Number(nextRun.getDay())
                 const daysUntilTarget = (targetDay - currentDay + 7) % 7 || 7
                 nextRun.setDate(nextRun.getDate() + daysUntilTarget)
                 break
-            case 'monthly':
+            }
+            case 'monthly': {
                 const targetDate = schedule.dayOfMonth || 1
                 nextRun.setMonth(nextRun.getMonth() + 1, targetDate)
                 break
+            }
             case 'quarterly':
                 nextRun.setMonth(nextRun.getMonth() + 3, schedule.dayOfMonth || 1)
                 break
+            case 'yearly':
+                nextRun.setFullYear(
+                    nextRun.getFullYear() + 1,
+                    schedule.monthOfYear || 1,
+                    schedule.dayOfMonth || 1
+                )
+                break
+            default:
+                throw new Error(`Unsupported schedule frequency: ${schedule.frequency}`)
         }
     }
-    
+
     return nextRun.toISOString()
 }
 ```
@@ -137,10 +169,10 @@ S->>DB : Update next run time
 ```
 
 **Diagram sources**
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L400-L600)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L547-L662)
 
 **Section sources**
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L400-L600)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L547-L662)
 
 ## Delivery Mechanisms and Retry Logic
 
@@ -195,6 +227,14 @@ private async deliverReport(
             case 'storage':
                 await this.deliverViaStorage(config.delivery, reportResult, deliveryAttempt)
                 break
+            case 'sftp':
+            case 'download':
+                console.warn(`Delivery method ${config.delivery.method} not yet implemented`)
+                deliveryAttempt.status = 'failed'
+                deliveryAttempt.error = `Delivery method ${config.delivery.method} not yet implemented`
+                throw new Error(deliveryAttempt.error)
+            default:
+                throw new Error(`Unsupported delivery method: ${config.delivery.method}`)
         }
 
         deliveryAttempt.status = 'delivered'
@@ -227,10 +267,10 @@ B --> |No| K[No Action Needed]
 The retry process preserves the original execution context and updates the delivery attempts array in the database. Each retry increments the retry count and records the attempt timestamp.
 
 **Diagram sources**
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L800-L916)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L950-L1002)
 
 **Section sources**
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L800-L916)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L950-L1002)
 
 ## GraphQL API Interface
 
@@ -354,10 +394,10 @@ Resolver-->>Client : Return scheduled report
 ```
 
 **Diagram sources**
-- [scheduled-reports.ts](file://apps/server/src/lib/graphql/resolvers/scheduled-reports.ts)
+- [scheduled-report-api.ts](file://apps/server/src/routes/scheduled-report-api.ts)
 
 **Section sources**
-- [scheduled-reports.ts](file://apps/server/src/lib/graphql/resolvers/scheduled-reports.ts)
+- [scheduled-report-api.ts](file://apps/server/src/routes/scheduled-report-api.ts)
 
 ## Report Templates and Configuration
 
@@ -387,7 +427,12 @@ async createReportFromTemplate(
         throw new Error(`Report template not found: ${templateId}`)
     }
 
-    const reportConfig = {
+    const reportConfig: Omit<
+        ScheduledReportConfig,
+        'id' | 'createdAt' | 'updatedAt' | 'nextRun' | 'version'
+    > & {
+        organizationId: string
+    } = {
         ...overrides,
         name: overrides.name || `${template.name} - ${new Date().toISOString().split('T')[0]}`,
         description: overrides.description || template.description,
@@ -397,25 +442,54 @@ async createReportFromTemplate(
         criteria: {
             ...template.defaultCriteria,
             ...overrides.criteria,
-        },
+        } as ReportCriteria,
         format: overrides.format || template.defaultFormat,
         schedule: overrides.schedule || {
             frequency: 'monthly',
-            dayOfMonth: 1,
-            time: '09:00',
             timezone: 'UTC',
+            hour: 9,
+            minute: 0,
+            dayOfMonth: 1,
+            skipWeekends: false,
+            skipHolidays: false,
+            maxMissedRuns: 3,
+            catchUpMissedRuns: false,
         },
         delivery: overrides.delivery || {
             method: 'email',
-            recipients: [],
+            email: {
+                smtpConfig: {
+                    host: 'smtp.example.com',
+                    port: 587,
+                    secure: false,
+                    auth: {
+                        user: 'user',
+                        pass: 'pass',
+                    },
+                },
+                from: 'reports@smedrec.com',
+                subject: `Scheduled Report: ${template.name}`,
+                bodyTemplate: 'Please find the attached report.',
+                attachmentName: `report-${new Date().toISOString().split('T')[0]}.json`,
+                recipients: ['teste@exemplo.com'],
+            },
         },
         export: overrides.export || {
             format: 'json',
             includeMetadata: true,
             includeIntegrityReport: false,
         },
+        notification: overrides.notification || {
+            recipients: ['reports@smedrec.com'],
+            onSuccess: false,
+            onFailure: true,
+            onSkip: false,
+            includeReport: false,
+        },
         enabled: overrides.enabled !== undefined ? overrides.enabled : true,
         createdBy: overrides.createdBy || 'system',
+        tags: overrides.tags || template.tags || [],
+        metadata: overrides.metadata || {},
     }
 
     return this.createScheduledReport(reportConfig)
@@ -425,7 +499,7 @@ async createReportFromTemplate(
 This approach ensures consistency across reports while allowing necessary customization for specific use cases.
 
 **Section sources**
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L600-L800)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L840-L915)
 
 ## Error Handling and Monitoring
 
@@ -480,7 +554,145 @@ try {
 - Consider adding metrics for execution duration, success rates, and delivery performance
 
 **Section sources**
-- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L400-L600)
+- [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts#L547-L662)
+
+## Execution History and Monitoring
+
+The system now provides comprehensive execution history tracking for scheduled reports, allowing users to monitor report execution status and troubleshoot issues.
+
+### Execution History API
+
+The system exposes a dedicated endpoint for retrieving execution history:
+
+```typescript
+const getExecutionHistoryRoute = createRoute({
+    method: 'get',
+    path: '/{id}/executions',
+    tags: ['Scheduled Reports'],
+    summary: 'Get execution history for a scheduled report',
+    description: 'Retrieves the execution history for a specific scheduled report.',
+    request: {
+        params: z.object({
+            id: z.string().startsWith('report-'),
+        }),
+        query: z.object({
+            status: z
+                .array(
+                    z.enum(['pending', 'running', 'completed', 'failed', 'cancelled', 'skipped', 'timeout'])
+                )
+                .optional(),
+            trigger: z.array(z.enum(['scheduled', 'manual', 'api', 'retry', 'catchup'])).optional(),
+            startDate: z.string().datetime().optional(),
+            endDate: z.string().datetime().optional(),
+            limit: z.string().optional(),
+            offset: z.string().optional(),
+            sortBy: z.enum(['scheduled_time', 'execution_time', 'duration', 'status']).optional(),
+            sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
+        }),
+    },
+    responses: {
+        200: {
+            description: 'Execution history retrieved successfully',
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        data: z.array(
+                            z.object({
+                                id: z.string().startsWith('execution-'),
+                                scheduledReportId: z.string(),
+                                status: z.enum([
+                                    'pending',
+                                    'running',
+                                    'completed',
+                                    'failed',
+                                    'cancelled',
+                                    'skipped',
+                                    'timeout',
+                                ]),
+                                trigger: z.enum(['scheduled', 'manual', 'api', 'retry', 'catchup']),
+                                scheduledTime: z.string().datetime(),
+                                executionTime: z.string().datetime().optional(),
+                                duration: z.number().min(0).optional(),
+                                reportId: z.string().optional(),
+                                recordsProcessed: z.number().int().min(0).optional(),
+                                deliveryAttempts: z.array(
+                                    z.object({
+                                        attemptId: z.string(),
+                                        timestamp: z.string().datetime(),
+                                        status: z.enum(['pending', 'delivered', 'failed', 'skipped']),
+                                        method: z.enum(['email', 'webhook', 'storage', 'download', 'sftp']),
+                                        target: z.string(),
+                                        error: z
+                                            .object({
+                                                code: z.string(),
+                                                message: z.string(),
+                                                details: z.record(z.string(), z.any()).optional(),
+                                                stackTrace: z.string().optional(),
+                                            })
+                                            .optional(),
+                                        responseCode: z.number().optional(),
+                                        responseTime: z.number().optional(),
+                                        retryCount: z.number().int().min(0),
+                                    })
+                                ),
+                                error: z
+                                    .object({
+                                        code: z.string(),
+                                        message: z.string(),
+                                        details: z.record(z.string(), z.any()).optional(),
+                                        stackTrace: z.string().optional(),
+                                    })
+                                    .optional(),
+                            })
+                        ),
+                        pagination: z.object({
+                            total: z.number().int().min(0),
+                            limit: z.number().int().min(1),
+                            offset: z.number().int().min(0),
+                            hasNext: z.boolean(),
+                            hasPrevious: z.boolean(),
+                            nextCursor: z.string().optional(),
+                            previousCursor: z.string().optional(),
+                        }),
+                    }),
+                },
+            },
+        },
+        ...openApiErrorResponses,
+    },
+})
+```
+
+### UI Implementation
+
+The frontend provides a dedicated interface for viewing execution history:
+
+```typescript
+export const Route = createFileRoute(
+    '/_authenticated/compliance/scheduled-reports/$reportId/executions'
+)({
+    component: RouteComponent,
+    validateSearch: executionHistorySearchSchema,
+    beforeLoad: ({ context, params }) => {
+        // Route guard: ensure user has permission to view execution history
+        // and validate that reportId is a valid format
+        if (!params.reportId || params.reportId.trim() === '') {
+            throw new Error('Invalid report ID')
+        }
+        return context
+    },
+})
+
+function RouteComponent() {
+    const { reportId } = Route.useParams()
+
+    return <ExecutionHistoryPage reportId={reportId} />
+}
+```
+
+**Section sources**
+- [scheduled-report-api.ts](file://apps/server/src/routes/scheduled-report-api.ts#L400-L690)
+- [executions.tsx](file://apps/app/src/routes/_authenticated/compliance/scheduled-reports/$reportId/executions.tsx)
 
 ## Testing and Validation
 
@@ -619,5 +831,5 @@ const response = await fetch('/graphql', {
 
 **Section sources**
 - [scheduled-reporting.ts](file://packages/audit/src/report/scheduled-reporting.ts)
-- [scheduled-reports.ts](file://apps/server/src/lib/graphql/resolvers/scheduled-reports.ts)
+- [scheduled-report-api.ts](file://apps/server/src/routes/scheduled-report-api.ts)
 - [scheduled-reporting.test.ts](file://packages/audit/src/__tests__/scheduled-reporting.test.ts)
