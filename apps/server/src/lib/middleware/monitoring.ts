@@ -289,7 +289,7 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 						type: 'METRICS',
 						title: 'High Error Rate Detected',
 						description: `Error rate for ${c.req.method} ${c.req.path} is ${(errorRate * 100).toFixed(2)}%`,
-						timestamp: new Date().toISOString(),
+						createdAt: new Date().toISOString(),
 						source: 'error-rate-monitor',
 						status: 'active',
 						metadata: {
