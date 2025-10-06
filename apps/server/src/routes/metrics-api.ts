@@ -602,12 +602,12 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			// Acknowledge alert using enhanced alerting service
 			const result = await monitor.alert.acknowledgeAlert(id, session.session.userId)
 
-			if (!alert) {
+			/**if (!alert) {
 				throw new ApiError({
 					code: 'NOT_FOUND',
 					message: 'Alert not found',
 				})
-			}
+			}*/
 
 			logger.info('Alert acknowledged', {
 				requestId,
@@ -661,12 +661,12 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 				resolutionNotes: resolution,
 			})
 
-			if (!result) {
+			/**if (!result) {
 				throw new ApiError({
 					code: 'NOT_FOUND',
 					message: 'Alert not found',
 				})
-			}
+			}*/
 
 			logger.info('Alert resolved', {
 				requestId,
@@ -715,12 +715,12 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			// Acknowledge alert using enhanced alerting service
 			const result = await monitor.alert.dismissAlert(id, session.session.userId)
 
-			if (!alert) {
+			/**if (!alert) {
 				throw new ApiError({
 					code: 'NOT_FOUND',
 					message: 'Alert not found',
 				})
-			}
+			}*/
 
 			logger.info('Alert dismissed', {
 				requestId,

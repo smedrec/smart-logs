@@ -18,7 +18,7 @@ export interface AlertActionRequest {
 	alertId: string
 	action: AlertAction
 	notes?: string
-	userId: string
+	userId?: string
 }
 
 export interface AlertBulkActionRequest {

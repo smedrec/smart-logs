@@ -30,7 +30,7 @@ const AlertSchema = z.object({
 	resolved: z.string().default('false'),
 	resolved_at: z.iso.datetime().optional(),
 	resolved_by: z.string().optional(),
-	resolutionNotes: z.string().optional(),
+	resolution_notes: z.string().optional(),
 	tags: z.array(z.string()).optional(),
 	created_at: z.iso.datetime(),
 	updated_at: z.iso.datetime(),

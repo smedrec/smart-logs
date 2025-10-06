@@ -241,6 +241,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 					resolved = 'true',
 					resolved_at = ${now},
 					resolved_by = ${dismissedBy},
+					resolution_notes = 'Dismissed by user',
 					updated_at = ${now}
 				WHERE id = ${alertId}
 				RETURNING id

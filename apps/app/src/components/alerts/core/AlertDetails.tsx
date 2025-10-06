@@ -24,6 +24,7 @@ import {
 	Eye,
 	FileText,
 	History,
+	NotebookText,
 	Settings,
 	Tag,
 	User,
@@ -54,7 +55,7 @@ interface AlertHistoryEntry {
 	id: string
 	action: string
 	user: string
-	createdAt: string
+	timestamp: string
 	notes?: string
 }
 
@@ -75,36 +76,36 @@ export function AlertDetails({
 
 	// Mock history data - in real implementation, this would come from props or API
 	// Not implemented
-	/*const alertHistory: AlertHistoryEntry[] = [
+	const alertHistory: AlertHistoryEntry[] = [
 		{
 			id: '1',
 			action: 'Created',
-			user: 'System',
-			timestamp: alert.timestamp,
+			user: alert.source.replace('-', ' ').toUpperCase(),
+			timestamp: alert.created_at,
 		},
-		...(alert.acknowledgedBy
+		...(alert.acknowledged_by
 			? [
 					{
 						id: '2',
 						action: 'Acknowledged',
-						user: alert.acknowledgedBy,
-						timestamp: alert.acknowledgedAt!,
+						user: alert.acknowledged_by,
+						timestamp: alert.acknowledged_at!,
 					},
 				]
 			: []),
-		...(alert.resolvedBy
+		...(alert.resolved_by
 			? [
 					{
 						id: '3',
-						action: 'Resolved',
-						user: alert.resolvedBy,
-						timestamp: alert.resolvedAt!,
-						notes: alert.resolutionNotes,
+						action: alert.status === 'dismissed' ? 'Dismissed' : 'Resolved',
+						user: alert.resolved_by,
+						timestamp: alert.resolved_at!,
+						notes: alert.resolution_notes,
 					},
 				]
 			: []),
-	]*/
-	const alertHistory: AlertHistoryEntry[] = []
+	]
+	//const alertHistory: AlertHistoryEntry[] = []
 
 	const getSeverityColor = (severity: AlertSeverity) => {
 		switch (severity) {
@@ -316,7 +317,7 @@ export function AlertDetails({
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
-								<ScrollArea className="h-64">
+								<ScrollArea className="h-48">
 									<div className="space-y-4">
 										{alertHistory.map((entry, index) => (
 											<div key={entry.id} className="flex items-start space-x-3">
@@ -327,11 +328,11 @@ export function AlertDetails({
 															{entry.action} by {entry.user}
 														</p>
 														<p className="text-xs text-muted-foreground">
-															{formatRelativeTime(entry.createdAt)}
+															{formatRelativeTime(entry.timestamp)}
 														</p>
 													</div>
 													<p className="text-xs text-muted-foreground">
-														{formatTimestamp(entry.createdAt)}
+														{formatTimestamp(entry.timestamp)}
 													</p>
 													{entry.notes && (
 														<p className="text-sm text-muted-foreground mt-1">
@@ -464,6 +465,19 @@ export function AlertDetails({
 												<p className="text-xs text-muted-foreground">
 													{formatTimestamp(alert.resolved_at!)}
 												</p>
+											</div>
+										</div>
+									</>
+								)}
+
+								{alert.resolution_notes && (
+									<>
+										<Separator />
+										<div className="flex items-center space-x-2">
+											<NotebookText className="h-4 w-4 text-muted-foreground" />
+											<div>
+												<p className="text-sm font-medium">Notes</p>
+												<p className="text-xs text-muted-foreground">{alert.resolution_notes}</p>
 											</div>
 										</div>
 									</>

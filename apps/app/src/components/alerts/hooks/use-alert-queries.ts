@@ -16,9 +16,11 @@ import {
 	type AlertListResponse,
 } from '@/components/alerts/types/api-types'
 import { useAuditContext } from '@/contexts/audit-provider'
+import { authStateCollection } from '@/lib/auth-client'
 import { AlertApiService, AlertApiServiceError } from '@/lib/services/alert-api'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
+import { toast } from 'sonner'
 
 import type { AlertStatistics, AlertUI } from '@/components/alerts/types/alert-types'
 import type { AlertFilters } from '@/components/alerts/types/filter-types'
@@ -155,6 +157,7 @@ export function useAlertStatistics(organizationId: string, options: UseAlertQuer
  * Hook for alert action mutations (acknowledge, resolve, dismiss)
  */
 export function useAlertAction() {
+	const organizationId = authStateCollection.get('auth')?.session.activeOrganizationId
 	const apiService = useAlertApiService()
 	const queryClient = useQueryClient()
 
@@ -162,10 +165,9 @@ export function useAlertAction() {
 		mutationFn: (request: AlertActionRequest) => apiService.acknowledgeAlert(request),
 		onMutate: async (request) => {
 			// Cancel outgoing refetches
-			await queryClient.cancelQueries({ queryKey: alertQueryKeys.detail(request.alertId) })
-
+			//await queryClient.cancelQueries({ queryKey: alertQueryKeys.detail(request.alertId) })
 			// Snapshot previous value
-			const previousAlert = queryClient.getQueryData<AlertUI>(
+			/**const previousAlert = queryClient.getQueryData<AlertUI>(
 				alertQueryKeys.detail(request.alertId)
 			)
 
@@ -179,30 +181,32 @@ export function useAlertAction() {
 				})
 			}
 
-			return { previousAlert }
+			return { previousAlert }*/
 		},
 		onError: (error, request, context) => {
 			// Rollback optimistic update
-			if (context?.previousAlert) {
+			/**if (context?.previousAlert) {
 				queryClient.setQueryData(alertQueryKeys.detail(request.alertId), context.previousAlert)
-			}
+			}*/
+			toast.error('Failed to acknowledge alert', { description: error.message })
 		},
 		onSuccess: (data, request) => {
 			// Update the alert detail cache
-			queryClient.setQueryData(alertQueryKeys.detail(request.alertId), data.alert)
+			//queryClient.setQueryData(alertQueryKeys.detail(request.alertId), data.alert)
 
 			// Invalidate related queries
-			queryClient.invalidateQueries({ queryKey: alertQueryKeys.lists() })
+			//queryClient.invalidateQueries({ queryKey: alertQueryKeys.lists() })
 			queryClient.invalidateQueries({
-				queryKey: alertQueryKeys.statistics(data.alert.organizationId),
+				queryKey: alertQueryKeys.statistics(organizationId),
 			})
+			toast.success('Alert acknowledged successfully')
 		},
 	})
 
 	const resolveMutation = useMutation({
 		mutationFn: (request: AlertActionRequest) => apiService.resolveAlert(request),
 		onMutate: async (request) => {
-			await queryClient.cancelQueries({ queryKey: alertQueryKeys.detail(request.alertId) })
+			/**await queryClient.cancelQueries({ queryKey: alertQueryKeys.detail(request.alertId) })
 
 			const previousAlert = queryClient.getQueryData<AlertUI>(
 				alertQueryKeys.detail(request.alertId)
@@ -218,26 +222,28 @@ export function useAlertAction() {
 				})
 			}
 
-			return { previousAlert }
+			return { previousAlert }*/
 		},
 		onError: (error, request, context) => {
-			if (context?.previousAlert) {
+			/**if (context?.previousAlert) {
 				queryClient.setQueryData(alertQueryKeys.detail(request.alertId), context.previousAlert)
-			}
+			}*/
+			toast.error('Failed to resolve alert', { description: error.message })
 		},
 		onSuccess: (data, request) => {
-			queryClient.setQueryData(alertQueryKeys.detail(request.alertId), data.alert)
-			queryClient.invalidateQueries({ queryKey: alertQueryKeys.lists() })
+			//queryClient.setQueryData(alertQueryKeys.detail(request.alertId), data.alert)
+			//queryClient.invalidateQueries({ queryKey: alertQueryKeys.lists() })
 			queryClient.invalidateQueries({
-				queryKey: alertQueryKeys.statistics(data.alert.organizationId),
+				queryKey: alertQueryKeys.statistics(organizationId),
 			})
+			toast.success('Alert resolved successfully')
 		},
 	})
 
 	const dismissMutation = useMutation({
 		mutationFn: (request: AlertActionRequest) => apiService.dismissAlert(request),
 		onMutate: async (request) => {
-			await queryClient.cancelQueries({ queryKey: alertQueryKeys.detail(request.alertId) })
+			/**await queryClient.cancelQueries({ queryKey: alertQueryKeys.detail(request.alertId) })
 
 			const previousAlert = queryClient.getQueryData<AlertUI>(
 				alertQueryKeys.detail(request.alertId)
@@ -250,19 +256,21 @@ export function useAlertAction() {
 				})
 			}
 
-			return { previousAlert }
+			return { previousAlert }*/
 		},
 		onError: (error, request, context) => {
-			if (context?.previousAlert) {
+			/**if (context?.previousAlert) {
 				queryClient.setQueryData(alertQueryKeys.detail(request.alertId), context.previousAlert)
-			}
+			}*/
+			toast.error('Failed to dismiss alert', { description: error.message })
 		},
 		onSuccess: (data, request) => {
-			queryClient.setQueryData(alertQueryKeys.detail(request.alertId), data.alert)
-			queryClient.invalidateQueries({ queryKey: alertQueryKeys.lists() })
+			//queryClient.setQueryData(alertQueryKeys.detail(request.alertId), data.alert)
+			//queryClient.invalidateQueries({ queryKey: alertQueryKeys.lists() })
 			queryClient.invalidateQueries({
-				queryKey: alertQueryKeys.statistics(data.alert.organizationId),
+				queryKey: alertQueryKeys.statistics(organizationId),
 			})
+			toast.success('Alert dismissed successfully')
 		},
 	})
 

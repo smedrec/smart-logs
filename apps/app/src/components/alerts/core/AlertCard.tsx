@@ -364,9 +364,9 @@ export function AlertCard({
 											minute: '2-digit',
 										}).format(new Date(alert.resolved_at!))}
 									</div>
-									{alert.resolutionNotes && (
+									{alert.resolution_notes && (
 										<div className="text-xs text-muted-foreground">
-											<strong>Notes:</strong> {alert.resolutionNotes}
+											<strong>Notes:</strong> {alert.resolution_notes}
 										</div>
 									)}
 								</div>

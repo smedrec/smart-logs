@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 
 import { AlertStatistics } from '../data/AlertStatistics'
 import { ALERT_SHORTCUTS, useAlertKeyboardNavigation } from '../hooks/use-alert-keyboard-navigation'
+import { useAlertAction } from '../hooks/use-alert-queries'
 import { useAlertDashboardLayout, useAlertTouchFriendly } from '../hooks/use-alert-responsive'
 import { AlertResponsiveContainer, AlertResponsiveGrid } from '../layout/alert-responsive-container'
 import AlertKeyboardShortcutsDialog from '../navigation/alert-keyboard-shortcuts-dialog'
@@ -59,6 +60,7 @@ export function AlertDashboard({
 	const [currentView, setCurrentView] = useState<'list' | 'board' | 'statistics'>(view)
 	const [showShortcuts, setShowShortcuts] = useState(false)
 	const [filters, setFilters] = useState<AlertFilters>(initialFilters ?? {})
+	const { acknowledge, resolve, dismiss } = useAlertAction()
 
 	// Responsive layout hooks
 	const { headerLayout, actionButtonsLayout, spacing, isMobile, isTablet } =
@@ -86,7 +88,20 @@ export function AlertDashboard({
 	}
 
 	const handleAlertAction = (alertId: string, action: string) => {
-		toast.success(`Alert ${alertId} ${action} triggered`)
+		switch (action) {
+			case 'acknowledge':
+				acknowledge.mutate({ alertId, action })
+				break
+			case 'resolve':
+				resolve.mutate({ alertId, action })
+				break
+			case 'dismiss':
+				dismiss.mutate({ alertId, action })
+				break
+			default:
+				toast.error('Invalid action')
+				break
+		}
 	}
 
 	// Keyboard shortcuts for the dashboard
@@ -345,7 +360,9 @@ export function AlertDashboard({
 										{/* AlertCard components will be rendered here */}
 										<div className="text-center py-4 text-sm text-muted-foreground">
 											{alerts
-												.filter((alert) => alert.resolved === 'false')
+												.filter(
+													(alert) => alert.resolved === 'false' && alert.acknowledged === 'false'
+												)
 												.map((alert) => (
 													<AlertCard
 														alert={alert}
@@ -391,7 +408,7 @@ export function AlertDashboard({
 									<CardContent className="space-y-2">
 										<div className="text-center py-4 text-sm text-muted-foreground">
 											{alerts
-												.filter((alert) => alert.resolved === 'true')
+												.filter((alert) => alert.resolved === 'true' && alert.status === 'resolved')
 												.map((alert) => (
 													<AlertCard
 														alert={alert}
