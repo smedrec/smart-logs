@@ -152,7 +152,7 @@ export function AlertDashboard({
 				{/* Skip Links for Accessibility */}
 				<AlertSkipLinks />
 
-				{/* Dashboard Header */}
+				{/* Dashboard Header
 				<AlertSkipTarget
 					id="alert-main-content"
 					as="div"
@@ -170,9 +170,9 @@ export function AlertDashboard({
 						<p className={cn('text-muted-foreground', isMobile ? 'text-xs' : 'text-sm')}>
 							Monitor and manage system alerts across your organization
 						</p>
-					</div>
+					</div>  */}
 
-					{/* Dashboard Actions */}
+				{/* Dashboard Actions 
 					<AlertSkipTarget
 						id="alert-actions"
 						as="div"
@@ -221,13 +221,19 @@ export function AlertDashboard({
 							triggerSize={isMobile ? 'sm' : 'sm'}
 						/>
 					</AlertSkipTarget>
-				</AlertSkipTarget>
+				</AlertSkipTarget> */}
 
-				{/* Compliance Page Header */}
+				{/* Page Header */}
 				<PageHeader
 					title="Alert Management"
 					description="Monitor and manage system alerts across your organization"
 					actions={[
+						{
+							label: 'Filters',
+							href: `/settings/alerts`,
+							variant: 'outline',
+							icon: Filter,
+						},
 						{
 							label: 'Settings',
 							href: `/settings/alerts`,

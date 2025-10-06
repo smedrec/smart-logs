@@ -1,14 +1,20 @@
 import { AlertList } from '@/components/alerts/core/AlertList'
 import { AlertErrorBoundary } from '@/components/alerts/error/AlertErrorBoundary'
 import { AlertFilters } from '@/components/alerts/forms/AlertFilters'
+import {
+	ALERT_SHORTCUTS,
+	useAlertKeyboardNavigation,
+} from '@/components/alerts/hooks/use-alert-keyboard-navigation'
 import { useAlertQueries } from '@/components/alerts/hooks/use-alert-queries'
 import { AlertPage } from '@/components/alerts/layout/AlertPage'
 import { AlertStatus } from '@/components/alerts/types/alert-types'
+import { PageHeader } from '@/components/navigation'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import { authStateCollection } from '@/lib/auth-client'
 import { recentAlertsCollection } from '@/lib/collections'
 import { eq, useLiveQuery } from '@tanstack/react-db'
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
+import { Filter, Settings } from 'lucide-react'
 import { useState } from 'react'
 
 import type { AlertFilters as AlertFiltersType } from '@/components/alerts/types/filter-types'
@@ -32,6 +38,7 @@ export const Route = createFileRoute('/_authenticated/alerts/resolved')({
 function RouteComponent() {
 	const navigate = useNavigate()
 	const searchParams = useSearch({ from: '/_authenticated/alerts/resolved' })
+	const [showShortcuts, setShowShortcuts] = useState(false)
 	const activeOrganizationId = authStateCollection.get('auth')?.session.activeOrganizationId
 	const alertsCollection = recentAlertsCollection(activeOrganizationId)
 	const {
@@ -67,18 +74,6 @@ function RouteComponent() {
 
 		return initialFilters
 	})
-
-	// Use alert queries hook for data fetching
-	/**const { alerts, isLoading, error, refetch } = useAlertQueries({
-		filters,
-		pagination: {
-			page: searchParams.page,
-			pageSize: searchParams.pageSize,
-			total: 0,
-			hasNext: false,
-			hasPrevious: false,
-		},
-	})*/
 
 	const handleFilterChange = (newFilters: AlertFiltersType) => {
 		setFilters(newFilters)
@@ -119,11 +114,60 @@ function RouteComponent() {
 		})
 	}
 
+	const handleSearchFocus = () => {
+		const searchInput = document.querySelector('[data-alert-search]') as HTMLInputElement
+		if (searchInput) {
+			searchInput.focus()
+		}
+	}
+
+	const handleFilterFocus = () => {
+		const filterButton = document.querySelector('[data-alert-filters]') as HTMLButtonElement
+		if (filterButton) {
+			filterButton.focus()
+		}
+	}
+
+	// Keyboard shortcuts
+	const shortcuts = [
+		{
+			...ALERT_SHORTCUTS.SEARCH_ALERTS,
+			action: handleSearchFocus,
+		},
+		{
+			...ALERT_SHORTCUTS.FILTER_ALERTS,
+			action: handleFilterFocus,
+		},
+		{
+			...ALERT_SHORTCUTS.SHOW_SHORTCUTS,
+			action: () => setShowShortcuts(true),
+		},
+	]
+
 	return (
 		<AlertErrorBoundary>
 			<AlertPage>
 				<div className="flex flex-1 flex-col gap-4 p-4">
-					<PageBreadcrumb link="Alerts" page="Resolved" />
+					{/* Page Header */}
+					<PageHeader
+						title="Resolved Alerts"
+						description="Manage and review resolved alerts"
+						actions={[
+							{
+								label: 'Filters',
+								href: `/settings/alerts`,
+								variant: 'outline',
+								icon: Filter,
+							},
+							{
+								label: 'Settings',
+								href: `/settings/alerts`,
+								variant: 'outline',
+								icon: Settings,
+							},
+						]}
+						shortcuts={shortcuts}
+					/>
 
 					{/* Filters 
 					<AlertFilters

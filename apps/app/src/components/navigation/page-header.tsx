@@ -1,7 +1,7 @@
 /**
- * Compliance Page Header Component
+ * App Page Header Component
  *
- * Provides a consistent page header for compliance pages with breadcrumbs,
+ * Provides a consistent page header for app pages with breadcrumbs,
  * title, description, and action buttons.
  */
 
@@ -158,6 +158,7 @@ export function SectionHeader({
 	className,
 	children,
 }: SectionHeaderProps) {
+	const { actionButtonsLayout } = useDashboardLayout()
 	return (
 		<div className={cn('space-y-3', className)}>
 			<div className="flex items-start justify-between gap-4">
@@ -167,7 +168,14 @@ export function SectionHeader({
 				</div>
 
 				{actions.length > 0 && (
-					<div className="flex items-center gap-2">
+					<div
+						className={cn(
+							'flex items-center',
+							actionButtonsLayout === 'dropdown' && 'justify-end',
+							actionButtonsLayout === 'compact' && 'space-x-1',
+							actionButtonsLayout === 'full' && 'space-x-2'
+						)}
+					>
 						{actions.map((action, index) => {
 							const ActionButton = (
 								<Button
@@ -179,7 +187,9 @@ export function SectionHeader({
 									className="gap-2"
 								>
 									{action.icon && <action.icon className="h-4 w-4" />}
-									{action.label}
+									{actionButtonsLayout === 'full' && (
+										<span className="hidden sm:inline">{action.label}</span>
+									)}
 								</Button>
 							)
 
