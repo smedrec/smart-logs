@@ -48,7 +48,7 @@ export function ComplianceDashboard({ className }: ComplianceDashboardProps) {
 
 			{/* Compliance Page Header */}
 			<CompliancePageHeader
-				title="Dashboard"
+				title="Compliance Dashboard"
 				description="Monitor compliance reports, executions, and system health"
 				actions={[
 					{

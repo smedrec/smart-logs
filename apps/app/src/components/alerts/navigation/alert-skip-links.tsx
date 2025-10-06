@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import React from 'react'
 
+import type { JSX } from 'react'
+
 export interface AlertSkipLinksProps {
 	/** Skip link targets with their labels */
 	targets?: Array<{

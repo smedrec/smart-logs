@@ -460,9 +460,9 @@ export function AlertList({
 													<p className="text-xs text-muted-foreground">
 														Resolved by {alert.resolved_by} on {formatTimestamp(alert.resolved_at!)}
 													</p>
-													{alert.resolutionNotes && (
+													{alert.resolution_notes && (
 														<p className="text-xs text-muted-foreground">
-															<strong>Notes:</strong> {alert.resolutionNotes}
+															<strong>Notes:</strong> {alert.resolution_notes}
 														</p>
 													)}
 												</div>

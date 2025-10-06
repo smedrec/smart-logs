@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -221,6 +222,21 @@ export function AlertDashboard({
 						/>
 					</AlertSkipTarget>
 				</AlertSkipTarget>
+
+				{/* Compliance Page Header */}
+				<PageHeader
+					title="Alert Management"
+					description="Monitor and manage system alerts across your organization"
+					actions={[
+						{
+							label: 'Settings',
+							href: `/settings/alerts`,
+							variant: 'outline',
+							icon: Settings,
+						},
+					]}
+					shortcuts={shortcuts}
+				/>
 
 				{/* View Navigation */}
 				<Tabs
