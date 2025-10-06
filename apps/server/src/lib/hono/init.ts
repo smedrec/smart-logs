@@ -259,7 +259,6 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		if (!monitoringService) {
 			if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
 			monitoringService = new MonitoringService(config.monitoring, metricsCollector)
-			monitoringService.addAlertHandler(databaseAlertHandler)
 		}
 
 		// Initialize resilience service

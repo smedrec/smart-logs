@@ -12,7 +12,8 @@ export * from './queue/dead-letter-queue.js'
 export * from './queue/reliable-processor.js'
 
 // Export monitoring with explicit exports to avoid conflicts
-export { MonitoringService, ConsoleAlertHandler } from './monitor/monitoring.js'
+export { MonitoringService } from './monitor/monitoring.js'
+export { AlertingService, ConsoleAlertHandler } from './monitor/alerting.js'
 export { RedisMetricsCollector } from './monitor/metrics-collector.js'
 export type { AlertHandler } from './monitor/monitoring.js'
 export type {
