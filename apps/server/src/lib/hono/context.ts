@@ -2,6 +2,7 @@ import type { betterAuth } from 'better-auth'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Inngest } from 'inngest'
 import type {
+	AlertingService,
 	Audit,
 	AuditBottleneckAnalyzer,
 	AuditMonitoringDashboard,
@@ -60,7 +61,7 @@ export type ServiceContext = {
 		gdpr: GDPRComplianceService
 	}
 	monitor: {
-		alert: DatabaseAlertHandler
+		alerts: AlertingService
 		metrics: MonitoringService
 	}
 	observability: {

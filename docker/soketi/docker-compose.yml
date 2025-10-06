@@ -1,0 +1,19 @@
+services:
+  websocket-server:
+    image: quay.io/soketi/soketi:1.4-16-debian
+    container_name: soketi
+    restart: always
+    ports:
+      - "6001:6001"
+      - "9601:9601"
+    environment:
+      - SOKETI_USER_AUTHENTICATION_TIMEOUT=3000
+      - SOKETI_DEBUG=1
+      - SOKETI_DEFAULT_APP_ID=1
+      - SOKETI_DEFAULT_APP_KEY=${DEFAULT_APP_KEY}
+      - SOKETI_DEFAULT_APP_SECRET=${DEFAULT_APP_SECRET}
+      - SOKETI_DB_REDIS_HOST=${DB_REDIS_HOST}
+      - SOKETI_DB_REDIS_PORT=${DB_REDIS_PORT}
+      - SOKETI_DB_REDIS_DB=${DB_REDIS_DB}
+      - SOKETI_DB_REDIS_PASSWORD=${DB_REDIS_PASSWORD}
+      - SOKETI_DB_REDIS_KEY_PREFIX=soketi_

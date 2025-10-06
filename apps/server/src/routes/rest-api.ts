@@ -23,6 +23,7 @@ import { adaptiveRateLimit, rateLimit } from '@/lib/middleware/rate-limit'
 import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono, z } from '@hono/zod-openapi'
 
+import { createAlertsAPI } from './alerts'
 import { createAuditAPI } from './audit-api'
 import { createComplianceAPI } from './compliance-api'
 import { createFunctionsAPI } from './functions-api'
@@ -300,6 +301,7 @@ Pagination information is included in the response:
 	app.use('/compliance/*', requireAuthOrApiKey)
 	app.use('/scheduled-reports/*', requireAuthOrApiKey)
 	app.use('/metrics/*', requireAuthOrApiKey)
+	app.use('/alerts/*', requireAuthOrApiKey)
 	app.use('/observability/*', requireAuthOrApiKey)
 	app.use('/performance/*', requireAuthOrApiKey)
 	app.use('/functions/*', requireAuthOrApiKey)
@@ -308,6 +310,7 @@ Pagination information is included in the response:
 	// Organization access control for audit and compliance endpoints
 	app.use('/audit/*', requireOrganizationAccess())
 	app.use('/compliance/*', requireOrganizationAccess())
+	app.use('/alerts/*', requireOrganizationAccess())
 	app.use('/scheduled-reports/*', requireOrganizationAccess())
 	app.use('/functions/*', requireOrganizationAccess())
 	app.use('/organization/*', requireOrganizationAccess())
@@ -323,6 +326,7 @@ Pagination information is included in the response:
 	app.route('/scheduled-reports', createscheduledReportAPI())
 	app.route('/health', createHealthAPI()) // Health check endpoints (no authentication required)
 	app.route('/metrics', createMetricsAPI())
+	app.route('/alerts', createAlertsAPI())
 	app.route('/observability', createObservabilityAPI())
 	app.route('/performance', createPerformanceAPI())
 	app.route('/functions', createFunctionsAPI())

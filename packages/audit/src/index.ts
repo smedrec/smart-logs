@@ -15,9 +15,9 @@ export * from './queue/reliable-processor.js'
 export { MonitoringService } from './monitor/monitoring.js'
 export { AlertingService, ConsoleAlertHandler } from './monitor/alerting.js'
 export { RedisMetricsCollector } from './monitor/metrics-collector.js'
-export type { AlertHandler } from './monitor/monitoring.js'
 export type {
 	Alert,
+	AlertHandler,
 	AlertSeverity,
 	AlertType,
 	OrganizationalAlert,

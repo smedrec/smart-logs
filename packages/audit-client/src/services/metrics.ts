@@ -296,7 +296,7 @@ export class MetricsService extends BaseResource {
 
 		const validatedQuery = validationResult.data!
 
-		const response = await this.request<PaginatedAlerts>('/metrics/alerts', {
+		const response = await this.request<PaginatedAlerts>('/alerts', {
 			method: 'GET',
 			query: validatedQuery,
 		})
@@ -323,7 +323,7 @@ export class MetricsService extends BaseResource {
 		}
 
 		try {
-			const response = await this.request<Alert>(`/metrics/alerts/${id}`, {
+			const response = await this.request<Alert>(`/alerts/${id}`, {
 				method: 'GET',
 			})
 
@@ -344,7 +344,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<any> Alert statistics summary
 	 */
 	async getAlertStatistics(): Promise<AlertStatistics> {
-		return this.request<AlertStatistics>('/metrics/alerts/statistics', {
+		return this.request<AlertStatistics>('/alerts/statistics', {
 			method: 'GET',
 		})
 	}
@@ -356,7 +356,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<AlertActionResponse> Acknowledgment result
 	 */
 	async acknowledgeAlert(id: string): Promise<AlertActionResponse> {
-		return this.request<AlertActionResponse>(`/metrics/alerts/${id}/acknowledge`, {
+		return this.request<AlertActionResponse>(`/alerts/${id}/acknowledge`, {
 			method: 'POST',
 		})
 	}
@@ -369,7 +369,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<AlertActionResponse> Resolution result
 	 */
 	async resolveAlert(id: string, request: ResolveAlertRequest): Promise<AlertActionResponse> {
-		return this.request<AlertActionResponse>(`/metrics/alerts/${id}/resolve`, {
+		return this.request<AlertActionResponse>(`/alerts/${id}/resolve`, {
 			method: 'POST',
 			body: request,
 		})
@@ -382,7 +382,7 @@ export class MetricsService extends BaseResource {
 	 * @returns Promise<{ success: boolean }> Dismissal result
 	 */
 	async dismissAlert(id: string): Promise<AlertActionResponse> {
-		return this.request<AlertActionResponse>(`/metrics/alerts/${id}/dismiss`, {
+		return this.request<AlertActionResponse>(`/alerts/${id}/dismiss`, {
 			method: 'POST',
 		})
 	}

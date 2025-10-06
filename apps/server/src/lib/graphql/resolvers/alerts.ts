@@ -106,7 +106,7 @@ export const alertResolvers = {
 				}
 
 				// Get alerts from monitoring service
-				const monitorAlerts = await monitor.alert.getAlerts(queryFilters)
+				const monitorAlerts = await monitor.alerts.getAlerts(queryFilters)
 
 				// Get total count for pagination
 				const totalCount = monitorAlerts.length // This is a simplified approach
@@ -118,7 +118,8 @@ export const alertResolvers = {
 					severity: alert.severity,
 					title: alert.title,
 					description: alert.description,
-					createdAt: alert.timestamp,
+					createdAt: alert.createdAt,
+					status: alert.status,
 					acknowledgedAt: alert.acknowledgedAt,
 					resolvedAt: alert.resolvedAt,
 					acknowledgedBy: alert.acknowledgedBy,
@@ -203,7 +204,7 @@ export const alertResolvers = {
 
 			try {
 				// Acknowledge the alert
-				const result = await monitor.alert.acknowledgeAlert(args.id, userId)
+				const result = await monitor.alerts.acknowledgeAlert(args.id, userId)
 
 				if (!result.success) {
 					throw new GraphQLError('Alert not found', {
@@ -212,7 +213,7 @@ export const alertResolvers = {
 				}
 
 				// Get the updated alert
-				const alert = await monitor.alert.getAlertById(args.id, organizationId)
+				const alert = await monitor.alerts.getAlertById(args.id, organizationId)
 
 				if (!alert) {
 					throw new GraphQLError('Alert not found after acknowledgment', {
@@ -295,7 +296,7 @@ export const alertResolvers = {
 
 			try {
 				// Resolve the alert with resolution notes
-				const result = await monitor.alert.resolveAlert(args.id, userId, {
+				const result = await monitor.alerts.resolveAlert(args.id, userId, {
 					resolvedBy: userId,
 					resolutionNotes: args.resolution,
 				})
@@ -307,7 +308,7 @@ export const alertResolvers = {
 				}
 
 				// Get the updated alert
-				const alert = await monitor.alert.getAlertById(args.id, organizationId)
+				const alert = await monitor.alerts.getAlertById(args.id, organizationId)
 
 				if (!alert) {
 					throw new GraphQLError('Alert not found after resolution', {

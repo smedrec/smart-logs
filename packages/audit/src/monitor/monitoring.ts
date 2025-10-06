@@ -5,7 +5,6 @@
 
 import { MonitoringConfig, PatternDetectionConfig } from '../config/types.js'
 import { AlertingService } from './alerting.js'
-import { AlertResolution } from './database-alert-handler.js'
 import { MetricsCollector, RedisMetricsCollector } from './metrics-collector.js'
 
 import type { AuditLogEvent } from '../types.js'
@@ -43,24 +42,6 @@ export interface SuspiciousPattern {
 	events: AuditLogEvent[]
 	metadata: Record<string, any>
 	timestamp: string
-}
-
-/**
- * Alert handler interface
- */
-export interface AlertHandler {
-	handlerName(): string
-	sendAlert(alert: Alert): Promise<void>
-	acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }>
-	resolveAlert(
-		alertId: string,
-		resolvedBy: string,
-		resolutionData?: AlertResolution
-	): Promise<{ success: boolean }>
-	dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }>
-	getActiveAlerts(organizationId?: string): Promise<Alert[]>
-	numberOfActiveAlerts(organizationId?: string): Promise<number>
-	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
 }
 
 /**

@@ -1,31 +1,12 @@
 import { MonitoringConfig } from '../config/types'
 import { MetricsCollector, RedisMetricsCollector } from './metrics-collector'
 
-import type { AlertResolution } from './database-alert-handler'
-import type { Alert, AlertStatistics } from './monitoring-types'
-
-/**
- * Alert handler interface
- */
-export interface AlertHandler {
-	handlerName(): string
-	sendAlert(alert: Alert): Promise<void>
-	acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }>
-	resolveAlert(
-		alertId: string,
-		resolvedBy: string,
-		resolutionData?: AlertResolution
-	): Promise<{ success: boolean }>
-	dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }>
-	getActiveAlerts(organizationId?: string): Promise<Alert[]>
-	numberOfActiveAlerts(organizationId?: string): Promise<number>
-	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
-}
+import type { AlertQueryFilters, AlertResolution } from './database-alert-handler'
+import type { Alert, AlertHandler, AlertStatistics } from './monitoring-types'
 
 export class AlertingService {
 	private readonly alertPrefix = 'alerts:'
 	private readonly cooldownPrefix = 'alert_cooldown:'
-	private alerts: Alert[] = []
 	private config: MonitoringConfig
 	private alertHandlers: AlertHandler[] = []
 	private metricsCollector: MetricsCollector
@@ -52,6 +33,37 @@ export class AlertingService {
 	}
 
 	/**
+	 * Get alerts with optional filters
+	 */
+	async getAlerts(filters: AlertQueryFilters): Promise<Alert[]> {
+		for (const handler of this.alertHandlers) {
+			try {
+				if (handler.handlerName() === 'DatabaseAlertHandler') {
+					return await handler.getAlerts(filters)
+				}
+			} catch (error) {
+				console.error('Failed to count the active alerts:', error)
+				throw error
+			}
+		}
+		return []
+	}
+
+	async getActiveAlerts(organizationId?: string): Promise<Alert[]> {
+		for (const handler of this.alertHandlers) {
+			try {
+				if (handler.handlerName() === 'DatabaseAlertHandler') {
+					return await handler.getActiveAlerts(organizationId)
+				}
+			} catch (error) {
+				console.error('Failed to get the active alerts:', error)
+				throw error
+			}
+		}
+		return []
+	}
+
+	/**
 	 * Generate and send alert
 	 */
 	async generateAlert(alert: Alert): Promise<void> {
@@ -61,8 +73,7 @@ export class AlertingService {
 			console.debug('Duplicate alert suppressed', { alertId: alert.id, title: alert.title })
 			return
 		}
-
-		this.alerts.push(alert)
+		// Record alert generation metric
 		this.metricsCollector.recordAlertGenerated()
 
 		// Send alert through all registered handlers
@@ -76,13 +87,6 @@ export class AlertingService {
 
 		// Send notifications
 		await this.sendNotifications(alert)
-	}
-
-	/**
-	 * Get active alerts
-	 */
-	async getActiveAlerts(): Promise<Alert[]> {
-		return this.alerts.filter((alert) => !alert.resolved)
 	}
 
 	/**
@@ -143,45 +147,53 @@ export class AlertingService {
 	/**
 	 * Resolve an alert
 	 */
-	async resolveAlert(alertId: string, resolvedBy: string): Promise<void> {
-		const alert = this.alerts.find((a) => a.id === alertId)
-		if (alert) {
-			alert.resolved = true
-			alert.status = 'resolved'
-			alert.resolvedAt = new Date().toISOString()
-			alert.resolvedBy = resolvedBy
-
-			// Notify handlers
-			for (const handler of this.alertHandlers) {
-				try {
-					await handler.resolveAlert(alertId, resolvedBy)
-				} catch (error) {
-					console.error('Failed to resolve alert through handler:', error)
-				}
+	async resolveAlert(
+		alertId: string,
+		resolvedBy: string,
+		resolutionData?: AlertResolution
+	): Promise<{ success: boolean }> {
+		// Notify handlers
+		for (const handler of this.alertHandlers) {
+			try {
+				return await handler.resolveAlert(alertId, resolvedBy, resolutionData)
+			} catch (error) {
+				console.error('Failed to resolve alert through handler:', error)
+				throw error
 			}
 		}
+		return { success: false }
 	}
 
 	/**
 	 * Acknowledge an alert
 	 */
-	async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<void> {
-		const alert = this.alerts.find((a) => a.id === alertId)
-		if (alert) {
-			alert.acknowledged = true
-			alert.status = 'acknowledged'
-			alert.acknowledgedAt = new Date().toISOString()
-			alert.acknowledgedBy = acknowledgedBy
-
-			// Notify handlers
-			for (const handler of this.alertHandlers) {
-				try {
-					await handler.acknowledgeAlert(alertId, acknowledgedBy)
-				} catch (error) {
-					console.error('Failed to acknowledge alert through handler:', error)
-				}
+	async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }> {
+		// Notify handlers
+		for (const handler of this.alertHandlers) {
+			try {
+				return await handler.acknowledgeAlert(alertId, acknowledgedBy)
+			} catch (error) {
+				console.error('Failed to acknowledge alert through handler:', error)
+				throw error
 			}
 		}
+		return { success: false }
+	}
+
+	/**
+	 * Acknowledge an alert
+	 */
+	async dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }> {
+		// Notify handlers
+		for (const handler of this.alertHandlers) {
+			try {
+				return await handler.dismissAlert(alertId, dismissedBy)
+			} catch (error) {
+				console.error('Failed to dismiss alert through handler:', error)
+				throw error
+			}
+		}
+		return { success: false }
 	}
 
 	/**
@@ -291,6 +303,12 @@ export class AlertingService {
 export class ConsoleAlertHandler implements AlertHandler {
 	handlerName(): string {
 		return 'ConsoleAlertHandler'
+	}
+
+	async getAlerts(filters: AlertQueryFilters): Promise<Alert[]> {
+		// Console handler doesn't store alerts
+		console.log(`📋 Getting alerts${filters ? ` with filters` : ''}`)
+		return []
 	}
 
 	async sendAlert(alert: Alert): Promise<void> {

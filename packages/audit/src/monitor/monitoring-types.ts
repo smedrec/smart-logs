@@ -1,6 +1,7 @@
 /**
  * Shared types for monitoring and health check systems
  */
+import { AlertQueryFilters, AlertResolution } from './database-alert-handler.js'
 
 export interface Metrics {
 	eventsProcessed: number
@@ -209,4 +210,23 @@ export interface MetricQuery {
 	startTime?: string
 	endTime?: string
 	groupBy?: 'hour' | 'day' | 'week' | 'month' | 'year'
+}
+
+/**
+ * Alert handler interface
+ */
+export interface AlertHandler {
+	handlerName(): string
+	sendAlert(alert: Alert): Promise<void>
+	acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ success: boolean }>
+	resolveAlert(
+		alertId: string,
+		resolvedBy: string,
+		resolutionData?: AlertResolution
+	): Promise<{ success: boolean }>
+	dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }>
+	getAlerts(filters: AlertQueryFilters): Promise<Alert[]>
+	getActiveAlerts(organizationId?: string): Promise<Alert[]>
+	numberOfActiveAlerts(organizationId?: string): Promise<number>
+	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
 }

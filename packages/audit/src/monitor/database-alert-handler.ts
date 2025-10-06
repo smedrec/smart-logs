@@ -14,12 +14,12 @@ import {
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
 	Alert,
+	AlertHandler,
 	AlertSeverity,
 	AlertStatistics,
 	AlertStatus,
 	AlertType,
 } from './monitoring-types.js'
-import type { AlertHandler } from './monitoring.js'
 
 /**
  * Database alert record interface

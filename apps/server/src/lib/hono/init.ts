@@ -1,6 +1,7 @@
 import { Inngest } from 'inngest'
 
 import {
+	AlertingService,
 	Audit,
 	AuditBottleneckAnalyzer,
 	AuditMonitoringDashboard,
@@ -73,6 +74,7 @@ let audit: Audit | undefined = undefined
 let metricsCollector: RedisMetricsCollector | undefined = undefined
 let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
+let alertingService: AlertingService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
 
 // Observability services
@@ -260,7 +262,11 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			if (!metricsCollector) metricsCollector = new RedisMetricsCollector(connection)
 			monitoringService = new MonitoringService(config.monitoring, metricsCollector)
 		}
-
+		if (!alertingService) {
+			alertingService = new AlertingService(config.monitoring, metricsCollector)
+			// Set alerting service config for database alert handler
+			alertingService.addAlertHandler(databaseAlertHandler)
+		}
 		// Initialize resilience service
 		if (!resilienceService) {
 			resilienceService = createResilienceService(structuredLogger)
@@ -295,7 +301,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		}
 
 		const monitor = {
-			alert: databaseAlertHandler,
+			alerts: alertingService,
 			metrics: monitoringService,
 		}
 
