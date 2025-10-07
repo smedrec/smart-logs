@@ -27,7 +27,9 @@ import { DataTableFacetedFilter } from '../ui/data-table-faceted-filter'
 import { DataTablePagination } from '../ui/data-table-pagination'
 import { DataTableViewOptions } from '../ui/data-table-view-options'
 import { severities, types } from './data'
+import { AlertActions } from './forms/AlertActions'
 
+import type { Alert } from '@/lib/collections'
 import type {
 	ColumnDef,
 	ColumnFiltersState,
@@ -38,7 +40,14 @@ import type {
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[]
 	data: TData[]
-	onmultiResolve: (data: TData[]) => void
+	/** Callback when alert is viewed */
+	onViewAlert?: (alert: Alert) => void
+	/** Callback when alert is acknowledged */
+	onAcknowledgeAlert?: (alertId: string) => Promise<void>
+	/** Callback when alert is resolved */
+	onResolveAlert?: (alertId: string, note: string) => Promise<void>
+	/** Callback when alert is dismissed */
+	onDismissAlert?: (alertId: string) => Promise<void>
 }
 
 export interface DataTableRef {
@@ -47,13 +56,21 @@ export interface DataTableRef {
 
 export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>>(
 	function DataTable<TData, TValue>(
-		{ columns, data, onmultiResolve }: DataTableProps<TData, TValue>,
+		{
+			columns,
+			data,
+			onViewAlert,
+			onAcknowledgeAlert,
+			onResolveAlert,
+			onDismissAlert,
+		}: DataTableProps<TData, TValue>,
 		ref: any
 	) {
 		const [rowSelection, setRowSelection] = React.useState({})
 		const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
 		const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
 		const [sorting, setSorting] = React.useState<SortingState>([])
+		const [selectedRows, setSelectedRows] = React.useState<Alert[]>([])
 
 		const table = useReactTable({
 			data,
@@ -88,11 +105,27 @@ export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>
 			clearRowSelection: () => setRowSelection({}),
 		}))
 
-		const handlemultiResolve = () => {
-			const selectedItems = table
-				.getFilteredSelectedRowModel()
-				.rows.map((row) => row.original as TData)
-			onmultiResolve(selectedItems)
+		// Handle bulk actions
+		const handleBulkAcknowledge = async (alertIds: string[]) => {
+			if (alertIds.length && onAcknowledgeAlert) {
+				alertIds.forEach(onAcknowledgeAlert)
+				//selectedRows.forEach(onAcknowledgeAlert)
+				ref.current?.clearRowSelection?.()
+			}
+		}
+
+		const handleBulkResolve = async (alertIds: string[], note: string) => {
+			if (alertIds.length > 0 && onResolveAlert) {
+				alertIds.forEach((alertId) => onResolveAlert(alertId, note))
+				ref.current?.clearRowSelection?.()
+			}
+		}
+
+		const handleBulkDismiss = async (alertIds: string[]) => {
+			if (alertIds.length > 0 && onDismissAlert) {
+				alertIds.forEach(onDismissAlert)
+				ref.current?.clearRowSelection?.()
+			}
 		}
 
 		return (
@@ -132,15 +165,14 @@ export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>
 						<DataTableViewOptions table={table} />
 
 						{Object.keys(rowSelection).length > 0 && (
-							<Button
-								onClick={handlemultiResolve}
-								variant="secondary"
-								size="sm"
-								className="ml-auto hidden h-8 lg:flex"
-							>
-								<CheckCheck />
-								Resolve Selected ({Object.keys(rowSelection).length})
-							</Button>
+							<AlertActions
+								selectedAlerts={table
+									.getFilteredSelectedRowModel()
+									.rows.map((row) => row.original as Alert)}
+								onAcknowledge={handleBulkAcknowledge}
+								onResolve={handleBulkResolve}
+								onDismiss={handleBulkDismiss}
+							/>
 						)}
 					</div>
 				</div>

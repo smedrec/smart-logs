@@ -15,7 +15,7 @@ import React, { useState } from 'react'
 
 import { AlertActionDialog } from './AlertActionDialog'
 
-import type { Alert } from '@/lib/types/alert'
+import type { Alert } from '@/lib/collections'
 
 interface AlertActionsProps {
 	/** Selected alerts to perform actions on */

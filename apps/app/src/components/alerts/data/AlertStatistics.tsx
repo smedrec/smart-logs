@@ -54,10 +54,7 @@ import {
 	YAxis,
 } from 'recharts'
 
-import type {
-	AlertStatistics as AlertStatisticsType,
-	AlertUI,
-} from '@/components/alerts/types/alert-types'
+import type { AlertStatistics as AlertStatisticsType } from '@/components/alerts/types/alert-types'
 import type { Alert } from '@/lib/collections'
 
 // Time period options

@@ -77,6 +77,10 @@ export function AlertPagination<TData>({
 	const navigate = useNavigate()
 	const searchParams = useSearch({ strict: false })
 
+	// Track if we're initializing from URL to prevent circular updates
+	const [isInitialized, setIsInitialized] = React.useState(false)
+	const [isUpdatingUrl, setIsUpdatingUrl] = React.useState(false)
+
 	// Handle null table
 	if (!table) {
 		return (
@@ -113,10 +117,12 @@ export function AlertPagination<TData>({
 	const canPreviousPage = table.getCanPreviousPage()
 	const canNextPage = table.getCanNextPage()
 
-	// URL state management
+	// URL state management - only update URL when user interacts, not during initialization
 	const updateUrlState = React.useCallback(
 		(newPageIndex?: number, newPageSize?: number) => {
-			if (!enableUrlState) return
+			if (!enableUrlState || !isInitialized || isUpdatingUrl) return
+
+			setIsUpdatingUrl(true)
 
 			const newSearch: Record<string, any> = { ...searchParams }
 
@@ -139,9 +145,11 @@ export function AlertPagination<TData>({
 			navigate({
 				search: newSearch as any,
 				replace: true, // Use replace to avoid cluttering browser history
+			}).finally(() => {
+				setIsUpdatingUrl(false)
 			})
 		},
-		[enableUrlState, navigate, searchParams]
+		[enableUrlState, navigate, searchParams, isInitialized, isUpdatingUrl]
 	)
 
 	// Handle page size change
@@ -158,31 +166,28 @@ export function AlertPagination<TData>({
 		updateUrlState(newPageIndex)
 	}
 
-	// Initialize from URL state
+	// Initialize from URL state only once
 	React.useEffect(() => {
-		if (!enableUrlState) return
+		if (!enableUrlState || isInitialized) return
 
 		const urlPage = searchParams.page ? Number(searchParams.page) - 1 : 0 // Convert to 0-based index
 		const urlPageSize = searchParams.pageSize ? Number(searchParams.pageSize) : 25
 
-		// Update table state if URL params differ from current state
-		if (urlPage !== pagination.pageIndex && urlPage >= 0 && urlPage < pageCount) {
-			table.setPageIndex(urlPage)
+		// Validate URL parameters
+		const validPageSize = pageSizeOptions.includes(urlPageSize) ? urlPageSize : 25
+		const validPageIndex = urlPage >= 0 ? urlPage : 0
+
+		// Set initial table state without triggering URL updates
+		if (validPageSize !== pagination.pageSize) {
+			table.setPageSize(validPageSize)
 		}
 
-		if (pageSizeOptions.includes(urlPageSize) && urlPageSize !== pagination.pageSize) {
-			table.setPageSize(urlPageSize)
+		if (validPageIndex !== pagination.pageIndex) {
+			table.setPageIndex(validPageIndex)
 		}
-	}, [
-		enableUrlState,
-		searchParams.page,
-		searchParams.pageSize,
-		table,
-		pagination.pageIndex,
-		pagination.pageSize,
-		pageCount,
-		pageSizeOptions,
-	])
+
+		setIsInitialized(true)
+	}, [enableUrlState, isInitialized]) // Remove dependencies that cause re-runs
 
 	const selectedRowCount = table.getFilteredSelectedRowModel().rows.length
 	const totalRowCount = table.getFilteredRowModel().rows.length

@@ -25,6 +25,8 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { AlertActions } from '../forms/AlertActions'
+
 import type { AlertSeverity, AlertStatus, AlertType } from '@/components/alerts/types'
 import type { Alert } from '@/lib/collections'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -356,11 +358,12 @@ export function createAlertColumns(config: AlertColumnsConfig = {}): ColumnDef<A
 
 	// Timestamp column
 	columns.push({
-		accessorKey: 'timestamp',
+		accessorKey: 'created_at',
 		header: ({ column }) => <DataTableColumnHeader column={column} title="Created" />,
 		cell: ({ row }) => {
-			const timestamp = row.getValue('timestamp') as Date
-			const formatted = formatTimestamp(timestamp)
+			const timestamp = row.getValue('created_at') as string
+			const date = new Date(timestamp)
+			const formatted = formatTimestamp(date)
 			const fullDate = new Intl.DateTimeFormat('en-US', {
 				year: 'numeric',
 				month: 'long',
@@ -368,7 +371,7 @@ export function createAlertColumns(config: AlertColumnsConfig = {}): ColumnDef<A
 				hour: '2-digit',
 				minute: '2-digit',
 				second: '2-digit',
-			}).format(new Date(timestamp))
+			}).format(date)
 
 			return (
 				<TooltipProvider>
@@ -431,56 +434,21 @@ export function createAlertColumns(config: AlertColumnsConfig = {}): ColumnDef<A
 				const canDismiss = alert.status !== 'dismissed'
 
 				return (
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button
-								variant="ghost"
-								className="h-8 w-8 p-0"
-								aria-label={`Actions for alert ${alert.title}`}
-							>
-								<span className="sr-only">Open menu</span>
-								<MoreHorizontal className="h-4 w-4" />
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end" className="w-[160px]">
-							<DropdownMenuLabel>Actions</DropdownMenuLabel>
-							<DropdownMenuSeparator />
-
-							{onViewAlert && (
-								<DropdownMenuItem onClick={() => onViewAlert(alert)}>
-									<Eye className="mr-2 h-4 w-4" />
-									View Details
-								</DropdownMenuItem>
-							)}
-
-							{onAcknowledgeAlert && canAcknowledge && (
-								<DropdownMenuItem onClick={() => onAcknowledgeAlert(alert)}>
-									<Clock className="mr-2 h-4 w-4" />
-									Acknowledge
-								</DropdownMenuItem>
-							)}
-
-							{onResolveAlert && canResolve && (
-								<DropdownMenuItem onClick={() => onResolveAlert(alert)}>
-									<CheckCircle className="mr-2 h-4 w-4" />
-									Resolve
-								</DropdownMenuItem>
-							)}
-
-							{onDismissAlert && canDismiss && (
-								<>
-									<DropdownMenuSeparator />
-									<DropdownMenuItem
-										onClick={() => onDismissAlert(alert)}
-										className="text-destructive focus:text-destructive"
-									>
-										<XCircle className="mr-2 h-4 w-4" />
-										Dismiss
-									</DropdownMenuItem>
-								</>
-							)}
-						</DropdownMenuContent>
-					</DropdownMenu>
+					<>
+						<AlertActions
+							selectedAlerts={[alert]}
+							onAcknowledge={function (alertIds: string[]): Promise<void> {
+								throw new Error('Function not implemented.')
+							}}
+							onResolve={function (alertIds: string[], notes: string): Promise<void> {
+								throw new Error('Function not implemented.')
+							}}
+							onDismiss={function (alertIds: string[]): Promise<void> {
+								throw new Error('Function not implemented.')
+							}}
+							mode="dropdown"
+						/>
+					</>
 				)
 			},
 			enableSorting: false,

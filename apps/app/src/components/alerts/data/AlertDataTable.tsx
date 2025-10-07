@@ -154,31 +154,51 @@ export const AlertDataTable = React.forwardRef<AlertDataTableRef, AlertDataTable
 			globalFilterFn: 'includesString',
 		})
 
-		// Handle external callbacks
-		React.useEffect(() => {
-			if (onRowSelectionChange) {
-				const selectedRows = table.getFilteredSelectedRowModel().rows.map((row) => row.original)
-				onRowSelectionChange(selectedRows)
-			}
-		}, [rowSelection, onRowSelectionChange, table])
+		// Handle external callbacks with stable references
+		const stableOnRowSelectionChange = React.useCallback(
+			(selectedRows: Alert[]) => {
+				onRowSelectionChange?.(selectedRows)
+			},
+			[onRowSelectionChange]
+		)
+
+		const stableOnPaginationChange = React.useCallback(
+			(paginationState: PaginationState) => {
+				onPaginationChange?.(paginationState)
+			},
+			[onPaginationChange]
+		)
+
+		const stableOnSortingChange = React.useCallback(
+			(sortingState: SortingState) => {
+				onSortingChange?.(sortingState)
+			},
+			[onSortingChange]
+		)
+
+		const stableOnFiltersChange = React.useCallback(
+			(filtersState: ColumnFiltersState) => {
+				onFiltersChange?.(filtersState)
+			},
+			[onFiltersChange]
+		)
+
+		/**React.useEffect(() => {
+			const selectedRows = table.getFilteredSelectedRowModel().rows.map((row) => row.original)
+			stableOnRowSelectionChange(selectedRows)
+		}, [rowSelection, stableOnRowSelectionChange, table])
 
 		React.useEffect(() => {
-			if (onPaginationChange) {
-				onPaginationChange(pagination)
-			}
-		}, [pagination, onPaginationChange])
+			stableOnPaginationChange(pagination)
+		}, [pagination, stableOnPaginationChange])
 
 		React.useEffect(() => {
-			if (onSortingChange) {
-				onSortingChange(sorting)
-			}
-		}, [sorting, onSortingChange])
+			stableOnSortingChange(sorting)
+		}, [sorting, stableOnSortingChange])
 
 		React.useEffect(() => {
-			if (onFiltersChange) {
-				onFiltersChange(columnFilters)
-			}
-		}, [columnFilters, onFiltersChange])
+			stableOnFiltersChange(columnFilters)
+		}, [columnFilters, stableOnFiltersChange])*/
 
 		// Expose methods via ref
 		React.useImperativeHandle(ref, () => ({

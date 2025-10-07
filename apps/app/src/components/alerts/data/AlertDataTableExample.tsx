@@ -74,18 +74,6 @@ export function AlertDataTableExample({
 		setSelectedRows(rows)
 	}
 
-	// Update table state when data changes or component mounts
-	React.useEffect(() => {
-		// Use a small delay to ensure the table ref is populated
-		const timer = setTimeout(() => {
-			if (tableRef.current?.getTable) {
-				setTable(tableRef.current.getTable())
-			}
-		}, 0)
-
-		return () => clearTimeout(timer)
-	}, [data, loading]) // Re-run when data or loading state changes
-
 	// Handle bulk actions
 	const handleBulkAcknowledge = () => {
 		if (selectedRows.length > 0 && onAcknowledgeAlert) {
@@ -117,8 +105,8 @@ export function AlertDataTableExample({
 				enableFiltering={true}
 				enableViewOptions={true}
 				enableExport={true}
-				enableRefresh={true}
-				enableRealTimeToggle={true}
+				enableRefresh={false}
+				enableRealTimeToggle={false}
 				onRefresh={onRefresh}
 				onExport={onExport}
 				realTimeEnabled={realTimeEnabled}
