@@ -225,7 +225,7 @@ export class AlertingService {
 	 * Create alert hash for deduplication
 	 */
 	private createAlertHash(alert: Alert): string {
-		const content = `${alert.source}:${alert.title}:${alert.severity}`
+		const content = `${alert.source}:${alert.title}:${alert.severity}:${alert.description}`
 		return Buffer.from(content).toString('base64')
 	}
 

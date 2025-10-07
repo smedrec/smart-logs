@@ -173,7 +173,7 @@ export function performanceMonitoring(options: { threshold?: number; alertOnSlow
 					tags: ['api', 'performance', 'slow-request'],
 				}
 
-				await monitor.alert.sendExternalAlert(alert)
+				await monitor.alerts.sendExternalAlert(alert)
 			} catch (alertError) {
 				logger.error(
 					'Failed to create slow request alert',
@@ -304,7 +304,7 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 						resolved: false,
 						tags: ['api', 'error-rate', 'high-error-rate'],
 					}
-					await monitor.alert.sendExternalAlert(alert)
+					await monitor.alerts.sendExternalAlert(alert)
 				}
 			} catch (alertError) {
 				logger.error(
