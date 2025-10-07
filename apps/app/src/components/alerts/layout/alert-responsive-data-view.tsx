@@ -5,7 +5,7 @@ import React, { useState } from 'react'
 
 import { useAlertResponsive } from '../hooks/use-alert-responsive'
 
-import type { Alert } from '@/lib/types/alert'
+import type { Alert } from '@/lib/collections'
 
 export type AlertViewMode = 'table' | 'cards' | 'list'
 
