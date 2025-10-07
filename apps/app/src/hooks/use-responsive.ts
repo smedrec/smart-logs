@@ -189,7 +189,7 @@ export function useAlertResponsiveGrid() {
 			const breakpointOrder: Breakpoint[] = ['2xl', 'xl', 'lg', 'md', 'sm']
 
 			for (const bp of breakpointOrder) {
-				if (config[bp] && (bp === currentBreakpoint || windowSize.width >= ALERT_BREAKPOINTS[bp])) {
+				if (config[bp] && (bp === currentBreakpoint || windowSize.width >= BREAKPOINTS[bp])) {
 					return config[bp]
 				}
 			}
@@ -201,7 +201,7 @@ export function useAlertResponsiveGrid() {
 	}
 
 	const getGridClasses = (config: Partial<Record<Breakpoint, string>>) => {
-		const classes = []
+		const classes: string[] = []
 
 		Object.entries(config).forEach(([breakpoint, className]) => {
 			if (breakpoint === 'sm') {

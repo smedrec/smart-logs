@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import React from 'react'
 
 import type { AlertBreakpoint } from '@/components/alerts/hooks/use-alert-responsive'
+import type { JSX } from 'react'
 
 export interface AlertResponsiveContainerProps {
 	/** Children to render inside the container */
@@ -50,7 +51,7 @@ export function AlertResponsiveContainer({
 	}
 
 	const getResponsiveClasses = (config: Partial<Record<AlertBreakpoint, string>>) => {
-		const classes = []
+		const classes: string[] = []
 
 		Object.entries(config).forEach(([breakpoint, className]) => {
 			if (breakpoint === 'sm') {
@@ -112,7 +113,7 @@ export function AlertResponsiveGrid({
 	}
 
 	const getGridClasses = (config: Partial<Record<AlertBreakpoint, number>>) => {
-		const classes = []
+		const classes: string[] = []
 
 		Object.entries(config).forEach(([breakpoint, cols]) => {
 			const gridClass = `grid-cols-${cols}`
@@ -127,7 +128,7 @@ export function AlertResponsiveGrid({
 	}
 
 	const getGapClasses = (config: Partial<Record<AlertBreakpoint, string>>) => {
-		const classes = []
+		const classes: string[] = []
 
 		Object.entries(config).forEach(([breakpoint, gapClass]) => {
 			if (breakpoint === 'sm') {
