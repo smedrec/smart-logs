@@ -5,6 +5,8 @@
  * providing type-safe route generation and navigation helpers.
  */
 
+import type { AlertSeverity } from '@/components/alerts'
+
 export const ROUTES = {
 	// Main dashboard
 	DASHBOARD: '/dashboard',
@@ -31,6 +33,14 @@ export const ROUTES = {
 
 	// Global execution history
 	EXECUTION_HISTORY: '/compliance/execution-history',
+
+	// Settings
+	SETTINGS: '/settings',
+	SETTINGS_ACCOUNT: '/settings/account',
+	SETTINGS_ORGANIZATION: '/settings/organization',
+	SETTINGS_STAFF: '/settings/staff',
+	SETTINGS_SECURITY: '/settings/security',
+	SETTINGS_BILLING: '/settings/billing',
 
 	// Legacy routes (to be deprecated)
 	HIPAA: '/compliance/hipaa',
@@ -87,6 +97,24 @@ export interface CreateReportSearchParams {
 	template?: string
 }
 
+export interface AlertsBoardSearchParams {
+	view: 'list' | 'board' | 'statistics'
+	severity?: AlertSeverity
+	search?: string
+	source?: string
+	tags?: string[]
+}
+
+export interface AlertsSearchParams {
+	page?: number
+	pageSize?: number
+	severity?: AlertSeverity
+	search?: string
+	source?: string
+	tags?: string[]
+	alertId?: string
+}
+
 /**
  * Route permission requirements
  */
@@ -113,10 +141,54 @@ export function hasRoutePermission(route: string, userPermissions: string[]): bo
  */
 export const complianceNavigation = {
 	toHomeDashboard: () => ROUTES.DASHBOARD,
-	toAlertsBoard: () => ROUTES.ALERTS_BOARD,
-	toActiveAlerts: () => ROUTES.ALERTS_ACTIVE,
-	toAcknowledgedAlerts: () => ROUTES.ALERTS_ACKNOWLEDGED,
-	toResolvedAlerts: () => ROUTES.ALERTS_RESOLVED,
+	toAlertsBoard: (params?: AlertsBoardSearchParams) => {
+		const searchParams = new URLSearchParams()
+		if (params) {
+			Object.entries(params).forEach(([key, value]) => {
+				if (value !== undefined) {
+					searchParams.set(key, String(value))
+				}
+			})
+		}
+		const query = searchParams.toString()
+		return `${ROUTES.ALERTS_BOARD}${query ? `?${query}` : ''}`
+	},
+	toActiveAlerts: (params?: AlertsSearchParams) => {
+		const searchParams = new URLSearchParams()
+		if (params) {
+			Object.entries(params).forEach(([key, value]) => {
+				if (value !== undefined) {
+					searchParams.set(key, String(value))
+				}
+			})
+		}
+		const query = searchParams.toString()
+		return `${ROUTES.ALERTS_ACTIVE}${query ? `?${query}` : ''}`
+	},
+	toAcknowledgedAlerts: (params?: AlertsSearchParams) => {
+		const searchParams = new URLSearchParams()
+		if (params) {
+			Object.entries(params).forEach(([key, value]) => {
+				if (value !== undefined) {
+					searchParams.set(key, String(value))
+				}
+			})
+		}
+		const query = searchParams.toString()
+		return `${ROUTES.ALERTS_ACKNOWLEDGED}${query ? `?${query}` : ''}`
+	},
+	toResolvedAlerts: (params?: AlertsSearchParams) => {
+		const searchParams = new URLSearchParams()
+		if (params) {
+			Object.entries(params).forEach(([key, value]) => {
+				if (value !== undefined) {
+					searchParams.set(key, String(value))
+				}
+			})
+		}
+		const query = searchParams.toString()
+		return `${ROUTES.ALERTS_RESOLVED}${query ? `?${query}` : ''}`
+	},
 	toComplianceDashboard: () => ROUTES.COMPLIANCE_DASHBOARD,
 	toScheduledReports: (params?: ScheduledReportsSearchParams) => {
 		const searchParams = new URLSearchParams()
@@ -181,4 +253,10 @@ export const complianceNavigation = {
 		const query = searchParams.toString()
 		return `${ROUTES.EXECUTION_HISTORY}${query ? `?${query}` : ''}`
 	},
+	toSettings: () => ROUTES.SETTINGS,
+	toSettingsAccount: () => ROUTES.SETTINGS_ACCOUNT,
+	toSettingsOrganization: () => ROUTES.SETTINGS_ORGANIZATION,
+	toSettingsStaff: () => ROUTES.SETTINGS_STAFF,
+	toSettingsSecurity: () => ROUTES.SETTINGS_SECURITY,
+	toSettingsBilling: () => ROUTES.SETTINGS_BILLING,
 }

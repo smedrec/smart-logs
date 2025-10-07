@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/breadcrumb'
 import { ROUTES } from '@/lib/routes'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { CircleAlert, FileCheck2, Home } from 'lucide-react'
+import { CircleAlert, FileCheck2, Home, Settings2 } from 'lucide-react'
 import { useMemo } from 'react'
 
 interface BreadcrumbItem {
@@ -68,6 +68,14 @@ export function Breadcrumbs({
 				label: 'Compliance',
 				href: ROUTES.COMPLIANCE_DASHBOARD,
 				icon: FileCheck2,
+			})
+		}
+
+		if (showRoot && currentPath.startsWith('/settings')) {
+			items.push({
+				label: 'Settings',
+				href: ROUTES.SETTINGS,
+				icon: Settings2,
 			})
 		}
 
@@ -161,6 +169,26 @@ export function Breadcrumbs({
 		} else if (currentPath === ROUTES.ALERTS_RESOLVED) {
 			items.push({
 				label: 'Resolved Alerts',
+			})
+		} else if (currentPath === ROUTES.SETTINGS_ACCOUNT) {
+			items.push({
+				label: 'Account',
+			})
+		} else if (currentPath === ROUTES.SETTINGS_ORGANIZATION) {
+			items.push({
+				label: 'Current Organization',
+			})
+		} else if (currentPath === ROUTES.SETTINGS_STAFF) {
+			items.push({
+				label: 'Staff',
+			})
+		} else if (currentPath === ROUTES.SETTINGS_SECURITY) {
+			items.push({
+				label: 'Security',
+			})
+		} else if (currentPath === ROUTES.SETTINGS_BILLING) {
+			items.push({
+				label: 'Billing',
 			})
 		}
 

@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/navigation'
 import { PageBreadcrumb } from '@/components/ui/page-breadcrumb'
 import {
 	//APIKeysCard,
@@ -15,7 +16,8 @@ export const Route = createFileRoute('/_authenticated/settings/account')({
 function RouteComponent() {
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">
-			<PageBreadcrumb link="Settings" page="Account" />
+			{/* Page Header */}
+			<PageHeader title="Account" description="Account settings" />
 			<div className="grid auto-rows-min gap-4 md:grid-cols-3">
 				<div className="aspect-video rounded-xl">
 					<UpdateAvatarCard />

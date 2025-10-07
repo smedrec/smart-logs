@@ -76,8 +76,6 @@ function RouteComponent() {
 		<AlertErrorBoundary>
 			<AlertPage>
 				<div className="flex flex-1 flex-col gap-4 p-4">
-					<PageBreadcrumb link="Alerts" page="Board" />
-
 					<AlertDashboard
 						alerts={alerts}
 						statistics={statistics}

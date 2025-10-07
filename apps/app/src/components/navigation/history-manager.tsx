@@ -1,8 +1,8 @@
 /**
- * Compliance History Manager Component
+ * App History Manager Component
  *
  * Manages browser history and provides navigation history features
- * for compliance pages.
+ * for app pages.
  */
 
 import { Button } from '@/components/ui/button'
@@ -60,7 +60,9 @@ export function HistoryManager({ className, maxHistoryItems = 10 }: HistoryManag
 			const urlObj = new URL(url)
 			const pathname = urlObj.pathname
 
-			if (pathname === '/compliance') {
+			if (pathname === '/dashboard') {
+				return 'Dashboard'
+			} else if (pathname === '/compliance') {
 				return 'Compliance Dashboard'
 			} else if (pathname === '/compliance/scheduled-reports') {
 				return 'Scheduled Reports'
@@ -87,6 +89,18 @@ export function HistoryManager({ className, maxHistoryItems = 10 }: HistoryManag
 				return 'Acknowledged Alerts'
 			} else if (pathname === '/alerts/resolved') {
 				return 'Resolved Alerts'
+			} else if (pathname === '/settings') {
+				return 'Settings'
+			} else if (pathname === '/settings/account') {
+				return 'Account Settings'
+			} else if (pathname === '/settings/organization') {
+				return 'Organization Settings'
+			} else if (pathname === '/settings/staff') {
+				return 'Staff Settings'
+			} else if (pathname === '/settings/security') {
+				return 'Security Settings'
+			} else if (pathname === '/settings/billing') {
+				return 'Billing Settings'
 			}
 
 			return 'Home'

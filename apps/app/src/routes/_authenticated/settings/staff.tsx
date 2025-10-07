@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/navigation'
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -16,17 +17,8 @@ export const Route = createFileRoute('/_authenticated/settings/staff')({
 function RouteComponent() {
 	return (
 		<div className="flex flex-1 flex-col gap-4 p-4">
-			<Breadcrumb>
-				<BreadcrumbList>
-					<BreadcrumbItem className="hidden md:block">
-						<BreadcrumbLink href="#">Setting</BreadcrumbLink>
-					</BreadcrumbItem>
-					<BreadcrumbSeparator className="hidden md:block" />
-					<BreadcrumbItem>
-						<BreadcrumbPage>Staff</BreadcrumbPage>
-					</BreadcrumbItem>
-				</BreadcrumbList>
-			</Breadcrumb>
+			{/* Page Header */}
+			<PageHeader title="Staff" description="Manage the current organization staff" />
 			<OrganizationMembersCard />
 			<OrganizationInvitationsCard />
 		</div>
