@@ -156,7 +156,11 @@ export function Breadcrumbs({
 			})
 		} else if (currentPath === ROUTES.ALERTS_BOARD) {
 			items.push({
-				label: 'Alerts Board',
+				label: 'Board',
+			})
+		} else if (currentPath === ROUTES.ALERTS_DATA) {
+			items.push({
+				label: 'All Alerts',
 			})
 		} else if (currentPath === ROUTES.ALERTS_ACTIVE) {
 			items.push({
@@ -279,7 +283,9 @@ export function useBreadcrumbs() {
 				items.push({ label: 'Execute' })
 			}
 		} else if (currentPath === ROUTES.ALERTS_BOARD) {
-			items.push({ label: 'Alerts Board' })
+			items.push({ label: 'Board' })
+		} else if (currentPath === ROUTES.ALERTS_DATA) {
+			items.push({ label: 'All Alerts' })
 		} else if (currentPath === ROUTES.ALERTS_ACTIVE) {
 			items.push({ label: 'Active Alerts' })
 		} else if (currentPath === ROUTES.ALERTS_ACKNOWLEDGED) {

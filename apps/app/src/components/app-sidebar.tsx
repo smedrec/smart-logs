@@ -47,6 +47,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						url: '/alerts',
 					},
 					{
+						title: 'All Alerts',
+						url: '/alerts/data',
+					},
+					{
 						title: 'Active',
 						url: '/alerts/active',
 					},
@@ -107,6 +111,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						url: '/settings/account',
 					},
 					{
+						title: 'Security',
+						url: '/settings/security',
+					},
+					{
 						title: 'Organization',
 						url: '/settings/organization',
 					},
@@ -114,10 +122,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						title: 'Staff',
 						url: '/settings/staff',
 					},
-					{
-						title: 'Security',
-						url: '/settings/security',
-					},
+
 					{
 						title: 'Billing',
 						url: '/settings/billing',
@@ -140,7 +145,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 				<SidebarMenu>
 					<FooterLink to="https://smedrec-67bbd.web.app/" Icon={BookOpen} label="Documentation" />
 					<FooterLink
-						to="https://github.com/joseantcordeiro/smart-logs"
+						to="https://github.com/smedrec/smart-logs"
 						Icon={Github}
 						label="View Source"
 					/>

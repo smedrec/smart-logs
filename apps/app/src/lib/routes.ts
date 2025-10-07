@@ -13,6 +13,7 @@ export const ROUTES = {
 	// Main Alerting dashboard
 	ALERTS_BOARD: '/alerts',
 	// Alert details
+	ALERTS_DATA: '/alerts/data',
 	ALERTS_ACTIVE: '/alerts/active',
 	ALERTS_ACKNOWLEDGED: '/alerts/acknowledged',
 	ALERTS_RESOLVED: '/alerts/resolved',
@@ -152,6 +153,18 @@ export const complianceNavigation = {
 		}
 		const query = searchParams.toString()
 		return `${ROUTES.ALERTS_BOARD}${query ? `?${query}` : ''}`
+	},
+	toAlertsData: (params?: AlertsSearchParams) => {
+		const searchParams = new URLSearchParams()
+		if (params) {
+			Object.entries(params).forEach(([key, value]) => {
+				if (value !== undefined) {
+					searchParams.set(key, String(value))
+				}
+			})
+		}
+		const query = searchParams.toString()
+		return `${ROUTES.ALERTS_ACTIVE}${query ? `?${query}` : ''}`
 	},
 	toActiveAlerts: (params?: AlertsSearchParams) => {
 		const searchParams = new URLSearchParams()
