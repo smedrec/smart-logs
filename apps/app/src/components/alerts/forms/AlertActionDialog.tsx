@@ -24,7 +24,7 @@ import React from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-type ActionType = 'acknowledge' | 'resolve' | 'dismiss'
+type ActionType = 'view' | 'acknowledge' | 'resolve' | 'dismiss'
 
 interface AlertActionDialogProps {
 	/** Whether the dialog is open */

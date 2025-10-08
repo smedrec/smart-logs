@@ -1,19 +1,9 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
 import {
 	AlertTriangle,
 	CheckCircle,
@@ -39,11 +29,11 @@ export interface AlertColumnsConfig {
 	/** Callback when alert is viewed */
 	onViewAlert?: (alert: Alert) => void
 	/** Callback when alert is acknowledged */
-	onAcknowledgeAlert?: (alert: Alert) => void
+	onAcknowledgeAlert?: (alertIds: string[]) => Promise<void>
 	/** Callback when alert is resolved */
-	onResolveAlert?: (alert: Alert) => void
+	onResolveAlert?: (alertIds: string[], note: string) => Promise<void>
 	/** Callback when alert is dismissed */
-	onDismissAlert?: (alert: Alert) => void
+	onDismissAlert?: (alertIds: string[]) => Promise<void>
 	/** Custom column widths */
 	columnWidths?: {
 		select?: number
@@ -434,21 +424,14 @@ export function createAlertColumns(config: AlertColumnsConfig = {}): ColumnDef<A
 				const canDismiss = alert.status !== 'dismissed'
 
 				return (
-					<>
-						<AlertActions
-							selectedAlerts={[alert]}
-							onAcknowledge={function (alertIds: string[]): Promise<void> {
-								throw new Error('Function not implemented.')
-							}}
-							onResolve={function (alertIds: string[], notes: string): Promise<void> {
-								throw new Error('Function not implemented.')
-							}}
-							onDismiss={function (alertIds: string[]): Promise<void> {
-								throw new Error('Function not implemented.')
-							}}
-							mode="dropdown"
-						/>
-					</>
+					<AlertActions
+						selectedAlerts={[alert]}
+						onView={onViewAlert}
+						onAcknowledge={onAcknowledgeAlert}
+						onResolve={onResolveAlert}
+						onDismiss={onDismissAlert}
+						mode="dropdown"
+					/>
 				)
 			},
 			enableSorting: false,

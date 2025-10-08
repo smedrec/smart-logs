@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AlertStatus } from '@/lib/types/alert'
 import { cn } from '@/lib/utils'
-import { Check, CheckCircle, MoreHorizontal, X, XCircle } from 'lucide-react'
+import { Check, CheckCircle, Eye, EyeIcon, MoreHorizontal, X, XCircle } from 'lucide-react'
 import React, { useState } from 'react'
 
 import { AlertActionDialog } from './AlertActionDialog'
@@ -20,6 +20,8 @@ import type { Alert } from '@/lib/collections'
 interface AlertActionsProps {
 	/** Selected alerts to perform actions on */
 	selectedAlerts: Alert[]
+	/** Callback when view action is triggered */
+	onView: (alert: Alert) => void
 	/** Callback when acknowledge action is triggered */
 	onAcknowledge: (alertIds: string[]) => Promise<void>
 	/** Callback when resolve action is triggered */
@@ -36,7 +38,7 @@ interface AlertActionsProps {
 	className?: string
 }
 
-type ActionType = 'acknowledge' | 'resolve' | 'dismiss'
+type ActionType = 'view' | 'acknowledge' | 'resolve' | 'dismiss'
 
 /**
  * Action buttons for individual and bulk alert operations
@@ -44,6 +46,7 @@ type ActionType = 'acknowledge' | 'resolve' | 'dismiss'
  */
 export function AlertActions({
 	selectedAlerts,
+	onView,
 	onAcknowledge,
 	onResolve,
 	onDismiss,
@@ -61,6 +64,7 @@ export function AlertActions({
 
 	// Determine which actions are available based on alert statuses
 	const availableActions = {
+		view: selectedAlerts.length === 1,
 		acknowledge: selectedAlerts.some((alert) => alert.status === AlertStatus.ACTIVE),
 		resolve: selectedAlerts.some(
 			(alert) => alert.status === AlertStatus.ACTIVE || alert.status === AlertStatus.ACKNOWLEDGED
@@ -88,6 +92,9 @@ export function AlertActions({
 		setIsLoading(true)
 		try {
 			switch (action) {
+				case 'view':
+					onView(selectedAlerts[0])
+					break
 				case 'acknowledge':
 					await onAcknowledge(alertIds)
 					break
@@ -124,6 +131,8 @@ export function AlertActions({
 		const suffix = count > 1 ? ` (${count})` : ''
 
 		switch (action) {
+			case 'view':
+				return `View Details`
 			case 'acknowledge':
 				return `Acknowledge${suffix}`
 			case 'resolve':
@@ -135,6 +144,8 @@ export function AlertActions({
 
 	const getActionIcon = (action: ActionType) => {
 		switch (action) {
+			case 'view':
+				return <Eye className="h-4 w-4" />
 			case 'acknowledge':
 				return <Check className="h-4 w-4" />
 			case 'resolve':
@@ -146,6 +157,8 @@ export function AlertActions({
 
 	const getActionVariant = (action: ActionType) => {
 		switch (action) {
+			case 'view':
+				return 'outline' as const
 			case 'acknowledge':
 				return 'default' as const
 			case 'resolve':
@@ -171,6 +184,12 @@ export function AlertActions({
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end" className="w-48">
+						{availableActions.view && (
+							<DropdownMenuItem onClick={() => handleActionClick('view')} disabled={isLoading}>
+								{getActionIcon('view')}
+								{getActionLabel('view')}
+							</DropdownMenuItem>
+						)}
 						{availableActions.acknowledge && (
 							<DropdownMenuItem
 								onClick={() => handleActionClick('acknowledge')}
@@ -217,6 +236,23 @@ export function AlertActions({
 	return (
 		<>
 			<div className={cn('flex items-center gap-2', className)}>
+				{availableActions.view && (
+					<Button
+						variant="outline"
+						size={size}
+						onClick={() => handleActionClick('view')}
+						disabled={disabled || !hasSelectedAlerts || isLoading}
+						className="whitespace-nowrap"
+					>
+						{isLoading && pendingAction === 'view' ? (
+							<div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+						) : (
+							getActionIcon('view')
+						)}
+						{getActionLabel('view')}
+					</Button>
+				)}
+
 				{availableActions.acknowledge && (
 					<Button
 						variant={getActionVariant('acknowledge')}

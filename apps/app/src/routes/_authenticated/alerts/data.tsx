@@ -1,7 +1,6 @@
 import AlertCard from '@/components/alerts/core/AlertCard'
 import AlertList from '@/components/alerts/core/AlertList'
 import { DataTable } from '@/components/alerts/data-table'
-import createAlertColumns from '@/components/alerts/data/AlertColumns'
 import {
 	ALERT_SHORTCUTS,
 	useAlertKeyboardNavigation,
@@ -54,7 +53,6 @@ function RouteComponent() {
 	const [showShortcuts, setShowShortcuts] = useState(false)
 	const activeOrganizationId = authStateCollection.get('auth')?.session.activeOrganizationId
 	const alertsCollection = recentAlertsCollection(activeOrganizationId)
-	const columns = createAlertColumns()
 	const dataTableRef = useRef<DataTableRef>(null)
 	const { acknowledge, resolve, dismiss } = useAlertAction()
 	const {
@@ -62,9 +60,7 @@ function RouteComponent() {
 		isLoading,
 		isError,
 		status,
-	} = useLiveQuery((q) =>
-		q.from({ alert: alertsCollection }).where(({ alert }) => eq(alert.resolved, 'false'))
-	)
+	} = useLiveQuery((q) => q.from({ alert: alertsCollection }))
 
 	// Convert URL params to filters
 	const [filters, setFilters] = useState<AlertFiltersType>(() => {
@@ -173,7 +169,6 @@ function RouteComponent() {
 		return (
 			<DataTable
 				ref={dataTableRef}
-				columns={columns}
 				data={alerts}
 				loading={isLoading}
 				error={isError ? status : undefined}
@@ -221,8 +216,8 @@ function RouteComponent() {
 		<div className="flex flex-1 flex-col gap-4 p-4">
 			{/* Page Header */}
 			<PageHeader
-				title="Active Alerts"
-				description="Manage and respond to active system alerts"
+				title="All Alerts"
+				description="Manage and respond to system alerts"
 				shortcuts={shortcuts}
 			/>
 

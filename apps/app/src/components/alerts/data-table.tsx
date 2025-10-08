@@ -26,7 +26,10 @@ import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { DataTablePagination } from '../ui/data-table-pagination'
 import { Skeleton } from '../ui/skeleton'
+import createAlertColumns from './data/AlertColumns'
+import AlertPagination from './data/AlertPagination'
 import AlertTableToolbar from './data/AlertTableToolbar'
+import { AlertDetailsDialog } from './data/details-dialog'
 import { AlertActions } from './forms/AlertActions'
 
 import type { Alert } from '@/lib/collections'
@@ -38,7 +41,6 @@ import type {
 } from '@tanstack/react-table'
 
 interface DataTableProps<TData, TValue> {
-	columns: ColumnDef<TData, TValue>[]
 	data: TData[]
 	/** Loading state */
 	loading?: boolean
@@ -63,7 +65,6 @@ export interface DataTableRef {
 export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>>(
 	function DataTable<TData, TValue>(
 		{
-			columns,
 			data,
 			loading = false,
 			error,
@@ -80,6 +81,50 @@ export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>
 		const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
 		const [sorting, setSorting] = React.useState<SortingState>([])
 		const [selectedRows, setSelectedRows] = React.useState<Alert[]>([])
+		const [dialogOpen, setDialogOpen] = React.useState(false)
+		const [alertDetails, setAlertDetails] = React.useState<Alert | null>(null)
+
+		// Handle bulk actions
+		const handleViewAlert = (alert: Alert) => {
+			setAlertDetails(alert)
+			setDialogOpen(true)
+		}
+
+		const handleBulkAcknowledge = async (alertIds: string[]) => {
+			if (alertIds.length && onAcknowledgeAlert) {
+				alertIds.forEach(onAcknowledgeAlert)
+				//selectedRows.forEach(onAcknowledgeAlert)
+				ref.current?.clearRowSelection?.()
+			}
+		}
+
+		const handleBulkResolve = async (alertIds: string[], note: string) => {
+			if (alertIds.length > 0 && onResolveAlert) {
+				alertIds.forEach((alertId) => onResolveAlert(alertId, note))
+				ref.current?.clearRowSelection?.()
+			}
+		}
+
+		const handleBulkDismiss = async (alertIds: string[]) => {
+			if (alertIds.length > 0 && onDismissAlert) {
+				alertIds.forEach(onDismissAlert)
+				ref.current?.clearRowSelection?.()
+			}
+		}
+
+		// Create columns with action handlers
+		const columns = React.useMemo(
+			() =>
+				createAlertColumns({
+					enableSelection: true,
+					enableActions: true,
+					onViewAlert: handleViewAlert,
+					onAcknowledgeAlert: handleBulkAcknowledge,
+					onResolveAlert: handleBulkResolve,
+					onDismissAlert: handleBulkDismiss,
+				}),
+			[handleViewAlert, handleBulkAcknowledge, handleBulkResolve, handleBulkDismiss]
+		)
 
 		const table = useReactTable({
 			data,
@@ -113,29 +158,6 @@ export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>
 		React.useImperativeHandle(ref, () => ({
 			clearRowSelection: () => setRowSelection({}),
 		}))
-
-		// Handle bulk actions
-		const handleBulkAcknowledge = async (alertIds: string[]) => {
-			if (alertIds.length && onAcknowledgeAlert) {
-				alertIds.forEach(onAcknowledgeAlert)
-				//selectedRows.forEach(onAcknowledgeAlert)
-				ref.current?.clearRowSelection?.()
-			}
-		}
-
-		const handleBulkResolve = async (alertIds: string[], note: string) => {
-			if (alertIds.length > 0 && onResolveAlert) {
-				alertIds.forEach((alertId) => onResolveAlert(alertId, note))
-				ref.current?.clearRowSelection?.()
-			}
-		}
-
-		const handleBulkDismiss = async (alertIds: string[]) => {
-			if (alertIds.length > 0 && onDismissAlert) {
-				alertIds.forEach(onDismissAlert)
-				ref.current?.clearRowSelection?.()
-			}
-		}
 
 		function onRefresh(): void {
 			throw new Error('Function not implemented.')
@@ -216,6 +238,7 @@ export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>
 								selectedAlerts={table
 									.getFilteredSelectedRowModel()
 									.rows.map((row) => row.original as Alert)}
+								onView={handleViewAlert}
 								onAcknowledge={handleBulkAcknowledge}
 								onResolve={handleBulkResolve}
 								onDismiss={handleBulkDismiss}
@@ -261,8 +284,18 @@ export const DataTable = React.forwardRef<DataTableRef, DataTableProps<any, any>
 							)}
 						</TableBody>
 					</Table>
+					<AlertDetailsDialog
+						open={dialogOpen}
+						onOpenChange={setDialogOpen}
+						alert={alertDetails}
+						onCancel={() => {
+							setDialogOpen(false)
+							setAlertDetails(null)
+						}}
+					/>
 				</div>
-				<DataTablePagination table={table} />
+				{/*<DataTablePagination table={table} />*/}
+				<AlertPagination table={table} />
 			</div>
 		)
 	}
