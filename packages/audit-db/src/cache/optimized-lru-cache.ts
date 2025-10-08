@@ -5,7 +5,7 @@
 
 import { LoggerFactory, StructuredLogger } from '@repo/logs'
 
-import type { IQueryCache, CacheStats } from './cache-factory.js'
+import type { IQueryCache, QueryCacheStats } from './cache-factory.js'
 
 export interface CacheNode<T = any> {
 	key: string
@@ -79,7 +79,7 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 			hits: 0,
 			size: 0,
 			prev: null,
-			next: null
+			next: null,
 		}
 
 		this.tail = {
@@ -90,7 +90,7 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 			hits: 0,
 			size: 0,
 			prev: null,
-			next: null
+			next: null,
 		}
 
 		// Link head and tail
@@ -105,7 +105,7 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 			evictions: 0,
 			cleanups: 0,
 			memoryUsageBytes: 0,
-			avgOperationTime: 0
+			avgOperationTime: 0,
 		}
 
 		// Start cleanup timer if enabled
@@ -152,7 +152,7 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 		this.metrics.hits++
 		this.recordOperationTime(startTime)
 
-		return node.value as U
+		return node.value as unknown as U
 	}
 
 	/**
@@ -177,7 +177,7 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 		if (node) {
 			// Update existing node - O(1)
 			this.currentSizeBytes -= node.size
-			node.value = value as T
+			node.value = value as unknown as T
 			node.timestamp = Date.now()
 			node.ttl = ttl
 			node.size = size
@@ -189,13 +189,13 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 			// Create new node - O(1)
 			node = {
 				key: fullKey,
-				value: value as T,
+				value: value as unknown as T,
 				timestamp: Date.now(),
 				ttl,
 				hits: 0,
 				size,
 				prev: null,
-				next: null
+				next: null,
 			}
 
 			// Add to map and list
@@ -241,16 +241,62 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 	/**
 	 * Get cache statistics
 	 */
-	async stats(): Promise<CacheStats> {
-		const hitRatio = this.metrics.totalOperations > 0 
-			? (this.metrics.hits / this.metrics.totalOperations) * 100 
-			: 0
+	async stats(): Promise<QueryCacheStats> {
+		const hitRatio =
+			this.metrics.totalOperations > 0
+				? (this.metrics.hits / this.metrics.totalOperations) * 100
+				: 0
 
 		return {
+			totalQueries: this.metrics.totalOperations,
+			cacheHits: this.metrics.hits,
+			cacheMisses: this.metrics.misses,
 			hitRatio,
-			totalKeys: this.keyMap.size,
-			memoryUsageMB: this.currentSizeBytes / (1024 * 1024),
-			evictions: this.metrics.evictions
+			totalSizeMB: this.currentSizeBytes / (1024 * 1024),
+			averageQueryTime: this.metrics.avgOperationTime,
+			evictions: this.metrics.evictions,
+		}
+	}
+
+	/**
+	 * Delete a key from cache - O(1) operation
+	 */
+	async delete(key: string): Promise<boolean> {
+		if (!this.config.enabled) {
+			return false
+		}
+
+		const fullKey = `${this.config.keyPrefix}:${key}`
+		const node = this.keyMap.get(fullKey)
+
+		if (!node) {
+			return false
+		}
+
+		this.removeNode(node)
+		this.keyMap.delete(fullKey)
+		this.currentSizeBytes -= node.size
+
+		return true
+	}
+
+	/**
+	 * Get cache statistics (IQueryCache interface requirement)
+	 */
+	getStats(): QueryCacheStats {
+		const hitRatio =
+			this.metrics.totalOperations > 0
+				? (this.metrics.hits / this.metrics.totalOperations) * 100
+				: 0
+
+		return {
+			totalQueries: this.metrics.totalOperations,
+			cacheHits: this.metrics.hits,
+			cacheMisses: this.metrics.misses,
+			hitRatio,
+			totalSizeMB: this.currentSizeBytes / (1024 * 1024),
+			averageQueryTime: this.metrics.avgOperationTime,
+			evictions: this.metrics.evictions,
 		}
 	}
 
@@ -305,20 +351,19 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 		hitRatio: number
 		avgNodeSize: number
 	} {
-		const hitRatio = this.metrics.totalOperations > 0 
-			? (this.metrics.hits / this.metrics.totalOperations) * 100 
-			: 0
+		const hitRatio =
+			this.metrics.totalOperations > 0
+				? (this.metrics.hits / this.metrics.totalOperations) * 100
+				: 0
 
-		const avgNodeSize = this.keyMap.size > 0 
-			? this.currentSizeBytes / this.keyMap.size 
-			: 0
+		const avgNodeSize = this.keyMap.size > 0 ? this.currentSizeBytes / this.keyMap.size : 0
 
 		return {
 			...this.metrics,
 			keyCount: this.keyMap.size,
 			sizeMB: this.currentSizeBytes / (1024 * 1024),
 			hitRatio,
-			avgNodeSize
+			avgNodeSize,
 		}
 	}
 
@@ -416,20 +461,20 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 			if (typeof value === 'object' && value !== null) {
 				return new Blob([JSON.stringify(value)]).size
 			}
-			
+
 			// For primitives, estimate size
 			if (typeof value === 'string') {
 				return value.length * 2 // UTF-16
 			}
-			
+
 			if (typeof value === 'number') {
 				return 8 // 64-bit number
 			}
-			
+
 			if (typeof value === 'boolean') {
 				return 1
 			}
-			
+
 			return 0
 		} catch (error) {
 			// Fallback estimation
@@ -452,25 +497,26 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 	 */
 	private recordOperationTime(startTime: number): void {
 		const duration = performance.now() - startTime
-		
+
 		// Update rolling average
 		const alpha = 0.1 // Smoothing factor
-		this.metrics.avgOperationTime = 
-			this.metrics.avgOperationTime * (1 - alpha) + duration * alpha
+		this.metrics.avgOperationTime = this.metrics.avgOperationTime * (1 - alpha) + duration * alpha
 	}
 }
 
 /**
  * Factory function for creating optimized LRU cache
  */
-export function createOptimizedLRUCache<T = any>(config: Partial<OptimizedLRUConfig> = {}): OptimizedLRUCache<T> {
+export function createOptimizedLRUCache<T = any>(
+	config: Partial<OptimizedLRUConfig> = {}
+): OptimizedLRUCache<T> {
 	const defaultConfig: OptimizedLRUConfig = {
 		maxSizeMB: 100,
 		defaultTTL: 300, // 5 minutes
 		keyPrefix: 'cache',
 		enabled: true,
 		maxKeys: 10000,
-		cleanupInterval: 60000 // 1 minute
+		cleanupInterval: 60000, // 1 minute
 	}
 
 	return new OptimizedLRUCache<T>({ ...defaultConfig, ...config })

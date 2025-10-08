@@ -29,7 +29,7 @@ export interface IAuditDatabase {
 	/**
 	 * Check database health
 	 */
-	healthCheck(): Promise<boolean>
+	healthCheck(): Promise<ConnectionHealth>
 }
 
 /**

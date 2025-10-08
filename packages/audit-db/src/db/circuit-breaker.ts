@@ -5,7 +5,7 @@
 
 import { LoggerFactory, StructuredLogger } from '@repo/logs'
 
-import type { ICircuitBreaker, CircuitBreakerConfig, CircuitBreakerState } from './interfaces.js'
+import { CircuitBreakerConfig, CircuitBreakerState, ICircuitBreaker } from './interfaces.js'
 
 export interface CircuitBreakerMetrics {
 	totalRequests: number
@@ -65,7 +65,7 @@ export class CircuitBreaker implements ICircuitBreaker {
 			successfulRequests: 0,
 			failedRequests: 0,
 			timeouts: 0,
-			circuitBreakerOpens: 0
+			circuitBreakerOpens: 0,
 		}
 	}
 
@@ -103,7 +103,7 @@ export class CircuitBreaker implements ICircuitBreaker {
 
 			// Race between operation and timeout
 			const result = await Promise.race([operation(), timeoutPromise])
-			
+
 			// Clear timeout on success
 			if (timeoutId) {
 				clearTimeout(timeoutId)
@@ -152,7 +152,7 @@ export class CircuitBreaker implements ICircuitBreaker {
 			failureCount: this.failureCount,
 			successCount: this.successCount,
 			nextAttemptTime: this.nextAttemptTime || undefined,
-			metrics: { ...this.metrics }
+			metrics: { ...this.metrics },
 		}
 	}
 
@@ -189,12 +189,18 @@ export class CircuitBreaker implements ICircuitBreaker {
 		this.failureCount++
 		this.successCount = 0
 
-		this.logger.warn(`Circuit breaker ${this.name} failure ${this.failureCount}/${this.config.failureThreshold}`, error)
+		this.logger.warn(
+			`Circuit breaker ${this.name} failure ${this.failureCount}/${this.config.failureThreshold}`,
+			error
+		)
 
 		if (this.state === CircuitBreakerState.HALF_OPEN) {
 			// Any failure in half-open state opens the circuit
 			this.openCircuit()
-		} else if (this.state === CircuitBreakerState.CLOSED && this.failureCount >= this.config.failureThreshold) {
+		} else if (
+			this.state === CircuitBreakerState.CLOSED &&
+			this.failureCount >= this.config.failureThreshold
+		) {
 			// Too many failures in closed state opens the circuit
 			this.openCircuit()
 		}
@@ -206,12 +212,14 @@ export class CircuitBreaker implements ICircuitBreaker {
 	private openCircuit(): void {
 		this.state = CircuitBreakerState.OPEN
 		this.metrics.circuitBreakerOpens++
-		
+
 		// Calculate next attempt time with exponential backoff and jitter
 		const backoffMs = this.calculateBackoff()
 		this.nextAttemptTime = new Date(Date.now() + backoffMs)
 
-		this.logger.error(`Circuit breaker ${this.name} OPENED. Next attempt at ${this.nextAttemptTime.toISOString()}`)
+		this.logger.error(
+			`Circuit breaker ${this.name} OPENED. Next attempt at ${this.nextAttemptTime.toISOString()}`
+		)
 	}
 
 	/**
@@ -320,11 +328,14 @@ export class CircuitBreakerOpenError extends Error {
 /**
  * Utility function to create circuit breaker with default configurations
  */
-export function createCircuitBreaker(name: string, config?: Partial<CircuitBreakerConfig>): CircuitBreaker {
+export function createCircuitBreaker(
+	name: string,
+	config?: Partial<CircuitBreakerConfig>
+): CircuitBreaker {
 	const defaultConfig: CircuitBreakerConfig = {
 		failureThreshold: 5,
 		timeoutMs: 30000,
-		resetTimeoutMs: 60000
+		resetTimeoutMs: 60000,
 	}
 
 	const finalConfig = { ...defaultConfig, ...config }
@@ -342,7 +353,7 @@ export const DatabaseCircuitBreakers = {
 	master: createCircuitBreaker('master-database', {
 		failureThreshold: 5,
 		timeoutMs: 30000,
-		resetTimeoutMs: 30000
+		resetTimeoutMs: 30000,
 	}),
 
 	/**
@@ -351,7 +362,7 @@ export const DatabaseCircuitBreakers = {
 	replica: createCircuitBreaker('read-replica', {
 		failureThreshold: 3,
 		timeoutMs: 15000,
-		resetTimeoutMs: 15000
+		resetTimeoutMs: 15000,
 	}),
 
 	/**
@@ -360,7 +371,7 @@ export const DatabaseCircuitBreakers = {
 	cache: createCircuitBreaker('redis-cache', {
 		failureThreshold: 10,
 		timeoutMs: 5000,
-		resetTimeoutMs: 5000
+		resetTimeoutMs: 5000,
 	}),
 
 	/**
@@ -369,6 +380,6 @@ export const DatabaseCircuitBreakers = {
 	partition: createCircuitBreaker('partition-operations', {
 		failureThreshold: 2,
 		timeoutMs: 60000,
-		resetTimeoutMs: 60000
-	})
+		resetTimeoutMs: 60000,
+	}),
 }
