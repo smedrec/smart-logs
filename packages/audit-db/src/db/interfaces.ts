@@ -223,7 +223,7 @@ export interface ErrorClassification {
 export enum CircuitBreakerState {
 	CLOSED = 'closed',
 	OPEN = 'open',
-	HALF_OPEN = 'half_open'
+	HALF_OPEN = 'half_open',
 }
 
 export interface RoutingOptions {
@@ -243,7 +243,7 @@ export interface ReplicaHealth {
 export enum RoutingStrategy {
 	ROUND_ROBIN = 'round_robin',
 	LEAST_CONNECTIONS = 'least_connections',
-	LEAST_LATENCY = 'least_latency'
+	LEAST_LATENCY = 'least_latency',
 }
 
 /**
