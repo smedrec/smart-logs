@@ -11,15 +11,17 @@
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Enhanced OTLP exporter with KMS encryption*
 - [otpl.ts](file://packages\logs\src\otpl.ts) - *Added structured logging with OTLP support*
 - [types.ts](file://packages\infisical-kms\src\types.ts) - *Updated KMS types for enhanced security*
+- [app-sidebar.tsx](file://apps\app\src\components\app-sidebar.tsx) - *Updated in recent commit*
+- [security.tsx](file://apps\app\src\routes\_authenticated\settings\security.tsx) - *Added API keys management*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Added new section on New Device Login Notifications to reflect recent security enhancement
-- Updated KMS Integration section with enhanced OTLP exporter and structured logging capabilities
-- Enhanced Cryptographic Protocols section with KMS encryption details for observability
+- Added new section on Security Settings Page to reflect updated navigation and functionality
+- Updated New Device Login Notifications section with additional context on security settings
+- Enhanced Compliance Requirements section with reference to security configuration interface
 - Added sources for new and updated sections
-- Updated diagram in KMS Integration to reflect enhanced OTLP transmission
+- Updated Table of Contents to include new Security Settings Page section
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,6 +32,7 @@
 6. [Practical Examples](#practical-examples)
 7. [Troubleshooting Guide](#troubleshooting-guide)
 8. [New Device Login Notifications](#new-device-login-notifications)
+9. [Security Settings Page](#security-settings-page)
 
 ## Introduction
 The Security and Compliance framework provides robust mechanisms for ensuring data integrity, confidentiality, and regulatory compliance within the audit system. This documentation details the cryptographic protocols, KMS integration, and compliance requirements that form the foundation of the system's security posture. The framework supports HIPAA and GDPR compliance reporting, cryptographic integrity verification, and secure key management through external KMS integration.
@@ -353,3 +356,35 @@ AuthSystem->>User : Return authentication response
 **Section sources**
 - [auth.ts](file://packages\auth\src\auth.ts#L159-L245)
 - [sendEmail.ts](file://apps\server\src\lib\inngest\functions\emails\sendEmail.ts#L101-L154)
+
+## Security Settings Page
+The application now includes a dedicated Security Settings page accessible through the Settings section in the application sidebar. This page provides users with comprehensive control over their account security features and configurations.
+
+The Security Settings page is accessible via the navigation path: Settings → Security. It is implemented as a React component that renders multiple security management cards, each providing specific functionality for account protection.
+
+The page includes the following security management components:
+- **API Keys Card**: Allows users to create, view, and manage API keys for programmatic access to the system
+- **Change Password Card**: Enables users to update their account password with proper validation and security checks
+- **Sessions Card**: Displays active sessions and allows users to terminate sessions from specific devices or locations
+
+The implementation follows a modular card-based design pattern, where each security feature is encapsulated in its own component. This design promotes reusability and makes it easy to add new security features in the future.
+
+```mermaid
+flowchart TD
+A[App Sidebar] --> B[Settings]
+B --> C[Security]
+C --> D[Security Settings Page]
+D --> E[API Keys Card]
+D --> F[Change Password Card]
+D --> G[Sessions Card]
+E --> H[Create API Key]
+E --> I[Revoke API Key]
+F --> J[Password Validation]
+F --> K[Password Update]
+G --> L[Session List]
+G --> M[Terminate Session]
+```
+
+**Section sources**
+- [app-sidebar.tsx](file://apps\app\src\components\app-sidebar.tsx#L0-L187)
+- [security.tsx](file://apps\app\src\routes\_authenticated\settings\security.tsx#L0-L19)

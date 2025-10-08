@@ -27,50 +27,38 @@
 - [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts) - *Updated with optimized queries and organization priority*
 - [lib/hono/init.ts](file://apps\server\src\lib\hono\init.ts) - *Updated with database preset handler and Sentry initialization*
 - [index.ts](file://apps\server\src\index.ts) - *Updated with configuration manager initialization*
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts) - *Refactored to new AlertingService class*
+- [monitor/monitoring.ts](file://packages\audit\src\monitor\monitoring.ts) - *Updated to use AlertingService*
+- [middleware/monitoring.ts](file://apps\server\src\lib\middleware\monitoring.ts) - *Updated alert method calls and hash content*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated documentation structure to reflect centralized documentation approach
-- Replaced extensive README content with brief overview and redirect to comprehensive documentation site
-- Added detailed documentation structure in docs/README.md
-- Updated API reference documentation for audit-class and event-types
-- Enhanced documentation with comprehensive examples and usage patterns
-- Added detailed information about healthcare-specific features and compliance requirements
-- Updated quick start guide with healthcare-compliant configuration example
-- Added security and compliance features documentation
-- Enhanced architecture section with detailed component descriptions
-- Added detailed information about monitoring and observability features
-- Added OTLP exporter configuration and usage details
-- Updated configuration management section with KMS encryption support
-- Added comprehensive details about KMS integration and error handling
-- Replaced legacy ConsoleLogger with StructuredLogger and integrated LoggerFactory for consistent, factory-based logging across the system
-- Enhanced observability with structured logging, performance metrics, and error tracking capabilities
-- Integrated DatabasePresetHandler with optimized queries and organization priority
-- Added Sentry initialization for error monitoring and reporting
-- Updated server initialization to include configuration manager and enhanced service initialization
+- Refactored alert handling functionality from MonitoringService to new AlertingService class
+- Updated alert method calls and enhanced hash content for deduplication
+- Added new AlertingService class with improved alert handling and notification capabilities
+- Updated MonitoringService to use the new AlertingService for alert generation and management
+- Enhanced alert deduplication mechanism with improved hash content
+- Updated monitoring middleware to use corrected alert method calls
+- Added ConsoleAlertHandler for development and testing purposes
+- Improved alert notification system with severity-based handling
+- Updated source tracking system to include new and modified files
 
 **List of new sections added**
-- Observability and OTLP Exporter Configuration
-- KMS Encryption in Configuration Management
-- Structured Logging Implementation
-- Database Preset Handler with Organization Priority
+- Alerting Service Architecture
+- Alert Deduplication Mechanism
+- Console Alert Handler
 
 **List of deprecated/removed sections**
 - None
 
 **Source tracking system updates and new source files**
-- Added annotations for updated README files
-- Added new source files for comprehensive documentation structure
-- Updated section sources to reflect changes in documentation organization
-- Added new sources for API reference documentation
-- Added sources for OTLP exporter implementation
-- Added sources for KMS encryption configuration
-- Added source for Infisical KMS client implementation
-- Added sources for StructuredLogger and LoggerFactory implementations
-- Added sources for DatabasePresetHandler with optimized queries
-- Added sources for Sentry initialization in server startup
-- Added sources for enhanced service initialization in init.ts
+- Added annotations for new AlertingService implementation
+- Updated section sources to reflect changes in alert handling
+- Added new sources for alerting functionality
+- Updated sources for monitoring service to reflect dependency on AlertingService
+- Added sources for console alert handler implementation
+- Updated sources for monitoring middleware with corrected alert method calls
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -91,6 +79,9 @@
 16. [KMS Encryption in Configuration Management](#kms-encryption-in-configuration-management)
 17. [Structured Logging Implementation](#structured-logging-implementation)
 18. [Database Preset Handler with Organization Priority](#database-preset-handler-with-organization-priority)
+19. [Alerting Service Architecture](#alerting-service-architecture)
+20. [Alert Deduplication Mechanism](#alert-deduplication-mechanism)
+21. [Console Alert Handler](#console-alert-handler)
 
 ## Introduction
 
@@ -120,30 +111,34 @@ A --> H[GDPR Compliance]
 A --> I[Observability Tracer]
 A --> J[Structured Logger]
 A --> K[Database Preset Handler]
-B --> L[File Storage]
-B --> M[S3 Storage]
-B --> N[KMS Encryption]
-C --> O[Validation Rules]
-D --> P[SHA-256 Hashing]
-D --> Q[HMAC-SHA256 Signatures]
-E --> R[BullMQ Queue]
-E --> S[Redis]
-E --> T[Circuit Breaker]
-E --> U[Dead Letter Queue]
-G --> V[Middleware Plugins]
-G --> W[Storage Plugins]
-G --> X[Auth Plugins]
-H --> Y[Data Pseudonymization]
-H --> Z[Retention Policies]
-H --> AA[Data Export]
-I --> AB[OTLP Exporter]
-I --> AC[Batch Processing]
-I --> AD[Error Handling]
-J --> AE[Performance Logging]
-J --> AF[Error Tracking]
-J --> AG[Metrics Collection]
-K --> AH[Optimized Database Queries]
-K --> AI[Organization Priority]
+A --> L[Alerting Service]
+B --> M[File Storage]
+B --> N[S3 Storage]
+B --> O[KMS Encryption]
+C --> P[Validation Rules]
+D --> Q[SHA-256 Hashing]
+D --> R[HMAC-SHA256 Signatures]
+E --> S[BullMQ Queue]
+E --> T[Redis]
+E --> U[Circuit Breaker]
+E --> V[Dead Letter Queue]
+G --> W[Middleware Plugins]
+G --> X[Storage Plugins]
+G --> Y[Auth Plugins]
+H --> Z[Data Pseudonymization]
+H --> AA[Retention Policies]
+H --> AB[Data Export]
+I --> AC[OTLP Exporter]
+I --> AD[Batch Processing]
+I --> AE[Error Handling]
+J --> AF[Performance Logging]
+J --> AG[Error Tracking]
+J --> AH[Metrics Collection]
+K --> AI[Optimized Database Queries]
+K --> AJ[Organization Priority]
+L --> AK[Alert Handlers]
+L --> AL[Metrics Collector]
+L --> AM[Notification System]
 ```
 
 **Diagram sources**
@@ -157,6 +152,8 @@ K --> AI[Organization Priority]
 - [logging.ts](file://packages\logs\src\logging.ts)
 - [loggerFactory.ts](file://packages\logs\src\logging.ts)
 - [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts)
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+- [monitor/monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
 
 **Section sources**
 - [audit.ts](file://packages\audit\src\audit.ts)
@@ -1298,3 +1295,185 @@ The handler is integrated into the server initialization process through the ini
 - [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts)
 - [lib/hono/init.ts](file://apps\server\src\lib\hono\init.ts)
 - [index.ts](file://apps\server\src\index.ts)
+
+## Alerting Service Architecture
+
+The AlertingService class has been extracted from the MonitoringService to provide a dedicated and focused implementation for alert handling. This refactoring improves code organization, testability, and maintainability by separating concerns between monitoring and alerting functionality.
+
+```mermaid
+classDiagram
+class AlertingService {
+-config : MonitoringConfig
+-alertHandlers : AlertHandler[]
+-metricsCollector : MetricsCollector
+-logger : any
++addAlertHandler(handler : AlertHandler) : void
++sendExternalAlert(alert : Alert) : Promise~void~
++getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++generateAlert(alert : Alert) : Promise~void~
++numberOfActiveAlerts(organizationId? : string) : Promise~number~
++getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
++resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{ success : boolean }~
++acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{ success : boolean }~
++dismissAlert(alertId : string, dismissedBy : string) : Promise~{ success : boolean }~
++checkDuplicateAlert(alert : Alert) : Promise~boolean~
++createAlertHash(alert : Alert) : string
++sendNotifications(alert : Alert) : Promise~void~
++sendCriticalAlertNotification(alert : Alert) : Promise~void~
+}
+class AlertHandler {
+<<interface>>
++handlerName() : string
++sendAlert(alert : Alert) : Promise~void~
++getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++numberOfActiveAlerts(organizationId? : string) : Promise~number~
++getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
++resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{ success : boolean }~
++acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{ success : boolean }~
++dismissAlert(alertId : string, dismissedBy : string) : Promise~{ success : boolean }~
+}
+class DatabaseAlertHandler {
+<<implementation>>
++handlerName() : string
++sendAlert(alert : Alert) : Promise~void~
++getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++numberOfActiveAlerts(organizationId? : string) : Promise~number~
++getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
++resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{ success : boolean }~
++acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{ success : boolean }~
++dismissAlert(alertId : string, dismissedBy : string) : Promise~{ success : boolean }~
+}
+class ConsoleAlertHandler {
+<<implementation>>
++handlerName() : string
++sendAlert(alert : Alert) : Promise~void~
++getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++numberOfActiveAlerts(organizationId? : string) : Promise~number~
++getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
++resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{ success : boolean }~
++acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{ success : boolean }~
++dismissAlert(alertId : string, dismissedBy : string) : Promise~{ success : boolean }~
+}
+AlertingService --> AlertHandler : uses
+AlertHandler <|-- DatabaseAlertHandler
+AlertHandler <|-- ConsoleAlertHandler
+```
+
+**Diagram sources**
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+- [monitor/monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+
+The AlertingService provides a comprehensive interface for alert management with the following key features:
+
+- **Modular Design**: Alert handling is separated into a dedicated service, allowing for independent development and testing
+- **Handler Pattern**: Supports multiple alert handlers through a common interface, enabling different storage and notification backends
+- **Deduplication**: Implements alert deduplication to prevent notification spam for similar events
+- **Metrics Integration**: Records alert generation metrics for monitoring and analysis
+- **Notification System**: Sends notifications based on alert severity with different handling for critical alerts
+- **External Integration**: Provides methods for external systems to send and manage alerts
+
+The service is designed to be extensible, allowing new alert handlers to be added without modifying the core implementation. This follows the Open/Closed Principle, making the system more maintainable and adaptable to changing requirements.
+
+**Section sources**
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+- [monitor/monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
+
+## Alert Deduplication Mechanism
+
+The AlertingService implements a sophisticated deduplication mechanism to prevent the generation of duplicate alerts for similar events within a cooldown period. This ensures that alert notifications are meaningful and not overwhelming to recipients.
+
+```mermaid
+flowchart TD
+A[Generate Alert] --> B[Create Alert Hash]
+B --> C[Check Cooldown]
+C --> |Exists| D[Suppress Alert]
+C --> |Not Exists| E[Set Cooldown]
+E --> F[Record Alert Metric]
+F --> G[Send to Handlers]
+G --> H[Send Notifications]
+H --> I[Alert Processed]
+subgraph Hash Creation
+B --> J[Extract Key Fields]
+J --> K[source, title, severity, description]
+K --> L[Concatenate Fields]
+L --> M[Base64 Encode]
+end
+subgraph Cooldown Management
+C --> N[Redis Check]
+E --> O[Redis Set]
+end
+```
+
+**Diagram sources**
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+
+The deduplication process works as follows:
+
+1. **Hash Creation**: When an alert is generated, a hash is created from key fields of the alert (source, title, severity, and description) using Base64 encoding
+2. **Cooldown Check**: The system checks if a cooldown key exists in Redis for the alert hash
+3. **Deduplication Decision**: If the cooldown key exists, the alert is suppressed; otherwise, it proceeds
+4. **Cooldown Setting**: After processing, a cooldown key is set in Redis with a TTL of 300 seconds (5 minutes)
+
+The hash creation process has been enhanced to include more relevant fields for better deduplication accuracy:
+
+```typescript
+private createAlertHash(alert: Alert): string {
+    const content = `${alert.source}:${alert.title}:${alert.severity}:${alert.description}`
+    return Buffer.from(content).toString('base64')
+}
+```
+
+This approach ensures that alerts with identical source, title, severity, and description are considered duplicates, while allowing variations in other fields (such as timestamps or metadata) to still generate alerts if they represent genuinely different events.
+
+The deduplication mechanism uses Redis as a distributed cache, allowing it to work across multiple instances of the service. The cooldown period is configurable through the monitoring configuration, providing flexibility based on operational requirements.
+
+**Section sources**
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+
+## Console Alert Handler
+
+The ConsoleAlertHandler is a development and testing implementation of the AlertHandler interface that outputs alert information to the console. This handler is particularly useful for debugging and local development environments where external alerting systems may not be available.
+
+```mermaid
+classDiagram
+class ConsoleAlertHandler {
++handlerName() : string
++sendAlert(alert : Alert) : Promise~void~
++getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++numberOfActiveAlerts(organizationId? : string) : Promise~number~
++getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
++resolveAlert(alertId : string, resolvedBy : string) : Promise~{ success : boolean }~
++acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{ success : boolean }~
++dismissAlert(alertId : string, dismissedBy : string) : Promise~{ success : boolean }~
+}
+```
+
+**Diagram sources**
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+
+The ConsoleAlertHandler provides the following functionality:
+
+- **Alert Display**: Outputs alert information to the console with appropriate log levels based on severity
+- **Management Operations**: Implements all required alert management operations (resolve, acknowledge, dismiss)
+- **Query Support**: Supports filtering of alerts by organization ID
+- **Statistics**: Provides basic alert statistics for monitoring purposes
+
+Example output from the ConsoleAlertHandler:
+
+```text
+🚨 ALERT [HIGH]: Suspicious Pattern Detected: FAILED_AUTH
+   Description: 5 failed authentication attempts detected from user-123 within 300 seconds
+   Source: audit-monitoring
+   Timestamp: 2024-01-15T10:30:00.000Z
+   Metadata: { patternType: 'FAILED_AUTH', eventCount: 5, source: 'user-123', ... }
+```
+
+The handler is automatically registered when the AlertingService is initialized in development environments, providing immediate feedback on alert generation without requiring external systems. This makes it easier to test alerting logic and verify that suspicious patterns are being detected correctly.
+
+**Section sources**
+- [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)

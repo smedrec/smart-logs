@@ -2,6 +2,8 @@
 
 <cite>
 **Referenced Files in This Document**   
+- [alerts.ts](file://apps\server\src\lib\graphql\resolvers\alerts.ts) - *Refactored to use AlertingService*
+- [context.ts](file://apps\server\src\lib\hono\context.ts) - *Updated service context with alerting service*
 - [compliance.ts](file://apps/server/src/lib/graphql/resolvers/compliance.ts)
 - [gdpr.ts](file://apps/server/src/lib/graphql/resolvers/gdpr.ts)
 - [health.ts](file://apps/server/src/lib/graphql/resolvers/health.ts)
@@ -15,6 +17,14 @@
 - [types.ts](file://apps/server/src/lib/graphql/types.ts)
 </cite>
 
+## Update Summary
+**Changes Made**   
+- Updated Alerts Resolvers section to reflect refactoring to use AlertingService
+- Added detailed explanation of AlertingService integration
+- Updated sequence diagram to show new service interaction
+- Enhanced error handling description with resilience patterns
+- Added section sources for newly analyzed files
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Resolver Registration and Schema Wiring](#resolver-registration-and-schema-wiring)
@@ -26,6 +36,7 @@
 8. [Subscriptions Resolvers](#subscriptions-resolvers)
 9. [Error Handling and Authentication Patterns](#error-handling-and-authentication-patterns)
 10. [Resolver Testing and Validation](#resolver-testing-and-validation)
+11. [Alerts Resolvers](#alerts-resolvers)
 
 ## Introduction
 This document provides comprehensive documentation for all GraphQL resolver functions in the smart-logs application, grouped by domain. The resolvers serve as the business logic layer between the GraphQL schema and underlying services, handling data retrieval, mutation operations, and real-time subscriptions. Each resolver module follows consistent patterns for authentication, authorization, error handling, and service interaction. The documentation details the functions, arguments, return types, and business logic for each resolver, explaining how they interact with services and databases.
@@ -40,7 +51,7 @@ A["resolvers/index.ts"] --> B["Aggregate all resolver modules"]
 B --> C["Export unified resolvers object"]
 C --> D["graphql/index.ts"]
 D --> E["Export resolvers"]
-E --> F["schema creation"]
+E --> F["Schema creation"]
 F --> G["GraphQL server"]
 H["compliance.ts"] --> B
 I["gdpr.ts"] --> B
@@ -48,6 +59,7 @@ J["health.ts"] --> B
 K["metrics.ts"] --> B
 L["scheduled-reports.ts"] --> B
 M["subscriptions.ts"] --> B
+N["alerts.ts"] --> B
 ```
 
 **Diagram sources**
@@ -457,3 +469,59 @@ H["Production Mode"] --> I["Introspection disabled"]
 - [integration.test.ts](file://apps/server/src/lib/graphql/__tests__/integration.test.ts)
 
 The testing strategy includes both unit tests that mock dependencies to test resolver logic in isolation, and integration tests that verify the complete GraphQL server configuration. The unit tests validate that resolvers correctly transform data between service and GraphQL types, handle authentication properly, and produce the expected output structure. The integration tests ensure that the GraphQL server is properly configured with the correct endpoints and security settings for different environments.
+
+## Alerts Resolvers
+
+The alerts resolvers have been refactored to use the dedicated AlertingService, providing a standardized interface for alert management operations.
+
+### Function: alerts
+- **Type**: Query
+- **Arguments**: 
+  - `filter`: AlertFilter (status, severities, types)
+  - `pagination`: PaginationInput (first, after)
+- **Return Type**: Promise<AlertConnection>
+- **Business Logic**: Retrieves alerts with filtering and pagination, converting between GraphQL and monitor service types.
+
+### Function: acknowledgeAlert
+- **Type**: Mutation
+- **Arguments**: 
+  - `id`: string (alert ID)
+- **Return Type**: Promise<Alert>
+- **Business Logic**: Acknowledges an alert through the AlertingService, updating its status and recording the acknowledging user.
+
+### Function: resolveAlert
+- **Type**: Mutation
+- **Arguments**: 
+  - `id`: string (alert ID)
+  - `resolution`: string (resolution notes)
+- **Return Type**: Promise<Alert>
+- **Business Logic**: Resolves an alert with resolution notes through the AlertingService, ensuring proper audit trail.
+
+```mermaid
+sequenceDiagram
+participant Client
+participant Resolver
+participant AlertingService
+participant DatabaseAlertHandler
+participant Logger
+Client->>Resolver : Query alerts(filter, pagination)
+Resolver->>Resolver : Validate authentication
+Resolver->>Resolver : Extract organizationId from session
+Resolver->>AlertingService : getAlerts(queryFilters)
+AlertingService->>DatabaseAlertHandler : getAlerts(filters)
+DatabaseAlertHandler-->>AlertingService : Return database alerts
+AlertingService-->>Resolver : Return monitor alerts
+Resolver->>Resolver : Convert to GraphQL format
+Resolver->>Logger : Log retrieval
+Resolver-->>Client : Return AlertConnection
+```
+
+**Section sources**
+- [alerts.ts](file://apps\server\src\lib\graphql\resolvers\alerts.ts)
+- [context.ts](file://apps\server\src\lib\hono\context.ts)
+
+**Diagram sources**
+- [alerts.ts](file://apps\server\src\lib\graphql\resolvers\alerts.ts)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+
+The alerts resolvers now utilize the AlertingService to interact with the underlying alert storage system. The resolver handles authentication and organization isolation, then delegates to the AlertingService which routes requests to the appropriate handler (DatabaseAlertHandler). The resolvers include type mapping between the GraphQL schema and the monitor service, with special handling for the METRICS type which is mapped to SYSTEM in the GraphQL schema. Error handling is enhanced with resilience patterns, ensuring graceful degradation when external services are unavailable.

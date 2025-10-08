@@ -4,51 +4,62 @@
 **Referenced Files in This Document**   
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts) - *Updated in recent commit*
 - [database-alert-handler.test.ts](file://packages/audit/src/__tests__/database-alert-handler.test.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Refactored to use AlertingService*
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts) - *New AlertingService implementation*
 - [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts) - *Updated in recent commit*
 - [manager.ts](file://packages/audit/src/config/manager.ts) - *Configuration management*
 - [index.ts](file://packages/audit-db/src/db/index.ts) - *EnhancedAuditDb client*
 - [connection.ts](file://packages/redis-client/src/connection.ts) - *Redis connection management*
 - [permissions.ts](file://packages/auth/src/permissions.ts) - *Redis caching for authorization and role management*
+- [context.ts](file://apps/server/src/lib/hono/context.ts) - *Service context with AlertingService*
+- [init.ts](file://apps/server/src/lib/hono/init.ts) - *Initialization with AlertingService*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated the Real-World Deployment Example section to reflect changes in the integration example
-- Added information about the new configuration management system
-- Updated code examples to show the use of EnhancedAuditDb client instead of direct database connection
-- Added details about centralized configuration and improved Redis integration
-- Added documentation for Redis caching in authorization and role management
+- Updated the Core Components section to reflect the refactoring of alert handling to AlertingService
+- Added new section for AlertingService architecture and responsibilities
+- Updated the Alert Lifecycle and Notification Flow section to show the new service interaction
+- Modified the Real-World Deployment Example to reflect the new service context initialization
+- Added documentation for the new service initialization pattern in the server
 - Updated section sources to reflect the new files analyzed
+- Removed outdated references to direct alert handling in MonitoringService
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Core Components](#core-components)
-3. [Detection Logic and Pattern Recognition](#detection-logic-and-pattern-recognition)
-4. [Threshold Configurations and Sensitivity Settings](#threshold-configurations-and-sensitivity-settings)
-5. [Alert Lifecycle and Notification Flow](#alert-lifecycle-and-notification-flow)
-6. [False Positive Reduction and Correlation Rules](#false-positive-reduction-and-correlation-rules)
-7. [Integration with External Alerting Services](#integration-with-external-alerting-services)
-8. [Performance Considerations for High-Volume Monitoring](#performance-considerations-for-high-volume-monitoring)
-9. [Configuration Guidance and Customization](#configuration-guidance-and-customization)
-10. [Real-World Deployment Example](#real-world-deployment-example)
+3. [Alerting Service Architecture](#alerting-service-architecture)
+4. [Detection Logic and Pattern Recognition](#detection-logic-and-pattern-recognition)
+5. [Threshold Configurations and Sensitivity Settings](#threshold-configurations-and-sensitivity-settings)
+6. [Alert Lifecycle and Notification Flow](#alert-lifecycle-and-notification-flow)
+7. [False Positive Reduction and Correlation Rules](#false-positive-reduction-and-correlation-rules)
+8. [Integration with External Alerting Services](#integration-with-external-alerting-services)
+9. [Performance Considerations for High-Volume Monitoring](#performance-considerations-for-high-volume-monitoring)
+10. [Configuration Guidance and Customization](#configuration-guidance-and-customization)
+11. [Real-World Deployment Example](#real-world-deployment-example)
 
 ## Introduction
 The Database Security Alerting system provides comprehensive monitoring of database activities to detect and respond to suspicious patterns such as unauthorized access attempts, anomalous query volumes, and schema changes. Built as part of a multi-organizational audit system, this solution combines real-time pattern detection with persistent alert storage and management. The system is designed to identify potential security incidents through configurable thresholds and correlation rules, while minimizing false positives through intelligent deduplication and organizational isolation. This document details the architecture, detection mechanisms, and operational characteristics of the alerting system, providing guidance for customization and deployment in production environments.
 
 ## Core Components
 
-The Database Security Alerting system consists of two primary components: the `MonitoringService` responsible for detecting suspicious patterns in audit events, and the `DatabaseAlertHandler` that persists alerts to a PostgreSQL database with multi-organizational support. The `MonitoringService` analyzes incoming audit events against configurable thresholds to identify potential security incidents, while the `DatabaseAlertHandler` implements the `AlertHandler` interface to store alerts with full organizational isolation, enabling secure multi-tenancy.
+The Database Security Alerting system consists of three primary components: the `MonitoringService` responsible for detecting suspicious patterns in audit events, the `AlertingService` that manages alert generation and distribution, and the `DatabaseAlertHandler` that persists alerts to a PostgreSQL database with multi-organizational support. The `MonitoringService` analyzes incoming audit events against configurable thresholds to identify potential security incidents, while the `AlertingService` coordinates alert handling across multiple handlers. The `DatabaseAlertHandler` implements the `AlertHandler` interface to store alerts with full organizational isolation, enabling secure multi-tenancy.
 
 ```mermaid
 classDiagram
 class MonitoringService {
 +processEvent(event)
 +detectSuspiciousPatterns(events)
-+addAlertHandler(handler)
 +getActiveAlerts()
 +resolveAlert(alertId, resolvedBy)
++acknowledgeAlert(alertId, acknowledgedBy)
+}
+class AlertingService {
++generateAlert(alert)
++addAlertHandler(handler)
++getActiveAlerts(organizationId)
++getAlertStatistics(organizationId)
++resolveAlert(alertId, resolvedBy, resolutionData)
 +acknowledgeAlert(alertId, acknowledgedBy)
 }
 class AlertHandler {
@@ -56,8 +67,8 @@ class AlertHandler {
 +sendAlert(alert)
 +resolveAlert(alertId, resolvedBy)
 +acknowledgeAlert(alertId, acknowledgedBy)
-+getActiveAlerts()
-+getAlertStatistics()
++getActiveAlerts(organizationId)
++getAlertStatistics(organizationId)
 }
 class DatabaseAlertHandler {
 +sendAlert(alert)
@@ -69,18 +80,75 @@ class DatabaseAlertHandler {
 +getAlertStatistics(organizationId)
 +cleanupResolvedAlerts(organizationId, retentionDays)
 }
-MonitoringService --> AlertHandler : "uses"
+MonitoringService --> AlertingService : "delegates"
+AlertingService --> AlertHandler : "uses"
 DatabaseAlertHandler ..|> AlertHandler : "implements"
 MonitoringService --> DatabaseAlertHandler : "notifies"
 ```
 
 **Diagram sources**
 - [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L106-L1287)
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L49-L1025)
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L6-L297)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L1-L451)
+
+## Alerting Service Architecture
+
+The `AlertingService` has been introduced as part of a refactoring effort to separate alert handling concerns from the `MonitoringService`. This service is responsible for managing the lifecycle of alerts, including generation, deduplication, distribution to handlers, and notification delivery. The separation of concerns allows for more flexible alert handling configurations and easier integration with external systems.
+
+### Service Responsibilities
+The `AlertingService` has several key responsibilities:
+
+**: Alert Generation**
+- Receives alert candidates from the `MonitoringService`
+- Performs duplicate detection using Redis-based cooldown mechanism
+- Generates unique alert identifiers and timestamps
+- Records alert generation metrics
+
+**: Alert Distribution**
+- Maintains a registry of `AlertHandler` implementations
+- Distributes alerts to all registered handlers
+- Handles errors in individual handlers without affecting overall alert processing
+- Supports multiple handlers for different persistence and notification mechanisms
+
+**: Alert Management**
+- Provides methods for retrieving active alerts with optional filtering
+- Manages alert statistics by severity, type, and source
+- Handles alert resolution and acknowledgment workflows
+- Supports alert dismissal functionality
+
+**: Notification Handling**
+- Sends notifications based on alert severity
+- Implements different notification strategies for critical vs. non-critical alerts
+- Integrates with external notification systems through configurable endpoints
+- Logs notification events for audit purposes
+
+### Service Initialization
+The `AlertingService` is initialized with the same configuration as the `MonitoringService` and shares the same metrics collector and logger instances. During initialization, it automatically registers the `DatabaseAlertHandler` as the primary alert handler, ensuring that all generated alerts are persisted to the database.
+
+```mermaid
+flowchart TD
+A[MonitoringService] --> |detects pattern| B[AlertingService]
+B --> |checkDuplicateAlert| C[Redis Cooldown Check]
+C --> |not duplicate| D[Record Alert Metrics]
+D --> |sendAlert| E[DatabaseAlertHandler]
+D --> |sendAlert| F[External Alert Handlers]
+E --> |persist| G[PostgreSQL Database]
+F --> |notify| H[External Systems]
+D --> |sendNotifications| I[Notification Service]
+```
+
+**Diagram sources**
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L6-L297)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L300-L320)
+
+**Section sources**
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L6-L297)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L300-L320)
 
 ## Detection Logic and Pattern Recognition
 
@@ -101,19 +169,15 @@ UnauthorizedAccess --> CreateAlert
 DataVelocity --> CreateAlert
 BulkOperations --> CreateAlert
 OffHours --> CreateAlert
-CreateAlert --> CheckDuplicate["Check for Duplicate Alert"]
-CheckDuplicate --> |Duplicate| Suppress["Suppress Alert"]
-CheckDuplicate --> |New| SendAlert["Send Alert to Handlers"]
-SendAlert --> Notify["Send Notifications"]
-Notify --> End([Alert Processing Complete])
-Suppress --> End
+CreateAlert --> SendToAlerting["Send to AlertingService"]
+SendToAlerting --> End([Alert Processing Complete])
 ```
 
 **Diagram sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L106-L1287)
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L49-L1025)
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L106-L1287)
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L49-L1025)
 
 ### Failed Authentication Detection
 The system detects failed authentication attempts by monitoring events with action types containing 'auth.login.failure' and a failure status. It groups these events by principal ID or IP address and triggers an alert when the number of failed attempts exceeds the configured threshold within the specified time window. This helps identify potential brute force attacks or credential stuffing attempts.
@@ -211,21 +275,22 @@ The alert lifecycle begins with detection and ends with resolution, involving mu
 sequenceDiagram
 participant Event as Audit Event
 participant Monitor as MonitoringService
+participant Alerting as AlertingService
 participant Handler as DatabaseAlertHandler
 participant DB as PostgreSQL
 participant User as Security Team
 Event->>Monitor : processEvent()
 Monitor->>Monitor : detectSuspiciousPatterns()
 alt Pattern Detected
-Monitor->>Monitor : createAlertFromPattern()
-Monitor->>Monitor : checkDuplicateAlert()
+Monitor->>Alerting : generateAlert()
+Alerting->>Alerting : checkDuplicateAlert()
 alt Not Duplicate
-Monitor->>Handler : sendAlert()
+Alerting->>Handler : sendAlert()
 Handler->>DB : INSERT INTO alerts
 DB-->>Handler : Success
-Handler-->>Monitor : Acknowledged
-Monitor->>Monitor : sendNotifications()
-Monitor->>User : Alert Notification
+Handler-->>Alerting : Acknowledged
+Alerting->>Alerting : sendNotifications()
+Alerting->>User : Alert Notification
 end
 end
 User->>Handler : acknowledgeAlert()
@@ -239,15 +304,17 @@ Handler-->>User : Resolved
 ```
 
 **Diagram sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L106-L1287)
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L49-L1025)
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L6-L297)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L1-L451)
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L106-L1287)
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L49-L1025)
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L6-L297)
 - [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L1-L451)
 
 ### Alert Generation
-When the `MonitoringService` detects a suspicious pattern, it creates an alert with detailed metadata including the pattern type, event count, and relevant contextual information. Before sending the alert, the system checks for duplicates using an alert hash based on the source, title, and severity. This deduplication mechanism prevents alert fatigue by suppressing identical alerts within a 5-minute cooldown period.
+When the `MonitoringService` detects a suspicious pattern, it creates an alert with detailed metadata including the pattern type, event count, and relevant contextual information. The alert is then passed to the `AlertingService` which checks for duplicates using an alert hash based on the source, title, and severity. This deduplication mechanism prevents alert fatigue by suppressing identical alerts within a 5-minute cooldown period.
 
 ### Alert Persistence
 The `DatabaseAlertHandler` persists alerts to a PostgreSQL database with comprehensive organizational isolation. Each alert is stored with its full metadata, including organization ID, severity, type, and resolution status. The handler ensures that all operations are scoped to the appropriate organization, preventing cross-organizational data access.
@@ -282,10 +349,10 @@ The `AlertHandler` interface defines the contract for alert handling components:
 - **sendAlert(alert)**: Called when a new alert is generated
 - **resolveAlert(alertId, resolvedBy)**: Called when an alert is resolved
 - **acknowledgeAlert(alertId, acknowledgedBy)**: Called when an alert is acknowledged
-- **getActiveAlerts()**: Retrieves currently active alerts
-- **getAlertStatistics()**: Provides alert statistics by severity and type
+- **getActiveAlerts(organizationId)**: Retrieves currently active alerts for an organization
+- **getAlertStatistics(organizationId)**: Provides alert statistics by severity and type for an organization
 
-Multiple handlers can be registered with the `MonitoringService`, allowing alerts to be sent to multiple destinations simultaneously. For example, an organization might use both the `DatabaseAlertHandler` for persistent storage and a `SlackAlertHandler` for real-time notifications.
+Multiple handlers can be registered with the `AlertingService`, allowing alerts to be sent to multiple destinations simultaneously. For example, an organization might use both the `DatabaseAlertHandler` for persistent storage and a `SlackAlertHandler` for real-time notifications.
 
 ### Example Integration Points
 Potential integration points for external alerting services include:
@@ -359,46 +426,50 @@ The `database-alert-integration.ts` example demonstrates a complete real-world d
 ```mermaid
 flowchart LR
 A[Configuration Manager] --> B[DatabaseAlertHandler]
-C[MonitoringService] --> B
-D[Audit Events] --> C
-B --> E[PostgreSQL Database]
-F[Security Team] --> G[Query Alerts]
-G --> B
-H[Resolve Alerts] --> B
-I[Get Statistics] --> B
+C[MonitoringService] --> D[AlertingService]
+D --> B
+E[Audit Events] --> C
+B --> F[PostgreSQL Database]
+G[Security Team] --> H[Query Alerts]
+H --> B
+I[Resolve Alerts] --> B
+J[Get Statistics] --> B
 style A fill:#f9f,stroke:#333
 style B fill:#bbf,stroke:#333
 style C fill:#f96,stroke:#333
-style D fill:#9f9,stroke:#333
-style E fill:#999,stroke:#333
-style F fill:#ff9,stroke:#333
-style G fill:#6f6,stroke:#333
+style D fill:#69f,stroke:#333
+style E fill:#9f9,stroke:#333
+style F fill:#999,stroke:#333
+style G fill:#ff9,stroke:#333
 style H fill:#6f6,stroke:#333
 style I fill:#6f6,stroke:#333
+style J fill:#6f6,stroke:#333
 ```
 
-**Updated** The diagram has been updated to reflect the new configuration management system and the use of EnhancedAuditDb client.
+**Updated** The diagram has been updated to reflect the new configuration management system, the use of EnhancedAuditDb client, and the introduction of AlertingService.
 
 **Diagram sources**
 - [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L1-L283)
 - [manager.ts](file://packages/audit/src/config/manager.ts#L33-L843)
 - [index.ts](file://packages/audit-db/src/db/index.ts#L160-L222)
 - [connection.ts](file://packages/redis-client/src/connection.ts#L73-L135)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L300-L320)
 
 **Section sources**
 - [database-alert-integration.ts](file://packages/audit/src/examples/database-alert-integration.ts#L1-L283)
 - [manager.ts](file://packages/audit/src/config/manager.ts#L33-L843)
 - [index.ts](file://packages/audit-db/src/db/index.ts#L160-L222)
 - [connection.ts](file://packages/redis-client/src/connection.ts#L73-L135)
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L300-L320)
 
 ### Integration Example Walkthrough
 The example demonstrates several key aspects of real-world deployment:
 
-1. **Setup**: The `setupMonitoringWithDatabaseAlerts` function now uses a `ConfigurationManager` to centralize configuration management, replaces direct database connection with the `EnhancedAuditDb` client, and improves Redis integration and error handling.
+1. **Setup**: The `setupMonitoringWithDatabaseAlerts` function now uses a `ConfigurationManager` to centralize configuration management, replaces direct database connection with the `EnhancedAuditDb` client, improves Redis integration and error handling, and properly initializes the `AlertingService`.
 
-2. **Event Processing**: The `processAuditEventsWithAlerts` function simulates suspicious activity (multiple failed login attempts) and processes these events through the monitoring service, demonstrating how alerts are automatically generated.
+2. **Event Processing**: The `processAuditEventsWithAlerts` function simulates suspicious activity (multiple failed login attempts) and processes these events through the monitoring service, demonstrating how alerts are automatically generated and passed to the `AlertingService`.
 
-3. **Alert Management**: The example shows how to retrieve active alerts, resolve alerts with resolution notes, and obtain alert statistics for reporting and analysis.
+3. **Alert Management**: The example shows how to retrieve active alerts, resolve alerts with resolution notes, and obtain alert statistics for reporting and analysis through the `AlertingService` interface.
 
 4. **Multi-Organizational Isolation**: The `demonstrateMultiOrganizationalIsolation` function verifies that alerts from one organization cannot be accessed by another organization, ensuring data privacy and compliance.
 

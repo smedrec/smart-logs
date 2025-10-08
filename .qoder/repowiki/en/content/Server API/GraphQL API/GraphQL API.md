@@ -9,7 +9,17 @@
 - [audit-events.ts](file://apps/server/src/lib/graphql/resolvers/audit-events.ts)
 - [compliance.ts](file://apps/server/src/lib/graphql/resolvers/compliance.ts)
 - [scheduled-reports.ts](file://apps/server/src/lib/graphql/resolvers/scheduled-reports.ts)
+- [alerts.ts](file://apps/server/src/lib/graphql/resolvers/alerts.ts) - *Updated in recent commit*
+- [context.ts](file://apps/server/src/lib/hono/context.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated **Mutation Operations** section to reflect the use of AlertingService for alert mutations
+- Added **Section sources** to Mutation Operations section to reference updated resolver files
+- Updated **Access Control** section to reflect enhanced service context structure
+- Added **Section sources** to Access Control section to reference updated context file
+- No changes to diagrams as the architectural flow remains consistent
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -401,87 +411,13 @@ mutation ResolveAlert($id: ID!, $resolution: String!) {
 }
 ```
 
-The mutations are implemented as resolver functions that validate authentication, enforce organization isolation, and delegate to the appropriate service layers for data modification. They return the created or updated objects to provide immediate feedback to the client.
-
-```mermaid
-classDiagram
-class Mutation {
-+createAuditEvent(input : CreateAuditEventInput!) : AuditEvent
-+verifyAuditEvent(id : ID!) : IntegrityVerificationResult
-+createScheduledReport(input : CreateScheduledReportInput!) : ScheduledReport
-+updateScheduledReport(id : ID!, input : UpdateScheduledReportInput!) : ScheduledReport
-+deleteScheduledReport(id : ID!) : Boolean
-+executeScheduledReport(id : ID!) : ReportExecution
-+createAuditPreset(input : CreateAuditPresetInput!) : AuditPreset
-+updateAuditPreset(name : String!, input : UpdateAuditPresetInput!) : AuditPreset
-+deleteAuditPreset(name : String!) : Boolean
-+acknowledgeAlert(id : ID!) : Alert
-+resolveAlert(id : ID!, resolution : String!) : Alert
-+gdprExportUserData(input : GDPRExportInput!) : GDPRExportResult
-+gdprPseudonymizeUserData(input : GDPRPseudonymizeInput!) : GDPRPseudonymizeResult
-+gdprDeleteUserData(input : GDPRDeleteInput!) : GDPRDeleteResult
-}
-class CreateAuditEventInput {
-+action : String!
-+targetResourceType : String
-+targetResourceId : String
-+principalId : String!
-+organizationId : String!
-+status : AuditEventStatus!
-+outcomeDescription : String
-+dataClassification : DataClassification
-+sessionContext : SessionContextInput
-+correlationId : String
-+retentionPolicy : String
-+metadata : JSON
-}
-class CreateScheduledReportInput {
-+name : String!
-+description : String
-+reportType : ComplianceReportType!
-+criteria : ReportCriteriaInput!
-+schedule : ReportScheduleInput!
-+deliveryConfig : DeliveryConfigInput!
-+isActive : Boolean
-}
-class UpdateScheduledReportInput {
-+name : String
-+description : String
-+criteria : ReportCriteriaInput
-+schedule : ReportScheduleInput
-+deliveryConfig : DeliveryConfigInput
-+isActive : Boolean
-}
-class GDPRExportInput {
-+principalId : String!
-+format : String!
-+dateRange : TimeRangeInput
-+includeMetadata : Boolean
-}
-class GDPRExportResult {
-+requestId : String!
-+principalId : String!
-+recordCount : Int!
-+dataSize : Int!
-+format : String!
-+exportTimestamp : DateTime!
-+metadata : GDPRExportMetadata!
-+data : String!
-}
-Mutation --> CreateAuditEventInput
-Mutation --> CreateScheduledReportInput
-Mutation --> UpdateScheduledReportInput
-Mutation --> GDPRExportInput
-Mutation --> GDPRExportResult
-```
-
-**Diagram sources**
-- [schema.ts](file://apps/server/src/lib/graphql/schema.ts#L0-L659)
-- [types.ts](file://apps/server/src/lib/graphql/types.ts#L0-L485)
+The mutations are implemented as resolver functions that validate authentication, enforce organization isolation, and delegate to the appropriate service layers for data modification. They return the created or updated objects to provide immediate feedback to the client. The alert mutations (`acknowledgeAlert` and `resolveAlert`) now use the dedicated AlertingService through the monitor.alerts service interface.
 
 **Section sources**
 - [schema.ts](file://apps/server/src/lib/graphql/schema.ts#L0-L659)
 - [types.ts](file://apps/server/src/lib/graphql/types.ts#L0-L485)
+- [alerts.ts](file://apps/server/src/lib/graphql/resolvers/alerts.ts#L0-L377)
+- [context.ts](file://apps/server/src/lib/hono/context.ts#L0-L101)
 
 ## Subscription Capabilities
 
@@ -786,7 +722,7 @@ The API supports multiple authentication methods:
 - **Session-based authentication**: For web and mobile clients using JWT tokens
 - **API key authentication**: For server-to-server communication and integrations
 
-The context object includes information about the authentication method used, allowing resolvers to apply different security policies based on how the client is authenticated.
+The context object includes information about the authentication method used, allowing resolvers to apply different security policies based on how the client is authenticated. The service context now includes a dedicated monitor.alerts service for handling alert operations.
 
 ```mermaid
 graph TD
@@ -811,6 +747,7 @@ style Results fill:#D5E8D4,stroke:#82B366
 **Section sources**
 - [server.ts](file://apps/server/src/lib/graphql/server.ts#L0-L132)
 - [types.ts](file://apps/server/src/lib/graphql/types.ts#L0-L485)
+- [context.ts](file://apps/server/src/lib/hono/context.ts#L0-L101)
 
 ## Sample Requests
 

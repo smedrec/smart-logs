@@ -12,16 +12,18 @@
 - [crypto.test.ts](file://packages/audit/src/__tests__/crypto.test.ts)
 - [permissions.ts](file://packages/auth/src/permissions.ts) - *Added Redis caching for authorization and role management in commit a386f63b*
 - [redis.ts](file://packages/auth/src/redis.ts) - *Redis connection management for caching in commit a386f63b*
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts) - *Refactored alert handling in commit 8d12d47b*
+- [context.ts](file://apps/server/src/lib/hono/context.ts) - *Updated service context in commit 8646eddf*
+- [init.ts](file://apps/server/src/lib/hono/init.ts) - *Updated service initialization in commit 8646eddf*
 </cite>
 
 ## Update Summary
-- Added documentation for asynchronous event signature generation with KMS support in CryptoService
-- Updated Cryptographic Functions section to include KMS integration and multiple signing algorithms
-- Enhanced the HMAC Signature Verification section with details about the new async signature response format
-- Updated the Security Alerting System section with enhanced alert persistence features and cleanup functionality
-- Added new section on Redis-based Authorization and Role Caching to document recent security enhancements
-- Added code examples and architectural details for permission and role caching mechanisms
-- Maintained all existing security documentation while adding new content for the updated cryptographic functions, alert persistence, and authorization caching
+- Added documentation for the new AlertingService that now handles security alerts
+- Updated Security Alerting System section to reflect the refactored architecture with AlertingService and DatabaseAlertHandler
+- Added details about the service initialization and context setup in the server application
+- Updated section sources to include new files alerting.ts, context.ts, and init.ts
+- Maintained all existing security documentation while adding new content for the refactored alert handling system
+- Removed outdated references to direct MonitoringService alert handling
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -248,57 +250,106 @@ Aggregations trigger alerts when thresholds are exceeded, enabling proactive mon
 
 ## Security Alerting System
 
-The database alert handler detects and responds to suspicious activities through persistent storage and multi-organizational access control.
+The security alerting system has been refactored to use a dedicated `AlertingService` that coordinates with the `DatabaseAlertHandler` for persistent storage and multi-organizational access control.
 
-### Enhanced Alert Persistence
-The `DatabaseAlertHandler` stores alerts in PostgreSQL with organization-based isolation:
-- Each alert belongs to a specific **organization_id**
-- Fields include severity, type, status, and resolution metadata
-- Supports acknowledgment and resolution workflows
-- Includes automatic cleanup of resolved alerts based on retention policy
+### Alerting Service Architecture
+The new architecture separates concerns between alert generation and persistence:
+- **AlertingService**: Central coordinator for alert management and distribution
+- **DatabaseAlertHandler**: Specialized handler for database persistence with organization-based isolation
 
 ```mermaid
-erDiagram
-ALERTS {
-string id PK
-string organization_id FK
-string severity
-string type
-string title
-string description
-timestamp created_at
-timestamp updated_at
-boolean acknowledged
-timestamp acknowledged_at
-string acknowledged_by
-boolean resolved
-timestamp resolved_at
-string resolved_by
-string resolution_notes
-string correlation_id
-json metadata
+classDiagram
+class AlertingService {
++addAlertHandler(handler) void
++sendExternalAlert(alert) Promise~void~
++generateAlert(alert) Promise~void~
++getAlerts(filters) Promise~Alert[]~
++getActiveAlerts(organizationId) Promise~Alert[]~
++numberOfActiveAlerts(organizationId) Promise~number~
++getAlertStatistics(organizationId) Promise~AlertStatistics~
++resolveAlert(alertId, resolvedBy, resolutionData) Promise~{success : boolean}~
++acknowledgeAlert(alertId, acknowledgedBy) Promise~{success : boolean}~
++dismissAlert(alertId, dismissedBy) Promise~{success : boolean}~
++checkDuplicateAlert(alert) Promise~boolean~
++createAlertHash(alert) string
++sendNotifications(alert) Promise~void~
++sendCriticalAlertNotification(alert) Promise~void~
 }
-ORGANIZATIONS {
-string id PK
-string name
+class DatabaseAlertHandler {
++handlerName() string
++sendAlert(alert) Promise~void~
++acknowledgeAlert(alertId, acknowledgedBy) Promise~{success : boolean}~
++resolveAlert(alertId, resolvedBy, resolutionData) Promise~{success : boolean}~
++dismissAlert(alertId, dismissedBy) Promise~{success : boolean}~
++getAlerts(filters) Promise~Alert[]~
++getActiveAlerts(organizationId) Promise~Alert[]~
++numberOfActiveAlerts(organizationId) Promise~number~
++getAlertStatistics(organizationId) Promise~AlertStatistics~
++cleanupResolvedAlerts(organizationId, retentionDays) Promise~number~
++mapDatabaseAlertToAlert(dbAlert) Alert
 }
-ORGANIZATIONS ||--o{ ALERTS : "has"
+class AlertHandler {
++handlerName() string
++sendAlert(alert) Promise~void~
++acknowledgeAlert(alertId, acknowledgedBy) Promise~{success : boolean}~
++resolveAlert(alertId, resolvedBy, resolutionData) Promise~{success : boolean}~
++dismissAlert(alertId, dismissedBy) Promise~{success : boolean}~
++getAlerts(filters) Promise~Alert[]~
++getActiveAlerts(organizationId) Promise~Alert[]~
++numberOfActiveAlerts(organizationId) Promise~number~
++getAlertStatistics(organizationId) Promise~AlertStatistics~
+}
+AlertHandler <|.. DatabaseAlertHandler
+AlertingService --> AlertHandler : "uses multiple"
 ```
 
 **Diagram sources**
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L0-L450)
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L6-L297)
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L76-L539)
+- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts#L217-L231)
 
 **Section sources**
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L0-L450)
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L6-L297)
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L76-L539)
 
 ### Alert Lifecycle Management
-The system supports:
-- **Creation**: New alerts are inserted with initial metadata
-- **Acknowledgment**: Users mark alerts as seen
-- **Resolution**: Alerts are closed with resolution notes
-- **Querying**: Filter by status, severity, type, and organization
-- **Statistics**: Real-time metrics on alert volume and distribution
-- **Cleanup**: Automatic deletion of resolved alerts older than retention period
+The `AlertingService` manages the complete alert lifecycle:
+- **Creation**: New alerts are generated through `generateAlert`
+- **Deduplication**: Checks for duplicate alerts using content hashing
+- **Distribution**: Sends alerts to all registered handlers
+- **Notification**: Sends appropriate notifications based on severity
+- **Querying**: Provides methods to retrieve alerts with various filters
+- **Statistics**: Offers comprehensive alert statistics and trends
+
+The service uses a cooldown mechanism to prevent alert flooding, with similar alerts being suppressed for 5 minutes based on a hash of the alert content.
+
+### Service Initialization and Context Setup
+The alerting system is initialized in the server application through the service context setup:
+
+```typescript
+// In init.ts - Service initialization
+if (!alertingService) {
+    alertingService = new AlertingService(config.monitoring, metricsCollector)
+    // Set alerting service config for database alert handler
+    alertingService.addAlertHandler(databaseAlertHandler)
+}
+
+// In context.ts - Service context definition
+export type ServiceContext = {
+    // ... other services
+    monitor: {
+        alerts: AlertingService
+        metrics: MonitoringService
+    }
+    // ... other services
+}
+```
+
+This initialization pattern ensures that the `AlertingService` is properly configured with the `DatabaseAlertHandler` during application startup, creating a complete alerting pipeline.
+
+**Section sources**
+- [init.ts](file://apps/server/src/lib/hono/init.ts#L280-L285)
+- [context.ts](file://apps/server/src/lib/hono/context.ts#L100-L105)
 
 ### Multi-Tenant Security
 Organization-based access control ensures:
@@ -306,6 +357,8 @@ Organization-based access control ensures:
 - Queries include `organization_id` filtering
 - Cross-tenant data leakage is prevented
 - Administrative views can aggregate across organizations
+
+The `DatabaseAlertHandler` enforces multi-tenancy by requiring an `organizationId` in the alert metadata and including it in all database queries.
 
 ### Automatic Alert Cleanup
 The system includes a `cleanupResolvedAlerts` method that automatically removes resolved alerts older than a specified retention period:
@@ -334,7 +387,7 @@ async cleanupResolvedAlerts(organizationId: string, retentionDays: number = 90):
 This ensures that the alert storage remains efficient while maintaining compliance with data retention policies.
 
 **Section sources**
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L400-L430)
+- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L480-L510)
 
 ## Dead-Letter Queue for Message Integrity
 

@@ -15,7 +15,7 @@
 - [api-version.ts](file://apps\server\src\lib\middleware\api-version.ts)
 - [openapi_responses.ts](file://apps\server\src\lib\errors\openapi_responses.ts)
 - [http.ts](file://apps\server\src\lib\errors\http.ts)
-- [alerts.ts](file://apps\server\src\routers\alerts.ts)
+- [alerts.ts](file://apps\server\src\routes\alerts.ts)
 - [organization-api.ts](file://apps\server\src\routes\organization-api.ts)
 - [0005_fluffy_donald_blake.sql](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql)
 - [init.ts](file://apps\server\src\lib\hono\init.ts)
@@ -51,6 +51,13 @@
 - Updated alert property names from timestamp to created_at and acknowledgedBy to acknowledged_by
 - Added new section for Alert Management API with updated field mappings
 - Updated request/response examples to reflect new alert field names
+- Added new dedicated alerts service with API routes for alert management
+- Updated Alert Management API to reflect new service implementation and standardized handling
+- Added documentation for new alert statistics endpoint
+- Updated alert query parameters to include orderBy and sortOrder
+- Added dismiss alert functionality to Alert Management API
+- Updated alert schema to include createdAt instead of timestamp
+- Added new section sources for alerts.ts and graphql resolvers
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -998,7 +1005,7 @@ The Alert Management API provides endpoints for managing system alerts with upda
 The alert object has been updated with new field names to improve consistency and clarity:
 
 **Updated Field Mappings**:
-- `timestamp` → `created_at` (ISO 8601 formatted string)
+- `timestamp` → `createdAt` (ISO 8601 formatted string)
 - `acknowledgedBy` → `acknowledged_by` (string)
 - `acknowledgedAt` → `acknowledged_at` (ISO 8601 formatted string)
 - `resolvedBy` → `resolved_by` (string)
@@ -1014,7 +1021,7 @@ The alert object has been updated with new field names to improve consistency an
   "type": "PERFORMANCE",
   "status": "active",
   "source": "system-monitor",
-  "created_at": "2024-01-01T10:00:00.000Z",
+  "createdAt": "2024-01-01T10:00:00.000Z",
   "acknowledged_at": "2024-01-01T10:05:00.000Z",
   "acknowledged_by": "usr_456",
   "resolved_at": "2024-01-01T10:15:00.000Z",
@@ -1032,6 +1039,7 @@ The alert object has been updated with new field names to improve consistency an
 The `/alerts/board` route has been removed as part of the UI refactoring. The primary alert endpoints are now:
 
 - `GET /alerts`: List all alerts (replaces board view functionality)
+- `GET /alerts/statistics`: Get alert statistics
 - `GET /alerts/{id}`: Get specific alert details
 - `POST /alerts/{id}/acknowledge`: Acknowledge an alert
 - `POST /alerts/{id}/resolve`: Resolve an alert
@@ -1040,22 +1048,23 @@ The `/alerts/board` route has been removed as part of the UI refactoring. The pr
 ### Query Parameters
 The alert listing endpoint supports the following query parameters for filtering and sorting:
 
-- `severity`: Filter by alert severity (CRITICAL, HIGH, MEDIUM, LOW, INFO)
-- `type`: Filter by alert type (SYSTEM, SECURITY, PERFORMANCE, COMPLIANCE, CUSTOM)
-- `status`: Filter by alert status (active, acknowledged, resolved, dismissed)
+- `acknowledged`: Filter by acknowledgment status
+- `resolved`: Filter by resolution status
+- `severity`: Filter by alert severity (LOW, MEDIUM, HIGH, CRITICAL)
+- `type`: Filter by alert type (SECURITY, COMPLIANCE, PERFORMANCE, SYSTEM, METRICS, CUSTOM)
 - `source`: Filter by source system
-- `startDate`, `endDate`: Time range filtering by created_at
+- `status`: Filter by alert status (active, acknowledged, resolved, dismissed)
 - `limit`: Items per page (default: 50, maximum: 100)
 - `offset`: Items to skip
-- `sortField`: Field to sort by (created_at, severity, status)
-- `sortDirection`: Sort direction (asc, desc)
+- `orderBy`: Field to sort by (createdAt, updatedAt, severity)
+- `sortOrder`: Sort direction (asc, desc)
 
 ### Response Format
 The alert listing endpoint returns a paginated response:
 
 ```json
 {
-  "alerts": [
+  "data": [
     {
       "id": "alrt_123",
       "title": "Security Breach Attempt",
@@ -1064,7 +1073,9 @@ The alert listing endpoint returns a paginated response:
       "type": "SECURITY",
       "status": "active",
       "source": "auth-service",
-      "created_at": "2024-01-01T09:30:00.000Z",
+      "createdAt": "2024-01-01T09:30:00.000Z",
+      "acknowledged": false,
+      "resolved": false,
       "metadata": {
         "ip_address": "192.168.1.100",
         "attempt_count": 15
@@ -1082,7 +1093,49 @@ The alert listing endpoint returns a paginated response:
 }
 ```
 
+### Alert Statistics
+The new alert statistics endpoint provides comprehensive alert metrics:
+
+**Endpoint**: `GET /statistics`  
+**Authentication**: Required  
+**Permissions**: Read access to organization
+
+**Response**:
+```json
+{
+  "total": 150,
+  "active": 25,
+  "acknowledged": 75,
+  "resolved": 45,
+  "dismissed": 5,
+  "bySeverity": {
+    "INFO": 10,
+    "LOW": 20,
+    "MEDIUM": 30,
+    "HIGH": 50,
+    "CRITICAL": 40
+  },
+  "byType": {
+    "SECURITY": 60,
+    "COMPLIANCE": 30,
+    "PERFORMANCE": 40,
+    "SYSTEM": 15,
+    "METRICS": 5
+  },
+  "recentAlerts": [
+    {
+      "id": "alrt_123",
+      "title": "High CPU Usage",
+      "severity": "HIGH",
+      "type": "PERFORMANCE",
+      "createdAt": "2024-01-01T10:00:00.000Z"
+    }
+  ]
+}
+```
+
 **Section sources**
+- [alerts.ts](file://apps\server\src\routes\alerts.ts#L1-L477)
 - [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx#L1-L459)
 - [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx#L1-L572)
 - [AlertDetails.tsx](file://apps\app\src\components\alerts\core\AlertDetails.tsx#L1-L520)

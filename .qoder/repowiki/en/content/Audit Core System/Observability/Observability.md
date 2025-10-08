@@ -15,7 +15,8 @@
 - [tracer.test.ts](file://packages/audit/src/observability/__tests__/tracer.test.ts) - *Updated in recent commit*
 - [dashboard.test.ts](file://packages/audit/src/observability/__tests__/dashboard.test.ts) - *Updated in recent commit*
 - [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts) - *Updated in recent commit*
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Updated in recent commit*
+- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts) - *Updated in recent commit to use AlertingService*
+- [alerting.ts](file://packages/audit/src/monitor/alerting.ts) - *Added in recent commit as AlertingService*
 - [health.ts](file://apps/server/src/lib/services/health.ts) - *Updated in recent commit*
 - [health-api.ts](file://apps/server/src/routes/health-api.ts) - *Updated in recent commit*
 </cite>
@@ -28,6 +29,8 @@
 - Updated file references to reflect current implementation with new logging infrastructure
 - Added platform-specific configuration examples for enhanced OTLP exporter
 - Enhanced source tracking with commit annotations
+- Updated MonitoringService section to reflect refactoring that extracted alert handling to AlertingService
+- Added documentation for the new AlertingService class and its integration with MonitoringService
 - Maintained all technical content while updating references
 
 ## Table of Contents

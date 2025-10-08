@@ -5,11 +5,12 @@
 - [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts) - *Updated with enhanced OTLP exporter and KMS encryption*
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Enhanced OTLP exporter with batch processing and authentication*
 - [types.ts](file://packages\audit\src\observability\types.ts) - *Updated ObservabilityConfig interface*
-- [otpl-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *OTLP configuration guide*
-- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts) - *Monitoring service implementation*
+- [otpl-configuration.md](file://packages\audit\docs\observability\otpl-configuration.md) - *OTLP configuration guide*
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts) - *Monitoring service implementation with AlertingService integration*
 - [otpl.ts](file://packages\logs\src\otpl.ts) - *OTLP logging implementation*
 - [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts) - *Updated with structured logging integration*
 - [preset-types.ts](file://packages\audit\src\preset\preset-types.ts) - *Database preset handler integration*
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts) - *AlertingService implementation extracted from MonitoringService*
 </cite>
 
 ## Update Summary
@@ -23,6 +24,8 @@
 - Integrated structured logging system into metrics collection framework
 - Updated metrics collector implementations to support enhanced logging capabilities
 - Added documentation for database preset handler integration and detailed phase timing metrics
+- Documented the refactoring of alert handling functionality to the AlertingService class
+- Updated references to alert statistics and active alerts methods to reflect their delegation to AlertingService
 
 ## Table of Contents
 1. [Metrics Collection System Overview](#metrics-collection-system-overview)
@@ -40,9 +43,12 @@ The Metrics Collection system is a comprehensive observability framework designe
 
 The metrics collection system serves as the foundation for monitoring service health, enabling teams to establish baselines, detect anomalies, and set up proactive alerting. It integrates seamlessly with the broader monitoring ecosystem, providing data for dashboards, alerting systems, and compliance reporting. Recent updates have enhanced the system with KMS encryption and an improved OTLP exporter with robust batch processing and error handling capabilities. The system now records detailed timing for validation, hashing, pseudonymization, and storage phases, providing granular insights into audit pipeline performance.
 
+A significant architectural change has been implemented with the refactoring of alert handling functionality. The `MonitoringService` class now delegates alert-related operations to a dedicated `AlertingService` class, improving separation of concerns and maintainability. This refactoring allows for more focused development and testing of alerting functionality while keeping the core monitoring service streamlined.
+
 **Section sources**
 - [metrics-collector.ts](file://packages\audit\src\observability\metrics-collector.ts#L1-L50) - *Updated in recent commit*
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L50)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts#L1-L20) - *Extracted alert handling functionality*
 
 ## Core Metrics Collector Implementation
 
@@ -527,4 +533,4 @@ P --> F
 **Section sources**
 - [index.ts](file://packages\audit\src\observability\index.ts#L59-L68)
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L535-L582)
-- [otpl-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md#L245-L282) - *Best practices for OTLP configuration*
+- [otpl-configuration.md](file://packages\audit\docs\observability\otpl-configuration.md#L245-L282) - *Best practices for OTLP configuration*

@@ -2,18 +2,27 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [alert-provider.tsx](file://apps/app/src/contexts/alert-provider.tsx)
-- [alert-api.ts](file://apps/app/src/lib/services/alert-api.ts)
-- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx)
-- [AlertDataTable.tsx](file://apps/app/src/components/alerts/data/AlertDataTable.tsx)
-- [AlertFilters.tsx](file://apps/app/src/components/alerts/forms/AlertFilters.tsx)
-- [alert-types.ts](file://apps/app/src/components/alerts/types/alert-types.ts)
-- [api-types.ts](file://apps/app/src/components/alerts/types/api-types.ts)
-- [use-alert-queries.ts](file://apps/app/src/components/alerts/hooks/use-alert-queries.ts)
-- [use-alert-websocket.ts](file://apps/app/src/components/alerts/hooks/use-alert-websocket.ts)
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts)
+- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx) - *Updated in recent commit*
+- [AlertDataTable.tsx](file://apps/app/src/components/alerts/data/AlertDataTable.tsx) - *Refactored for modularity*
+- [details-dialog.tsx](file://apps/app/src/components/alerts/data/details-dialog.tsx) - *Added in recent commit*
+- [AlertColumns.tsx](file://apps/app/src/components/alerts/data/AlertColumns.tsx) - *Updated in recent commit*
+- [AlertList.tsx](file://apps/app/src/components/alerts/core/AlertList.tsx) - *Standardized properties*
+- [app-sidebar.tsx](file://apps/app/src/components/app-sidebar.tsx) - *Added navigation*
+- [routes.ts](file://apps/app/src/lib/routes.ts) - *Added new route*
+- [page-header.tsx](file://apps/app/src/components/navigation/page-header.tsx) - *Added keyboard shortcuts*
+- [active.tsx](file://apps/app/src/routes/_authenticated/alerts/active.tsx) - *Added page header*
+- [alerts.ts](file://apps/server/src/routes/alerts.ts) - *Refactored to dedicated service*
+- [context.ts](file://apps/server/src/lib/hono/context.ts) - *Modified for new service*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect new alert details view and all alerts data page
+- Added documentation for keyboard shortcuts and page headers
+- Updated component structure to reflect refactored data table and standardized properties
+- Added new route and navigation documentation
+- Updated API integration section to reflect service extraction
+- Enhanced source tracking with specific file references and change annotations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -57,6 +66,7 @@ D --> D1[AlertDataTable]
 D --> D2[AlertColumns]
 D --> D3[AlertPagination]
 D --> D4[AlertTableToolbar]
+D --> D5[details-dialog]
 E --> E1[AlertBadge]
 E --> E2[AlertIcon]
 E --> E3[AlertSkeleton]
@@ -86,6 +96,7 @@ J --> J4[use-alert-responsive]
 - [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx)
 - [AlertFilters.tsx](file://apps/app/src/components/alerts/forms/AlertFilters.tsx)
 - [AlertDataTable.tsx](file://apps/app/src/components/alerts/data/AlertDataTable.tsx)
+- [details-dialog.tsx](file://apps/app/src/components/alerts/data/details-dialog.tsx)
 - [alert-types.ts](file://apps/app/src/components/alerts/types/alert-types.ts)
 
 **Section sources**
@@ -98,12 +109,15 @@ The AlertDashboard component serves as the main container for the alert manageme
 
 The system also includes notification components such as NotificationBell and NotificationPanel that provide real-time alert notifications with the ability to mark notifications as read or dismiss them. The AlertCard component displays individual alerts in a compact format suitable for board views, while AlertDetails provides a more comprehensive view of a specific alert.
 
+A new AlertDetailsDialog component has been added to display detailed alert information in a modal dialog, accessible from the data table. The system now includes a dedicated ALERTS_DATA route for viewing all alerts, with navigation available in the app sidebar.
+
 **Section sources**
 - [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx)
 - [AlertDataTable.tsx](file://apps/app/src/components/alerts/data/AlertDataTable.tsx)
 - [AlertFilters.tsx](file://apps/app/src/components/alerts/forms/AlertFilters.tsx)
 - [NotificationPanel.tsx](file://apps/app/src/components/alerts/notifications/NotificationPanel.tsx)
 - [AlertCard.tsx](file://apps/app/src/components/alerts/core/AlertCard.tsx)
+- [details-dialog.tsx](file://apps/app/src/components/alerts/data/details-dialog.tsx)
 
 ## Architecture Overview
 The Alert Management System follows a layered architecture with clear separation of concerns between presentation, business logic, and data access layers. The system leverages React Context for global state management and TanStack Query for data fetching and caching.
@@ -248,15 +262,15 @@ class AlertUI {
 +type : AlertType
 +status : AlertStatus
 +source : string
-+createdAt : Date
-+acknowledgedAt? : Date
-+acknowledgedBy? : string
-+resolvedAt? : Date
-+resolvedBy? : string
-+resolutionNotes? : string
++created_at : Date
++acknowledged_at? : Date
++acknowledged_by? : string
++resolved_at? : Date
++resolved_by? : string
++resolution_notes? : string
 +metadata : Record~string, any~
 +tags : string[]
-+correlationId? : string
++correlation_id? : string
 }
 class AlertStatistics {
 +total : number
@@ -264,9 +278,9 @@ class AlertStatistics {
 +acknowledged : number
 +resolved : number
 +dismissed : number
-+bySeverity : Record~AlertSeverity, number~
-+byType : Record~AlertType, number~
-+bySource : Record~string, number~
++by_severity : Record~AlertSeverity, number~
++by_type : Record~AlertType, number~
++by_source : Record~string, number~
 +trends : {
 period : string
 created : number
@@ -275,13 +289,13 @@ resolved : number
 }
 class AlertNotification {
 +id : string
-+alertId : string
++alert_id : string
 +title : string
 +message : string
 +severity : 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
 +timestamp : Date
 +read : boolean
-+actionUrl? : string
++action_url? : string
 }
 AlertUI --> AlertSeverity
 AlertUI --> AlertType
@@ -298,7 +312,7 @@ AlertNotification --> AlertSeverity
 - [alert-types.ts](file://apps/app/src/components/alerts/types/alert-types.ts)
 
 ### API Integration and Data Flow
-The Alert Management System integrates with the backend through a service layer that handles API communication and data transformation.
+The Alert Management System integrates with the backend through a service layer that handles API communication and data transformation. The API routes have been refactored to a dedicated alerts service for better modularity and standardization.
 
 ```mermaid
 sequenceDiagram
@@ -331,12 +345,14 @@ Note over Server,UI : Real-time update flow
 ```
 
 **Diagram sources**
-- [alert-api.ts](file://apps/app/src/lib/services/alert-api.ts)
+- [alerts.ts](file://apps/server/src/routes/alerts.ts)
+- [context.ts](file://apps/server/src/lib/hono/context.ts)
 - [use-alert-queries.ts](file://apps/app/src/components/alerts/hooks/use-alert-queries.ts)
 - [use-alert-websocket.ts](file://apps/app/src/components/alerts/hooks/use-alert-websocket.ts)
 
 **Section sources**
-- [alert-api.ts](file://apps/app/src/lib/services/alert-api.ts)
+- [alerts.ts](file://apps/server/src/routes/alerts.ts)
+- [context.ts](file://apps/server/src/lib/hono/context.ts)
 - [use-alert-queries.ts](file://apps/app/src/components/alerts/hooks/use-alert-queries.ts)
 
 ### API Interface and Integration Patterns
@@ -389,12 +405,12 @@ AN --> AO
 ```
 
 **Diagram sources**
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts)
+- [alerts.ts](file://apps/server/src/routes/alerts.ts)
+- [context.ts](file://apps/server/src/lib/hono/context.ts)
 
 **Section sources**
-- [alerts.ts](file://apps/server/src/routers/alerts.ts)
-- [rest-api.ts](file://apps/server/src/routes/rest-api.ts)
+- [alerts.ts](file://apps/server/src/routes/alerts.ts)
+- [context.ts](file://apps/server/src/lib/hono/context.ts)
 
 ## Dependency Analysis
 The Alert Management System has a well-defined dependency structure that ensures loose coupling between components while maintaining clear integration points with external systems.
@@ -429,7 +445,6 @@ style M fill:#99f,stroke:#333
 ```
 
 **Diagram sources**
-- [go.mod](file://go.mod)
 - [package.json](file://package.json)
 
 **Section sources**
@@ -467,7 +482,7 @@ This section provides guidance for common issues encountered when working with t
 
 1. **WebSocket Connection Issues**
    - **Symptoms**: Real-time updates not working, connection status showing as disconnected
-   - **Causes**: Network issues, authentication problems, server-side WebSocket configuration
+   - **Causes**: Network connectivity issues, authentication problems, server-side WebSocket configuration
    - **Solutions**: 
      - Verify network connectivity
      - Check authentication token validity
@@ -522,6 +537,6 @@ The Alert Management System provides a comprehensive solution for monitoring and
 
 Key strengths of the system include its real-time WebSocket integration for immediate alert notifications, flexible filtering and visualization options, and robust error handling. The system's integration with TanStack Query provides efficient data management with caching and background updates, while the modular component structure ensures maintainability and scalability.
 
-The system could be further enhanced by implementing additional features such as alert escalation policies, custom alert routing rules, and more sophisticated alert correlation and deduplication. Additionally, expanding the notification channels beyond the current in-app notifications to include email, SMS, or integration with external monitoring systems would increase the system's utility in production environments.
+The system has been enhanced with new features including a detailed alert view, keyboard shortcuts for improved accessibility, and a dedicated route for viewing all alerts. The API has been refactored to a dedicated service for better modularity and standardization, and alert properties have been standardized to snake_case for consistency.
 
 Overall, the Alert Management System represents a well-designed, production-ready solution that effectively addresses the requirements for comprehensive alert management in a healthcare audit context.
