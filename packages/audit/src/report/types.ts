@@ -57,7 +57,7 @@ export const ReportCriteriaSchema = z.object({
 	includeSuccessfulEvents: z.boolean().default(true).optional(),
 	includeFailedEvents: z.boolean().default(true).optional(),
 	includeAttemptEvents: z.boolean().default(false).optional(),
-	customFilters: z.record(z.unknown()).optional(),
+	customFilters: z.record(z.string(), z.any()).optional(),
 	limit: z.number().int().min(1).max(10000).optional(),
 	offset: z.number().int().min(0).optional(),
 	sortBy: z.enum(['timestamp', 'status']).optional(),
@@ -76,8 +76,8 @@ export const ReportMetadataSchema = z.object({
 	dataRange: DateRangeFilterSchema,
 	totalEvents: z.number().int().min(0),
 	processingTime: z.number().min(0),
-	filters: z.record(z.unknown()).optional(),
-	customFields: z.record(z.unknown()).optional(),
+	filters: z.record(z.string(), z.any()).optional(),
+	customFields: z.record(z.string(), z.any()).optional(),
 })
 export type ReportMetadata = z.infer<typeof ReportMetadataSchema>
 
@@ -265,7 +265,7 @@ export const CustomReportTemplateSchema = z.object({
 			type: z.enum(['string', 'number', 'boolean', 'date', 'array', 'object']),
 			required: z.boolean().default(false),
 			description: z.string().optional(),
-			validation: z.record(z.unknown()).optional(),
+			validation: z.record(z.string(), z.any()).optional(),
 		})
 	),
 	filters: z.array(
@@ -306,7 +306,7 @@ export const CustomReportParamsSchema = z.object({
 	name: z.string().min(1),
 	template: CustomReportTemplateSchema.optional(),
 	criteria: ReportCriteriaSchema,
-	parameters: z.record(z.unknown()).optional(),
+	parameters: z.record(z.string(), z.any()).optional(),
 	format: ReportFormatSchema.default('json'),
 	includeRawData: z.boolean().default(false),
 	maxRecords: z.number().int().min(1).max(1000000).optional(),
@@ -323,10 +323,10 @@ export const CustomReportSchema = z.object({
 	templateId: z.string().optional(),
 	generatedAt: z.string().datetime(),
 	criteria: ReportCriteriaSchema,
-	parameters: z.record(z.unknown()).optional(),
-	data: z.array(z.record(z.unknown())),
-	summary: z.record(z.unknown()),
-	aggregations: z.record(z.unknown()).optional(),
+	parameters: z.record(z.string(), z.any()).optional(),
+	data: z.array(z.record(z.string(), z.any())),
+	summary: z.record(z.string(), z.any()),
+	aggregations: z.record(z.string(), z.any()).optional(),
 	metadata: ReportMetadataSchema,
 	downloadUrl: z.string().url().optional(),
 	expiresAt: z.string().datetime().optional(),
@@ -489,7 +489,7 @@ export const ReportTemplateSchema = z.object({
 				description: z.string().optional(),
 				required: z.boolean().default(true),
 				fields: z.array(z.string().min(1)),
-				filters: z.record(z.unknown()).optional(),
+				filters: z.record(z.string(), z.any()).optional(),
 			})
 		),
 		formatting: z
@@ -504,8 +504,8 @@ export const ReportTemplateSchema = z.object({
 		branding: z
 			.object({
 				logo: z.string().url().optional(),
-				colors: z.record(z.string()).optional(),
-				fonts: z.record(z.string()).optional(),
+				colors: z.array(z.string()).optional(),
+				fonts: z.array(z.string()).optional(),
 			})
 			.optional(),
 	}),
