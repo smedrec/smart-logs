@@ -3,21 +3,24 @@
  * Implements circuit breakers, error handling, and partition management
  */
 
+import { sql } from 'drizzle-orm'
+
 import { LoggerFactory, StructuredLogger } from '@repo/logs'
 
+import { OptimizedLRUCache } from '../cache/optimized-lru-cache.js'
 import { DatabaseCircuitBreakers } from './circuit-breaker.js'
 import { EnhancedPartitionManager } from './enhanced-partition-manager.js'
 import { GlobalErrorHandler } from './error-handler.js'
-import { OptimizedLRUCache } from '../cache/optimized-lru-cache.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
 import type {
+	ConnectionHealth,
+	DatabaseConnectionConfig,
+	ErrorContext,
 	IAuditDatabase,
 	IConnectionManager,
-	DatabaseConnectionConfig,
 	PartitionConfig,
-	ErrorContext
 } from './interfaces.js'
 import type * as schema from './schema.js'
 
@@ -70,7 +73,7 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		totalRequests: 0,
 		successfulRequests: 0,
 		failedRequests: 0,
-		totalResponseTime: 0
+		totalResponseTime: 0,
 	}
 
 	constructor(
@@ -106,7 +109,7 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 			defaultTTL: config.cache.defaultTTL,
 			keyPrefix: 'audit_db',
 			maxKeys: 50000,
-			cleanupInterval: 60000
+			cleanupInterval: 60000,
 		})
 
 		this.initialize()
@@ -137,17 +140,17 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		const context: ErrorContext = {
 			operation: 'insert',
 			timestamp: new Date(),
-			metadata: { dataType: typeof data }
+			metadata: { dataType: typeof data },
 		}
 
 		return this.executeWithProtection(async () => {
 			// Insert operation through database
 			// Implementation would depend on your schema structure
 			this.logger.debug('Inserting audit log entry', { data })
-			
+
 			// Invalidate related cache entries
 			await this.cache.invalidate('audit_log:*')
-			
+
 			return Promise.resolve()
 		}, context)
 	}
@@ -159,7 +162,7 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		const context: ErrorContext = {
 			operation: 'query',
 			timestamp: new Date(),
-			metadata: { filters }
+			metadata: { filters },
 		}
 
 		// Generate cache key based on filters
@@ -175,13 +178,13 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 
 			// Execute query against database
 			this.logger.debug('Cache miss, executing database query', { filters })
-			
+
 			// Placeholder for actual query implementation
 			const result: T[] = []
-			
+
 			// Cache the result
 			await this.cache.set(cacheKey, result, this.config.cache.defaultTTL)
-			
+
 			return result
 		}, context)
 	}
@@ -189,10 +192,12 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 	/**
 	 * Execute transaction with circuit breaker protection
 	 */
-	async transaction<T>(callback: (tx: PostgresJsDatabase<typeof schema>) => Promise<T>): Promise<T> {
+	async transaction<T>(
+		callback: (tx: PostgresJsDatabase<typeof schema>) => Promise<T>
+	): Promise<T> {
 		const context: ErrorContext = {
 			operation: 'transaction',
-			timestamp: new Date()
+			timestamp: new Date(),
 		}
 
 		return this.executeWithProtection(async () => {
@@ -203,13 +208,25 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 	/**
 	 * Check database health
 	 */
-	async healthCheck(): Promise<boolean> {
+	async healthCheck(): Promise<ConnectionHealth> {
 		try {
 			const health = await this.getHealthStatus()
-			return health.overall === 'healthy'
+			const poolStats = await this.poolStats()
+
+			return {
+				healthy: health.overall === 'healthy',
+				activeConnections: poolStats.activeConnections,
+				errorRate: health.metrics.errorRate,
+				averageResponseTime: health.metrics.averageResponseTime,
+			}
 		} catch (error) {
 			this.logger.error('Health check failed:', error as Error)
-			return false
+			return {
+				healthy: false,
+				activeConnections: 0,
+				errorRate: 100,
+				averageResponseTime: -1,
+			}
 		}
 	}
 
@@ -228,7 +245,7 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 			totalConnections: 1, // Placeholder
 			activeConnections: 1,
 			idleConnections: 0,
-			waitingRequests: 0
+			waitingRequests: 0,
 		}
 	}
 
@@ -241,32 +258,35 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		try {
 			// Test database connection
 			const connectionHealth = await this.testConnection()
-			
+
 			// Get cache statistics
 			const cacheStats = await this.cache.stats()
-			
+
 			// Get partition status
 			const partitionStatus = await this.partitionManager.getPartitionStatus()
-			
+
 			// Get circuit breaker status
 			const circuitBreakerStatus = DatabaseCircuitBreakers.master.getState()
-			
+
 			const responseTime = Date.now() - startTime
-			const successRate = this.metrics.totalRequests > 0 
-				? (this.metrics.successfulRequests / this.metrics.totalRequests) * 100 
-				: 100
-			
-			const averageResponseTime = this.metrics.totalRequests > 0 
-				? this.metrics.totalResponseTime / this.metrics.totalRequests 
-				: 0
-			
-			const errorRate = this.metrics.totalRequests > 0 
-				? (this.metrics.failedRequests / this.metrics.totalRequests) * 100 
-				: 0
+			const successRate =
+				this.metrics.totalRequests > 0
+					? (this.metrics.successfulRequests / this.metrics.totalRequests) * 100
+					: 100
+
+			const averageResponseTime =
+				this.metrics.totalRequests > 0
+					? this.metrics.totalResponseTime / this.metrics.totalRequests
+					: 0
+
+			const errorRate =
+				this.metrics.totalRequests > 0
+					? (this.metrics.failedRequests / this.metrics.totalRequests) * 100
+					: 0
 
 			// Determine overall health
 			let overall: 'healthy' | 'degraded' | 'unhealthy' = 'healthy'
-			
+
 			if (!connectionHealth.healthy || circuitBreakerStatus === 'open') {
 				overall = 'unhealthy'
 			} else if (cacheStats.hitRatio < 50 || successRate < 95) {
@@ -278,27 +298,27 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 				components: {
 					connection: {
 						status: connectionHealth.healthy ? 'healthy' : 'unhealthy',
-						responseTime: connectionHealth.responseTime
+						responseTime: connectionHealth.responseTime,
 					},
 					cache: {
 						status: this.config.cache.enabled ? 'healthy' : 'unhealthy',
 						hitRatio: cacheStats.hitRatio,
-						sizeMB: cacheStats.memoryUsageMB
+						sizeMB: cacheStats.totalSizeMB,
 					},
 					partitions: {
 						status: partitionStatus.length > 0 ? 'healthy' : 'unhealthy',
-						totalPartitions: partitionStatus.length
+						totalPartitions: partitionStatus.length,
 					},
 					circuitBreaker: {
-						status: circuitBreakerStatus as 'closed' | 'open' | 'half_open'
-					}
+						status: circuitBreakerStatus as 'closed' | 'open' | 'half_open',
+					},
 				},
 				metrics: {
 					totalRequests: this.metrics.totalRequests,
 					successRate,
 					averageResponseTime,
-					errorRate
-				}
+					errorRate,
+				},
 			}
 		} catch (error) {
 			this.logger.error('Failed to get health status:', error as Error)
@@ -308,14 +328,14 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 					connection: { status: 'unhealthy', responseTime: -1 },
 					cache: { status: 'unhealthy', hitRatio: 0, sizeMB: 0 },
 					partitions: { status: 'unhealthy', totalPartitions: 0 },
-					circuitBreaker: { status: 'open' }
+					circuitBreaker: { status: 'open' },
 				},
 				metrics: {
 					totalRequests: this.metrics.totalRequests,
 					successRate: 0,
 					averageResponseTime: 0,
-					errorRate: 100
-				}
+					errorRate: 100,
+				},
 			}
 		}
 	}
@@ -347,32 +367,32 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		try {
 			// Execute with circuit breaker protection
 			const result = await DatabaseCircuitBreakers.master.execute(operation)
-			
+
 			// Record success metrics
 			this.metrics.successfulRequests++
 			this.metrics.totalResponseTime += Date.now() - startTime
-			
+
 			return result
 		} catch (error) {
 			// Record failure metrics
 			this.metrics.failedRequests++
 			this.metrics.totalResponseTime += Date.now() - startTime
-			
+
 			// Handle error with enhanced error handler
 			const resolution = await GlobalErrorHandler.handle(error as Error, context)
-			
+
 			// Attempt recovery if suggested
 			if (resolution.retryable && resolution.retryAfterMs) {
 				this.logger.info(`Retrying operation after ${resolution.retryAfterMs}ms`, { context })
 				await this.delay(resolution.retryAfterMs)
-				
+
 				// Retry the operation (simple retry, could be enhanced with retry limits)
 				return this.executeWithProtection(operation, {
 					...context,
-					retryAttempt: (context as any).retryAttempt ? (context as any).retryAttempt + 1 : 1
+					retryAttempt: (context as any).retryAttempt ? (context as any).retryAttempt + 1 : 1,
 				} as ErrorContext)
 			}
-			
+
 			throw error
 		}
 	}
@@ -382,19 +402,19 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 	 */
 	private async testConnection(): Promise<{ healthy: boolean; responseTime: number }> {
 		const startTime = Date.now()
-		
+
 		try {
 			// Simple connectivity test
-			await this.db.execute({ sql: 'SELECT 1', args: [] })
-			
+			await this.db.execute(sql`SELECT 1`)
+
 			return {
 				healthy: true,
-				responseTime: Date.now() - startTime
+				responseTime: Date.now() - startTime,
 			}
 		} catch (error) {
 			return {
 				healthy: false,
-				responseTime: Date.now() - startTime
+				responseTime: Date.now() - startTime,
 			}
 		}
 	}
@@ -415,7 +435,7 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		let hash = 0
 		for (let i = 0; i < str.length; i++) {
 			const char = str.charCodeAt(i)
-			hash = ((hash << 5) - hash) + char
+			hash = (hash << 5) - hash + char
 			hash = hash & hash // Convert to 32-bit integer
 		}
 		return hash.toString(36)
@@ -425,7 +445,7 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 	 * Utility delay function
 	 */
 	private delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms))
+		return new Promise((resolve) => setTimeout(resolve, ms))
 	}
 }
 
@@ -444,7 +464,7 @@ export function createEnhancedAuditDatabaseClient(
 			connectionTimeout: 30000,
 			queryTimeout: 30000,
 			ssl: false,
-			maxConnectionAttempts: 3
+			maxConnectionAttempts: 3,
 		},
 		partition: {
 			strategy: 'range',
@@ -452,24 +472,24 @@ export function createEnhancedAuditDatabaseClient(
 			interval: 'monthly',
 			retentionDays: 2555, // ~7 years
 			autoMaintenance: true,
-			maintenanceInterval: 86400000 // 24 hours
+			maintenanceInterval: 86400000, // 24 hours
 		},
 		cache: {
 			enabled: true,
 			maxSizeMB: 100,
-			defaultTTL: 300 // 5 minutes
+			defaultTTL: 300, // 5 minutes
 		},
 		circuitBreaker: {
 			enabled: true,
 			failureThreshold: 5,
 			timeoutMs: 30000,
-			resetTimeoutMs: 60000
+			resetTimeoutMs: 60000,
 		},
 		monitoring: {
 			enabled: true,
 			slowQueryThreshold: 1000,
-			metricsRetentionDays: 30
-		}
+			metricsRetentionDays: 30,
+		},
 	}
 
 	const finalConfig = { ...defaultConfig, ...config }

@@ -6,13 +6,7 @@
 import { LoggerFactory, StructuredLogger } from '@repo/logs'
 
 import { DatabaseCircuitBreakers } from './circuit-breaker.js'
-
-import type {
-	IReadReplicaRouter,
-	RoutingOptions,
-	ReplicaHealth,
-	RoutingStrategy
-} from './interfaces.js'
+import { IReadReplicaRouter, ReplicaHealth, RoutingOptions, RoutingStrategy } from './interfaces.js'
 
 export interface ReplicaConnection {
 	id: string
@@ -94,7 +88,7 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	 */
 	async route<T>(query: () => Promise<T>, options: RoutingOptions = {}): Promise<T> {
 		const decision = this.makeRoutingDecision(options)
-		
+
 		if (decision.fallbackToMaster) {
 			this.logger.info('Routing to master database', { decision })
 			return this.executeOnMaster(query)
@@ -111,16 +105,16 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 			return await this.executeOnReplica(replica, query)
 		} catch (error) {
 			this.logger.error(`Query failed on replica ${replica.id}:`, error as Error)
-			
+
 			// Mark replica as unhealthy
 			await this.markReplicaUnhealthy(replica.id, error as Error)
-			
+
 			// Fallback to master if configured
 			if (this.config.fallbackToMaster) {
 				this.logger.info('Falling back to master database', { replicaId: replica.id })
 				return this.executeOnMaster(query)
 			}
-			
+
 			throw error
 		}
 	}
@@ -134,13 +128,13 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 				const startTime = Date.now()
 				await this.performHealthCheck(replica)
 				const responseTime = Date.now() - startTime
-				
+
 				return {
 					id: replica.id,
 					url: replica.url,
 					healthy: replica.isHealthy,
 					lagMs: await this.measureReplicationLag(replica),
-					responseTimeMs: responseTime
+					responseTimeMs: responseTime,
 				}
 			} catch (error) {
 				this.logger.error(`Health check failed for replica ${replica.id}:`, error as Error)
@@ -149,7 +143,7 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 					url: replica.url,
 					healthy: false,
 					lagMs: -1,
-					responseTimeMs: -1
+					responseTimeMs: -1,
 				}
 			}
 		})
@@ -180,7 +174,7 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 			healthyReplicas: 0,
 			routingDecisions: {} as Record<string, number>,
 			averageResponseTimes: {} as Record<string, number>,
-			errorRates: {} as Record<string, number>
+			errorRates: {} as Record<string, number>,
 		}
 
 		for (const replica of this.replicas.values()) {
@@ -190,10 +184,11 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 
 			stats.routingDecisions[replica.id] = replica.metrics.totalRequests
 			stats.averageResponseTimes[replica.id] = replica.metrics.averageResponseTime
-			
-			const errorRate = replica.metrics.totalRequests > 0 
-				? (replica.metrics.failedRequests / replica.metrics.totalRequests) * 100 
-				: 0
+
+			const errorRate =
+				replica.metrics.totalRequests > 0
+					? (replica.metrics.failedRequests / replica.metrics.totalRequests) * 100
+					: 0
 			stats.errorRates[replica.id] = errorRate
 		}
 
@@ -228,8 +223,8 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 					successfulRequests: 0,
 					failedRequests: 0,
 					averageResponseTime: 0,
-					currentConnections: 0
-				}
+					currentConnections: 0,
+				},
 			}
 
 			this.replicas.set(replica.id, replica)
@@ -241,8 +236,9 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	 * Make routing decision based on strategy and options
 	 */
 	private makeRoutingDecision(options: RoutingOptions): RoutingDecision {
-		const healthyReplicas = Array.from(this.replicas.values())
-			.filter(replica => replica.isHealthy)
+		const healthyReplicas = Array.from(this.replicas.values()).filter(
+			(replica) => replica.isHealthy
+		)
 
 		// No healthy replicas - fallback to master
 		if (healthyReplicas.length === 0) {
@@ -250,15 +246,15 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 				replicaId: '',
 				reason: 'No healthy replicas available',
 				fallbackToMaster: true,
-				estimatedLatency: -1
+				estimatedLatency: -1,
 			}
 		}
 
 		// Filter by region preference if specified
 		let candidateReplicas = healthyReplicas
 		if (options.preferLocal) {
-			const localReplicas = healthyReplicas.filter(replica => 
-				replica.region === process.env.AWS_REGION || replica.region === 'local'
+			const localReplicas = healthyReplicas.filter(
+				(replica) => replica.region === process.env.AWS_REGION || replica.region === 'local'
 			)
 			if (localReplicas.length > 0) {
 				candidateReplicas = localReplicas
@@ -267,7 +263,7 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 
 		// Filter by maximum lag if specified
 		if (options.maxLagMs) {
-			candidateReplicas = candidateReplicas.filter(async replica => {
+			candidateReplicas = candidateReplicas.filter(async (replica) => {
 				const lag = await this.measureReplicationLag(replica)
 				return lag <= options.maxLagMs!
 			})
@@ -275,12 +271,12 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 
 		// Select replica based on routing strategy
 		const selectedReplica = this.selectReplicaByStrategy(candidateReplicas)
-		
+
 		return {
 			replicaId: selectedReplica.id,
 			reason: `Selected by ${this.config.strategy} strategy`,
 			fallbackToMaster: false,
-			estimatedLatency: selectedReplica.metrics.averageResponseTime
+			estimatedLatency: selectedReplica.metrics.averageResponseTime,
 		}
 	}
 
@@ -291,13 +287,13 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 		switch (this.config.strategy) {
 			case RoutingStrategy.ROUND_ROBIN:
 				return this.selectRoundRobin(replicas)
-			
+
 			case RoutingStrategy.LEAST_CONNECTIONS:
 				return this.selectLeastConnections(replicas)
-			
+
 			case RoutingStrategy.LEAST_LATENCY:
 				return this.selectLeastLatency(replicas)
-			
+
 			default:
 				return this.selectRoundRobin(replicas)
 		}
@@ -316,10 +312,8 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	 * Least connections selection
 	 */
 	private selectLeastConnections(replicas: ReplicaConnection[]): ReplicaConnection {
-		return replicas.reduce((least, current) => 
-			current.metrics.currentConnections < least.metrics.currentConnections 
-				? current 
-				: least
+		return replicas.reduce((least, current) =>
+			current.metrics.currentConnections < least.metrics.currentConnections ? current : least
 		)
 	}
 
@@ -327,10 +321,8 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	 * Least latency selection
 	 */
 	private selectLeastLatency(replicas: ReplicaConnection[]): ReplicaConnection {
-		return replicas.reduce((fastest, current) => 
-			current.metrics.averageResponseTime < fastest.metrics.averageResponseTime 
-				? current 
-				: fastest
+		return replicas.reduce((fastest, current) =>
+			current.metrics.averageResponseTime < fastest.metrics.averageResponseTime ? current : fastest
 		)
 	}
 
@@ -347,7 +339,10 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	/**
 	 * Execute query on specific replica
 	 */
-	private async executeOnReplica<T>(replica: ReplicaConnection, query: () => Promise<T>): Promise<T> {
+	private async executeOnReplica<T>(
+		replica: ReplicaConnection,
+		query: () => Promise<T>
+	): Promise<T> {
 		const startTime = Date.now()
 		replica.metrics.totalRequests++
 		replica.metrics.currentConnections++
@@ -381,7 +376,7 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	 */
 	private updateAverageResponseTime(replica: ReplicaConnection, responseTime: number): void {
 		const alpha = 0.1 // Smoothing factor
-		replica.metrics.averageResponseTime = 
+		replica.metrics.averageResponseTime =
 			replica.metrics.averageResponseTime * (1 - alpha) + responseTime * alpha
 	}
 
@@ -393,8 +388,8 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 			await this.performHealthChecks()
 		}, this.config.healthCheckInterval)
 
-		this.logger.info('Started health monitoring', { 
-			interval: this.config.healthCheckInterval 
+		this.logger.info('Started health monitoring', {
+			interval: this.config.healthCheckInterval,
 		})
 	}
 
@@ -402,8 +397,8 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	 * Perform health checks on all replicas
 	 */
 	private async performHealthChecks(): Promise<void> {
-		const healthCheckPromises = Array.from(this.replicas.values()).map(replica =>
-			this.performHealthCheck(replica).catch(error => {
+		const healthCheckPromises = Array.from(this.replicas.values()).map((replica) =>
+			this.performHealthCheck(replica).catch((error) => {
 				this.logger.error(`Health check failed for replica ${replica.id}:`, error as Error)
 				replica.isHealthy = false
 			})
@@ -418,18 +413,18 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	private async performHealthCheck(replica: ReplicaConnection): Promise<void> {
 		try {
 			const startTime = Date.now()
-			
+
 			// Simulate health check query
 			// In real implementation, this would execute a simple query like SELECT 1
-			await new Promise(resolve => setTimeout(resolve, 10))
-			
+			await new Promise((resolve) => setTimeout(resolve, 10))
+
 			const responseTime = Date.now() - startTime
 			replica.isHealthy = true
 			replica.lastHealthCheck = new Date()
-			
+
 			// Update response time if health check was successful
 			this.updateAverageResponseTime(replica, responseTime)
-			
+
 			this.logger.debug(`Health check passed for replica ${replica.id}`, { responseTime })
 		} catch (error) {
 			replica.isHealthy = false
@@ -467,7 +462,9 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 /**
  * Factory function for creating read replica router
  */
-export function createReadReplicaRouter(config: Partial<ReadReplicaConfig> = {}): ReadReplicaRouter {
+export function createReadReplicaRouter(
+	config: Partial<ReadReplicaConfig> = {}
+): ReadReplicaRouter {
 	const defaultConfig: ReadReplicaConfig = {
 		replicas: [],
 		strategy: RoutingStrategy.ROUND_ROBIN,
@@ -477,8 +474,8 @@ export function createReadReplicaRouter(config: Partial<ReadReplicaConfig> = {})
 		fallbackToMaster: true,
 		loadBalancing: {
 			enabled: true,
-			algorithm: 'round_robin'
-		}
+			algorithm: 'round_robin',
+		},
 	}
 
 	return new ReadReplicaRouter({ ...defaultConfig, ...config })

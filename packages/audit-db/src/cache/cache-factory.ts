@@ -9,7 +9,7 @@ import type { RedisQueryCacheConfig } from './redis-query-cache.js'
  * Cache factory for creating appropriate cache instances
  */
 
-type CacheType = 'local' | 'redis' | 'hybrid'
+export type CacheType = 'local' | 'redis' | 'hybrid'
 
 export interface QueryCacheConfig {
 	/** Enable query result caching */

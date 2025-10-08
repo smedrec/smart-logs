@@ -8,10 +8,10 @@ import { LoggerFactory, StructuredLogger } from '@repo/logs'
 import { CircuitBreakerOpenError } from './circuit-breaker.js'
 
 import type {
-	IErrorHandler,
+	ErrorClassification,
 	ErrorContext,
 	ErrorResolution,
-	ErrorClassification
+	IErrorHandler,
 } from './interfaces.js'
 
 export interface ErrorMetrics {
@@ -66,7 +66,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			errorsByType: {},
 			errorsBySeverity: {},
 			recoveryAttempts: 0,
-			successfulRecoveries: 0
+			successfulRecoveries: 0,
 		}
 	}
 
@@ -79,7 +79,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 
 		// Classify the error
 		const classification = this.classify(error)
-		
+
 		// Update metrics
 		this.updateMetrics(classification)
 
@@ -109,7 +109,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				type: 'system',
 				severity: 'high',
-				category: 'circuit_breaker_open'
+				category: 'circuit_breaker_open',
 			}
 		}
 
@@ -118,7 +118,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				type: 'connection',
 				severity: 'high',
-				category: 'database_connection'
+				category: 'database_connection',
 			}
 		}
 
@@ -127,7 +127,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				type: 'timeout',
 				severity: 'medium',
-				category: 'operation_timeout'
+				category: 'operation_timeout',
 			}
 		}
 
@@ -136,7 +136,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				type: 'validation',
 				severity: 'low',
-				category: 'data_validation'
+				category: 'data_validation',
 			}
 		}
 
@@ -145,7 +145,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				type: 'permission',
 				severity: 'medium',
-				category: 'access_denied'
+				category: 'access_denied',
 			}
 		}
 
@@ -154,7 +154,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				type: 'system',
 				severity: 'medium',
-				category: 'resource_lock'
+				category: 'resource_lock',
 			}
 		}
 
@@ -162,7 +162,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 		return {
 			type: 'system',
 			severity: 'high',
-			category: 'unknown_error'
+			category: 'unknown_error',
 		}
 	}
 
@@ -171,31 +171,31 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	 */
 	async recover(error: Error, context: ErrorContext): Promise<boolean> {
 		this.metrics.recoveryAttempts++
-		
+
 		const classification = this.classify(error)
 
 		try {
 			switch (classification.type) {
 				case 'connection':
 					return await this.recoverConnection(error, context)
-				
+
 				case 'timeout':
 					return await this.recoverTimeout(error, context)
-				
+
 				case 'system':
 					if (classification.category === 'resource_lock') {
 						return await this.recoverLock(error, context)
 					}
 					return false
-				
+
 				case 'validation':
 					// Validation errors generally can't be recovered automatically
 					return false
-				
+
 				case 'permission':
 					// Permission errors need manual intervention
 					return false
-				
+
 				default:
 					return false
 			}
@@ -221,7 +221,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			errorsByType: {},
 			errorsBySeverity: {},
 			recoveryAttempts: 0,
-			successfulRecoveries: 0
+			successfulRecoveries: 0,
 		}
 	}
 
@@ -236,10 +236,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			'ENOTFOUND',
 			'ETIMEDOUT',
 			'ECONNRESET',
-			'connect ECONNREFUSED'
+			'connect ECONNREFUSED',
 		]
-		
-		return connectionKeywords.some(keyword => 
+
+		return connectionKeywords.some((keyword) =>
 			error.message.toLowerCase().includes(keyword.toLowerCase())
 		)
 	}
@@ -253,10 +253,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			'timed out',
 			'ETIMEDOUT',
 			'query timeout',
-			'connection timeout'
+			'connection timeout',
 		]
-		
-		return timeoutKeywords.some(keyword => 
+
+		return timeoutKeywords.some((keyword) =>
 			error.message.toLowerCase().includes(keyword.toLowerCase())
 		)
 	}
@@ -271,10 +271,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			'constraint',
 			'check constraint',
 			'foreign key',
-			'not null'
+			'not null',
 		]
-		
-		return validationKeywords.some(keyword => 
+
+		return validationKeywords.some((keyword) =>
 			error.message.toLowerCase().includes(keyword.toLowerCase())
 		)
 	}
@@ -289,10 +289,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			'unauthorized',
 			'access',
 			'forbidden',
-			'authentication'
+			'authentication',
 		]
-		
-		return permissionKeywords.some(keyword => 
+
+		return permissionKeywords.some((keyword) =>
 			error.message.toLowerCase().includes(keyword.toLowerCase())
 		)
 	}
@@ -307,10 +307,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			'deadlock',
 			'conflict',
 			'concurrent',
-			'serialization failure'
+			'serialization failure',
 		]
-		
-		return lockKeywords.some(keyword => 
+
+		return lockKeywords.some((keyword) =>
 			error.message.toLowerCase().includes(keyword.toLowerCase())
 		)
 	}
@@ -320,11 +320,11 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	 */
 	private updateMetrics(classification: ErrorClassification): void {
 		// Update type metrics
-		this.metrics.errorsByType[classification.type] = 
+		this.metrics.errorsByType[classification.type] =
 			(this.metrics.errorsByType[classification.type] || 0) + 1
-		
+
 		// Update severity metrics
-		this.metrics.errorsBySeverity[classification.severity] = 
+		this.metrics.errorsBySeverity[classification.severity] =
 			(this.metrics.errorsBySeverity[classification.severity] || 0) + 1
 	}
 
@@ -332,10 +332,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	 * Enrich error context with additional information
 	 */
 	private enrichContext(
-		error: Error, 
-		context: ErrorContext, 
+		error: Error,
+		context: ErrorContext,
 		classification: ErrorClassification
-	): ErrorContext & { 
+	): ErrorContext & {
 		classification: ErrorClassification
 		errorId: string
 		stackTrace?: string
@@ -345,7 +345,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			classification,
 			errorId: this.generateErrorId(),
 			stackTrace: error.stack,
-			timestamp: new Date()
+			timestamp: new Date(),
 		}
 	}
 
@@ -353,19 +353,19 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	 * Log error with structured format
 	 */
 	private logError(
-		error: Error, 
-		context: ErrorContext & { classification: ErrorClassification }, 
+		error: Error,
+		context: ErrorContext & { classification: ErrorClassification },
 		classification: ErrorClassification
 	): void {
 		const logData = {
 			error: {
 				name: error.name,
 				message: error.message,
-				stack: error.stack
+				stack: error.stack,
 			},
 			context,
 			classification,
-			metrics: this.getMetrics()
+			metrics: this.getMetrics(),
 		}
 
 		switch (classification.severity) {
@@ -376,10 +376,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 				this.logger.error('High severity database error', error, logData)
 				break
 			case 'medium':
-				this.logger.warn('Medium severity database error', error, logData)
+				this.logger.warn('Medium severity database error', logData)
 				break
 			case 'low':
-				this.logger.info('Low severity database error', error, logData)
+				this.logger.info('Low severity database error', logData)
 				break
 		}
 	}
@@ -397,7 +397,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				resolved: false,
 				retryable: false,
-				action: 'fail'
+				action: 'fail',
 			}
 		}
 
@@ -407,7 +407,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 				resolved: false,
 				retryable: true,
 				retryAfterMs: this.calculateRetryDelay(context),
-				action: 'retry'
+				action: 'retry',
 			}
 		}
 
@@ -417,7 +417,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 				resolved: false,
 				retryable: true,
 				retryAfterMs: this.calculateRetryDelay(context) * 2,
-				action: 'retry'
+				action: 'retry',
 			}
 		}
 
@@ -427,7 +427,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 				resolved: false,
 				retryable: true,
 				retryAfterMs: this.calculateRetryDelay(context) + Math.random() * 1000,
-				action: 'retry'
+				action: 'retry',
 			}
 		}
 
@@ -436,7 +436,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				resolved: false,
 				retryable: false,
-				action: 'fail'
+				action: 'fail',
 			}
 		}
 
@@ -445,7 +445,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			return {
 				resolved: false,
 				retryable: false,
-				action: 'fail'
+				action: 'fail',
 			}
 		}
 
@@ -454,7 +454,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			resolved: false,
 			retryable: true,
 			retryAfterMs: this.calculateRetryDelay(context),
-			action: 'retry'
+			action: 'retry',
 		}
 	}
 
@@ -465,13 +465,13 @@ export class EnhancedErrorHandler implements IErrorHandler {
 		const attempt = context.retryAttempt || 0
 		const baseDelay = this.config.baseRetryDelay
 		const maxDelay = this.config.maxRetryDelay
-		
+
 		// Exponential backoff: baseDelay * 2^attempt
 		const exponentialDelay = baseDelay * Math.pow(2, attempt)
-		
+
 		// Add jitter (±25%)
 		const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1)
-		
+
 		// Cap at max delay
 		return Math.min(exponentialDelay + jitter, maxDelay)
 	}
@@ -482,15 +482,15 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	private async recoverConnection(error: Error, context: ErrorContext): Promise<boolean> {
 		// Wait before attempting recovery
 		await this.delay(1000)
-		
+
 		try {
 			// Attempt to recreate connection pool or similar recovery logic
 			// This would be implemented based on specific connection manager
 			this.logger.info('Attempting connection recovery', { context })
-			
+
 			// Placeholder for actual recovery logic
 			// In real implementation, this would interact with connection manager
-			
+
 			this.metrics.successfulRecoveries++
 			return true
 		} catch (recoveryError) {
@@ -516,7 +516,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 		// Wait with jitter to avoid thundering herd
 		const delay = 500 + Math.random() * 1000
 		await this.delay(delay)
-		
+
 		this.logger.info('Lock recovery - retrying after delay', { context, delay })
 		return true // Indicate retry should be attempted
 	}
@@ -541,7 +541,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 		this.logger.error('ALERT: High-severity database error detected', error, {
 			context,
 			classification,
-			alertLevel: classification.severity
+			alertLevel: classification.severity,
 		})
 	}
 
@@ -556,7 +556,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	 * Utility delay function
 	 */
 	private delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms))
+		return new Promise((resolve) => setTimeout(resolve, ms))
 	}
 }
 
@@ -571,7 +571,7 @@ export function createErrorHandler(config?: Partial<ErrorHandlerConfig>): Enhanc
 		maxRetryDelay: 30000,
 		enableCircuitBreaker: true,
 		enableErrorReporting: true,
-		alertingThreshold: 5
+		alertingThreshold: 5,
 	}
 
 	return new EnhancedErrorHandler({ ...defaultConfig, ...config })
