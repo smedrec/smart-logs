@@ -284,16 +284,17 @@ export class MemoryAwareQueue<T> extends EventEmitter {
 		const resourceManager = getResourceManager()
 		const memStats = resourceManager.getMemoryStats()
 
-		// Check if we're using too much memory
-		const memoryPressure = memStats.heapUsed / (1024 * 1024 * 1024) // GB
+		// Check if we're using too much memory: compute used/total ratio if available
+		const heapTotal = memStats.heapTotal || 0
+		const memoryPressureRatio = heapTotal > 0 ? memStats.heapUsed / heapTotal : 0
 
-		if (memoryPressure > 0.8 && this.config.enableAdaptiveSize) {
+		if (memoryPressureRatio > 0.8 && this.config.enableAdaptiveSize) {
 			// Remove old items to reduce memory pressure
 			const removedCount = this.removeOldItems(30000) // Remove items older than 30 seconds
 			if (removedCount > 0) {
 				this.emit('memoryPressureCleanup', {
 					removedCount,
-					memoryPressure,
+					memoryPressureRatio,
 					queueSize: this.items.length,
 				})
 			}

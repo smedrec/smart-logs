@@ -1,3 +1,7 @@
+/**
+ * Deprecated: use src/types instead.
+ * Defines the Log class and schema for structured logging.
+ */
 import { version } from 'os'
 import { z } from 'zod'
 

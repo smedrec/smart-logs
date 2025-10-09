@@ -16,9 +16,5 @@ export * from './transports/index.js'
 // Utilities
 export * from './utils/index.js'
 
-// Legacy exports for backward compatibility (avoiding duplicates)
-export { LoggerFactory, createRequestLogger } from './logging.js'
-//export * from './console.js'
-
 // Compatibility layer for migration
 export * as Compatibility from './compatibility/index.js'

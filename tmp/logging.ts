@@ -1,4 +1,5 @@
 /**
+ * Deprecated: use src/core/structured-logger.ts instead.
  * @fileoverview Enhanced Structured Logging Service
  *
  * Provides comprehensive structured logging with:

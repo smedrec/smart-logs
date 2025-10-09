@@ -72,7 +72,18 @@ export class RedisTransport implements LogTransport {
 		)
 
 		// Initialize Redis connection
-		this.initializeConnection()
+		// Initialize Redis connection (catch rejections to avoid unhandled promise rejections)
+		this.initializeConnection().catch((err) => {
+			console.error('Redis transport initialization failed:', err)
+			this.isHealthyState = false
+			this.lastError = err as Error
+			// Schedule a reconnect with backoff strategy
+			try {
+				this.scheduleReconnect()
+			} catch (scheduleErr) {
+				console.error('Failed to schedule Redis reconnect:', scheduleErr)
+			}
+		})
 	}
 
 	/**
@@ -83,10 +94,15 @@ export class RedisTransport implements LogTransport {
 			return
 		}
 
-		// Add entries to batch manager for processing
+		// Add entries to batch manager for processing concurrently
+		const adds: Promise<void>[] = []
 		for (const entry of entries) {
-			await this.batchManager.add(entry)
+			adds.push(this.batchManager.add(entry))
 		}
+
+		// Await all add operations and propagate any error to the caller.
+		// Tests expect send() to reject on failure scenarios.
+		await Promise.all(adds)
 	}
 
 	/**

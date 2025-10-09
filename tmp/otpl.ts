@@ -1,3 +1,7 @@
+/**
+ * Deprecated: use src/transports/otlp-transport.ts instead.
+ * An OTLP logger implementation that sends logs to an OTLP HTTP endpoint.
+ */
 import chalk from 'chalk'
 
 import { Log } from './log.js'

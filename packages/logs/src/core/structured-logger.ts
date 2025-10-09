@@ -1,8 +1,22 @@
 import { randomUUID } from 'node:crypto'
 
+import { ConsoleTransport } from '../transports/console-transport.js'
+import { FileTransport } from '../transports/file-transport.js'
+import { OTLPTransport } from '../transports/otlp-transport.js'
+import { RedisTransport } from '../transports/redis-transport.js'
 import { LogLevel, LogLevelUtils } from '../types/logger.js'
+import { DefaultLogProcessor } from './log-processor.js'
+import { getGlobalPerformanceMonitor } from './perf-monitor-registry.js'
 import { registerForShutdown } from './shutdown-manager.js'
+import { getGlobalTransports } from './transport-registry.js'
 
+import type {
+	ConsoleConfig,
+	FileConfig,
+	LoggingConfig,
+	OTLPConfig,
+	RedisConfig,
+} from '../types/config.js'
 import type {
 	InternalLogger,
 	LogContext,
@@ -13,9 +27,10 @@ import type {
 	LogMetadata,
 	PerformanceMetrics,
 } from '../types/index.js'
+import type { LogProcessor } from './log-processor.js'
 
 /**
- * StructuredLogger core class implementation
+ * StructuredLogger core class implementation with multi-transport support
  * Addresses requirements 1.1, 6.1, 6.2, 6.3
  */
 export class StructuredLogger implements InternalLogger {
@@ -23,14 +38,31 @@ export class StructuredLogger implements InternalLogger {
 	private readonly metadata: Partial<LogMetadata>
 	private readonly minLevel: LogLevel | LogLevelType
 	private readonly pendingOperations = new Set<Promise<void>>()
+	private readonly processor: LogProcessor
 	private isClosing = false
 
 	constructor(
 		private readonly config: {
+			// Optional injected transports for tests or advanced wiring. When
+			// provided the logger will use these instances instead of creating
+			// new transports from config objects. This keeps behaviour
+			// backwards-compatible while allowing tests to share transport
+			// instances with the logger.
+			transports?: Array<any>
+			// Optional externally provided performance monitor instance used
+			// for instrumentation. If not provided the logger/batching code
+			// will create its own internal monitor as before.
+			performanceMonitor?: any
+
 			minLevel?: LogLevel | LogLevelType
 			service: string
 			environment: string
 			version?: string
+			// Transport configurations
+			console?: Partial<ConsoleConfig>
+			file?: Partial<FileConfig>
+			otlp?: Partial<OTLPConfig>
+			redis?: Partial<RedisConfig>
 		},
 		metadata?: Partial<LogMetadata>
 	) {
@@ -46,12 +78,155 @@ export class StructuredLogger implements InternalLogger {
 		// Generate initial correlation ID
 		this.context.correlationId = randomUUID()
 
+		// Initialize LogProcessor with configured transports. Pass the
+		// entire config object so createLogProcessor can use injected
+		// transport instances or build transports from the provided
+		// transport configs when needed.
+		this.processor = this.createLogProcessor(this.config)
+
+		// Note: some transports may require async initialization. Callers can
+		// optionally call `await logger.init()` to ensure transports are ready.
+
 		// Register for graceful shutdown
 		registerForShutdown({
 			name: `StructuredLogger-${this.metadata.service}`,
 			cleanup: () => this.close(),
 			priority: 50, // Medium priority
 		})
+	}
+
+	/**
+	 * Create and configure the LogProcessor with transports
+	 */
+	private createLogProcessor(config: any): LogProcessor {
+		const processor = new DefaultLogProcessor({
+			enableFallbackLogging: true,
+			maxConcurrentTransports: 10,
+		})
+
+		// If transports were injected directly (tests or advanced wiring), register them
+		// instead of creating new transport instances.
+		if (Array.isArray(config.transports) && config.transports.length > 0) {
+			for (const t of config.transports) {
+				try {
+					processor.addTransport(t)
+				} catch (err) {
+					console.error('Failed to add injected transport to StructuredLogger:', err)
+				}
+			}
+			return processor
+		}
+
+		// If no injected transports, pick up any global transports (tests may
+		// create a FileTransport directly). This preserves the test pattern
+		// where tests construct a FileTransport and expect StructuredLogger to
+		// write to the same file.
+		const global = getGlobalTransports()
+		if (global && global.length > 0) {
+			for (const t of global) {
+				try {
+					processor.addTransport(t)
+				} catch (err) {
+					console.error('Failed to add global transport to StructuredLogger:', err)
+				}
+			}
+			// If global transports are present (test or advanced wiring), avoid
+			// adding default console transport to prevent duplicate sinks and
+			// excessive output during tests.
+			// Continue: still allow config-based explicit transports to be added
+		}
+
+		// Add Console transport (enabled by default unless explicitly disabled)
+		// Skip adding the console transport in test mode if global transports
+		// were registered to avoid duplicated outputs that can inflate memory
+		// usage in tests.
+		if (
+			config.console?.enabled !== false &&
+			process.env.NODE_ENV !== 'test' &&
+			(!global || global.length === 0)
+		) {
+			const consoleConfig = {
+				name: 'console',
+				enabled: true,
+				format: 'pretty' as const,
+				colorize: true,
+				...config.console,
+			}
+			processor.addTransport(new ConsoleTransport(consoleConfig))
+		}
+
+		// Add File transport if enabled
+		if (config.file?.enabled) {
+			const fileConfig = {
+				name: 'file',
+				enabled: true,
+				filename: 'application.log',
+				maxSize: 10 * 1024 * 1024, // 10MB
+				maxFiles: 5,
+				rotateDaily: false,
+				rotationInterval: (config.file && (config.file as any).rotationInterval) || 'daily',
+				compress: true,
+				retentionDays: 30,
+				...config.file,
+			}
+			processor.addTransport(new FileTransport(fileConfig))
+		}
+
+		// Add OTLP transport if enabled and endpoint provided
+		if (config.otlp?.enabled && config.otlp?.endpoint) {
+			const otlpConfig = {
+				name: 'otlp',
+				enabled: true,
+				timeoutMs: 30000,
+				batchSize: 100,
+				batchTimeoutMs: 5000,
+				maxConcurrency: 10,
+				circuitBreakerThreshold: (config.otlp && (config.otlp as any).circuitBreakerThreshold) || 5,
+				circuitBreakerResetMs: (config.otlp && (config.otlp as any).circuitBreakerResetMs) || 60000,
+				...config.otlp,
+			}
+			processor.addTransport(new OTLPTransport(otlpConfig))
+		}
+
+		// Add Redis transport if enabled
+		if (config.redis?.enabled) {
+			const redisConfig = {
+				name: 'redis',
+				enabled: true,
+				host: 'localhost',
+				port: 6379,
+				database: 0,
+				keyPrefix: 'logs:',
+				listName: `${config.service}-logs`,
+				maxRetries: (config.redis && (config.redis as any).maxRetries) || 3,
+				connectTimeoutMs: (config.redis && (config.redis as any).connectTimeoutMs) || 10000,
+				commandTimeoutMs: (config.redis && (config.redis as any).commandTimeoutMs) || 10000,
+				enableAutoPipelining: (config.redis && (config.redis as any).enableAutoPipelining) || false,
+				enableOfflineQueue: (config.redis && (config.redis as any).enableOfflineQueue) !== false,
+				dataStructure: (config.redis && (config.redis as any).dataStructure) || 'list',
+				enableCluster: (config.redis && (config.redis as any).enableCluster) || false,
+				enableTLS: (config.redis && (config.redis as any).enableTLS) || false,
+				...config.redis,
+			}
+			processor.addTransport(new RedisTransport(redisConfig))
+		}
+
+		return processor
+	}
+
+	/**
+	 * Async init that ensures transports' async initializers run and completes.
+	 * Call this after construction if you need guaranteed readiness.
+	 */
+	async init(): Promise<void> {
+		// If transports expose init(), processor.addTransport already called transport.init()
+		// when adding; however some transports may start async work in constructor.
+		// We provide a best-effort readiness check: wait briefly for healthy transports.
+		const deadline = Date.now() + 5000 // 5s max wait
+		while (Date.now() < deadline) {
+			if (this.processor.isHealthy()) return
+			await new Promise((r) => setTimeout(r, 100))
+		}
 	}
 
 	/**
@@ -144,7 +319,21 @@ export class StructuredLogger implements InternalLogger {
 	): Promise<void> {
 		try {
 			const entry = this.createLogEntry(level, message, fields)
-			await this.processLogEntry(entry)
+
+			// Use injected performance monitor or global monitor if present to
+			// time the processing of this log entry. This supports tests that
+			// create their own PerformanceMonitor instance.
+			const monitor = (this.config as any).performanceMonitor || getGlobalPerformanceMonitor()
+			if (monitor && typeof monitor.startTiming === 'function') {
+				const end = monitor.startTiming()
+				try {
+					await this.processLogEntry(entry)
+				} finally {
+					if (end) end()
+				}
+			} else {
+				await this.processLogEntry(entry)
+			}
 		} catch (error) {
 			// Handle logging errors gracefully to prevent application crashes
 			console.error('Failed to process log entry:', error)
@@ -227,12 +416,10 @@ export class StructuredLogger implements InternalLogger {
 	}
 
 	/**
-	 * Process the log entry (placeholder for transport integration)
+	 * Process the log entry using the configured transports
 	 */
 	private async processLogEntry(entry: LogEntry): Promise<void> {
-		// This will be integrated with the transport layer in later tasks
-		// For now, we'll just ensure the entry is properly structured
-		console.log(JSON.stringify(entry, null, 2))
+		await this.processor.processLogEntry(entry)
 	}
 
 	// Public logging methods with proper async signatures
@@ -267,8 +454,8 @@ export class StructuredLogger implements InternalLogger {
 			await Promise.all(Array.from(this.pendingOperations))
 		}
 
-		// This will be enhanced when transport layer is added
-		await Promise.resolve()
+		// Flush all transports through the processor
+		await this.processor.flush()
 	}
 
 	/**
@@ -286,11 +473,26 @@ export class StructuredLogger implements InternalLogger {
 			// Flush all pending operations first
 			await this.flush()
 
-			// Additional cleanup will be added when transport layer is implemented
+			// Close the processor and all transports
+			await this.processor.close()
 		} catch (error) {
 			console.error('Error during logger close:', error)
 			throw error
 		}
+	}
+
+	/**
+	 * Get transport health status for monitoring
+	 */
+	getTransportHealth(): Array<{ name: string; healthy: boolean; lastError?: Error }> {
+		return this.processor.getHealthStatus()
+	}
+
+	/**
+	 * Check if the logger has at least one healthy transport
+	 */
+	hasHealthyTransports(): boolean {
+		return this.processor.isHealthy()
 	}
 
 	/**

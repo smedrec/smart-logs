@@ -1,3 +1,7 @@
+/**
+ * Deprecated: use src/transports/console-transport.ts instead.
+ * A simple console logger implementation that outputs logs to the console with colors.
+ */
 import chalk from 'chalk'
 
 import { Log } from './log.js'

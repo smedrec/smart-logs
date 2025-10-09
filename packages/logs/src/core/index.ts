@@ -2,6 +2,21 @@
 export { StructuredLogger } from './structured-logger.js'
 export { CorrelationManager } from './correlation-manager.js'
 
+// LogProcessor and transport integration
+export {
+	DefaultLogProcessor,
+	type LogProcessor,
+	type ProcessorTransportHealth,
+} from './log-processor.js'
+
+// Logger Factory for convenient logger creation
+export {
+	LoggerFactory,
+	createDevelopmentLogger,
+	createProductionLogger,
+	createConsoleAndOTLPLogger,
+} from './logger-factory.js'
+
 // Async operation handling components
 export { DefaultBatchManager } from './batch-manager.js'
 export { DefaultRetryManager } from './retry-manager.js'

@@ -1,3 +1,8 @@
+/**
+ * Deprecated: use src/types instead.
+ * Defines interfaces and types for the logging system.
+ */
+
 export type Fields = {
 	[field: string]: unknown
 }

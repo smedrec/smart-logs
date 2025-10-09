@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.73.0
+    container_name: otel-collector-logs-example
+    volumes:
+      - ./otel-config.yaml:/etc/otel/config.yaml:ro
+    command: ["--config", "/etc/otel/config.yaml"]
+    ports:
+      - "4318:4318" # OTLP HTTP
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: redis-logs-example
+    ports:
+      - "6379:6379"
+    restart: unless-stopped

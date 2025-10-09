@@ -207,10 +207,16 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 				console: {
 					name: 'console',
 					enabled: true,
-					format: 'json',
+					format: 'pretty',
 					colorize: true,
-					timestamp: true,
 					level: 'info',
+				},
+				otlp: {
+					name: 'otpl',
+					enabled: true,
+					level: 'info',
+					endpoint: config.logging.exporterEndpoint || '',
+					headers: config.logging.exporterHeaders || {},
 				},
 			})
 		}

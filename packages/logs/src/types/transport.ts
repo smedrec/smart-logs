@@ -7,6 +7,9 @@ import type { LogEntry } from './log-entry.js'
 export interface LogTransport {
 	readonly name: string
 
+	// Optional async initializer (some transports need async setup)
+	init?(): Promise<void>
+
 	// Core transport operations
 	send(entries: LogEntry[]): Promise<void>
 	flush(): Promise<void>
