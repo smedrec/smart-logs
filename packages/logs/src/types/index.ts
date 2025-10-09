@@ -16,4 +16,11 @@ export type {
 export { ConfigValidator, LoggingConfigSchema } from './config.js'
 
 // Batch types (avoiding duplicates)
-export type { BatchManager, RetryManager, CircuitBreaker, CircuitBreakerConfig } from './batch.js'
+export type {
+	BatchManager,
+	RetryManager,
+	CircuitBreaker,
+	CircuitBreakerConfig,
+	BatchConfig,
+	RetryConfig,
+} from './batch.js'

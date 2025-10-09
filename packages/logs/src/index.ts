@@ -10,10 +10,8 @@ export * from './core/index.js'
 // Transport implementations
 export * from './transports/index.js'
 
-// Batching and queuing implementations
-export { BatchManager } from './batch/batch-manager.js'
-export { RetryManager } from './batch/retry-manager.js'
-export { CircuitBreaker } from './batch/circuit-breaker.js'
+// Async operation handling implementations (new)
+// Note: The core implementations are already exported via './core/index.js'
 
 // Utilities
 export * from './utils/index.js'
