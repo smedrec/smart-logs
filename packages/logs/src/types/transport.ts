@@ -41,7 +41,9 @@ export interface FileTransportConfig extends TransportConfig {
 	maxSize: number
 	maxFiles: number
 	rotateDaily: boolean
+	rotationInterval: 'daily' | 'weekly' | 'monthly'
 	compress: boolean
+	retentionDays: number
 }
 
 /**

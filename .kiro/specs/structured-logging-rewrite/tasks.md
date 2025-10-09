@@ -81,22 +81,22 @@
   - Test configuration options and field filtering
   - _Requirements: 10.1, 10.3_
 
-- [ ] 5. Implement File transport with rotation support
-- [ ] 5.1 Create FileTransport class with rotation
+- [x] 5. Implement File transport with rotation support
+- [x] 5.1 Create FileTransport class with rotation
   - Implement FileTransport with configurable file rotation by size and time
   - Add proper file handle management and cleanup on shutdown
   - Create directory structure creation and permission handling
   - Implement atomic write operations to prevent corrupted log files
   - _Requirements: 5.2, 8.3_
 
-- [ ] 5.2 Add file rotation and cleanup logic
+- [x] 5.2 Add file rotation and cleanup logic
   - Implement size-based rotation with configurable maximum file size
   - Add time-based rotation with daily/weekly/monthly options
   - Create old file cleanup with configurable retention periods
   - Implement compression of rotated files to save disk space
   - _Requirements: 5.2_
 
-- [ ] 5.3 Write unit tests for file transport
+- [x] 5.3 Write unit tests for file transport
   - Test file creation, writing, and rotation functionality
   - Validate cleanup logic and retention period handling
   - Test error scenarios like disk full and permission issues

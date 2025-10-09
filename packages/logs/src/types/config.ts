@@ -29,7 +29,9 @@ export const FileConfigSchema = z.object({
 		.default(10 * 1024 * 1024), // 10MB
 	maxFiles: z.number().min(1, 'Must keep at least 1 file').default(5),
 	rotateDaily: z.boolean().default(false),
+	rotationInterval: z.enum(['daily', 'weekly', 'monthly']).default('daily'),
 	compress: z.boolean().default(true),
+	retentionDays: z.number().min(1, 'Retention must be at least 1 day').default(30),
 })
 
 // OTLP transport configuration schema
