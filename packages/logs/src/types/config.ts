@@ -22,7 +22,7 @@ export const FileConfigSchema = z.object({
 	name: z.string().default('file'),
 	enabled: z.boolean().default(false),
 	level: LogLevelSchema.optional(),
-	filename: z.string().min(1, 'Filename cannot be empty'),
+	filename: z.string().min(1, 'Filename cannot be empty').optional(),
 	maxSize: z
 		.number()
 		.min(1024, 'Max size must be at least 1KB')
@@ -39,7 +39,21 @@ export const OTLPConfigSchema = z.object({
 	name: z.string().default('otlp'),
 	enabled: z.boolean().default(false),
 	level: LogLevelSchema.optional(),
-	endpoint: z.string().url('OTLP endpoint must be a valid URL'),
+	endpoint: z
+		.string()
+		.min(1, 'OTLP endpoint cannot be empty')
+		.refine(
+			(url) => {
+				try {
+					new URL(url)
+					return true
+				} catch {
+					return false
+				}
+			},
+			{ message: 'OTLP endpoint must be a valid URL' }
+		)
+		.optional(),
 	headers: z.record(z.string(), z.string()).optional(),
 	timeoutMs: z.number().min(1000, 'Timeout must be at least 1 second').default(30000),
 	batchSize: z.number().min(1, 'Batch size must be at least 1').default(100),
@@ -187,7 +201,32 @@ export class ConfigValidator {
 
 	static validatePartial(config: unknown): Partial<LoggingConfig> {
 		try {
-			return LoggingConfigSchema.partial().parse(config)
+			// Create a schema without defaults for partial validation
+			const partialSchema = z
+				.object({
+					level: LogLevelSchema.optional(),
+					service: z.string().min(1, 'Service name cannot be empty').optional(),
+					environment: z.string().min(1, 'Environment cannot be empty').optional(),
+					version: z.string().optional(),
+					console: ConsoleConfigSchema.optional(),
+					file: FileConfigSchema.optional(),
+					otlp: OTLPConfigSchema.optional(),
+					redis: RedisConfigSchema.optional(),
+					performance: PerformanceConfigSchema.optional(),
+					batch: BatchConfigSchema.optional(),
+					retry: RetryConfigSchema.optional(),
+					shutdownTimeoutMs: z
+						.number()
+						.min(1000, 'Shutdown timeout must be at least 1 second')
+						.optional(),
+					enableCorrelationIds: z.boolean().optional(),
+					enableRequestTracking: z.boolean().optional(),
+					enableDebugMode: z.boolean().optional(),
+					prettyPrint: z.boolean().optional(),
+				})
+				.strict()
+
+			return partialSchema.parse(config)
 		} catch (error) {
 			if (error instanceof z.ZodError) {
 				const errorMessages = error.issues

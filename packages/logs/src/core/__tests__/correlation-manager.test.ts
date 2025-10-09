@@ -18,7 +18,7 @@ describe('CorrelationManager', () => {
 		})
 	})
 
-	describe('correlation ID generation', () => {
+	describe('ID generation', () => {
 		it('should generate unique correlation IDs', () => {
 			const id1 = correlationManager.generateCorrelationId()
 			const id2 = correlationManager.generateCorrelationId()
@@ -28,13 +28,32 @@ describe('CorrelationManager', () => {
 			expect(id1).not.toBe(id2)
 			expect(typeof id1).toBe('string')
 			expect(typeof id2).toBe('string')
+			expect(id1).toMatch(/^corr_[0-9a-f-]{36}$/)
 		})
 
-		it('should generate UUIDs', () => {
-			const id = correlationManager.generateCorrelationId()
-			// UUID v4 pattern: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-			const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-			expect(id).toMatch(uuidPattern)
+		it('should generate unique request IDs', () => {
+			const id1 = correlationManager.generateRequestId()
+			const id2 = correlationManager.generateRequestId()
+
+			expect(id1).toBeDefined()
+			expect(id2).toBeDefined()
+			expect(id1).not.toBe(id2)
+			expect(id1).toMatch(/^req_[0-9a-f-]{36}$/)
+		})
+
+		it('should generate trace contexts', () => {
+			const context = correlationManager.generateTraceContext()
+
+			expect(context.traceId).toMatch(/^trace_[0-9a-f]{32}$/)
+			expect(context.spanId).toMatch(/^[0-9a-f]{16}$/)
+			expect(context.traceFlags).toBe(1)
+		})
+
+		it('should generate trace context with parent span', () => {
+			const parentSpanId = '00f067aa0ba902b7'
+			const context = correlationManager.generateTraceContext(parentSpanId)
+
+			expect(context.parentSpanId).toBe(parentSpanId)
 		})
 	})
 
@@ -127,6 +146,83 @@ describe('CorrelationManager', () => {
 				const context = correlationManager.getContext()
 				expect(context?.requestId).toBe(testRequestId)
 			})
+		})
+	})
+
+	describe('trace context management', () => {
+		it('should parse W3C trace context', () => {
+			const traceParent = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'
+			const context = correlationManager.parseTraceContext(traceParent)
+
+			expect(context).not.toBeNull()
+			expect(context!.traceId).toBe('4bf92f3577b34da6a3ce929d0e0e4736')
+			expect(context!.parentSpanId).toBe('00f067aa0ba902b7')
+		})
+
+		it('should create child trace context', () => {
+			const parentContext = correlationManager.generateTraceContext()
+			const childContext = correlationManager.createChildTraceContext(parentContext)
+
+			expect(childContext.traceId).toBe(parentContext.traceId)
+			expect(childContext.spanId).not.toBe(parentContext.spanId)
+			expect(childContext.parentSpanId).toBe(parentContext.spanId)
+		})
+
+		it('should set trace context in current context', () => {
+			const traceContext = correlationManager.generateTraceContext()
+
+			correlationManager.runWithContext({ correlationId: 'test' }, () => {
+				correlationManager.setTraceContext(traceContext)
+				const context = correlationManager.getContext()
+				expect(context?.traceId).toBe(traceContext.traceId)
+				expect(context?.spanId).toBe(traceContext.spanId)
+			})
+		})
+
+		it('should get trace and span IDs from context', () => {
+			const traceContext = correlationManager.generateTraceContext()
+
+			correlationManager.runWithContext(
+				{
+					correlationId: 'test',
+					traceId: traceContext.traceId,
+					spanId: traceContext.spanId,
+				},
+				() => {
+					expect(correlationManager.getTraceId()).toBe(traceContext.traceId)
+					expect(correlationManager.getSpanId()).toBe(traceContext.spanId)
+				}
+			)
+		})
+	})
+
+	describe('request context generation', () => {
+		it('should generate complete request context', () => {
+			const context = correlationManager.generateRequestContext()
+
+			expect(context.correlationId).toMatch(/^corr_[0-9a-f-]{36}$/)
+			expect(context.requestId).toMatch(/^req_[0-9a-f-]{36}$/)
+			expect(context.traceId).toMatch(/^trace_[0-9a-f]{32}$/)
+			expect(context.spanId).toMatch(/^[0-9a-f]{16}$/)
+		})
+
+		it('should use provided trace parent', () => {
+			const traceParent = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'
+			const context = correlationManager.generateRequestContext(traceParent)
+
+			expect(context.traceId).toBe('4bf92f3577b34da6a3ce929d0e0e4736')
+		})
+
+		it('should run function with request context', () => {
+			const result = correlationManager.runWithRequestContext(undefined, () => {
+				const context = correlationManager.getContext()
+				return context
+			})
+
+			expect(result?.correlationId).toMatch(/^corr_[0-9a-f-]{36}$/)
+			expect(result?.requestId).toMatch(/^req_[0-9a-f-]{36}$/)
+			expect(result?.traceId).toMatch(/^trace_[0-9a-f]{32}$/)
+			expect(result?.spanId).toMatch(/^[0-9a-f]{16}$/)
 		})
 	})
 })

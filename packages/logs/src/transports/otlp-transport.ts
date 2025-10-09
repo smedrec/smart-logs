@@ -74,6 +74,11 @@ export class OTLPTransport implements LogTransport {
 		private readonly circuitBreaker?: CircuitBreaker,
 		private readonly retryManager?: RetryManager
 	) {
+		// Validate required configuration
+		if (!config.endpoint) {
+			throw new Error('OTLP transport requires an endpoint to be configured')
+		}
+
 		// Initialize batch manager with OTLP-specific configuration
 		this.batchManager = new DefaultBatchManager(
 			{
@@ -138,7 +143,8 @@ export class OTLPTransport implements LogTransport {
 	async performHealthCheck(): Promise<boolean> {
 		try {
 			// Send a minimal health check request to the OTLP endpoint
-			const response = await fetch(this.config.endpoint, {
+			// Endpoint is guaranteed to be present after validation in constructor
+			const response = await fetch(this.config.endpoint!, {
 				method: 'HEAD', // Use HEAD to minimize overhead
 				headers: {
 					'User-Agent': 'structured-logger/1.0.0',
@@ -315,7 +321,8 @@ export class OTLPTransport implements LogTransport {
 			}
 		}
 
-		const response = await fetch(this.config.endpoint, {
+		// Endpoint is guaranteed to be present after validation in constructor
+		const response = await fetch(this.config.endpoint!, {
 			method: 'POST',
 			headers,
 			body,

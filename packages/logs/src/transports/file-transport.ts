@@ -214,11 +214,14 @@ export class FileTransport implements LogTransport {
 	 * Get current file path with rotation suffix
 	 */
 	private getCurrentFilePath(): string {
+		// Filename is guaranteed to be present after validation in constructor
+		const filename = this.config.filename!
+
 		if (this.config.rotateDaily) {
 			const now = new Date()
-			const ext = extname(this.config.filename)
-			const base = basename(this.config.filename, ext)
-			const dir = dirname(this.config.filename)
+			const ext = extname(filename)
+			const base = basename(filename, ext)
+			const dir = dirname(filename)
 
 			let suffix: string
 			switch (this.config.rotationInterval) {
@@ -239,7 +242,7 @@ export class FileTransport implements LogTransport {
 
 			return join(dir, `${base}-${suffix}${ext}`)
 		}
-		return this.config.filename
+		return filename
 	}
 
 	/**
@@ -384,12 +387,14 @@ export class FileTransport implements LogTransport {
 	 */
 	private async cleanupOldFiles(): Promise<void> {
 		try {
-			const dir = dirname(this.config.filename)
-			const base = basename(this.config.filename, extname(this.config.filename))
+			// Filename is guaranteed to be present after validation in constructor
+			const filename = this.config.filename!
+			const dir = dirname(filename)
+			const base = basename(filename, extname(filename))
 
 			const files = await fs.readdir(dir)
 			const logFiles = files
-				.filter((file) => file.startsWith(base) && file !== basename(this.config.filename))
+				.filter((file) => file.startsWith(base) && file !== basename(filename))
 				.map((file) => join(dir, file))
 
 			// Get file stats for all log files
