@@ -2,9 +2,9 @@
 
 import * as React from 'react'
 
-import { createAlertColumns } from './AlertColumns'
+import { createAlertColumns } from './alert-columns'
+import { AlertPagination } from './alert-pagination'
 import { AlertDataTable } from './AlertDataTable'
-import { AlertPagination } from './AlertPagination'
 import { SimpleAlertTable } from './SimpleAlertTable'
 
 import type { AlertSeverity, AlertStatus, AlertType } from '@/components/alerts/types'

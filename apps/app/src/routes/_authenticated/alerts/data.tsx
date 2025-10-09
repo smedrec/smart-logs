@@ -1,6 +1,6 @@
 import AlertCard from '@/components/alerts/core/AlertCard'
 import AlertList from '@/components/alerts/core/AlertList'
-import { DataTable } from '@/components/alerts/data-table'
+import { DataTable } from '@/components/alerts/data/alert-data-table'
 import {
 	ALERT_SHORTCUTS,
 	useAlertKeyboardNavigation,
@@ -17,7 +17,7 @@ import { eq, useLiveQuery } from '@tanstack/react-db'
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 
-import type { DataTableRef } from '@/components/alerts/data-table'
+import type { DataTableRef } from '@/components/alerts/data/alert-data-table'
 import type { AlertFilters as AlertFiltersType } from '@/components/alerts/types/filter-types'
 import type { Alert } from '@/lib/collections'
 

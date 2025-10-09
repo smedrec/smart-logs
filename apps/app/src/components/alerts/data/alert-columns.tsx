@@ -419,9 +419,6 @@ export function createAlertColumns(config: AlertColumnsConfig = {}): ColumnDef<A
 			header: 'Actions',
 			cell: ({ row }) => {
 				const alert = row.original
-				const canAcknowledge = alert.status === 'active'
-				const canResolve = alert.status === 'active' || alert.status === 'acknowledged'
-				const canDismiss = alert.status !== 'dismissed'
 
 				return (
 					<AlertActions

@@ -2,10 +2,10 @@
 
 import * as React from 'react'
 
-import { createAlertColumns } from './AlertColumns'
+import { createAlertColumns } from './alert-columns'
+import { AlertPagination } from './alert-pagination'
+import { AlertTableToolbar } from './alert-table-toolbar'
 import { AlertDataTable } from './AlertDataTable'
-import { AlertPagination } from './AlertPagination'
-import { AlertTableToolbar } from './AlertTableToolbar'
 
 import type { Alert } from '@/lib/collections'
 

@@ -5,17 +5,17 @@ export {
 	defaultAlertColumns,
 	readOnlyAlertColumns,
 	compactAlertColumns,
-} from './AlertColumns'
-export { AlertPagination, SimpleAlertPagination, CompactAlertPagination } from './AlertPagination'
+} from './alert-columns'
+export { AlertPagination, SimpleAlertPagination, CompactAlertPagination } from './alert-pagination'
 export {
 	AlertTableToolbar,
 	SimpleAlertTableToolbar,
 	CompactAlertTableToolbar,
-} from './AlertTableToolbar'
+} from './alert-table-toolbar'
 export { AlertStatistics } from './AlertStatistics'
 
 // Re-export types
 export type { AlertDataTableProps, AlertDataTableRef } from './AlertDataTable'
-export type { AlertColumnsConfig } from './AlertColumns'
-export type { AlertPaginationProps } from './AlertPagination'
-export type { AlertTableToolbarProps } from './AlertTableToolbar'
+export type { AlertColumnsConfig } from './alert-columns'
+export type { AlertPaginationProps } from './alert-pagination'
+export type { AlertTableToolbarProps } from './alert-table-toolbar'

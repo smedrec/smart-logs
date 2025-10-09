@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { AlertPagination } from '../AlertPagination'
+import { AlertPagination } from '../alert-pagination'
 
 // Mock TanStack Router
 vi.mock('@tanstack/react-router', () => ({

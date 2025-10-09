@@ -22,15 +22,14 @@ import {
 import { AlertTriangle } from 'lucide-react'
 import * as React from 'react'
 
-import { Button } from '../ui/button'
-import { Card, CardContent } from '../ui/card'
-import { DataTablePagination } from '../ui/data-table-pagination'
-import { Skeleton } from '../ui/skeleton'
-import createAlertColumns from './data/AlertColumns'
-import AlertPagination from './data/AlertPagination'
-import AlertTableToolbar from './data/AlertTableToolbar'
-import { AlertDetailsDialog } from './data/details-dialog'
-import { AlertActions } from './forms/AlertActions'
+import { Button } from '../../ui/button'
+import { Card, CardContent } from '../../ui/card'
+import { Skeleton } from '../../ui/skeleton'
+import { AlertActions } from '../forms/AlertActions'
+import createAlertColumns from './alert-columns'
+import AlertPagination from './alert-pagination'
+import AlertTableToolbar from './alert-table-toolbar'
+import { AlertDetailsDialog } from './details-dialog'
 
 import type { Alert } from '@/lib/collections'
 import type {
