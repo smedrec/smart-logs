@@ -87,8 +87,9 @@ export function requestMetrics() {
 			} catch (metricsError) {
 				logger.error(
 					'Failed to store request metrics',
-					metricsError instanceof Error ? metricsError.message : 'Unknown error',
+
 					{
+						error: metricsError instanceof Error ? metricsError.message : 'Unknown error',
 						requestId,
 					}
 				)
@@ -177,8 +178,9 @@ export function performanceMonitoring(options: { threshold?: number; alertOnSlow
 			} catch (alertError) {
 				logger.error(
 					'Failed to create slow request alert',
-					alertError instanceof Error ? alertError.message : 'Unknown error',
+
 					{
+						error: alertError instanceof Error ? alertError.message : 'Unknown error',
 						requestId,
 					}
 				)
@@ -224,7 +226,7 @@ export function healthCheckMonitoring() {
 			// Log health status
 			logger.info('Health check performed', {
 				requestId,
-				healthStatus,
+				healthStatus: JSON.stringify(healthStatus),
 			})
 
 			// Store health status in context for endpoint handler
@@ -234,9 +236,10 @@ export function healthCheckMonitoring() {
 		} catch (error) {
 			logger.error(
 				'Health check failed',
-				error instanceof Error ? error.message : 'Unknown error',
+
 				{
 					requestId,
+					error: error instanceof Error ? error.message : 'Unknown error',
 				}
 			)
 
@@ -309,9 +312,10 @@ export function errorRateMonitoring(options: { windowSize?: number; threshold?: 
 			} catch (alertError) {
 				logger.error(
 					'Failed to create error rate alert',
-					alertError instanceof Error ? alertError.message : 'Unknown error',
+
 					{
 						requestId,
+						error: alertError instanceof Error ? alertError.message : 'Unknown error',
 					}
 				)
 			}

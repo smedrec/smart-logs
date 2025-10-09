@@ -24,3 +24,15 @@ export type {
 	BatchConfig,
 	RetryConfig,
 } from './batch.js'
+
+// Error handling types
+export type {
+	ErrorMetrics,
+	ErrorContext,
+	CategorizedError,
+	ErrorRecoveryResult,
+	ErrorHandlerConfig,
+	ErrorHandler as IErrorHandler,
+	AlertingProvider,
+} from './error.js'
+export { ErrorCategory, ErrorSeverity, RecoveryStrategy } from './error.js'

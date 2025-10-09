@@ -273,7 +273,7 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(basicHealth, 200)
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Basic health check failed', errorMessage, { requestId, error: errorMessage })
+			logger.error('Basic health check failed', { requestId, error: errorMessage })
 
 			const errorResponse = {
 				status: 'unhealthy' as const,
@@ -336,7 +336,7 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(basicHealth, 200)
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Basic health check failed', errorMessage, { requestId, error: errorMessage })
+			logger.error('Basic health check failed', { requestId, error: errorMessage })
 
 			const errorResponse = {
 				status: 'unhealthy' as const,
@@ -373,7 +373,7 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(healthStatus, statusCode)
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Detailed health check failed', errorMessage, { requestId, error: errorMessage })
+			logger.error('Detailed health check failed', { requestId, error: errorMessage })
 
 			const errorResponse = {
 				status: 'unhealthy' as const,
@@ -453,7 +453,7 @@ export function createHealthAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(databaseHealth, statusCode)
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Database health check failed', errorMessage, { requestId, error: errorMessage })
+			logger.error('Database health check failed', { requestId, error: errorMessage })
 
 			const errorResponse = {
 				overall: 'critical' as const,

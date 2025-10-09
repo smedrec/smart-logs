@@ -33,7 +33,7 @@ import {
 } from '@repo/audit-db'
 import { Auth, createAuthorizationService } from '@repo/auth'
 import { InfisicalKmsClient } from '@repo/infisical-kms'
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 import { getRedisConnectionStatus, getSharedRedisConnectionWithConfig } from '@repo/redis-client'
 
 import { bindingsMiddleware } from '../inngest/middleware.js'
@@ -184,7 +184,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 
 		// Initialize enhanced structured logger
 		if (!structuredLogger) {
-			LoggerFactory.setDefaultConfig({
+			/**LoggerFactory.setDefaultConfig({
 				level: config.server.monitoring.logLevel,
 				enablePerformanceLogging: true,
 				enableErrorTracking: true,
@@ -200,6 +200,18 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			structuredLogger = LoggerFactory.createLogger({
 				requestId,
 				service: application,
+			})*/
+			structuredLogger = new StructuredLogger({
+				service: 'api',
+				environment: 'development',
+				console: {
+					name: 'console',
+					enabled: true,
+					format: 'json',
+					colorize: true,
+					timestamp: true,
+					level: 'info',
+				},
 			})
 		}
 

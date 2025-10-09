@@ -39,6 +39,7 @@ export interface RetryConfig {
 	initialDelayMs: number
 	maxDelayMs: number
 	multiplier: number
+	jitterMs?: number
 }
 
 /**

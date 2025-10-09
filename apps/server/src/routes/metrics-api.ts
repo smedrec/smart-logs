@@ -204,7 +204,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(metrics, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get system metrics', message, {
+			logger.error('Failed to get system metrics', {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -245,7 +245,7 @@ export function createMetricsAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(metrics, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get audit metrics', message, {
+			logger.error('Failed to get audit metrics', {
 				requestId,
 				error: message,
 				userId: session?.session.userId,

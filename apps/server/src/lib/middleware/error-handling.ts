@@ -162,21 +162,19 @@ export function createContextEnrichmentMiddleware(): MiddlewareHandler<HonoEnv> 
 			const services = c.get('services')
 
 			if (services?.logger) {
-				services.logger.logRequestEnd(
-					c.req.method,
-					c.req.path,
-					c.res.status,
-					{
-						requestId: c.get('requestId'),
-						userId: c.get('session')?.session.userId,
-						sessionId: c.get('session')?.session.id,
-						organizationId: c.get('session')?.session.activeOrganizationId || undefined,
-					},
-					{
-						duration,
+				services.logger.info('Request completed', {
+					method: c.req.method,
+					path: c.req.path,
+					status: c.res.status,
+					requestId: c.get('requestId'),
+					userId: c.get('session')?.session.userId,
+					sessionId: c.get('session')?.session.id,
+					organizationId: c.get('session')?.session.activeOrganizationId || undefined,
+					duration,
+					metadata: {
 						...metadata,
-					}
-				)
+					},
+				})
 			}
 		}
 	}
@@ -194,10 +192,11 @@ export function createErrorRecoveryMiddleware(): MiddlewareHandler<HonoEnv> {
 			const logger = services?.logger || LoggerFactory.createLogger()
 
 			// Log the error for monitoring
-			logger.error('Request failed, attempting recovery', error as Error, {
+			logger.error('Request failed, attempting recovery', {
 				requestId: c.get('requestId'),
 				endpoint: c.req.path,
 				method: c.req.method,
+				error: error instanceof Error ? error.message : 'Unknown error',
 			})
 
 			// Check if we can provide a degraded response

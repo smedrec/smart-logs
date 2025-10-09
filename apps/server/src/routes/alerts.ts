@@ -252,7 +252,7 @@ export function createAlertsAPI(): OpenAPIHono<HonoEnv> {
 			)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get alerts', message, {
+			logger.error('Failed to get alerts', {
 				requestId,
 				error: message,
 				userId: session?.session.userId,
@@ -294,7 +294,7 @@ export function createAlertsAPI(): OpenAPIHono<HonoEnv> {
 			return c.json(stats, 200)
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to get alert statistics', message, {
+			logger.error('Failed to get alert statistics', {
 				requestId,
 				error: message,
 			})
@@ -345,7 +345,7 @@ export function createAlertsAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to acknowledge alert', message, {
+			logger.error('Failed to acknowledge alert', {
 				requestId,
 				alertId: c.req.param('id'),
 				error: message,
@@ -405,7 +405,7 @@ export function createAlertsAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to resolve alert', message, {
+			logger.error('Failed to resolve alert', {
 				requestId,
 				alertId: c.req.param('id'),
 				error: message,
@@ -458,7 +458,7 @@ export function createAlertsAPI(): OpenAPIHono<HonoEnv> {
 			}
 
 			const message = error instanceof Error ? error.message : 'Unknown error'
-			logger.error('Failed to dismiss alert', message, {
+			logger.error('Failed to dismiss alert', {
 				requestId,
 				alertId: c.req.param('id'),
 				error: message,

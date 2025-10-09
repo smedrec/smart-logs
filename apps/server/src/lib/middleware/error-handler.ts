@@ -368,7 +368,7 @@ export function methodNotAllowedHandler(allowedMethods: string[]) {
 		logger.warn('Method not allowed', {
 			method: c.req.method,
 			path: c.req.path,
-			allowedMethods,
+			allowedMethods: JSON.stringify(allowedMethods),
 			requestId,
 		})
 

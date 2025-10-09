@@ -46,11 +46,13 @@ vi.mock('ioredis', () => {
 	return { default: Redis }
 })
 
-// Mock the Redis client package
-vi.mock('@repo/redis-client', () => ({
-	getSharedRedisConnection: vi.fn(() => mockRedisClient),
-	closeSharedRedisConnection: vi.fn(),
-}))
+// Mock ioredis directly
+vi.mock('ioredis', () => {
+	return {
+		default: vi.fn(() => mockRedisClient),
+		Cluster: vi.fn(() => mockRedisClient),
+	}
+})
 
 // Mock batch manager, circuit breaker, and retry manager
 let mockProcessor: ((entries: any[]) => Promise<void>) | null = null

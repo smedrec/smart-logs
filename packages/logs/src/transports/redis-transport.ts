@@ -1,7 +1,5 @@
 import Redis from 'ioredis'
 
-import { closeSharedRedisConnection, getSharedRedisConnection } from '@repo/redis-client'
-
 import { DefaultBatchManager } from '../core/batch-manager.js'
 import { DefaultCircuitBreaker } from '../core/circuit-breaker.js'
 import { DefaultRetryManager } from '../core/retry-manager.js'
