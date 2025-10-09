@@ -1,3 +1,5 @@
+import { registerForShutdown } from './shutdown-manager.js'
+
 import type { BatchConfig, BatchManager } from '../types/batch.js'
 import type { LogEntry } from '../types/log-entry.js'
 
@@ -14,7 +16,8 @@ export class DefaultBatchManager implements BatchManager {
 
 	constructor(
 		config: Partial<BatchConfig>,
-		private readonly processor: (entries: LogEntry[]) => Promise<void>
+		private readonly processor: (entries: LogEntry[]) => Promise<void>,
+		name = 'BatchManager'
 	) {
 		this.config = {
 			maxSize: config.maxSize || 100,
@@ -25,6 +28,13 @@ export class DefaultBatchManager implements BatchManager {
 
 		// Start the flush timer
 		this.scheduleFlush()
+
+		// Register for graceful shutdown
+		registerForShutdown({
+			name: `BatchManager-${name}`,
+			cleanup: () => this.close(),
+			priority: 10, // High priority - flush batches early
+		})
 	}
 
 	/**

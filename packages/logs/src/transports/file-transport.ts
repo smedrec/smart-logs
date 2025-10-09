@@ -3,6 +3,8 @@ import { basename, dirname, extname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { gzip } from 'node:zlib'
 
+import { registerResource, unregisterResource } from '../core/resource-manager.js'
+
 import type { WriteStream } from 'node:fs'
 import type { FileConfig } from '../types/config.js'
 import type { LogEntry } from '../types/log-entry.js'
@@ -23,9 +25,22 @@ export class FileTransport implements LogTransport {
 	private lastRotationTime = Date.now()
 	private isClosing = false
 	private pendingWrites = new Set<Promise<void>>()
+	private readonly resourceId: string
 
 	constructor(private config: FileConfig) {
 		this.validateConfig()
+		this.resourceId = `FileTransport-${this.config.filename}`
+
+		// Register with resource manager
+		registerResource({
+			id: this.resourceId,
+			type: 'stream',
+			cleanup: () => this.close(),
+			metadata: {
+				filename: this.config.filename,
+				maxSize: this.config.maxSize,
+			},
+		})
 	}
 
 	/**
@@ -84,27 +99,36 @@ export class FileTransport implements LogTransport {
 	 * Close the transport and cleanup resources
 	 */
 	async close(): Promise<void> {
+		if (this.isClosing) {
+			return
+		}
+
 		this.isClosing = true
 
-		// Wait for all pending writes to complete
-		await Promise.all(Array.from(this.pendingWrites))
+		try {
+			// Wait for all pending writes to complete
+			await Promise.all(Array.from(this.pendingWrites))
 
-		if (this.writeStream) {
-			return new Promise<void>((resolve, reject) => {
-				if (!this.writeStream) {
-					resolve()
-					return
-				}
-
-				this.writeStream.end((error: Error | null | undefined) => {
-					if (error) {
-						reject(error)
-					} else {
-						this.writeStream = null
+			if (this.writeStream) {
+				await new Promise<void>((resolve, reject) => {
+					if (!this.writeStream) {
 						resolve()
+						return
 					}
+
+					this.writeStream.end((error: Error | null | undefined) => {
+						if (error) {
+							reject(error)
+						} else {
+							this.writeStream = null
+							resolve()
+						}
+					})
 				})
-			})
+			}
+		} finally {
+			// Unregister from resource manager
+			await unregisterResource(this.resourceId)
 		}
 	}
 

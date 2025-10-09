@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { LogLevel, LogLevelUtils } from '../types/logger.js'
+import { registerForShutdown } from './shutdown-manager.js'
 
 import type {
 	InternalLogger,
@@ -21,6 +22,8 @@ export class StructuredLogger implements InternalLogger {
 	private context: LogContext = {}
 	private readonly metadata: Partial<LogMetadata>
 	private readonly minLevel: LogLevel | LogLevelType
+	private readonly pendingOperations = new Set<Promise<void>>()
+	private isClosing = false
 
 	constructor(
 		private readonly config: {
@@ -42,6 +45,13 @@ export class StructuredLogger implements InternalLogger {
 
 		// Generate initial correlation ID
 		this.context.correlationId = randomUUID()
+
+		// Register for graceful shutdown
+		registerForShutdown({
+			name: `StructuredLogger-${this.metadata.service}`,
+			cleanup: () => this.close(),
+			priority: 50, // Medium priority
+		})
 	}
 
 	/**
@@ -110,10 +120,28 @@ export class StructuredLogger implements InternalLogger {
 		message: string,
 		fields?: LogFields
 	): Promise<void> {
-		if (!this.shouldLog(level)) {
+		if (!this.shouldLog(level) || this.isClosing) {
 			return
 		}
 
+		const operation = this.processLogEntryWithTracking(level, message, fields)
+		this.pendingOperations.add(operation)
+
+		try {
+			await operation
+		} finally {
+			this.pendingOperations.delete(operation)
+		}
+	}
+
+	/**
+	 * Process log entry with proper tracking for shutdown
+	 */
+	private async processLogEntryWithTracking(
+		level: LogLevel | LogLevelType,
+		message: string,
+		fields?: LogFields
+	): Promise<void> {
 		try {
 			const entry = this.createLogEntry(level, message, fields)
 			await this.processLogEntry(entry)
@@ -231,19 +259,51 @@ export class StructuredLogger implements InternalLogger {
 
 	/**
 	 * Flush all pending log operations
+	 * Waits for all pending async operations to complete
 	 */
 	async flush(): Promise<void> {
-		// This will be implemented when transport layer is added
-		// For now, ensure any pending operations complete
+		// Wait for all pending operations to complete
+		if (this.pendingOperations.size > 0) {
+			await Promise.all(Array.from(this.pendingOperations))
+		}
+
+		// This will be enhanced when transport layer is added
 		await Promise.resolve()
 	}
 
 	/**
 	 * Close the logger and cleanup resources
+	 * Implements graceful shutdown with proper resource cleanup
 	 */
 	async close(): Promise<void> {
-		// This will be implemented when transport layer is added
-		// For now, ensure proper cleanup
-		await this.flush()
+		if (this.isClosing) {
+			return
+		}
+
+		this.isClosing = true
+
+		try {
+			// Flush all pending operations first
+			await this.flush()
+
+			// Additional cleanup will be added when transport layer is implemented
+		} catch (error) {
+			console.error('Error during logger close:', error)
+			throw error
+		}
+	}
+
+	/**
+	 * Get the number of pending operations
+	 */
+	getPendingOperationCount(): number {
+		return this.pendingOperations.size
+	}
+
+	/**
+	 * Check if the logger is healthy and not closing
+	 */
+	isHealthy(): boolean {
+		return !this.isClosing && this.pendingOperations.size < 1000 // Reasonable threshold
 	}
 }
