@@ -130,22 +130,22 @@
   - Test retry logic and circuit breaker integration with mock OTLP endpoints
   - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 7. Implement Redis transport with connection management
-- [ ] 7.1 Create RedisTransport class
+- [x] 7. Implement Redis transport with connection management
+- [x] 7.1 Create RedisTransport class
   - Implement RedisTransport with proper Redis client connection management
   - Add support for Redis lists, streams, or pub/sub patterns for log delivery
   - Create connection pooling and automatic reconnection logic
   - Implement proper error handling for Redis connection failures
   - _Requirements: 5.3, 1.1_
 
-- [ ] 7.2 Add Redis connection resilience
+- [x] 7.2 Add Redis connection resilience
   - Implement connection retry logic with exponential backoff
   - Add Redis cluster support for high availability deployments
   - Create proper connection cleanup and resource management
   - Implement Redis authentication and TLS support for secure connections
   - _Requirements: 5.3, 9.1_
 
-- [ ] 7.3 Write unit tests for Redis transport
+- [x] 7.3 Write unit tests for Redis transport
   - Test Redis connection management and reconnection logic
   - Validate log delivery to different Redis data structures
   - Test error handling for connection failures and Redis unavailability

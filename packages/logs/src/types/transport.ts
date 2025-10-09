@@ -71,4 +71,20 @@ export interface RedisTransportConfig extends TransportConfig {
 	keyPrefix: string
 	listName: string
 	maxRetries: number
+	connectTimeoutMs: number
+	commandTimeoutMs: number
+	enableAutoPipelining: boolean
+	enableOfflineQueue: boolean
+	dataStructure: 'list' | 'stream' | 'pubsub'
+	streamName?: string
+	channelName?: string
+	enableCluster: boolean
+	clusterNodes?: string[]
+	enableTLS: boolean
+	tlsOptions?: {
+		rejectUnauthorized: boolean
+		ca?: string
+		cert?: string
+		key?: string
+	}
 }

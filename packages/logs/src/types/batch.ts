@@ -49,6 +49,7 @@ export interface CircuitBreaker {
 	onSuccess(): void
 	onFailure(): void
 	getState(): 'closed' | 'open' | 'half-open'
+	destroy(): void
 }
 
 /**

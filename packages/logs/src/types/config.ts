@@ -67,6 +67,32 @@ export const RedisConfigSchema = z.object({
 	keyPrefix: z.string().default('logs:'),
 	listName: z.string().min(1, 'List name cannot be empty').default('application-logs'),
 	maxRetries: z.number().min(0, 'Max retries must be non-negative').default(3),
+	// Connection settings
+	connectTimeoutMs: z
+		.number()
+		.min(1000, 'Connect timeout must be at least 1 second')
+		.default(10000),
+	commandTimeoutMs: z.number().min(1000, 'Command timeout must be at least 1 second').default(5000),
+	// Advanced options
+	enableAutoPipelining: z.boolean().default(true),
+	enableOfflineQueue: z.boolean().default(false),
+	// Data structure options
+	dataStructure: z.enum(['list', 'stream', 'pubsub']).default('list'),
+	streamName: z.string().optional(),
+	channelName: z.string().optional(),
+	// Cluster support
+	enableCluster: z.boolean().default(false),
+	clusterNodes: z.array(z.string()).optional(),
+	// TLS support
+	enableTLS: z.boolean().default(false),
+	tlsOptions: z
+		.object({
+			rejectUnauthorized: z.boolean().default(true),
+			ca: z.string().optional(),
+			cert: z.string().optional(),
+			key: z.string().optional(),
+		})
+		.optional(),
 })
 
 // Performance configuration schema
