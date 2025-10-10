@@ -54,7 +54,7 @@ const logger = new StructuredLogger({
 	console: {
 		name: 'console',
 		enabled: true,
-		format: 'json',
+		format: 'pretty',
 		colorize: true,
 		level: 'info',
 	},
@@ -145,7 +145,9 @@ export function getSharedRedisConnectionWithConfig(redisConfig: RedisConfig): Re
 		// This typically catches synchronous errors during Redis instantiation (e.g., invalid options)
 		// or immediate connection failures if ioredis is configured to throw them.
 		const message = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to create Redis instance: ${message}`, { error: err.message })
+		logger.error(`Failed to create Redis instance: ${message}`, {
+			error: { name: err.name, message: err.message, stack: err.stack },
+		})
 		redisConnection = null // Ensure connection is null if creation failed
 
 		throw err

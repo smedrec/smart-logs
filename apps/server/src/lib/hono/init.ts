@@ -61,6 +61,7 @@ import type { ResilienceService } from '../services/resilience.js'
 let isolateId: string | undefined = undefined
 let isolateCreatedAt: number | undefined = undefined
 
+let config: AuditConfig | undefined = undefined
 let connection: Redis | undefined = undefined
 
 let auditDbInstance: EnhancedAuditDb | undefined = undefined
@@ -180,7 +181,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		c.res.headers.set('x-application', application)
 		c.res.headers.set('x-version', version)
 
-		const config = configManager.getConfig()
+		if (!config) config = configManager.getConfig()
 
 		// Initialize enhanced structured logger
 		if (!structuredLogger) {
@@ -380,21 +381,22 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			gdpr: gdprComplianceService,
 		}
 
+		// System startup
+		if (!connection || !auditDbInstance) {
+			audit.logSystem({
+				action: 'startup',
+				status: 'success',
+				component: 'api-server',
+				outcomeDescription: 'API server started successfully',
+				systemContext: {
+					version: '0.1.0',
+					environment: configManager.getEnvironment(),
+					nodeVersion: process.version,
+				},
+			})
+		}
 		//const cache = initCache(c);
 		//const cache = null
-
-		// System startup
-		audit.logSystem({
-			action: 'startup',
-			status: 'success',
-			component: 'api-server',
-			outcomeDescription: 'API server started successfully',
-			systemContext: {
-				version: '0.1.0',
-				environment: configManager.getEnvironment(),
-				nodeVersion: process.version,
-			},
-		})
 
 		c.set('services', {
 			config: configManager,

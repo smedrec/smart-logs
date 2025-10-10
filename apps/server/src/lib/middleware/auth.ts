@@ -52,7 +52,7 @@ export const requireAuth = createMiddleware<HonoEnv>(async (c, next) => {
 			sessionCookie.session.userAgent = c.get('userAgent')
 		}
 
-		c.set('session', sessionCookie as Session)
+		c.set('session', sessionCookie as unknown as Session)
 	}
 
 	const session = c.get('session')
@@ -159,7 +159,7 @@ export const requireApiKey = createMiddleware<HonoEnv>(async (c, next) => {
 				headers: new Headers({
 					'x-api-key': apiKey,
 				}),
-			})) as Session
+			})) as unknown as Session
 
 			if (apiKeySession) {
 				if (!apiKeySession.session.ipAddress || apiKeySession.session.ipAddress === '') {

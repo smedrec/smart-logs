@@ -189,14 +189,18 @@ export function createErrorRecoveryMiddleware(): MiddlewareHandler<HonoEnv> {
 			await next()
 		} catch (error) {
 			const services = c.get('services')
-			const logger = services?.logger || LoggerFactory.createLogger()
+			const logger =
+				services?.logger || LoggerFactory.createDevelopmentLogger('ErrorRecoveryMiddleware')
 
 			// Log the error for monitoring
 			logger.error('Request failed, attempting recovery', {
 				requestId: c.get('requestId'),
 				endpoint: c.req.path,
 				method: c.req.method,
-				error: error instanceof Error ? error.message : 'Unknown error',
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Unknown error',
 			})
 
 			// Check if we can provide a degraded response

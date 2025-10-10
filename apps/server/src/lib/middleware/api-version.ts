@@ -104,13 +104,13 @@ export function apiVersion(config: Partial<ApiVersionConfig> = {}) {
 				throw error
 			}
 
-			logger.error(
-				'API versioning error',
-				error instanceof Error ? error.message : 'Unknown error',
-				{
-					path: c.req.path,
-				}
-			)
+			logger.error('API versioning error', {
+				path: c.req.path,
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Unknown error',
+			})
 
 			// Set default version and continue
 			c.set('apiVersion', {

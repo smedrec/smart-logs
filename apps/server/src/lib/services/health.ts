@@ -600,8 +600,9 @@ export class EnhancedHealthService {
 						type: 'METRICS',
 						title: `${serviceName} Service Unhealthy`,
 						description: check.message || `${serviceName} service is not responding`,
-						timestamp: new Date().toISOString(),
+						createdAt: new Date().toISOString(),
 						source: 'health-monitor',
+						status: 'active',
 						metadata: {
 							organizationId: 'system',
 							service: serviceName,
@@ -610,8 +611,9 @@ export class EnhancedHealthService {
 						},
 						acknowledged: false,
 						resolved: false,
+						tags: ['api', 'health'],
 					}
-					await this.services.monitor.metrics.sendExternalAlert(alert)
+					await this.services.monitor.alerts.sendExternalAlert(alert)
 				} catch (error) {
 					this.services.logger.error('Failed to create health alert', {
 						service: serviceName,
