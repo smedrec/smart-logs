@@ -3,7 +3,7 @@
  * Addresses the O(N) complexity issues identified in the code review
  */
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import type { IQueryCache, QueryCacheStats } from './cache-factory.js'
 
@@ -51,23 +51,25 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 
 	constructor(private config: OptimizedLRUConfig) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit-db - OptimizedLRUCache',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit-db - OptimizedLRUCache',
 		})
 
 		// Initialize dummy head and tail nodes for easier list manipulation

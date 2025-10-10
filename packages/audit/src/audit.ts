@@ -3,7 +3,7 @@ import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { Redis as RedisInstance } from 'ioredis' // Renamed to avoid conflict
 
 import { SigningAlgorithm } from '@repo/infisical-kms'
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 import { getSharedRedisConnection } from '@repo/redis-client'
 
 import { AuditConfig, ComplianceConfig } from './config/types.js'
@@ -105,23 +105,25 @@ export class Audit {
 		this.cryptoService = new CryptoService(this.config.security)
 		this.presetsService = presetsService
 
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit - audit',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit - audit',
 		})
 
 		const defaultDirectOptions: RedisOptions = {
@@ -175,7 +177,17 @@ export class Audit {
 					const message = err instanceof Error ? err.message : String(err)
 					this.logger.error(
 						`[AuditService] Failed to create direct Redis instance for queue ${this.queueName}:`,
-						err instanceof Error ? err : String(err)
+						//err instanceof Error ? err : String(err)
+						{
+							error:
+								err instanceof Error
+									? {
+											name: err.name,
+											message: err.message,
+											stack: err.stack,
+										}
+									: String(err),
+						}
 					)
 					throw new Error(
 						`[AuditService] Failed to initialize direct Redis connection for queue ${this.queueName}. Error: ${err instanceof Error ? err.message : String(err)}`
@@ -211,7 +223,16 @@ export class Audit {
 				const message = err instanceof Error ? err.message : String(err)
 				this.logger.error(
 					`[AuditService] Failed to create direct Redis instance using AUDIT_REDIS_URL for queue ${this.queueName}:`,
-					err instanceof Error ? err : String(err)
+					{
+						error:
+							err instanceof Error
+								? {
+										name: err.name,
+										message: err.message,
+										stack: err.stack,
+									}
+								: String(err),
+					}
 				)
 				throw new Error(
 					`[AuditService] Failed to initialize direct Redis connection using AUDIT_REDIS_URL for queue ${this.queueName}. Error: ${err instanceof Error ? err.message : String(err)}`
@@ -237,10 +258,16 @@ export class Audit {
 				},
 			})
 		} catch (error) {
-			this.logger.error(
-				`Failed to create BullMQ queue "${this.queueName}":`,
-				error instanceof Error ? error : String(error)
-			)
+			this.logger.error(`Failed to create BullMQ queue "${this.queueName}":`, {
+				error:
+					error instanceof Error
+						? {
+								name: error.name,
+								message: error.message,
+								stack: error.stack,
+							}
+						: String(error),
+			})
 			throw new Error(
 				`Failed to create BullMQ queue "${this.queueName}". Error: ${error instanceof Error ? error.message : String(error)}`
 			)
@@ -260,7 +287,16 @@ export class Audit {
 			this.connection.on('error', (err: Error) => {
 				this.logger.error(
 					`[AuditService] Redis Connection Error (direct connection for queue "${this.queueName}"): ${err.message}`,
-					err
+					{
+						error:
+							err instanceof Error
+								? {
+										name: err.name,
+										message: err.message,
+										stack: err.stack,
+									}
+								: String(err),
+					}
 				)
 			})
 			this.connection.on('connect', () => {
@@ -505,7 +541,7 @@ export class Audit {
 		if (!this.bullmq_queue) {
 			this.logger.error(
 				`Cannot log event: BullMQ queue is not initialized for queue "${this.queueName}".`,
-				'BullMQ queue is not initialized'
+				{ error: 'BullMQ queue is not initialized' }
 			)
 			throw new Error(
 				`[AuditService] Cannot log event: BullMQ queue is not initialized for queue "${this.queueName}".`
@@ -549,10 +585,9 @@ export class Audit {
 				const errorMessages = validationResult.validationErrors
 					.map((err) => `${err.field}: ${err.message} (${err.code})`)
 					.join('; ')
-				this.logger.error(
-					`Validation Error for queue "${this.queueName}": ${errorMessages}`,
-					errorMessages
-				)
+				this.logger.error(`Validation Error for queue "${this.queueName}": ${errorMessages}`, {
+					error: errorMessages,
+				})
 				// FIXME: This error cause the system to crash
 				//throw new Error(`[AuditService] Validation Error: ${errorMessages}`)
 			}
@@ -569,7 +604,16 @@ export class Audit {
 			} catch (error) {
 				this.logger.error(
 					`[AuditService] Failed to generate hash for event: ${error instanceof Error ? error.message : String(error)}`,
-					error instanceof Error ? error : String(error)
+					{
+						error:
+							error instanceof Error
+								? {
+										name: error.name,
+										message: error.message,
+										stack: error.stack,
+									}
+								: String(error),
+					}
 				)
 			}
 		}
@@ -582,7 +626,16 @@ export class Audit {
 			} catch (error) {
 				this.logger.error(
 					`[AuditService] Failed to generate signature for event: ${error instanceof Error ? error.message : String(error)}`,
-					error instanceof Error ? error : String(error)
+					{
+						error:
+							error instanceof Error
+								? {
+										name: error.name,
+										message: error.message,
+										stack: error.stack,
+									}
+								: String(error),
+					}
 				)
 			}
 		}
@@ -604,7 +657,16 @@ export class Audit {
 		} catch (error) {
 			this.logger.error(
 				`[AuditService] Failed to add event to reliable processing queue "${this.queueName}":`,
-				error instanceof Error ? error : String(error)
+				{
+					error:
+						error instanceof Error
+							? {
+									name: error.name,
+									message: error.message,
+									stack: error.stack,
+								}
+							: String(error),
+				}
 			)
 			throw new Error(
 				`[AuditService] Failed to log audit event with guaranteed delivery. Error: ${error instanceof Error ? error.message : String(error)}`
@@ -867,10 +929,16 @@ export class Audit {
 				await this.bullmq_queue.close()
 				this.logger.info(`[AuditService] BullMQ queue '${this.queueName}' closed successfully.`)
 			} catch (err) {
-				this.logger.error(
-					`[AuditService] Error closing BullMQ queue '${this.queueName}':`,
-					err instanceof Error ? err : String(err)
-				)
+				this.logger.error(`[AuditService] Error closing BullMQ queue '${this.queueName}':`, {
+					error:
+						err instanceof Error
+							? {
+									name: err.name,
+									message: err.message,
+									stack: err.stack,
+								}
+							: String(err),
+				})
 			}
 		}
 
@@ -885,7 +953,16 @@ export class Audit {
 				} catch (err) {
 					this.logger.error(
 						`[AuditService] Error quitting direct Redis connection for queue '${this.queueName}':`,
-						err instanceof Error ? err : String(err)
+						{
+							error:
+								err instanceof Error
+									? {
+											name: err.name,
+											message: err.message,
+											stack: err.stack,
+										}
+									: String(err),
+						}
 					)
 					if (this.connection.status !== 'end') {
 						this.connection.disconnect()

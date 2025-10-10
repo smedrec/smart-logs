@@ -5,7 +5,7 @@
 
 import { sql } from 'drizzle-orm'
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type * as schema from './schema.js'
@@ -66,23 +66,25 @@ export class IntelligentIndexManager {
 		private config: IndexOptimizationConfig
 	) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit-db - IntelligentIndexManager',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit-db - IntelligentIndexManager',
 		})
 
 		this.startPeriodicAnalysis()
@@ -112,13 +114,13 @@ export class IntelligentIndexManager {
 				ORDER BY schemaname, tablename, indexname
 			`)
 
-			return result.map(row => {
+			return result.map((row) => {
 				const scans = Number(row.scans) || 0
 				const efficiency = Number(row.efficiency) || 0
 				const sizeBytes = Number(row.size_bytes) || 0
-				
+
 				let recommendation: 'keep' | 'drop' | 'recreate' | 'optimize' = 'keep'
-				
+
 				// Determine recommendation based on usage patterns
 				if (scans === 0 && this.isOlderThanThreshold(new Date())) {
 					recommendation = 'drop'
@@ -137,11 +139,17 @@ export class IntelligentIndexManager {
 					tuplesReturned: Number(row.tuples_returned) || 0,
 					efficiency,
 					sizeBytes,
-					recommendation
+					recommendation,
 				}
 			})
 		} catch (error) {
-			this.logger.error('Failed to analyze index usage:', error as Error)
+			this.logger.error('Failed to analyze index usage:', {
+				error: {
+					name: (error as Error).name,
+					message: (error as Error).message,
+					stack: (error as Error).stack,
+				},
+			})
 			throw error
 		}
 	}
@@ -155,10 +163,10 @@ export class IntelligentIndexManager {
 		try {
 			// Analyze slow queries to identify missing indexes
 			const slowQueries = await this.analyzeSlowQueries()
-			
+
 			// Analyze existing indexes for optimization opportunities
 			const indexStats = await this.analyzeIndexUsage()
-			
+
 			// Generate recommendations for missing indexes
 			for (const query of slowQueries) {
 				recommendations.push(...query.suggestedIndexes)
@@ -176,7 +184,7 @@ export class IntelligentIndexManager {
 						reason: `Unused index (${index.scans} scans)`,
 						estimatedImpact: 'medium',
 						priority: 3,
-						sqlCommand: `DROP INDEX CONCURRENTLY IF EXISTS ${index.indexName}`
+						sqlCommand: `DROP INDEX CONCURRENTLY IF EXISTS ${index.indexName}`,
 					})
 				} else if (index.recommendation === 'optimize') {
 					recommendations.push({
@@ -188,7 +196,7 @@ export class IntelligentIndexManager {
 						reason: `Low efficiency index (${index.efficiency}% efficiency)`,
 						estimatedImpact: 'high',
 						priority: 1,
-						sqlCommand: `REINDEX INDEX CONCURRENTLY ${index.indexName}`
+						sqlCommand: `REINDEX INDEX CONCURRENTLY ${index.indexName}`,
 					})
 				}
 			}
@@ -201,7 +209,7 @@ export class IntelligentIndexManager {
 				if (a.priority !== b.priority) {
 					return a.priority - b.priority
 				}
-				
+
 				const impactWeight = { high: 3, medium: 2, low: 1 }
 				return impactWeight[b.estimatedImpact] - impactWeight[a.estimatedImpact]
 			})
@@ -209,7 +217,13 @@ export class IntelligentIndexManager {
 			this.logger.info(`Generated ${recommendations.length} index recommendations`)
 			return recommendations
 		} catch (error) {
-			this.logger.error('Failed to generate index recommendations:', error as Error)
+			this.logger.error('Failed to generate index recommendations:', {
+				error: {
+					name: (error as Error).name,
+					message: (error as Error).message,
+					stack: (error as Error).stack,
+				},
+			})
 			throw error
 		}
 	}
@@ -236,12 +250,20 @@ export class IntelligentIndexManager {
 			try {
 				await this.executeRecommendation(recommendation)
 				executed++
-				this.logger.info(`Executed index recommendation: ${recommendation.type} on ${recommendation.tableName}`)
+				this.logger.info(
+					`Executed index recommendation: ${recommendation.type} on ${recommendation.tableName}`
+				)
 			} catch (error) {
 				failed++
 				const errorMsg = `Failed to execute ${recommendation.type} on ${recommendation.tableName}: ${(error as Error).message}`
 				errors.push(errorMsg)
-				this.logger.error(errorMsg, error as Error)
+				this.logger.error(errorMsg, {
+					error: {
+						name: (error as Error).name,
+						message: (error as Error).message,
+						stack: (error as Error).stack,
+					},
+				})
 			}
 		}
 
@@ -258,64 +280,64 @@ export class IntelligentIndexManager {
 			{
 				name: 'audit_log_timestamp_btree_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_timestamp_btree_idx ON audit_log USING btree (timestamp)',
-				reason: 'Time-range queries optimization'
+				reason: 'Time-range queries optimization',
 			},
-			
+
 			// Organization-based queries
 			{
 				name: 'audit_log_org_timestamp_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_org_timestamp_idx ON audit_log (organization_id, timestamp)',
-				reason: 'Organization audit queries optimization'
+				reason: 'Organization audit queries optimization',
 			},
-			
+
 			// User activity queries
 			{
 				name: 'audit_log_principal_action_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_principal_action_idx ON audit_log (principal_id, action)',
-				reason: 'User activity analysis optimization'
+				reason: 'User activity analysis optimization',
 			},
-			
+
 			// Resource access queries
 			{
 				name: 'audit_log_resource_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_resource_idx ON audit_log (target_resource_type, target_resource_id)',
-				reason: 'Resource access tracking optimization'
+				reason: 'Resource access tracking optimization',
 			},
-			
+
 			// Status and outcome queries
 			{
 				name: 'audit_log_status_timestamp_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_status_timestamp_idx ON audit_log (status, timestamp)',
-				reason: 'Failure analysis and monitoring optimization'
+				reason: 'Failure analysis and monitoring optimization',
 			},
-			
+
 			// Compliance queries
 			{
 				name: 'audit_log_classification_retention_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_classification_retention_idx ON audit_log (data_classification, retention_policy)',
-				reason: 'Compliance and data governance optimization'
+				reason: 'Compliance and data governance optimization',
 			},
-			
+
 			// Correlation tracking
 			{
 				name: 'audit_log_correlation_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_correlation_idx ON audit_log (correlation_id) WHERE correlation_id IS NOT NULL',
-				reason: 'Request correlation tracking optimization'
+				reason: 'Request correlation tracking optimization',
 			},
-			
+
 			// JSONB details search
 			{
 				name: 'audit_log_details_gin_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_details_gin_idx ON audit_log USING gin (details)',
-				reason: 'JSON details search optimization'
+				reason: 'JSON details search optimization',
 			},
-			
+
 			// Hash verification
 			{
 				name: 'audit_log_hash_idx',
 				sql: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_hash_idx ON audit_log USING hash (hash)',
-				reason: 'Integrity verification optimization'
-			}
+				reason: 'Integrity verification optimization',
+			},
 		]
 
 		for (const index of indexes) {
@@ -323,7 +345,13 @@ export class IntelligentIndexManager {
 				await this.db.execute(sql.raw(index.sql))
 				this.logger.info(`Created index: ${index.name} - ${index.reason}`)
 			} catch (error) {
-				this.logger.error(`Failed to create index ${index.name}:`, error as Error)
+				this.logger.error(`Failed to create index ${index.name}:`, {
+					error: {
+						name: (error as Error).name,
+						message: (error as Error).message,
+						stack: (error as Error).stack,
+					},
+				})
 			}
 		}
 	}
@@ -348,10 +376,14 @@ export class IntelligentIndexManager {
 				healthy++
 			} else if (index.efficiency > 0.3 || index.scans > 10) {
 				degraded++
-				recommendations.push(`Consider optimizing ${index.indexName} (efficiency: ${index.efficiency}%)`)
+				recommendations.push(
+					`Consider optimizing ${index.indexName} (efficiency: ${index.efficiency}%)`
+				)
 			} else {
 				critical++
-				recommendations.push(`${index.indexName} is unused or highly inefficient - consider dropping`)
+				recommendations.push(
+					`${index.indexName} is unused or highly inefficient - consider dropping`
+				)
 			}
 		}
 
@@ -382,20 +414,29 @@ export class IntelligentIndexManager {
 					frequency: 1000,
 					averageExecutionTime: 250,
 					missingIndexes: ['organization_id_timestamp'],
-					suggestedIndexes: [{
-						type: 'create',
-						tableName: 'audit_log',
-						columns: ['organization_id', 'timestamp'],
-						indexType: 'btree',
-						reason: 'Frequent organization time-range queries',
-						estimatedImpact: 'high',
-						priority: 1,
-						sqlCommand: 'CREATE INDEX CONCURRENTLY audit_log_org_time_idx ON audit_log (organization_id, timestamp)'
-					}]
-				}
+					suggestedIndexes: [
+						{
+							type: 'create',
+							tableName: 'audit_log',
+							columns: ['organization_id', 'timestamp'],
+							indexType: 'btree',
+							reason: 'Frequent organization time-range queries',
+							estimatedImpact: 'high',
+							priority: 1,
+							sqlCommand:
+								'CREATE INDEX CONCURRENTLY audit_log_org_time_idx ON audit_log (organization_id, timestamp)',
+						},
+					],
+				},
 			]
 		} catch (error) {
-			this.logger.error('Failed to analyze slow queries:', error as Error)
+			this.logger.error('Failed to analyze slow queries:', {
+				error: {
+					name: (error as Error).name,
+					message: (error as Error).message,
+					stack: (error as Error).stack,
+				},
+			})
 			return []
 		}
 	}
@@ -413,7 +454,8 @@ export class IntelligentIndexManager {
 				reason: 'BRIN index for time-series data compression',
 				estimatedImpact: 'medium',
 				priority: 2,
-				sqlCommand: 'CREATE INDEX CONCURRENTLY audit_log_timestamp_brin_idx ON audit_log USING brin (timestamp)'
+				sqlCommand:
+					'CREATE INDEX CONCURRENTLY audit_log_timestamp_brin_idx ON audit_log USING brin (timestamp)',
 			},
 			{
 				type: 'create',
@@ -423,8 +465,9 @@ export class IntelligentIndexManager {
 				reason: 'Version-specific audit queries',
 				estimatedImpact: 'low',
 				priority: 4,
-				sqlCommand: 'CREATE INDEX CONCURRENTLY audit_log_version_time_idx ON audit_log (event_version, timestamp)'
-			}
+				sqlCommand:
+					'CREATE INDEX CONCURRENTLY audit_log_version_time_idx ON audit_log (event_version, timestamp)',
+			},
 		]
 	}
 
@@ -448,17 +491,28 @@ export class IntelligentIndexManager {
 			} else if (recommendation.type === 'optimize') {
 				await this.db.execute(sql.raw(recommendation.sqlCommand))
 			} else {
-				this.logger.info(`Skipping recommendation (auto-execution disabled): ${recommendation.type}`)
+				this.logger.info(
+					`Skipping recommendation (auto-execution disabled): ${recommendation.type}`
+				)
 			}
 		} finally {
 			this.runningOperations--
-			
+
 			// Process queued operations
-			if (this.indexOperationsQueue.length > 0 && this.runningOperations < this.config.maxConcurrentIndexOps) {
+			if (
+				this.indexOperationsQueue.length > 0 &&
+				this.runningOperations < this.config.maxConcurrentIndexOps
+			) {
 				const nextOperation = this.indexOperationsQueue.shift()
 				if (nextOperation) {
-					this.executeRecommendation(nextOperation).catch(error => {
-						this.logger.error('Failed to execute queued index operation:', error as Error)
+					this.executeRecommendation(nextOperation).catch((error) => {
+						this.logger.error('Failed to execute queued index operation:', {
+							error: {
+								name: (error as Error).name,
+								message: (error as Error).message,
+								stack: (error as Error).stack,
+							},
+						})
 					})
 				}
 			}
@@ -497,12 +551,18 @@ export class IntelligentIndexManager {
 				const recommendations = await this.generateIndexRecommendations()
 				await this.executeRecommendations(recommendations)
 			} catch (error) {
-				this.logger.error('Periodic index analysis failed:', error as Error)
+				this.logger.error('Periodic index analysis failed:', {
+					error: {
+						name: (error as Error).name,
+						message: (error as Error).message,
+						stack: (error as Error).stack,
+					},
+				})
 			}
 		}, this.config.analysisInterval)
 
-		this.logger.info('Started periodic index analysis', { 
-			interval: this.config.analysisInterval 
+		this.logger.info('Started periodic index analysis', {
+			interval: this.config.analysisInterval,
 		})
 	}
 }
@@ -516,11 +576,11 @@ export function createIntelligentIndexManager(
 ): IntelligentIndexManager {
 	const defaultConfig: IndexOptimizationConfig = {
 		enableAutoCreation: false, // Conservative default
-		enableAutoDrop: false,     // Conservative default
+		enableAutoDrop: false, // Conservative default
 		unusedThresholdDays: 30,
 		minUsageScans: 10,
 		analysisInterval: 86400000, // 24 hours
-		maxConcurrentIndexOps: 2
+		maxConcurrentIndexOps: 2,
 	}
 
 	return new IntelligentIndexManager(db, { ...defaultConfig, ...config })

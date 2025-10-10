@@ -4,7 +4,7 @@ import { and, eq, gte, isNotNull, lte, sql } from 'drizzle-orm'
 import { auditLog, auditRetentionPolicy, pseudonymMapping } from '@repo/audit-db'
 import * as auditSchema from '@repo/audit-db/dist/db/schema.js'
 import { InfisicalKmsClient } from '@repo/infisical-kms'
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import { Audit } from '../audit.js'
 
@@ -130,23 +130,25 @@ export class GDPRComplianceService {
 		this.db = this.client.getDatabase()
 
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit - GDPRComplianceService',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit - GDPRComplianceService',
 		})
 	}
 
@@ -270,10 +272,12 @@ export class GDPRComplianceService {
 				return existingMapping[0].pseudonymId
 			}
 		} catch (error) {
-			this.logger.error(
-				'Error checking existing pseudonym',
-				error instanceof Error ? error : new Error('Error checking existing pseudonym')
-			)
+			this.logger.error('Error checking existing pseudonym', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Error checking existing pseudonym',
+			})
 			throw error
 		}
 
@@ -282,10 +286,12 @@ export class GDPRComplianceService {
 			const { ciphertext } = await this.kms.encrypt(principalId)
 			encryptedOriginalId = ciphertext
 		} catch (error) {
-			this.logger.error(
-				'Error encrypting original ID',
-				error instanceof Error ? error : new Error('Error encrypting original ID')
-			)
+			this.logger.error('Error encrypting original ID', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Error encrypting original ID',
+			})
 			throw error
 		}
 
@@ -300,10 +306,12 @@ export class GDPRComplianceService {
 				})
 				.onConflictDoNothing()
 		} catch (error) {
-			this.logger.error(
-				'Error inserting pseudonym mapping',
-				error instanceof Error ? error : new Error('Error inserting pseudonym mapping')
-			)
+			this.logger.error('Error inserting pseudonym mapping', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Error inserting pseudonym mapping',
+			})
 			throw error
 		}
 
@@ -346,10 +354,12 @@ export class GDPRComplianceService {
 		try {
 			pseudonymId = await this.pseudonymId(principalId, strategy)
 		} catch (error) {
-			this.logger.error(
-				'Error pseudonymizing user data',
-				error instanceof Error ? error : new Error('Error pseudonymizing user data')
-			)
+			this.logger.error('Error pseudonymizing user data', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Error pseudonymizing user data',
+			})
 			throw error
 		}
 		// Update audit logs with pseudonymized ID
@@ -364,10 +374,12 @@ export class GDPRComplianceService {
 				.where(eq(auditLog.principalId, principalId))
 			records = (updateResult as any).rowCount || 0
 		} catch (error) {
-			this.logger.error(
-				'Error updating audit logs',
-				error instanceof Error ? error : new Error('Error updating audit logs')
-			)
+			this.logger.error('Error updating audit logs', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Error updating audit logs',
+			})
 			throw error
 		}
 
@@ -639,18 +651,20 @@ export class GDPRComplianceService {
 				const decryptedOriginalId = await this.kms.decrypt(encryptedOrigialId)
 				return decryptedOriginalId.plaintext
 			} catch (error) {
-				this.logger.error(
-					'Error decrypting pseudonym mapping:',
-					error instanceof Error ? error : new Error('Error decrypting pseudonym mapping')
-				)
+				this.logger.error('Error decrypting pseudonym mapping:', {
+					error:
+						error instanceof Error
+							? { name: error.name, message: error.message, stack: error.stack }
+							: 'Error decrypting pseudonym mapping',
+				})
+
 				return undefined
 			}
 		}
 
-		this.logger.error(
-			`No pseudonym mapping found for ID: ${pseudonymId}`,
-			'No pseudonym mapping found'
-		)
+		this.logger.error(`No pseudonym mapping found for ID: ${pseudonymId}`, {
+			error: 'No pseudonym mapping found',
+		})
 		return undefined
 	}
 

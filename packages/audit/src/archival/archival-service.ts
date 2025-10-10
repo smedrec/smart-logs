@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { createDeflate, createGzip } from 'zlib'
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 /**
  * Configuration options for archive creation and management
@@ -434,23 +434,26 @@ export abstract class ArchivalService {
 		this.retentionPolicyTable = retentionPolicyTable
 		this.archiveTable = archiveTable
 		this.config = { ...DEFAULT_ARCHIVE_CONFIG, ...config }
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+
+		this.logger = new StructuredLogger({
+			service: '@repo/audit - ArchivalService',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit - ArchivalService',
 		})
 	}
 
@@ -554,18 +557,31 @@ export abstract class ArchivalService {
 						summary,
 					})
 				} catch (error) {
-					this.logger.error(
-						`Error processing policy ${policy.policyName}:`,
-						error instanceof Error ? error : 'Unknown error during retention policy processing'
-					)
+					this.logger.error(`Error processing policy ${policy.policyName}:`, {
+						error:
+							error instanceof Error
+								? {
+										name: error.name,
+										message: error.message,
+										stack: error.stack,
+									}
+								: 'Unknown error during retention policy processing',
+					})
+
 					// Continue with next policy
 				}
 			}
 		} catch (error) {
-			this.logger.error(
-				'Error retrieving retention policies:',
-				error instanceof Error ? error : 'Unknown error during retention policy processing'
-			)
+			this.logger.error('Error retrieving retention policies:', {
+				error:
+					error instanceof Error
+						? {
+								name: error.name,
+								message: error.message,
+								stack: error.stack,
+							}
+						: 'Error retrieving retention policies',
+			})
 		}
 
 		return results
@@ -600,10 +616,9 @@ export abstract class ArchivalService {
 					serializedData = records.map((record) => JSON.stringify(record)).join('\\n')
 					break
 				default:
-					this.logger.error(
-						'Unsupported archive format',
-						`Unsupported archive format: ${this.config.format}`
-					)
+					this.logger.error('Unsupported archive format', {
+						error: `Unsupported archive format: ${this.config.format}`,
+					})
 					throw new Error(`Unsupported archive format: ${this.config.format}`)
 			}
 
@@ -642,10 +657,9 @@ export abstract class ArchivalService {
 					compressedData = Buffer.from(serializedData, 'utf8')
 					break
 				default:
-					this.logger.error(
-						'Unsupported compression algorithm',
-						`Unsupported compression algorithm: ${this.config.compressionAlgorithm}`
-					)
+					this.logger.error('Unsupported compression algorithm', {
+						error: `Unsupported compression algorithm: ${this.config.compressionAlgorithm}`,
+					})
 					throw new Error(`Unsupported compression algorithm: ${this.config.compressionAlgorithm}`)
 			}
 
@@ -711,7 +725,9 @@ export abstract class ArchivalService {
 		} catch (error) {
 			const err =
 				error instanceof Error ? error : new Error('Unknown error during archive creation')
-			this.logger.error('Error creating archive:', err)
+			this.logger.error('Error creating archive:', {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -754,10 +770,9 @@ export abstract class ArchivalService {
 							.map((line) => JSON.parse(line))
 						break
 					default:
-						this.logger.error(
-							`Unsupported archive format: ${archive.metadata.config?.format}`,
-							`Unsupported archive format: ${archive.metadata.config?.format}`
-						)
+						this.logger.error(`Unsupported archive format: ${archive.metadata.config?.format}`, {
+							error: `Unsupported archive format: ${archive.metadata.config?.format}`,
+						})
 						throw new Error(`Unsupported archive format: ${archive.metadata.config?.format}`)
 				}
 
@@ -790,7 +805,9 @@ export abstract class ArchivalService {
 			}
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error('Unknown error during data retrieval')
-			this.logger.error('Error retrieving archived data:', err)
+			this.logger.error('Error retrieving archived data:', {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -885,7 +902,9 @@ export abstract class ArchivalService {
 			}
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error('Unknown error during secure deletion')
-			this.logger.error('Error during secure deletion:', err)
+			this.logger.error('Error during secure deletion:', {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -960,7 +979,9 @@ export abstract class ArchivalService {
 		} catch (error) {
 			const err =
 				error instanceof Error ? error : new Error('Unknown error getting archive statistics')
-			this.logger.error('Error getting archive statistics:', err)
+			this.logger.error('Error getting archive statistics:', {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -1017,7 +1038,9 @@ export abstract class ArchivalService {
 		} catch (error) {
 			const err =
 				error instanceof Error ? error : new Error('Unknown error during cleanup of old archives')
-			this.logger.error('Error cleaning up old archives:', err)
+			this.logger.error('Error cleaning up old archives:', {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -1066,7 +1089,9 @@ export abstract class ArchivalService {
 				error instanceof Error
 					? error
 					: new Error('Unknown error during validation of all archives')
-			this.logger.error('Error validating all archives:', err)
+			this.logger.error('Error validating all archives:', {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -1107,7 +1132,9 @@ export abstract class ArchivalService {
 				error instanceof Error
 					? error
 					: new Error('Unknown error during archive integrity verification')
-			this.logger.error(`Error verifying archive integrity for ${archiveId}:`, err)
+			this.logger.error(`Error verifying archive integrity for ${archiveId}:`, {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			return false
 		}
 	}

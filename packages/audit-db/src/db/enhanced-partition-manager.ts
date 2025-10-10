@@ -5,7 +5,7 @@
 
 import { sql } from 'drizzle-orm'
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
@@ -41,23 +41,25 @@ export class EnhancedPartitionManager implements IPartitionManager {
 		private redis: RedisType
 	) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit-db - EnhancedPartitionManager',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit-db - EnhancedPartitionManager',
 		})
 	}
 
@@ -84,7 +86,7 @@ export class EnhancedPartitionManager implements IPartitionManager {
 
 			// Create partition with error handling
 			await this.createPartitionTable(tableName, partitionName, startDate, endDate)
-			
+
 			// Create optimized indexes
 			await this.createPartitionIndexes(partitionName)
 
@@ -93,7 +95,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 
 			this.logger.info(`Successfully created partition: ${partitionName}`)
 		} catch (error) {
-			this.logger.error(`Failed to create partition ${partitionName}:`, error as Error)
+			this.logger.error(`Failed to create partition ${partitionName}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to create partition ${partitionName}:`,
+			})
 			throw error
 		} finally {
 			await this.releaseLock(lockKey)
@@ -131,7 +138,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 
 			this.logger.info(`Successfully dropped partition: ${partitionName}`)
 		} catch (error) {
-			this.logger.error(`Failed to drop partition ${partitionName}:`, error as Error)
+			this.logger.error(`Failed to drop partition ${partitionName}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to drop partition ${partitionName}`,
+			})
 			throw error
 		} finally {
 			await this.releaseLock(lockKey)
@@ -162,7 +174,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 
 			this.logger.info(`Successfully optimized partition: ${partitionName}`)
 		} catch (error) {
-			this.logger.error(`Failed to optimize partition ${partitionName}:`, error as Error)
+			this.logger.error(`Failed to optimize partition ${partitionName}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to optimize partition ${partitionName}`,
+			})
 			throw error
 		} finally {
 			await this.releaseLock(lockKey)
@@ -191,16 +208,21 @@ export class EnhancedPartitionManager implements IPartitionManager {
 				ORDER BY t.tablename
 			`)
 
-			return result.map(row => ({
+			return result.map((row) => ({
 				name: row.partition_name as string,
 				tableName: row.table_name as string,
 				healthy: row.healthy as boolean,
 				recordCount: Number(row.record_count) || 0,
 				sizeBytes: Number(row.size_bytes) || 0,
-				lastOptimized: new Date(row.last_optimized as string)
+				lastOptimized: new Date(row.last_optimized as string),
 			}))
 		} catch (error) {
-			this.logger.error('Failed to get partition status:', error as Error)
+			this.logger.error('Failed to get partition status:', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Failed to get partition status',
+			})
 			throw error
 		}
 	}
@@ -227,14 +249,24 @@ export class EnhancedPartitionManager implements IPartitionManager {
 				try {
 					await this.createPartition('audit_log', partition.startDate, partition.endDate)
 				} catch (error) {
-					this.logger.error(`Failed to create partition ${partition.name}:`, error as Error)
+					this.logger.error(`Failed to create partition ${partition.name}:`, {
+						error:
+							error instanceof Error
+								? { name: error.name, message: error.message, stack: error.stack }
+								: `Failed to create partition ${partition.name}`,
+					})
 					// Continue with other partitions
 				}
 			}
 
 			this.logger.info(`Successfully processed ${partitionsToCreate.length} partitions`)
 		} catch (error) {
-			this.logger.error('Failed to create audit log partitions:', error as Error)
+			this.logger.error('Failed to create audit log partitions:', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Failed to create audit log partitions',
+			})
 			throw error
 		}
 	}
@@ -245,15 +277,26 @@ export class EnhancedPartitionManager implements IPartitionManager {
 	private async acquireLock(key: string): Promise<PartitionLock> {
 		try {
 			const lockValue = `${Date.now()}-${Math.random()}`
-			const result = await this.redis.set(key, lockValue, 'EX', Math.floor(this.lockTimeout / 1000), 'NX')
-			
+			const result = await this.redis.set(
+				key,
+				lockValue,
+				'EX',
+				Math.floor(this.lockTimeout / 1000),
+				'NX'
+			)
+
 			return {
 				key,
 				acquired: result === 'OK',
-				expiresAt: new Date(Date.now() + this.lockTimeout)
+				expiresAt: new Date(Date.now() + this.lockTimeout),
 			}
 		} catch (error) {
-			this.logger.error(`Failed to acquire lock ${key}:`, error as Error)
+			this.logger.error(`Failed to acquire lock ${key}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to acquire lock ${key}`,
+			})
 			return { key, acquired: false, expiresAt: new Date() }
 		}
 	}
@@ -265,7 +308,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 		try {
 			await this.redis.del(key)
 		} catch (error) {
-			this.logger.error(`Failed to release lock ${key}:`, error as Error)
+			this.logger.error(`Failed to release lock ${key}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to release lock ${key}`,
+			})
 		}
 	}
 
@@ -283,7 +331,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 			`)
 			return (result[0]?.exists as boolean) || false
 		} catch (error) {
-			this.logger.error(`Failed to check partition existence ${partitionName}:`, error as Error)
+			this.logger.error(`Failed to check partition existence ${partitionName}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to check partition existence ${partitionName}`,
+			})
 			return false
 		}
 	}
@@ -333,7 +386,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 			try {
 				await this.db.execute(sql.raw(indexSql))
 			} catch (error) {
-				this.logger.warn(`Failed to create index: ${indexSql}`, error as Error)
+				this.logger.warn(`Failed to create index: ${indexSql}`, {
+					error:
+						error instanceof Error
+							? { name: error.name, message: error.message, stack: error.stack }
+							: `Failed to create index: ${indexSql}`,
+				})
 				// Continue with other indexes
 			}
 		}
@@ -431,7 +489,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 
 			this.logger.info('Partitioned audit_log table initialized successfully')
 		} catch (error) {
-			this.logger.error('Failed to initialize partitioned table:', error as Error)
+			this.logger.error('Failed to initialize partitioned table:', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Failed to initialize partitioned table',
+			})
 			throw error
 		}
 	}
@@ -495,7 +558,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 
 			return Number(result[0]?.recent_activity || 0) === 0
 		} catch (error) {
-			this.logger.error(`Failed to check partition safety ${partitionName}:`, error as Error)
+			this.logger.error(`Failed to check partition safety ${partitionName}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to check partition safety ${partitionName}`,
+			})
 			return false
 		}
 	}
@@ -512,12 +580,16 @@ export class EnhancedPartitionManager implements IPartitionManager {
 	/**
 	 * Update partition metadata
 	 */
-	private async updatePartitionMetadata(partitionName: string, startDate: Date, endDate: Date): Promise<void> {
+	private async updatePartitionMetadata(
+		partitionName: string,
+		startDate: Date,
+		endDate: Date
+	): Promise<void> {
 		const metadata = {
 			partition_name: partitionName,
 			start_date: startDate.toISOString(),
 			end_date: endDate.toISOString(),
-			created_at: new Date().toISOString()
+			created_at: new Date().toISOString(),
 		}
 
 		await this.redis.hset(`partition:metadata:${partitionName}`, metadata)
@@ -537,7 +609,12 @@ export class EnhancedPartitionManager implements IPartitionManager {
 		try {
 			await this.db.execute(sql`REINDEX TABLE ${sql.identifier(partitionName)}`)
 		} catch (error) {
-			this.logger.warn(`Failed to reindex partition ${partitionName}:`, error as Error)
+			this.logger.warn(`Failed to reindex partition ${partitionName}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to reindex partition ${partitionName}`,
+			})
 		}
 	}
 
@@ -545,6 +622,10 @@ export class EnhancedPartitionManager implements IPartitionManager {
 	 * Update optimization timestamp
 	 */
 	private async updateOptimizationTimestamp(partitionName: string): Promise<void> {
-		await this.redis.hset(`partition:metadata:${partitionName}`, 'last_optimized', new Date().toISOString())
+		await this.redis.hset(
+			`partition:metadata:${partitionName}`,
+			'last_optimized',
+			new Date().toISOString()
+		)
 	}
 }

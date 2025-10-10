@@ -3,7 +3,7 @@
  * Implements sophisticated routing strategies with health monitoring
  */
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import { DatabaseCircuitBreakers } from './circuit-breaker.js'
 import { IReadReplicaRouter, ReplicaHealth, RoutingOptions, RoutingStrategy } from './interfaces.js'
@@ -60,23 +60,25 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 
 	constructor(private config: ReadReplicaConfig) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit-db - ReadReplicaRouter',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit-db - ReadReplicaRouter',
 		})
 
 		this.initializeReplicas()
@@ -90,7 +92,7 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 		const decision = this.makeRoutingDecision(options)
 
 		if (decision.fallbackToMaster) {
-			this.logger.info('Routing to master database', { decision })
+			this.logger.info('Routing to master database', { decision: JSON.stringify(decision) })
 			return this.executeOnMaster(query)
 		}
 
@@ -101,10 +103,18 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 		}
 
 		try {
-			this.logger.debug('Routing query to replica', { decision, replica: replica.id })
+			this.logger.debug('Routing query to replica', {
+				decision: JSON.stringify(decision),
+				replica: replica.id,
+			})
 			return await this.executeOnReplica(replica, query)
 		} catch (error) {
-			this.logger.error(`Query failed on replica ${replica.id}:`, error as Error)
+			this.logger.error(`Query failed on replica ${replica.id}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Query failed on replica ${replica.id}`,
+			})
 
 			// Mark replica as unhealthy
 			await this.markReplicaUnhealthy(replica.id, error as Error)
@@ -137,7 +147,12 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 					responseTimeMs: responseTime,
 				}
 			} catch (error) {
-				this.logger.error(`Health check failed for replica ${replica.id}:`, error as Error)
+				this.logger.error(`Health check failed for replica ${replica.id}:`, {
+					error:
+						error instanceof Error
+							? { name: error.name, message: error.message, stack: error.stack }
+							: `Health check failed for replica ${replica.id}`,
+				})
 				return {
 					id: replica.id,
 					url: replica.url,
@@ -399,7 +414,12 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	private async performHealthChecks(): Promise<void> {
 		const healthCheckPromises = Array.from(this.replicas.values()).map((replica) =>
 			this.performHealthCheck(replica).catch((error) => {
-				this.logger.error(`Health check failed for replica ${replica.id}:`, error as Error)
+				this.logger.error(`Health check failed for replica ${replica.id}:`, {
+					error:
+						error instanceof Error
+							? { name: error.name, message: error.message, stack: error.stack }
+							: `Health check failed for replica ${replica.id}`,
+				})
 				replica.isHealthy = false
 			})
 		)
@@ -453,7 +473,12 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 			// In real implementation, this would query pg_stat_replication or similar
 			return Math.random() * 100 // Random lag between 0-100ms
 		} catch (error) {
-			this.logger.error(`Failed to measure replication lag for ${replica.id}:`, error as Error)
+			this.logger.error(`Failed to measure replication lag for ${replica.id}:`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Failed to measure replication lag for ${replica.id}`,
+			})
 			return -1
 		}
 	}

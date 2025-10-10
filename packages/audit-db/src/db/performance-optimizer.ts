@@ -3,7 +3,7 @@
  * Implements efficient algorithms for partition management and query optimization
  */
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
@@ -37,8 +37,25 @@ export class OptimizedPartitionMetadata {
 	private readonly logger: StructuredLogger
 
 	constructor(private redis: RedisType) {
-		this.logger = LoggerFactory.createLogger({
+		this.logger = new StructuredLogger({
 			service: '@repo/audit-db - OptimizedPartitionMetadata',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
+				endpoint: 'http://localhost:5080/api/default/default/_json',
+				headers: {
+					Authorization: process.env.OTLP_AUTH_HEADER || '',
+				},
+			},
 		})
 	}
 
@@ -48,7 +65,7 @@ export class OptimizedPartitionMetadata {
 	addPartition(metadata: PartitionMetadata): void {
 		// O(1) insertion into map
 		this.partitionMap.set(metadata.name, metadata)
-		
+
 		// O(log N) insertion into sorted array using binary search
 		const insertIndex = this.binarySearchInsertPosition(metadata.startDate)
 		this.partitionsByDate.splice(insertIndex, 0, metadata)
@@ -67,7 +84,7 @@ export class OptimizedPartitionMetadata {
 	findPartitionsForDateRange(startDate: Date, endDate: Date): PartitionMetadata[] {
 		const startIndex = this.binarySearchRange(startDate, 'start')
 		const endIndex = this.binarySearchRange(endDate, 'end')
-		
+
 		return this.partitionsByDate.slice(startIndex, endIndex + 1)
 	}
 
@@ -80,7 +97,7 @@ export class OptimizedPartitionMetadata {
 
 		// O(1) removal from map
 		this.partitionMap.delete(name)
-		
+
 		// O(log N) removal from sorted array
 		const index = this.binarySearchExact(metadata.startDate)
 		if (index >= 0) {
@@ -127,10 +144,8 @@ export class OptimizedPartitionMetadata {
 		while (left <= right) {
 			const mid = Math.floor((left + right) / 2)
 			const partition = this.partitionsByDate[mid]
-			
-			const matches = type === 'start' 
-				? partition.endDate > date 
-				: partition.startDate <= date
+
+			const matches = type === 'start' ? partition.endDate > date : partition.startDate <= date
 
 			if (matches) {
 				result = mid
@@ -182,8 +197,25 @@ export class OptimizedBatchProcessor {
 	private readonly logger: StructuredLogger
 
 	constructor() {
-		this.logger = LoggerFactory.createLogger({
+		this.logger = new StructuredLogger({
 			service: '@repo/audit-db - OptimizedBatchProcessor',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
+				endpoint: 'http://localhost:5080/api/default/default/_json',
+				headers: {
+					Authorization: process.env.OTLP_AUTH_HEADER || '',
+				},
+			},
 		})
 	}
 
@@ -208,13 +240,15 @@ export class OptimizedBatchProcessor {
 			const policy = policyMap.get(partition.retentionPolicy)
 			if (!policy) continue
 
-			const cutoffTime = now - (policy.retentionDays * 24 * 60 * 60 * 1000)
+			const cutoffTime = now - policy.retentionDays * 24 * 60 * 60 * 1000
 			if (partition.endDate.getTime() < cutoffTime) {
 				partitionsToDelete.push(partition.name)
 			}
 		}
 
-		this.logger.info(`Optimized cleanup identified ${partitionsToDelete.length} partitions for deletion`)
+		this.logger.info(
+			`Optimized cleanup identified ${partitionsToDelete.length} partitions for deletion`
+		)
 		return partitionsToDelete
 	}
 
@@ -227,7 +261,7 @@ export class OptimizedBatchProcessor {
 	): Promise<IndexRecommendation[]> {
 		// Sort query patterns by frequency for optimization - O(M log M)
 		const sortedPatterns = [...queryPatterns].sort((a, b) => b.frequency - a.frequency)
-		
+
 		// Create index lookup for fast matching - O(N)
 		const indexLookup = new Map<string, IndexInfo>()
 		for (const index of indexes) {
@@ -240,10 +274,10 @@ export class OptimizedBatchProcessor {
 		// Process patterns efficiently - O(M log N) where log N is map lookup
 		for (const pattern of sortedPatterns) {
 			const requiredColumns = this.extractColumnsFromPattern(pattern)
-			
+
 			for (const columnSet of requiredColumns) {
 				const key = `${pattern.tableName}_${columnSet.join('_')}`
-				
+
 				if (!indexLookup.has(key)) {
 					recommendations.push({
 						type: 'create',
@@ -253,7 +287,7 @@ export class OptimizedBatchProcessor {
 						reason: `Missing index for frequent query pattern (${pattern.frequency} occurrences)`,
 						estimatedImpact: this.calculateImpact(pattern.frequency, pattern.avgExecutionTime),
 						priority: this.calculatePriority(pattern),
-						sqlCommand: this.generateCreateIndexSQL(pattern.tableName, columnSet)
+						sqlCommand: this.generateCreateIndexSQL(pattern.tableName, columnSet),
 					})
 				}
 			}
@@ -298,13 +332,13 @@ export class OptimizedBatchProcessor {
 	private extractColumnsFromPattern(pattern: QueryPattern): string[][] {
 		// Simplified extraction - in real implementation, this would parse SQL
 		const columnSets: string[][] = []
-		
+
 		if (pattern.query.includes('WHERE')) {
 			// Extract WHERE clause columns
 			const whereColumns = ['timestamp', 'organization_id'] // Example
 			columnSets.push(whereColumns)
 		}
-		
+
 		if (pattern.query.includes('ORDER BY')) {
 			// Extract ORDER BY columns
 			const orderColumns = ['timestamp'] // Example
@@ -317,17 +351,20 @@ export class OptimizedBatchProcessor {
 	/**
 	 * Determine optimal index type based on query pattern
 	 */
-	private determineOptimalIndexType(columns: string[], pattern: QueryPattern): 'btree' | 'gin' | 'gist' | 'hash' | 'brin' {
+	private determineOptimalIndexType(
+		columns: string[],
+		pattern: QueryPattern
+	): 'btree' | 'gin' | 'gist' | 'hash' | 'brin' {
 		// Time-series data benefits from BRIN
 		if (columns.includes('timestamp')) {
 			return 'brin'
 		}
-		
+
 		// JSONB columns benefit from GIN
-		if (columns.some(col => col.includes('details'))) {
+		if (columns.some((col) => col.includes('details'))) {
 			return 'gin'
 		}
-		
+
 		// Default to B-tree
 		return 'btree'
 	}
@@ -337,7 +374,7 @@ export class OptimizedBatchProcessor {
 	 */
 	private calculateImpact(frequency: number, avgExecutionTime: number): 'high' | 'medium' | 'low' {
 		const impact = frequency * avgExecutionTime
-		
+
 		if (impact > 10000) return 'high'
 		if (impact > 1000) return 'medium'
 		return 'low'
@@ -385,7 +422,7 @@ export class OptimizedBatchProcessor {
 
 		while (left <= right) {
 			const mid = Math.floor((left + right) / 2)
-			
+
 			if (sortedArray[mid].startsWith(prefix)) {
 				result = mid
 				right = mid - 1 // Continue searching left for first match
@@ -408,7 +445,7 @@ export class OptimizedBatchProcessor {
 
 		while (left <= right) {
 			const mid = Math.floor((left + right) / 2)
-			
+
 			if (sortedArray[mid] === target) {
 				return mid
 			} else if (sortedArray[mid] < target) {
@@ -435,8 +472,25 @@ export class PerformanceOptimizer {
 		private db: PostgresJsDatabase<typeof schema>,
 		private redis: RedisType
 	) {
-		this.logger = LoggerFactory.createLogger({
+		this.logger = new StructuredLogger({
 			service: '@repo/audit-db - PerformanceOptimizer',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
+				endpoint: 'http://localhost:5080/api/default/default/_json',
+				headers: {
+					Authorization: process.env.OTLP_AUTH_HEADER || '',
+				},
+			},
 		})
 
 		this.partitionMetadata = new OptimizedPartitionMetadata(redis)
@@ -456,25 +510,32 @@ export class PerformanceOptimizer {
 
 		try {
 			const result = await operation()
-			
+
 			const endTime = performance.now()
 			const endMemory = process.memoryUsage().heapUsed
-			
+
 			const metrics: PerformanceMetrics = {
 				operationName,
 				executionTime: endTime - startTime,
 				complexity: expectedComplexity as any,
 				itemsProcessed: this.estimateItemsProcessed(result),
 				memoryUsage: endMemory - startMemory,
-				optimizationApplied: true
+				optimizationApplied: true,
 			}
 
 			this.metrics.push(metrics)
-			this.logger.debug(`Operation optimized: ${operationName}`, metrics)
+			this.logger.debug(`Operation optimized: ${operationName}`, {
+				metrics: JSON.stringify(metrics),
+			})
 
 			return { result, metrics }
 		} catch (error) {
-			this.logger.error(`Operation failed: ${operationName}`, error as Error)
+			this.logger.error(`Operation failed: ${operationName}`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: `Operation failed: ${operationName}`,
+			})
 			throw error
 		}
 	}
@@ -487,17 +548,20 @@ export class PerformanceOptimizer {
 		const results: OptimizationResult[] = []
 
 		for (const [operationName, operationMetrics] of operationGroups) {
-			const avgExecutionTime = operationMetrics.reduce((sum, m) => sum + m.executionTime, 0) / operationMetrics.length
-			const avgMemoryUsage = operationMetrics.reduce((sum, m) => sum + m.memoryUsage, 0) / operationMetrics.length
-			
+			const avgExecutionTime =
+				operationMetrics.reduce((sum, m) => sum + m.executionTime, 0) / operationMetrics.length
+			const avgMemoryUsage =
+				operationMetrics.reduce((sum, m) => sum + m.memoryUsage, 0) / operationMetrics.length
+
 			// Identify optimization opportunities
 			const recommendations: string[] = []
-			
+
 			if (avgExecutionTime > 1000) {
 				recommendations.push('Consider caching for this operation')
 			}
-			
-			if (avgMemoryUsage > 10 * 1024 * 1024) { // 10MB
+
+			if (avgMemoryUsage > 10 * 1024 * 1024) {
+				// 10MB
 				recommendations.push('High memory usage detected - consider streaming or pagination')
 			}
 
@@ -506,7 +570,7 @@ export class PerformanceOptimizer {
 				optimizedComplexity: 'O(N log N)',
 				performanceGain: 0.5, // 50% improvement
 				memoryReduction: 0.3, // 30% reduction
-				recommendedActions: recommendations
+				recommendedActions: recommendations,
 			})
 		}
 
@@ -523,11 +587,10 @@ export class PerformanceOptimizer {
 		complexityDistribution: Record<string, number>
 	} {
 		const total = this.metrics.length
-		const avgTime = total > 0 
-			? this.metrics.reduce((sum, m) => sum + m.executionTime, 0) / total 
-			: 0
-		
-		const optimized = this.metrics.filter(m => m.optimizationApplied).length
+		const avgTime =
+			total > 0 ? this.metrics.reduce((sum, m) => sum + m.executionTime, 0) / total : 0
+
+		const optimized = this.metrics.filter((m) => m.optimizationApplied).length
 		const successRate = total > 0 ? (optimized / total) * 100 : 0
 
 		const complexityDist: Record<string, number> = {}
@@ -539,7 +602,7 @@ export class PerformanceOptimizer {
 			totalOperations: total,
 			averageExecutionTime: avgTime,
 			optimizationSuccessRate: successRate,
-			complexityDistribution: complexityDist
+			complexityDistribution: complexityDist,
 		}
 	}
 
@@ -555,7 +618,7 @@ export class PerformanceOptimizer {
 	 */
 	private groupMetricsByOperation(): Map<string, PerformanceMetrics[]> {
 		const groups = new Map<string, PerformanceMetrics[]>()
-		
+
 		for (const metric of this.metrics) {
 			if (!groups.has(metric.operationName)) {
 				groups.set(metric.operationName, [])

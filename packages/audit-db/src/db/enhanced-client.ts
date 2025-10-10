@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import { EnhancedDatabaseClient } from './connection-pool.js'
 import { DatabasePartitionManager, PartitionMaintenanceScheduler } from './partitioning.js'
@@ -101,23 +101,25 @@ export class EnhancedAuditDatabaseClient {
 		private config: EnhancedClientConfig
 	) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit-db - EnhancedAuditDatabaseClient',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit-db - EnhancedAuditDatabaseClient',
 		})
 
 		// Initialize enhanced database client with connection pooling and caching
@@ -166,7 +168,9 @@ export class EnhancedAuditDatabaseClient {
 		} catch (error) {
 			let err =
 				error instanceof Error ? error : new Error('Failed to initialize enhanced database client')
-			this.logger.error('Failed to initialize enhanced database client:', err)
+			this.logger.error('Failed to initialize enhanced database client:', {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -210,10 +214,12 @@ export class EnhancedAuditDatabaseClient {
 				const report = await this.generatePerformanceReport()
 				this.handlePerformanceReport(report)
 			} catch (error) {
-				this.logger.error(
-					'Failed to generate performance report:',
-					error instanceof Error ? error : new Error('Failed to generate performance report')
-				)
+				this.logger.error('Failed to generate performance report:', {
+					error:
+						error instanceof Error
+							? { name: error.name, message: error.message, stack: error.stack }
+							: 'Failed to generate performance report',
+				})
 			}
 		}, reportInterval)
 	}
@@ -313,7 +319,9 @@ export class EnhancedAuditDatabaseClient {
 			return result
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(`Query failed: ${queryName}`)
-			this.logger.error(`Query failed: ${queryName}`, err)
+			this.logger.error(`Query failed: ${queryName}`, {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -421,14 +429,16 @@ export class EnhancedAuditDatabaseClient {
 			// Suggest index creation for frequently slow queries
 			if (report.performance.suggestions.length > 0) {
 				this.logger.warn('Performance suggestions available:', {
-					suggestions: report.performance.suggestions,
+					suggestions: report.performance.suggestions.join('; '),
 				})
 			}
 		} catch (error) {
-			this.logger.error(
-				'Auto-optimization failed:',
-				error instanceof Error ? error : new Error('Auto-optimization failed')
-			)
+			this.logger.error('Auto-optimization failed:', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Auto-optimization failed',
+			})
 		}
 	}
 
@@ -470,7 +480,7 @@ export class EnhancedAuditDatabaseClient {
 
 		// Log alerts
 		if (alerts.length > 0) {
-			this.logger.warn('Performance Alerts:', { alerts: alerts })
+			this.logger.warn('Performance Alerts:', { alerts: JSON.stringify(alerts) })
 		}
 	}
 
@@ -483,10 +493,12 @@ export class EnhancedAuditDatabaseClient {
 			const key = `queries:${Date.now()}`
 			await this.storeMetric(key, metrics, 3600) // 1 hour TTL
 		} catch (error) {
-			this.logger.error(
-				'Failed to store query metrics:',
-				error instanceof Error ? error : new Error('Failed to store query metrics')
-			)
+			this.logger.error('Failed to store query metrics:', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Failed to store query metrics',
+			})
 		}
 	}
 
@@ -504,14 +516,13 @@ export class EnhancedAuditDatabaseClient {
 				await this.connection.setex(fullKey, this.retentionPeriod, serialized)
 			}
 		} catch (error) {
-			this.logger.error(
-				'Failed to store metric',
-				error instanceof Error ? error : 'Unknown error',
-				{
-					key,
-					error: error instanceof Error ? error.message : 'Unknown error',
-				}
-			)
+			this.logger.error('Failed to store metric', {
+				key,
+				error:
+					error instanceof Error
+						? { error: error.name, message: error.message, stack: error.stack }
+						: 'Unknown error',
+			})
 		}
 	}
 

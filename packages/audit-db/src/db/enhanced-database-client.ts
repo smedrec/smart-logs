@@ -5,7 +5,7 @@
 
 import { sql } from 'drizzle-orm'
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import { OptimizedLRUCache } from '../cache/optimized-lru-cache.js'
 import { DatabaseCircuitBreakers } from './circuit-breaker.js'
@@ -82,23 +82,25 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		database: PostgresJsDatabase<typeof schema>
 	) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit-db - EnhancedAuditDatabaseClient',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit-db - EnhancedAuditDatabaseClient',
 		})
 
 		this.db = database
@@ -128,7 +130,12 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 
 			this.logger.info('Enhanced audit database client initialized successfully')
 		} catch (error) {
-			this.logger.error('Failed to initialize enhanced database client:', error as Error)
+			this.logger.error('Failed to initialize enhanced database client:', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Failed to initialize enhanced database client',
+			})
 			throw error
 		}
 	}
@@ -146,7 +153,11 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 		return this.executeWithProtection(async () => {
 			// Insert operation through database
 			// Implementation would depend on your schema structure
-			this.logger.debug('Inserting audit log entry', { data })
+			this.logger.debug('Inserting audit log entry', {
+				operation: 'insert',
+				timestamp: new Date().toISOString(),
+				metadata: { dataType: typeof data },
+			})
 
 			// Invalidate related cache entries
 			await this.cache.invalidate('audit_log:*')
@@ -220,7 +231,12 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 				averageResponseTime: health.metrics.averageResponseTime,
 			}
 		} catch (error) {
-			this.logger.error('Health check failed:', error as Error)
+			this.logger.error('Health check failed:', {
+				error:
+					error instanceof Error
+						? { message: error.message, stack: error.stack }
+						: 'Health check failed',
+			})
 			return {
 				healthy: false,
 				activeConnections: 0,
@@ -321,7 +337,12 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 				},
 			}
 		} catch (error) {
-			this.logger.error('Failed to get health status:', error as Error)
+			this.logger.error('Failed to get health status:', {
+				error:
+					error instanceof Error
+						? { message: error.message, stack: error.stack }
+						: 'Failed to get health status',
+			})
 			return {
 				overall: 'unhealthy',
 				components: {
@@ -349,7 +370,12 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 			// Database connection cleanup would be handled by the connection pool
 			this.logger.info('Enhanced database client closed successfully')
 		} catch (error) {
-			this.logger.error('Error closing database client:', error as Error)
+			this.logger.error('Error closing database client:', {
+				error:
+					error instanceof Error
+						? { message: error.message, stack: error.stack }
+						: 'Error closing database client',
+			})
 			throw error
 		}
 	}
@@ -383,7 +409,9 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 
 			// Attempt recovery if suggested
 			if (resolution.retryable && resolution.retryAfterMs) {
-				this.logger.info(`Retrying operation after ${resolution.retryAfterMs}ms`, { context })
+				this.logger.info(`Retrying operation after ${resolution.retryAfterMs}ms`, {
+					context: JSON.stringify(context),
+				})
 				await this.delay(resolution.retryAfterMs)
 
 				// Retry the operation (simple retry, could be enhanced with retry limits)

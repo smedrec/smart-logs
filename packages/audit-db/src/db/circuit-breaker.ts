@@ -3,7 +3,7 @@
  * Implements fault tolerance patterns following the design document specifications
  */
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import { CircuitBreakerConfig, CircuitBreakerState, ICircuitBreaker } from './interfaces.js'
 
@@ -41,23 +41,25 @@ export class CircuitBreaker implements ICircuitBreaker {
 		private readonly config: CircuitBreakerConfig
 	) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: `@repo/audit-db - CircuitBreaker[${name}]`,
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: `@repo/audit-db - CircuitBreaker[${name}]`,
 		})
 
 		this.metrics = {
@@ -191,7 +193,7 @@ export class CircuitBreaker implements ICircuitBreaker {
 
 		this.logger.warn(
 			`Circuit breaker ${this.name} failure ${this.failureCount}/${this.config.failureThreshold}`,
-			error
+			{ error: { message: error.message, stack: error.stack } }
 		)
 
 		if (this.state === CircuitBreakerState.HALF_OPEN) {
@@ -259,8 +261,25 @@ export class CircuitBreakerRegistry {
 	private readonly logger: StructuredLogger
 
 	private constructor() {
-		this.logger = LoggerFactory.createLogger({
+		this.logger = new StructuredLogger({
 			service: '@repo/audit-db - CircuitBreakerRegistry',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
+				endpoint: 'http://localhost:5080/api/default/default/_json',
+				headers: {
+					Authorization: process.env.OTLP_AUTH_HEADER || '',
+				},
+			},
 		})
 	}
 

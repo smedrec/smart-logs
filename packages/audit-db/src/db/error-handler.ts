@@ -3,7 +3,7 @@
  * Implements comprehensive error classification, recovery, and reporting
  */
 
-import { LoggerFactory, StructuredLogger } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 
 import { CircuitBreakerOpenError } from './circuit-breaker.js'
 
@@ -42,23 +42,25 @@ export class EnhancedErrorHandler implements IErrorHandler {
 
 	constructor(private config: ErrorHandlerConfig) {
 		// Initialize Structured Logger
-		LoggerFactory.setDefaultConfig({
-			level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-			enablePerformanceLogging: true,
-			enableErrorTracking: true,
-			enableMetrics: false,
-			format: 'json',
-			outputs: ['otpl'],
-			otplConfig: {
+		this.logger = new StructuredLogger({
+			service: '@repo/audit-db - EnhancedErrorHandler',
+			environment: 'development',
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'info',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'info',
 				endpoint: 'http://localhost:5080/api/default/default/_json',
 				headers: {
 					Authorization: process.env.OTLP_AUTH_HEADER || '',
 				},
 			},
-		})
-
-		this.logger = LoggerFactory.createLogger({
-			service: '@repo/audit-db - EnhancedErrorHandler',
 		})
 
 		this.metrics = {
@@ -200,7 +202,16 @@ export class EnhancedErrorHandler implements IErrorHandler {
 					return false
 			}
 		} catch (recoveryError) {
-			this.logger.error('Error recovery failed:', recoveryError as Error)
+			this.logger.error('Error recovery failed:', {
+				error:
+					recoveryError instanceof Error
+						? {
+								name: recoveryError.name,
+								message: recoveryError.message,
+								stack: recoveryError.stack,
+							}
+						: 'Error recovery failed',
+			})
 			return false
 		}
 	}
@@ -370,16 +381,52 @@ export class EnhancedErrorHandler implements IErrorHandler {
 
 		switch (classification.severity) {
 			case 'critical':
-				this.logger.error('Critical database error occurred', error, logData)
+				this.logger.error('Critical database error occurred', {
+					error: {
+						name: logData.error.name,
+						message: logData.error.message,
+						stack: logData.error.stack,
+					},
+					context: JSON.stringify(logData.context),
+					classification: logData.classification.severity,
+					metrics: JSON.stringify(logData.metrics),
+				})
 				break
 			case 'high':
-				this.logger.error('High severity database error', error, logData)
+				this.logger.error('High severity database error', {
+					error: {
+						name: logData.error.name,
+						message: logData.error.message,
+						stack: logData.error.stack,
+					},
+					context: JSON.stringify(logData.context),
+					classification: logData.classification.severity,
+					metrics: JSON.stringify(logData.metrics),
+				})
 				break
 			case 'medium':
-				this.logger.warn('Medium severity database error', logData)
+				this.logger.warn('Medium severity database error', {
+					error: {
+						name: logData.error.name,
+						message: logData.error.message,
+						stack: logData.error.stack,
+					},
+					context: JSON.stringify(logData.context),
+					classification: logData.classification.severity,
+					metrics: JSON.stringify(logData.metrics),
+				})
 				break
 			case 'low':
-				this.logger.info('Low severity database error', logData)
+				this.logger.info('Low severity database error', {
+					error: {
+						name: logData.error.name,
+						message: logData.error.message,
+						stack: logData.error.stack,
+					},
+					context: JSON.stringify(logData.context),
+					classification: logData.classification.severity,
+					metrics: JSON.stringify(logData.metrics),
+				})
 				break
 		}
 	}
@@ -486,7 +533,7 @@ export class EnhancedErrorHandler implements IErrorHandler {
 		try {
 			// Attempt to recreate connection pool or similar recovery logic
 			// This would be implemented based on specific connection manager
-			this.logger.info('Attempting connection recovery', { context })
+			this.logger.info('Attempting connection recovery', { context: JSON.stringify(context) })
 
 			// Placeholder for actual recovery logic
 			// In real implementation, this would interact with connection manager
@@ -494,7 +541,16 @@ export class EnhancedErrorHandler implements IErrorHandler {
 			this.metrics.successfulRecoveries++
 			return true
 		} catch (recoveryError) {
-			this.logger.error('Connection recovery failed:', recoveryError as Error)
+			this.logger.error('Connection recovery failed:', {
+				error:
+					recoveryError instanceof Error
+						? {
+								name: recoveryError.name,
+								message: recoveryError.message,
+								stack: recoveryError.stack,
+							}
+						: 'Error recovery failed',
+			})
 			return false
 		}
 	}
@@ -505,7 +561,9 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	private async recoverTimeout(error: Error, context: ErrorContext): Promise<boolean> {
 		// For timeout errors, we typically don't recover automatically
 		// but we can adjust timeout values or suggest query optimization
-		this.logger.info('Timeout recovery - suggesting query optimization', { context })
+		this.logger.info('Timeout recovery - suggesting query optimization', {
+			context: JSON.stringify(context),
+		})
 		return false
 	}
 
@@ -517,7 +575,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 		const delay = 500 + Math.random() * 1000
 		await this.delay(delay)
 
-		this.logger.info('Lock recovery - retrying after delay', { context, delay })
+		this.logger.info('Lock recovery - retrying after delay', {
+			context: JSON.stringify(context),
+			delay,
+		})
 		return true // Indicate retry should be attempted
 	}
 
@@ -538,9 +599,14 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	): Promise<void> {
 		// Implementation for alerting system
 		// This could integrate with PagerDuty, Slack, email, etc.
-		this.logger.error('ALERT: High-severity database error detected', error, {
-			context,
-			classification,
+		this.logger.error('ALERT: High-severity database error detected', {
+			error: {
+				name: error.name,
+				message: error.message,
+				stack: error.stack,
+			},
+			context: JSON.stringify(context),
+			classification: JSON.stringify(classification),
 			alertLevel: classification.severity,
 		})
 	}

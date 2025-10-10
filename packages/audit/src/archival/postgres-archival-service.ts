@@ -48,7 +48,9 @@ export class PostgresArchivalService extends ArchivalService {
 			})
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
-			this.logger.error(`Error storing archive: ${err.message}`, err)
+			this.logger.error(`Error storing archive: ${err.message}`, {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -79,7 +81,9 @@ export class PostgresArchivalService extends ArchivalService {
 			return archive
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
-			this.logger.error(`Error retrieving archive ${archiveId}: ${err.message}`, err)
+			this.logger.error(`Error retrieving archive ${archiveId}: ${err.message}`, {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -136,7 +140,9 @@ export class PostgresArchivalService extends ArchivalService {
 			}))
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
-			this.logger.error(`Error finding matching archives: ${err.message}`, err)
+			this.logger.error(`Error finding matching archives: ${err.message}`, {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -165,7 +171,9 @@ export class PostgresArchivalService extends ArchivalService {
 			}
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
-			this.logger.error(`Error decompressing archive data: ${err.message}`, err)
+			this.logger.error(`Error decompressing archive data: ${err.message}`, {
+				error: { name: err.name, message: err.message, stack: err.stack },
+			})
 			throw err
 		}
 	}
@@ -220,7 +228,9 @@ export class PostgresArchivalService extends ArchivalService {
 			const err = error instanceof Error ? error : new Error(String(error))
 			this.logger.error(
 				`Error updating retrieval statistics for archive ${archiveId}: ${err.message}`,
-				err
+				{
+					error: { name: err.name, message: err.message, stack: err.stack },
+				}
 			)
 			throw error
 		}
