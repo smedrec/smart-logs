@@ -43,3 +43,43 @@ export type {
 	TemplateOptions,
 	EmailSizeLimits,
 } from './email-template-engine.js'
+
+export {
+	StorageHandler,
+	createStorageHandler,
+	createStorageHandlerWithProviders,
+	StorageError,
+	StorageAuthenticationError,
+	StorageNotFoundError,
+	StorageNetworkError,
+	StorageQuotaExceededError,
+} from './storage-handler.js'
+
+export type {
+	IStorageProvider,
+	StorageProvider,
+	StorageConfig,
+	StorageUploadResult,
+	StorageDownloadResult,
+	StorageListResult,
+	StorageObjectInfo,
+	LocalStorageConfig,
+	S3StorageConfig,
+	AzureStorageConfig,
+	GCPStorageConfig,
+} from './storage-handler.js'
+
+export {
+	S3StorageProvider,
+	createS3StorageProvider,
+	AzureStorageProvider,
+	createAzureStorageProvider,
+	GCPStorageProvider,
+	createGCPStorageProvider,
+	LocalStorageProvider,
+	createLocalStorageProvider,
+	createStorageProvider,
+	getAvailableProviders,
+	StorageProviderRegistry,
+	defaultStorageProviderRegistry,
+} from './storage-providers/index.js'
