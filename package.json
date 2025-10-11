@@ -29,16 +29,16 @@
 	},
 	"dependencies": {},
 	"devDependencies": {
-		"@ianvs/prettier-plugin-sort-imports": "4.5.1",
+		"@ianvs/prettier-plugin-sort-imports": "4.7.0",
 		"@repo/eslint-config": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
 		"npm-run-all2": "8.0.4",
 		"prettier": "3.6.2",
-		"prettier-plugin-packagejson": "2.5.18",
-		"turbo": "^2.5.6",
+		"prettier-plugin-packagejson": "2.5.19",
+		"turbo": "^2.5.8",
 		"typescript": "5.8.2",
 		"vitest": "3.2.4",
-		"zx": "8.8.1"
+		"zx": "8.8.4"
 	},
-	"packageManager": "pnpm@10.16.0+sha512.8066e7b034217b700a9a4dbb3a005061d641ba130a89915213a10b3ca4919c19c037bec8066afdc559b89635fdb806b16ea673f2468fbb28aabfa13c53e3f769"
+	"packageManager": "pnpm@10.18.2+sha512.9fb969fa749b3ade6035e0f109f0b8a60b5d08a1a87fdf72e337da90dcc93336e2280ca4e44f2358a649b83c17959e9993e777c2080879f3801e6f0d999ad3dd"
 }
