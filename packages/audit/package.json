@@ -37,6 +37,7 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "3.859.0",
+		"@aws-sdk/client-ses": "3.859.0",
 		"@repo/audit-db": "workspace:*",
 		"@repo/infisical-kms": "workspace:*",
 		"@repo/logs": "workspace:*",
@@ -46,12 +47,14 @@
 		"drizzle-orm": "0.44.5",
 		"inngest": "3.40.2",
 		"ioredis": "5.8.0",
+		"nodemailer": "6.9.15",
 		"postgres": "3.4.7"
 	},
 	"devDependencies": {
 		"@repo/eslint-config": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
 		"@types/node": "24.0.13",
+		"@types/nodemailer": "6.4.19",
 		"typescript": "5.8.2",
 		"vitest": "3.2.4"
 	}
