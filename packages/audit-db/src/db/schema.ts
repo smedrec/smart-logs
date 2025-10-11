@@ -46,6 +46,7 @@
 // - [key: string]: any -> jsonb 'details' - OK (nullable)
 // This looks good.
 
+import { count } from 'console'
 import { sql } from 'drizzle-orm'
 import {
 	index,
@@ -705,6 +706,245 @@ export const pseudonymMapping = pgTable(
 			index('pseudonym_mapping_pseudonym_id_idx').on(table.pseudonymId),
 			uniqueIndex('pseudonym_mapping_original_id_idx').on(table.originalId),
 			index('pseudonym_mapping_strategy_idx').on(table.strategy),
+		]
+	}
+)
+
+export const deliveryDestinations = pgTable(
+	'delivery_destinations',
+	{
+		id: serial('id').primaryKey(),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		type: varchar('type', { length: 50 }).notNull(), // e.g., 'email', 's3', 'ftp'
+		label: varchar('label', { length: 255 }).notNull(), // Human-readable label
+		description: text('description'),
+		icon: varchar('icon', { length: 255 }), // URL or icon name
+		instructions: text('instructions'), // Setup or usage instructions
+		disabled: varchar('disabled', { length: 10 }).notNull().default('false'),
+		disabledAt: timestamp('disabled_at', { withTimezone: true, mode: 'string' }),
+		disabledBy: varchar('disabled_by', { length: 255 }),
+		countUsage: integer('count_usage').notNull().default(0), // Usage count
+		lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'string' }),
+		// Storing configuration as JSONB for flexibility
+		// Example structure:
+		// {
+		//   "email": { "address": "
+		//   "s3": { "bucket": "my-bucket", "region": "us-west-2", "accessKeyId": "...
+		//   "ftp": { "host": "ftp.example.com", "username": "...", "password": "..." }
+		// }
+		config: jsonb('config').notNull(), // Configuration details as JSON
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('delivery_destinations_type_idx').on(table.type),
+			index('delivery_destinations_organization_id_idx').on(table.organizationId),
+			index('delivery_destinations_disabled_idx').on(table.disabled),
+			index('delivery_destinations_last_used_at_idx').on(table.lastUsedAt),
+			uniqueIndex('delivery_destinations_org_label_unique').on(table.organizationId, table.label),
+			index('delivery_destinations_created_at_idx').on(table.createdAt),
+			index('delivery_destinations_updated_at_idx').on(table.updatedAt),
+		]
+	}
+)
+
+export const deliveryLogs = pgTable(
+	'delivery_logs',
+	{
+		id: serial('id').primaryKey(),
+		deliveryId: varchar('delivery_id', { length: 255 }).notNull(), // Global delivery identifier
+		destinationId: integer('destination_id').notNull(),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(), // For organizational isolation
+		objectDetails: jsonb('object_details').notNull(), // Details about the delivered object
+		// Details about the delivered object
+		// {
+		//   "type": "report" | "export" | "data",
+		//   "id": string,
+		//	 "executionId"?: string, // for reports
+		//   "name"?: string,
+		//   "size"?: number,
+		//   "format"?: string,
+		//   "url"?: string, // For download links
+		//   ...additional metadata
+		// }
+		status: varchar('status', { length: 20 }).notNull(), // 'pending' | 'delivered' | 'failed' | 'retrying'
+		attempts: jsonb('attempts').notNull().default('[]'), // Array of attempt timestamps
+		// Array of attempt timestamps
+		// [
+		//   { "timestamp": "2023-10-01T12:00:00Z", "status": "failed", "reason": "SMTP error" },
+		//   { "timestamp": "2023-10-01T12:05:00Z", "status": "delivered" }
+		// ]
+		// Consider storing structured attempt info for better analysis
+		// e.g., status and reason for each attempt
+		lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true, mode: 'string' }),
+		deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'string' }),
+		failureReason: text('failure_reason'),
+		crossSystemReference: varchar('cross_system_reference', { length: 255 }), // External tracking reference
+		correlationId: varchar('correlation_id', { length: 255 }), // For request correlation
+		idempotencyKey: varchar('idempotency_key', { length: 255 }), // For duplicate detection
+		details: jsonb('details'), // Additional delivery details
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('delivery_logs_delivery_id_idx').on(table.deliveryId),
+			index('delivery_logs_destination_id_idx').on(table.destinationId),
+			index('delivery_logs_organization_id_idx').on(table.organizationId),
+			index('delivery_logs_status_idx').on(table.status),
+			index('delivery_logs_attempts_idx').on(table.attempts),
+			index('delivery_logs_last_attempt_at_idx').on(table.lastAttemptAt),
+			index('delivery_logs_delivered_at_idx').on(table.deliveredAt),
+			index('delivery_logs_cross_system_reference_idx').on(table.crossSystemReference),
+			index('delivery_logs_correlation_id_idx').on(table.correlationId),
+			index('delivery_logs_idempotency_key_idx').on(table.idempotencyKey),
+			index('delivery_logs_created_at_idx').on(table.createdAt),
+			index('delivery_logs_updated_at_idx').on(table.updatedAt),
+			// Composite indexes for common queries
+			index('delivery_logs_destination_status_idx').on(table.destinationId, table.status),
+			index('delivery_logs_status_attempts_idx').on(table.status, table.attempts),
+			index('delivery_logs_org_status_idx').on(table.organizationId, table.status),
+			index('delivery_logs_org_created_idx').on(table.organizationId, table.createdAt),
+		]
+	}
+)
+
+/**
+ * Delivery queue table for managing pending deliveries
+ * Requirements 1.1, 1.5, 2.4: Queue-based delivery processing with priority support
+ */
+export const deliveryQueue = pgTable(
+	'delivery_queue',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		destinationId: integer('destination_id').notNull(),
+		payload: jsonb('payload').notNull(),
+		priority: integer('priority').notNull().default(0), // 0-10, higher = more priority
+		scheduledAt: timestamp('scheduled_at', { withTimezone: true, mode: 'string' }).notNull(),
+		processedAt: timestamp('processed_at', { withTimezone: true, mode: 'string' }),
+		status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, processing, completed, failed
+		correlationId: varchar('correlation_id', { length: 255 }),
+		idempotencyKey: varchar('idempotency_key', { length: 255 }),
+		retryCount: integer('retry_count').notNull().default(0),
+		maxRetries: integer('max_retries').notNull().default(5),
+		nextRetryAt: timestamp('next_retry_at', { withTimezone: true, mode: 'string' }),
+		metadata: jsonb('metadata').notNull().default('{}'),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('delivery_queue_organization_id_idx').on(table.organizationId),
+			index('delivery_queue_destination_id_idx').on(table.destinationId),
+			index('delivery_queue_status_idx').on(table.status),
+			index('delivery_queue_priority_idx').on(table.priority),
+			index('delivery_queue_scheduled_at_idx').on(table.scheduledAt),
+			index('delivery_queue_next_retry_at_idx').on(table.nextRetryAt),
+			index('delivery_queue_correlation_id_idx').on(table.correlationId),
+			index('delivery_queue_idempotency_key_idx').on(table.idempotencyKey),
+			index('delivery_queue_created_at_idx').on(table.createdAt),
+			// Composite indexes for queue processing
+			index('delivery_queue_status_priority_idx').on(table.status, table.priority),
+			index('delivery_queue_status_scheduled_idx').on(table.status, table.scheduledAt),
+			index('delivery_queue_org_status_idx').on(table.organizationId, table.status),
+			index('delivery_queue_retry_scheduled_idx').on(table.nextRetryAt, table.status),
+		]
+	}
+)
+
+/**
+ * Destination health table for tracking destination status and metrics
+ * Requirements 1.1, 3.4, 3.5: Health monitoring and failure tracking
+ */
+export const destinationHealth = pgTable(
+	'destination_health',
+	{
+		destinationId: integer('destination_id').primaryKey(),
+		status: varchar('status', { length: 20 }).notNull(), // healthy, degraded, unhealthy, disabled
+		lastCheckAt: timestamp('last_check_at', { withTimezone: true, mode: 'string' }).notNull(),
+		consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+		totalFailures: integer('total_failures').notNull().default(0),
+		totalDeliveries: integer('total_deliveries').notNull().default(0),
+		successRate: varchar('success_rate', { length: 10 }).notNull().default('0'), // Percentage as string
+		averageResponseTime: integer('average_response_time'), // milliseconds
+		lastFailureAt: timestamp('last_failure_at', { withTimezone: true, mode: 'string' }),
+		lastSuccessAt: timestamp('last_success_at', { withTimezone: true, mode: 'string' }),
+		disabledAt: timestamp('disabled_at', { withTimezone: true, mode: 'string' }),
+		disabledReason: text('disabled_reason'),
+		circuitBreakerState: varchar('circuit_breaker_state', { length: 20 })
+			.notNull()
+			.default('closed'), // closed, open, half-open
+		circuitBreakerOpenedAt: timestamp('circuit_breaker_opened_at', {
+			withTimezone: true,
+			mode: 'string',
+		}),
+		metadata: jsonb('metadata').notNull().default('{}'),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('destination_health_status_idx').on(table.status),
+			index('destination_health_last_check_at_idx').on(table.lastCheckAt),
+			index('destination_health_consecutive_failures_idx').on(table.consecutiveFailures),
+			index('destination_health_success_rate_idx').on(table.successRate),
+			index('destination_health_circuit_breaker_state_idx').on(table.circuitBreakerState),
+			index('destination_health_last_failure_at_idx').on(table.lastFailureAt),
+			index('destination_health_last_success_at_idx').on(table.lastSuccessAt),
+			index('destination_health_disabled_at_idx').on(table.disabledAt),
+			index('destination_health_updated_at_idx').on(table.updatedAt),
+		]
+	}
+)
+
+/**
+ * Webhook secrets table for secure signature management
+ * Requirements 4.3, 4.4, 4.5: Webhook security and secret rotation
+ */
+export const webhookSecrets = pgTable(
+	'webhook_secrets',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(),
+		destinationId: integer('destination_id').notNull(),
+		secretKey: varchar('secret_key', { length: 255 }).notNull(), // encrypted
+		algorithm: varchar('algorithm', { length: 50 }).notNull().default('HMAC-SHA256'),
+		isActive: varchar('is_active', { length: 10 }).notNull().default('true'),
+		isPrimary: varchar('is_primary', { length: 10 }).notNull().default('false'), // For rotation support
+		expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }),
+		rotatedAt: timestamp('rotated_at', { withTimezone: true, mode: 'string' }),
+		usageCount: integer('usage_count').notNull().default(0),
+		lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'string' }),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		createdBy: varchar('created_by', { length: 255 }),
+	},
+	(table) => {
+		return [
+			index('webhook_secrets_destination_id_idx').on(table.destinationId),
+			index('webhook_secrets_is_active_idx').on(table.isActive),
+			index('webhook_secrets_is_primary_idx').on(table.isPrimary),
+			index('webhook_secrets_expires_at_idx').on(table.expiresAt),
+			index('webhook_secrets_created_at_idx').on(table.createdAt),
+			index('webhook_secrets_last_used_at_idx').on(table.lastUsedAt),
+			// Composite indexes for secret management
+			index('webhook_secrets_destination_active_idx').on(table.destinationId, table.isActive),
+			index('webhook_secrets_destination_primary_idx').on(table.destinationId, table.isPrimary),
 		]
 	}
 )
