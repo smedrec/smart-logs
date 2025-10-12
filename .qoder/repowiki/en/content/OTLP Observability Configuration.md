@@ -11,6 +11,9 @@
 - [init.ts](file://apps/server/src/lib/hono/init.ts) - *Integrated structured logging*
 - [error-handling.ts](file://apps/server/src/lib/middleware/error-handling.ts) - *Enhanced error logging*
 - [index.ts](file://apps/worker/src/index.ts) - *Worker logging integration*
+- [otlp-transport.ts](file://packages/logs/src/transports/otlp-transport.ts) - *Added OTLP transport with batching and circuit breaker*
+- [config.ts](file://packages/logs/src/types/config.ts) - *Added OTLP configuration schema*
+- [batch-manager.ts](file://packages/logs/src/core/batch-manager.ts) - *Batching implementation for OTLP transport*
 </cite>
 
 ## Update Summary
@@ -21,6 +24,8 @@
 - Updated code examples to reflect new structured logging API
 - Improved error handling and retry logic documentation
 - Added performance timing and metrics logging capabilities
+- Integrated new OTLP transport features including circuit breaker and compression
+- Updated configuration schema details with new OTLP-specific parameters
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -187,6 +192,22 @@ The new StructuredLogger system replaces the previous ConsoleLogger implementati
 **Section sources**
 - [logging.ts](file://packages/logs/src/logging.ts#L0-L619)
 - [otpl.ts](file://packages/logs/src/otpl.ts#L0-L165)
+
+### OTLP Transport Features
+The OTLP transport implementation includes advanced reliability features:
+
+- **Circuit Breaker Integration**: Automatically detects and handles endpoint failures
+- **Gzip Compression**: Compresses payloads larger than 1KB to reduce bandwidth usage
+- **Health Checks**: Performs periodic health checks on the OTLP endpoint
+- **Retry Management**: Configurable retry policies with exponential backoff
+- **Backpressure Handling**: Prevents memory issues by limiting queue size
+
+The transport uses the DefaultBatchManager for efficient batch processing with configurable concurrency limits.
+
+**Section sources**
+- [otlp-transport.ts](file://packages/logs/src/transports/otlp-transport.ts#L64-L527)
+- [config.ts](file://packages/logs/src/types/config.ts#L37-L69)
+- [batch-manager.ts](file://packages/logs/src/core/batch-manager.ts#L9-L202)
 
 ## API Interfaces
 The OTLP Observability Configuration exposes a well-defined API interface for integration with the audit system.

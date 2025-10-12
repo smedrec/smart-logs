@@ -2,525 +2,448 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts)
-- [circuit-breaker.ts](file://packages/audit/src/queue/circuit-breaker.ts)
-- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts)
-- [retry.ts](file://packages/audit/src/retry.ts)
-- [schema.ts](file://packages/audit-db/src/db/schema.ts)
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts)
-- [external-dependencies-integration.test.ts](file://packages/audit/src/__tests__/external-dependencies-integration.test.ts)
-- [load-testing.test.ts](file://packages/audit/src/__tests__/load-testing.test.ts)
-- [chaos-engineering.test.ts](file://packages/audit/src/__tests__/chaos-engineering.test.ts)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Updated in recent commit*
+- [0017_past_bishop.sql](file://packages\audit-db\drizzle\migrations\0017_past_bishop.sql) - *Added in recent commit*
+- [scheduled-reporting.ts](file://packages\audit\src\report\scheduled-reporting.ts) - *Updated in recent commit*
 </cite>
+
+## Update Summary
+- Added documentation for new delivery system database schema and tables
+- Updated compliance reporting system to reflect new delivery destinations and health monitoring
+- Enhanced scheduled reporting section with delivery queue and health monitoring details
+- Added new section on delivery system architecture and components
+- Updated source tracking with new database schema files and migration scripts
 
 ## Table of Contents
 1. [Introduction](#introduction)
-2. [Core Components](#core-components)
-3. [Reliable Event Processing Architecture](#reliable-event-processing-architecture)
-4. [Message Queuing and Retry Mechanisms](#message-queuing-and-retry-mechanisms)
-5. [Circuit Breaker Implementation](#circuit-breaker-implementation)
-6. [Dead Letter Queue Handling](#dead-letter-queue-handling)
-7. [Data Flow and Transactional Guarantees](#data-flow-and-transactional-guarantees)
-8. [Audit Database Schema and Partitioning](#audit-database-schema-and-partitioning)
-9. [Integration Test Scenarios](#integration-test-scenarios)
-10. [Performance Considerations](#performance-considerations)
+2. [Delivery System Architecture](#delivery-system-architecture)
+3. [Database Schema for Delivery System](#database-schema-for-delivery-system)
+4. [Scheduled Reporting with Worker Services](#scheduled-reporting-with-worker-services)
+5. [Compliance Reporting System](#compliance-reporting-system)
 
 ## Introduction
-The Persistence Integration layer ensures reliable delivery of audit events to the audit-db system through a robust architecture combining message queuing, circuit breaker patterns, and retry mechanisms. This document details how audit events are processed from in-memory queues to durable storage with guaranteed delivery, even during database outages or network failures. The system employs a multi-layered approach to reliability, including automatic retries, circuit breakers to prevent cascading failures, and dead letter queues for failed event handling. The integration with audit-db leverages PostgreSQL partitioning for performance optimization and includes comprehensive monitoring and error recovery procedures.
+The Persistence Integration documentation has been updated to reflect recent changes in the audit system's delivery infrastructure. This update focuses on the new delivery system database schema, which enhances the compliance reporting capabilities with improved delivery tracking, health monitoring, and destination management. The changes support more robust scheduled reporting workflows and provide better visibility into delivery operations.
 
-## Core Components
-
-The persistence integration system is built around several key components that work together to ensure reliable audit event delivery:
-
-- **ReliableEventProcessor**: Orchestrates the entire processing pipeline, managing the queue, circuit breaker, and dead letter queue
-- **CircuitBreaker**: Prevents cascading failures by temporarily halting operations when failure thresholds are exceeded
-- **DeadLetterHandler**: Captures and manages events that cannot be processed after multiple retry attempts
-- **Retry Mechanism**: Implements exponential backoff with jitter for resilient retry attempts
-- **Database Partitioning**: Optimizes audit-db performance through time-based partitioning of audit logs
-
-These components work in concert to provide a resilient, high-throughput system for audit event persistence.
+The new delivery system components were introduced through a database migration that added several tables for managing delivery destinations, tracking delivery logs, implementing a delivery queue, monitoring destination health, and managing webhook secrets. These changes enable more reliable and secure delivery of compliance reports and audit data exports.
 
 **Section sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L50)
-- [circuit-breaker.ts](file://packages/audit/src/queue/circuit-breaker.ts#L1-L50)
-- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts#L1-L50)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Updated in recent commit*
+- [0017_past_bishop.sql](file://packages\audit-db\drizzle\migrations\0017_past_bishop.sql) - *Added in recent commit*
 
-## Reliable Event Processing Architecture
+## Delivery System Architecture
+The delivery system architecture has been enhanced with new components that provide reliable, secure, and monitored delivery of compliance reports and audit data. The system now includes destination management, delivery queuing, health monitoring, and secret management for secure webhook communications.
 
-The reliable event processing architecture implements a comprehensive solution for ensuring audit events are delivered to the audit-db system with high reliability and fault tolerance. The architecture follows a producer-consumer pattern with multiple reliability layers.
-
-```mermaid
-graph TD
-A[Application] --> |Audit Event| B(ReliableEventProcessor)
-B --> C{Circuit Breaker}
-C --> |OPEN| D[Reject Request]
-C --> |CLOSED/HALF_OPEN| E[Retry Mechanism]
-E --> |Success| F[Audit Database]
-E --> |Failure| G[Dead Letter Queue]
-F --> H[Partitioned Tables]
-G --> I[DLQ Worker]
-I --> J[Archive/Alert]
-K[Metrics Collector] --> B
-K --> C
-K --> G
-L[Health Monitor] --> M[Alerting System]
-style B fill:#f9f,stroke:#333
-style C fill:#ff9,stroke:#333
-style E fill:#9ff,stroke:#333
-style G fill:#f99,stroke:#333
-style F fill:#9f9,stroke:#333
-```
-
-**Diagram sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L50)
-- [circuit-breaker.ts](file://packages/audit/src/queue/circuit-breaker.ts#L1-L50)
-- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts#L1-L50)
-
-**Section sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L100)
-
-## Message Queuing and Retry Mechanisms
-
-The message queuing system is built on BullMQ, providing durable storage of audit events in Redis before they are processed and persisted to the audit-db. The retry mechanism is implemented in the `retry.ts` file and provides configurable retry strategies with exponential backoff, linear backoff, or fixed delays.
-
-```mermaid
-sequenceDiagram
-participant App as Application
-participant RP as ReliableEventProcessor
-participant Q as Redis Queue
-participant DB as Audit Database
-participant DLQ as Dead Letter Queue
-App->>RP : addEvent(event)
-RP->>Q : Add job to queue
-Q-->>RP : Job added
-RP->>RP : Start worker
-loop Process jobs
-RP->>Q : Get next job
-Q-->>RP : Job data
-RP->>RP : Execute with circuit breaker
-alt Circuit CLOSED
-RP->>RP : Execute with retry logic
-loop Retry attempts
-RP->>DB : Attempt to persist
-DB-->>RP : Success/Failure
-alt Success
-RP->>Q : Mark as completed
-break
-else Failure and retryable
-RP->>RP : Calculate delay
-RP->>RP : Wait with backoff
-end
-end
-alt Max retries exceeded
-RP->>DLQ : Send to dead letter queue
-end
-else Circuit OPEN
-RP->>App : Reject with circuit open error
-end
-end
-```
-
-The retry configuration includes:
-- **Max retries**: Configurable number of retry attempts (default: 5)
-- **Backoff strategy**: Exponential, linear, or fixed delay patterns
-- **Base delay**: Initial delay between retries (default: 1 second)
-- **Max delay**: Upper limit for retry delays (default: 30 seconds)
-- **Jitter**: Randomization to prevent thundering herd problems
-- **Retryable errors**: Specific error codes and messages that trigger retries
-
-The retry mechanism uses exponential backoff by default, where each subsequent retry delay is double the previous delay, up to the maximum delay limit. Jitter is applied to prevent synchronized retry attempts across multiple instances.
-
-**Section sources**
-- [retry.ts](file://packages/audit/src/retry.ts#L1-L190)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L500)
-
-## Circuit Breaker Implementation
-
-The circuit breaker pattern is implemented to prevent cascading failures when the audit-db system becomes unavailable. The implementation follows the standard circuit breaker states: CLOSED, OPEN, and HALF_OPEN.
-
-```mermaid
-stateDiagram-v2
-[*] --> CLOSED
-CLOSED --> OPEN : Failure threshold exceeded
-OPEN --> HALF_OPEN : Recovery timeout elapsed
-HALF_OPEN --> CLOSED : Success
-HALF_OPEN --> OPEN : Failure
-CLOSED --> CLOSED : Success
-OPEN --> OPEN : Before timeout
-HALF_OPEN --> HALF_OPEN : Multiple attempts during recovery
-note right of CLOSED
-Normal operation
-Requests pass through
-Failure count tracked
-end note
-note left of OPEN
-Circuit broken
-Requests immediately fail
-Prevents system overload
-end note
-note right of HALF_OPEN
-Testing recovery
-Limited requests allowed
-Determines next state
-end note
-```
-
-The circuit breaker configuration includes:
-- **Failure threshold**: Number of consecutive failures before opening the circuit (default: 5)
-- **Recovery timeout**: Time to wait before attempting recovery (default: 30 seconds)
-- **Monitoring period**: Window for calculating failure rate (default: 60 seconds)
-- **Minimum throughput**: Minimum number of requests before considering failure rate
-
-When the circuit is in the CLOSED state, all operations pass through normally. If the failure count exceeds the threshold within the monitoring period, the circuit transitions to the OPEN state, where all operations immediately fail without attempting to contact the database. After the recovery timeout elapses, the circuit enters the HALF_OPEN state, allowing a limited number of test operations. If these succeed, the circuit returns to CLOSED; if they fail, it returns to OPEN.
-
-The circuit breaker also provides metrics and event listeners to monitor its state and trigger alerts when the circuit opens.
-
-**Section sources**
-- [circuit-breaker.ts](file://packages/audit/src/queue/circuit-breaker.ts#L1-L365)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L500)
-
-## Dead Letter Queue Handling
-
-The dead letter queue (DLQ) serves as a safety net for audit events that cannot be processed after exhausting all retry attempts. It ensures that no audit events are lost, even in the face of persistent failures.
+The architecture follows a queue-based pattern where delivery requests are processed asynchronously, allowing for retry mechanisms, priority handling, and circuit breaker patterns to ensure delivery reliability. Each delivery is tracked through its lifecycle from queuing to successful delivery or failure, with comprehensive logging and monitoring.
 
 ```mermaid
 flowchart TD
-A[Failed Event] --> B{Retry Limit Exceeded?}
-B --> |Yes| C[Create DLQ Event]
-C --> D[Store in DLQ]
-D --> E[Send Alert]
-E --> F[DLQ Worker]
-F --> G{Event Age > Archive Threshold?}
-G --> |Yes| H[Archive to Storage]
-G --> |No| I{Event Age > Retention Period?}
-I --> |Yes| J[Delete Event]
-I --> |No| K[Keep for Analysis]
-H --> L[Delete from DLQ]
-J --> M[Event Removed]
-style C fill:#f99,stroke:#333
-style D fill:#f99,stroke:#333
-style F fill:#f99,stroke:#333
-style H fill:#9f9,stroke:#333
-style J fill:#9f9,stroke:#333
+A[Report Generation] --> B[Delivery Queue]
+B --> C{Destination Health Check}
+C --> |Healthy| D[Delivery Processor]
+C --> |Unhealthy| E[Circuit Breaker]
+E --> F[Retry Queue]
+D --> G[Delivery Method]
+G --> H[Email]
+G --> I[S3 Storage]
+G --> J[Webhook]
+D --> K[Delivery Logs]
+L[Destination Management] --> M[Destination Health]
+N[Webhook Secrets] --> J
+K --> O[Monitoring & Analytics]
 ```
 
-The DLQ stores comprehensive information about failed events, including:
-- **Original event**: The complete audit event that failed processing
-- **Failure reason**: Error message explaining why processing failed
-- **Failure count**: Number of times the event was attempted
-- **First/last failure times**: Timestamps of the first and most recent failures
-- **Retry history**: Complete record of all retry attempts with timestamps and errors
-- **Metadata**: Additional context including error stack traces
+**Diagram sources**
+- [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Updated in recent commit*
 
-The DLQ worker processes events periodically (every 5 minutes by default) to:
-- Archive events older than the configured archive threshold
-- Remove events that have exceeded the maximum retention period (default: 30 days)
-- Generate alerts when the DLQ size exceeds the alert threshold
+## Database Schema for Delivery System
+The delivery system database schema has been expanded with five new tables that provide comprehensive delivery management capabilities. These tables were added in migration `0017_past_bishop.sql` and are defined in the `schema.ts` file.
 
-The system also provides metrics about the DLQ, including total event count, events processed today, oldest/newest event timestamps, and top failure reasons.
-
-**Section sources**
-- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts#L1-L367)
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L500)
-
-## Data Flow and Transactional Guarantees
-
-The data flow from in-memory processing to durable storage follows a well-defined sequence that ensures transactional integrity and reliability:
-
-```mermaid
-flowchart LR
-A[Application] --> B[ReliableEventProcessor]
-B --> C[Redis Queue]
-C --> D[Circuit Breaker]
-D --> E[Retry Mechanism]
-E --> F[Audit Database]
-F --> G[Partitioned Tables]
-E --> H[Dead Letter Queue]
-H --> I[Archival Storage]
-subgraph "Reliability Layer"
-D
-E
-H
-end
-subgraph "Storage Layer"
-F
-G
-end
-style B fill:#f9f,stroke:#333
-style C fill:#9ff,stroke:#333
-style D fill:#ff9,stroke:#333
-style E fill:#9ff,stroke:#333
-style F fill:#9f9,stroke:#333
-style G fill:#9f9,stroke:#333
-style H fill:#f99,stroke:#333
-style I fill:#9f9,stroke:#333
-```
-
-The system provides the following transactional guarantees:
-- **At-least-once delivery**: Every audit event is guaranteed to be processed at least once, with duplicates prevented through idempotent operations
-- **Durability**: Events are stored in Redis before acknowledgment, ensuring persistence even if the processing service crashes
-- **Order preservation**: Events are processed in the order they are received, maintaining audit trail integrity
-- **Error recovery**: Failed events are captured in the DLQ for analysis and potential reprocessing
-
-The processing workflow ensures that events are only removed from the queue after successful persistence to the audit-db. If persistence fails, the event remains in the queue for retry according to the configured retry strategy.
-
-**Section sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L500)
-- [dead-letter-queue.ts](file://packages/audit/src/queue/dead-letter-queue.ts#L1-L367)
-
-## Audit Database Schema and Partitioning
-
-The audit-db system uses a sophisticated schema design optimized for audit event storage and retrieval. The primary audit_log table is partitioned by time to improve query performance and maintenance operations.
-
-```mermaid
-erDiagram
-AUDIT_LOG {
-integer id PK
-timestamp with time zone timestamp
-varchar ttl
-varchar principal_id
-varchar organization_id
-varchar action
-varchar target_resource_type
-varchar target_resource_id
-varchar status
-text outcome_description
-varchar hash
-varchar hash_algorithm
-varchar event_version
-varchar correlation_id
-varchar data_classification
-varchar retention_policy
-integer processing_latency
-timestamp with time zone archived_at
-jsonb details
-}
-AUDIT_PRESET {
-integer id PK
-varchar name
-text description
-varchar organization_id
-varchar action
-varchar data_classification
-jsonb required_fields
-jsonb default_values
-jsonb validation
-timestamp with time zone created_at
-varchar created_by
-timestamp with time zone updated_at
-varchar updated_by
-}
-AUDIT_INTEGRITY_LOG {
-integer id PK
-integer audit_log_id FK
-timestamp with time zone verification_timestamp
-varchar verification_status
-varchar verified_by
-varchar verification_method
-varchar verification_details
-timestamp with time zone created_at
-}
-AUDIT_RETENTION_POLICY {
-integer id PK
-varchar policy_name
-varchar data_classification
-integer retention_days
-boolean is_active
-timestamp with time zone created_at
-timestamp with time zone updated_at
-}
-AUDIT_LOG ||--o{ AUDIT_INTEGRITY_LOG : "1:N"
-AUDIT_PRESET ||--o{ AUDIT_LOG : "1:N"
-AUDIT_RETENTION_POLICY ||--o{ AUDIT_LOG : "1:N"
-```
-
-The audit_log table includes several compliance-focused fields:
-- **hash**: Cryptographic hash of the event for immutability verification
-- **hash_algorithm**: Algorithm used for hashing (default: SHA-256)
-- **event_version**: Version of the event schema
-- **correlation_id**: Identifier for tracing related events
-- **data_classification**: Sensitivity level (PUBLIC, INTERNAL, CONFIDENTIAL, PHI)
-- **retention_policy**: Policy governing how long the event should be retained
-- **processing_latency**: Time taken to process the event in milliseconds
-- **archived_at**: Timestamp when the event was archived
-
-The partitioning strategy creates monthly partitions of the audit_log table, with each partition covering a specific time period. This approach provides several benefits:
-- **Improved query performance**: Queries can be limited to relevant partitions
-- **Efficient maintenance**: Individual partitions can be optimized or dropped without affecting the entire table
-- **Faster backups**: Partitions can be backed up independently
-- **Better storage management**: Old partitions can be moved to cheaper storage or archived
-
-The partitioning system automatically creates new partitions for future periods and can drop expired partitions based on retention policies.
-
-**Section sources**
-- [schema.ts](file://packages/audit-db/src/db/schema.ts#L1-L662)
-- [partitioning.ts](file://packages/audit-db/src/db/partitioning.ts#L1-L497)
-
-## Integration Test Scenarios
-
-The system includes comprehensive integration tests that validate both successful and failed persistence scenarios. These tests verify the reliability mechanisms under various conditions.
-
-### Successful Persistence Scenario
-
-The external dependencies integration test demonstrates successful processing of audit events:
+### Delivery Destinations
+The `deliveryDestinations` table stores configuration for delivery destinations, supporting multiple delivery methods including email, S3, FTP, and webhooks.
 
 ```typescript
-// From external-dependencies-integration.test.ts
-it('should process events successfully under normal conditions', async () => {
-  const processor = new ReliableEventProcessor(connection, db, async (event) => {
-    // Simulate successful database insertion
-    await db.insert(auditLog).values(event);
-  });
-  
-  await processor.start();
-  
-  // Add test events
-  for (let i = 0; i < 100; i++) {
-    await processor.addEvent({
-      timestamp: new Date().toISOString(),
-      action: 'test.action',
-      status: 'success',
-      principalId: 'test-user',
-      organizationId: 'test-org',
-      targetResourceType: 'TestResource',
-      targetResourceId: 'test-123',
-      dataClassification: 'INTERNAL',
-    });
-  }
-  
-  // Wait for processing
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
-  // Verify events were persisted
-  const result = await db.select().from(auditLog)
-    .where(sql`action = 'test.action'`);
-  
-  expect(result.length).toBe(100);
-  
-  // Verify system health
-  const healthStatus = await processor.getHealthStatus();
-  expect(healthStatus.healthScore).toBeGreaterThan(70);
-});
+export const deliveryDestinations = pgTable(
+	'delivery_destinations',
+	{
+		id: serial('id').primaryKey(),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		type: varchar('type', { length: 50 }).notNull(), // e.g., 'email', 's3', 'ftp'
+		label: varchar('label', { length: 255 }).notNull(), // Human-readable label
+		description: text('description'),
+		icon: varchar('icon', { length: 255 }), // URL or icon name
+		instructions: text('instructions'), // Setup or usage instructions
+		disabled: varchar('disabled', { length: 10 }).notNull().default('false'),
+		disabledAt: timestamp('disabled_at', { withTimezone: true, mode: 'string' }),
+		disabledBy: varchar('disabled_by', { length: 255 }),
+		countUsage: integer('count_usage').notNull().default(0), // Usage count
+		lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'string' }),
+		config: jsonb('config').notNull(), // Configuration details as JSON
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('delivery_destinations_type_idx').on(table.type),
+			index('delivery_destinations_organization_id_idx').on(table.organizationId),
+			index('delivery_destinations_disabled_idx').on(table.disabled),
+			index('delivery_destinations_last_used_at_idx').on(table.lastUsedAt),
+			uniqueIndex('delivery_destinations_org_label_unique').on(table.organizationId, table.label),
+			index('delivery_destinations_created_at_idx').on(table.createdAt),
+			index('delivery_destinations_updated_at_idx').on(table.updatedAt),
+		]
+	}
+)
 ```
 
-This test verifies that:
-- Events are successfully added to the queue
-- The processor handles events without errors
-- All events are persisted to the database
-- The system maintains good health metrics
+**Section sources**
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L712-L753) - *Updated in recent commit*
+- [0017_past_bishop.sql](file://packages\audit-db\drizzle\migrations\0017_past_bishop.sql) - *Added in recent commit*
 
-### Failed Persistence Scenario
-
-The chaos engineering test simulates database failures and verifies the system's self-healing capabilities:
+### Delivery Logs
+The `deliveryLogs` table tracks the status and history of all delivery attempts, providing audit trails and operational visibility.
 
 ```typescript
-// From chaos-engineering.test.ts
-it('should handle database outages and self-heal', async () => {
-  // Mock database to fail initially
-  const mockDb = {
-    insert: vi.fn().mockImplementation(() => {
-      throw new Error('ECONNREFUSED: Connection refused');
-    })
-  };
-  
-  const processor = new ReliableEventProcessor(connection, mockDb, async (event) => {
-    await mockDb.insert(auditLog).values(event);
-  });
-  
-  await processor.start();
-  
-  // Add events during outage
-  const testEvents = Array(50).fill(null).map((_, i) => ({
-    timestamp: new Date().toISOString(),
-    action: 'chaos.test',
-    status: 'attempt',
-    principalId: `user-${i}`,
-  }));
-  
-  for (const event of testEvents) {
-    await processor.addEvent(event);
-  }
-  
-  // Restore database connection
-  mockDb.insert.mockImplementationOnce(() => {
-    throw new Error('ETIMEDOUT: Connection timeout');
-  }).mockImplementation(async (table, values) => {
-    // Simulate successful insertion
-    return { success: true };
-  });
-  
-  // Wait for recovery
-  await new Promise(resolve => setTimeout(resolve, 15000));
-  
-  // Verify self-healing
-  const healthStatus = await processor.getHealthStatus();
-  expect(healthStatus.circuitBreakerState).toBe('CLOSED');
-  expect(healthStatus.healthScore).toBeGreaterThan(70);
-});
+export const deliveryLogs = pgTable(
+	'delivery_logs',
+	{
+		id: serial('id').primaryKey(),
+		deliveryId: varchar('delivery_id', { length: 255 }).notNull(), // Global delivery identifier
+		destinationId: integer('destination_id').notNull(),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(), // For organizational isolation
+		objectDetails: jsonb('object_details').notNull(), // Details about the delivered object
+		status: varchar('status', { length: 20 }).notNull(), // 'pending' | 'delivered' | 'failed' | 'retrying'
+		attempts: jsonb('attempts').notNull().default('[]'), // Array of attempt timestamps
+		lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true, mode: 'string' }),
+		deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'string' }),
+		failureReason: text('failure_reason'),
+		crossSystemReference: varchar('cross_system_reference', { length: 255 }), // External tracking reference
+		correlationId: varchar('correlation_id', { length: 255 }), // For request correlation
+		idempotencyKey: varchar('idempotency_key', { length: 255 }), // For duplicate detection
+		details: jsonb('details'), // Additional delivery details
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('delivery_logs_delivery_id_idx').on(table.deliveryId),
+			index('delivery_logs_destination_id_idx').on(table.destinationId),
+			index('delivery_logs_organization_id_idx').on(table.organizationId),
+			index('delivery_logs_status_idx').on(table.status),
+			index('delivery_logs_attempts_idx').on(table.attempts),
+			index('delivery_logs_last_attempt_at_idx').on(table.lastAttemptAt),
+			index('delivery_logs_delivered_at_idx').on(table.deliveredAt),
+			index('delivery_logs_cross_system_reference_idx').on(table.crossSystemReference),
+			index('delivery_logs_correlation_id_idx').on(table.correlationId),
+			index('delivery_logs_idempotency_key_idx').on(table.idempotencyKey),
+			index('delivery_logs_created_at_idx').on(table.createdAt),
+			index('delivery_logs_updated_at_idx').on(table.updatedAt),
+			// Composite indexes for common queries
+			index('delivery_logs_destination_status_idx').on(table.destinationId, table.status),
+			index('delivery_logs_status_attempts_idx').on(table.status, table.attempts),
+			index('delivery_logs_org_status_idx').on(table.organizationId, table.status),
+			index('delivery_logs_org_created_idx').on(table.organizationId, table.createdAt),
+		]
+	}
+)
 ```
 
-This test verifies that:
-- The circuit breaker opens during sustained failures
-- Events are queued and not lost during outages
-- The system automatically recovers when the database becomes available
-- The circuit breaker resets to CLOSED state after successful operations
-- The overall system health recovers
+**Section sources**
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L755-L818) - *Updated in recent commit*
 
-The load testing also verifies performance under high throughput conditions, ensuring the system can handle 100+ events per second while maintaining stability.
+### Delivery Queue
+The `deliveryQueue` table implements a queue-based processing system for deliveries, supporting priority handling and retry mechanisms.
+
+```typescript
+export const deliveryQueue = pgTable(
+	'delivery_queue',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(),
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		destinationId: integer('destination_id').notNull(),
+		payload: jsonb('payload').notNull(),
+		priority: integer('priority').notNull().default(0), // 0-10, higher = more priority
+		scheduledAt: timestamp('scheduled_at', { withTimezone: true, mode: 'string' }).notNull(),
+		processedAt: timestamp('processed_at', { withTimezone: true, mode: 'string' }),
+		status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, processing, completed, failed
+		correlationId: varchar('correlation_id', { length: 255 }),
+		idempotencyKey: varchar('idempotency_key', { length: 255 }),
+		retryCount: integer('retry_count').notNull().default(0),
+		maxRetries: integer('max_retries').notNull().default(5),
+		nextRetryAt: timestamp('next_retry_at', { withTimezone: true, mode: 'string' }),
+		metadata: jsonb('metadata').notNull().default('{}'),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('delivery_queue_organization_id_idx').on(table.organizationId),
+			index('delivery_queue_destination_id_idx').on(table.destinationId),
+			index('delivery_queue_status_idx').on(table.status),
+			index('delivery_queue_priority_idx').on(table.priority),
+			index('delivery_queue_scheduled_at_idx').on(table.scheduledAt),
+			index('delivery_queue_next_retry_at_idx').on(table.nextRetryAt),
+			index('delivery_queue_correlation_id_idx').on(table.correlationId),
+			index('delivery_queue_idempotency_key_idx').on(table.idempotencyKey),
+			index('delivery_queue_created_at_idx').on(table.createdAt),
+			// Composite indexes for queue processing
+			index('delivery_queue_status_priority_idx').on(table.status, table.priority),
+			index('delivery_queue_status_scheduled_idx').on(table.status, table.scheduledAt),
+			index('delivery_queue_org_status_idx').on(table.organizationId, table.status),
+			index('delivery_queue_retry_scheduled_idx').on(table.nextRetryAt, table.status),
+		]
+	}
+)
+```
 
 **Section sources**
-- [external-dependencies-integration.test.ts](file://packages/audit/src/__tests__/external-dependencies-integration.test.ts#L622-L643)
-- [chaos-engineering.test.ts](file://packages/audit/src/__tests__/chaos-engineering.test.ts#L1016-L1040)
-- [load-testing.test.ts](file://packages/audit/src/__tests__/load-testing.test.ts#L496-L534)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L824-L866) - *Updated in recent commit*
 
-## Performance Considerations
+### Destination Health
+The `destinationHealth` table monitors the health and performance of delivery destinations, implementing circuit breaker patterns.
 
-The persistence integration system is designed with several performance optimizations to handle high write throughput and maintain responsiveness during database outages.
-
-### Write Throughput Optimization
-
-The system achieves high write throughput through:
-- **Concurrent processing**: The ReliableEventProcessor supports configurable concurrency (default: 5 workers)
-- **Batched operations**: Events are processed in parallel, maximizing database utilization
-- **Connection pooling**: Database connections are pooled to minimize connection overhead
-- **Efficient indexing**: The audit_log table includes optimized indexes for common query patterns
-
-Performance testing shows the system can process over 100 events per second while maintaining low latency.
-
-### Connection Pooling
-
-The audit-db system implements connection pooling to efficiently manage database connections:
-
-- **Pool size**: Configurable maximum number of connections
-- **Idle timeout**: Connections are closed after a period of inactivity
-- **Connection reuse**: Active connections are reused to minimize overhead
-- **Health checking**: Connections are validated before use
-
-This approach prevents connection exhaustion and ensures efficient resource utilization.
-
-### Backpressure Handling
-
-During database outages, the system implements several backpressure mechanisms:
-
-- **Circuit breaker**: Prevents overwhelming the database with requests
-- **Queue buffering**: Events are stored in Redis, providing a buffer during outages
-- **Retry with backoff**: Gradual retry attempts prevent thundering herd problems
-- **Health monitoring**: System health is continuously monitored and reported
-
-The Redis queue acts as a buffer, allowing the system to continue accepting events even when the database is unavailable. Events accumulate in the queue and are processed as capacity becomes available.
-
-### Monitoring and Alerting
-
-The system includes comprehensive monitoring capabilities:
-- **Processor metrics**: Queue depth, processing times, success/failure rates
-- **Circuit breaker metrics**: Failure rates, state changes, trip counts
-- **DLQ metrics**: Event counts, failure reasons, processing times
-- **Health scoring**: Composite health score based on multiple metrics
-
-These metrics are exposed for integration with monitoring systems like Prometheus and Grafana, enabling real-time visibility into system performance and health.
+```typescript
+export const destinationHealth = pgTable(
+	'destination_health',
+	{
+		destinationId: integer('destination_id').primaryKey(),
+		status: varchar('status', { length: 20 }).notNull(), // healthy, degraded, unhealthy, disabled
+		lastCheckAt: timestamp('last_check_at', { withTimezone: true, mode: 'string' }).notNull(),
+		consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+		totalFailures: integer('total_failures').notNull().default(0),
+		totalDeliveries: integer('total_deliveries').notNull().default(0),
+		successRate: varchar('success_rate', { length: 10 }).notNull().default('0'), // Percentage as string
+		averageResponseTime: integer('average_response_time'), // milliseconds
+		lastFailureAt: timestamp('last_failure_at', { withTimezone: true, mode: 'string' }),
+		lastSuccessAt: timestamp('last_success_at', { withTimezone: true, mode: 'string' }),
+		disabledAt: timestamp('disabled_at', { withTimezone: true, mode: 'string' }),
+		disabledReason: text('disabled_reason'),
+		circuitBreakerState: varchar('circuit_breaker_state', { length: 20 })
+			.notNull()
+			.default('closed'), // closed, open, half-open
+		circuitBreakerOpenedAt: timestamp('circuit_breaker_opened_at', {
+			withTimezone: true,
+			mode: 'string',
+		}),
+		metadata: jsonb('metadata').notNull().default('{}'),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			index('destination_health_status_idx').on(table.status),
+			index('destination_health_last_check_at_idx').on(table.lastCheckAt),
+			index('destination_health_consecutive_failures_idx').on(table.consecutiveFailures),
+			index('destination_health_success_rate_idx').on(table.successRate),
+			index('destination_health_circuit_breaker_state_idx').on(table.circuitBreakerState),
+			index('destination_health_last_failure_at_idx').on(table.lastFailureAt),
+			index('destination_health_last_success_at_idx').on(table.lastSuccessAt),
+			index('destination_health_disabled_at_idx').on(table.disabledAt),
+			index('destination_health_updated_at_idx').on(table.updatedAt),
+		]
+	}
+)
+```
 
 **Section sources**
-- [reliable-processor.ts](file://packages/audit/src/queue/reliable-processor.ts#L1-L500)
-- [enhanced-client.ts](file://packages/audit-db/src/db/enhanced-client.ts#L124-L163)
-- [performance.test.ts](file://packages/audit-db/src/__tests__/performance.test.ts#L478-L525)
-- [load-testing.test.ts](file://packages/audit/src/__tests__/load-testing.test.ts#L566-L605)
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L872-L912) - *Updated in recent commit*
+
+### Webhook Secrets
+The `webhookSecrets` table manages secure secrets for webhook deliveries, supporting secret rotation.
+
+```typescript
+export const webhookSecrets = pgTable(
+	'webhook_secrets',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(),
+		destinationId: integer('destination_id').notNull(),
+		secretKey: varchar('secret_key', { length: 255 }).notNull(), // encrypted
+		algorithm: varchar('algorithm', { length: 50 }).notNull().default('HMAC-SHA256'),
+		isActive: varchar('is_active', { length: 10 }).notNull().default('true'),
+		isPrimary: varchar('is_primary', { length: 10 }).notNull().default('false'), // For rotation support
+		expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }),
+		rotatedAt: timestamp('rotated_at', { withTimezone: true, mode: 'string' }),
+		usageCount: integer('usage_count').notNull().default(0),
+		lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'string' }),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		createdBy: varchar('created_by', { length: 255 }),
+	},
+	(table) => {
+		return [
+			index('webhook_secrets_destination_id_idx').on(table.destinationId),
+			index('webhook_secrets_is_active_idx').on(table.isActive),
+			index('webhook_secrets_is_primary_idx').on(table.isPrimary),
+			index('webhook_secrets_expires_at_idx').on(table.expiresAt),
+			index('webhook_secrets_created_at_idx').on(table.createdAt),
+			index('webhook_secrets_last_used_at_idx').on(table.lastUsedAt),
+			// Composite indexes for secret management
+			index('webhook_secrets_destination_active_idx').on(table.destinationId, table.isActive),
+			index('webhook_secrets_destination_primary_idx').on(table.destinationId, table.isPrimary),
+		]
+	}
+)
+```
+
+**Section sources**
+- [schema.ts](file://packages\audit-db\src\db\schema.ts#L918-L949) - *Updated in recent commit*
+
+## Scheduled Reporting with Worker Services
+The scheduled reporting system has been enhanced to leverage the new delivery infrastructure, providing more reliable and observable report delivery.
+
+### Architecture Updates
+The scheduled reporting workflow now integrates with the delivery queue and health monitoring system:
+
+```mermaid
+sequenceDiagram
+participant Scheduler as "Worker Scheduler"
+participant Service as "ScheduledReportingService"
+participant Report as "ComplianceReportingService"
+participant Export as "DataExportService"
+participant Queue as "Delivery Queue"
+participant Delivery as "Delivery System"
+Scheduler->>Service : Check Scheduled Reports
+Service->>Service : Find Due Reports
+loop Each Due Report
+Service->>Report : generateComplianceReport()
+Report-->>Service : Return Report
+Service->>Export : exportComplianceReport()
+Export-->>Service : Return ExportResult
+Service->>Queue : enqueueDelivery()
+Queue-->>Service : Return QueueId
+Service->>Service : Record Execution
+end
+Service-->>Scheduler : Processing Complete
+loop Delivery Worker
+Queue->>Delivery : processDelivery()
+Delivery->>Destination : deliverReport()
+alt Success
+Delivery-->>Queue : markComplete()
+else Failure
+Delivery-->>Queue : scheduleRetry()
+end
+end
+```
+
+**Diagram sources**
+- [scheduled-reporting.ts](file://packages\audit\src\report\scheduled-reporting.ts) - *Updated in recent commit*
+- [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Updated in recent commit*
+
+### Delivery Configuration
+The delivery configuration in scheduled reports now supports the enhanced delivery system:
+
+```typescript
+interface DeliveryConfig {
+    method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
+    email?: {
+        smtpConfig: SMTPConfig
+        from: string
+        subject: string
+        bodyTemplate: string
+        attachmentName: string
+        recipients: string[]
+    }
+    webhook?: {
+        url: string
+        method: 'POST' | 'PUT'
+        headers: Record<string, string>
+        timeout: number
+        retryConfig: {
+            maxRetries: number
+            backoffMultiplier: number
+            maxBackoffDelay: number
+        }
+        secretId?: string // References webhookSecrets.id
+    }
+    storage?: {
+        type: 's3' | 'gcp' | 'azure'
+        path: string
+        region?: string
+        bucket: string
+    }
+    sftp?: {
+        host: string
+        port: number
+        username: string
+        privateKey?: string
+        remotePath: string
+    }
+}
+```
+
+**Section sources**
+- [scheduled-reporting.ts](file://packages\audit\src\report\scheduled-reporting.ts) - *Updated in recent commit*
+
+## Compliance Reporting System
+The compliance reporting system has been updated to integrate with the new delivery infrastructure, enhancing reliability and observability.
+
+### Report Delivery Enhancements
+The reporting system now uses the delivery queue for asynchronous processing:
+
+```typescript
+async deliverReport(
+    config: ScheduledReportConfig,
+    reportResult: ExportResult,
+    execution: ReportExecution
+): Promise<void> {
+    const deliveryAttempt: DeliveryAttempt = {
+        attemptId: this.generateId('delivery'),
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+        method: config.delivery.method,
+        target: this.getDeliveryTarget(config.delivery),
+        retryCount: 0,
+    }
+
+    execution.deliveryAttempts.push(deliveryAttempt)
+
+    try {
+        // Enqueue delivery instead of direct delivery
+        await this.queueDelivery(config, reportResult, deliveryAttempt)
+        deliveryAttempt.status = 'queued'
+    } catch (error) {
+        deliveryAttempt.status = 'failed'
+        deliveryAttempt.error = error instanceof Error ? error.message : 'Unknown error'
+        throw error
+    }
+}
+```
+
+**Section sources**
+- [scheduled-reporting.ts](file://packages\audit\src\report\scheduled-reporting.ts) - *Updated in recent commit*
+
+### Health Monitoring Integration
+The system checks destination health before attempting delivery:
+
+```typescript
+async checkDestinationHealth(destinationId: number): Promise<boolean> {
+    const healthRecord = await this.db
+        .select()
+        .from(destinationHealth)
+        .where(eq(destinationHealth.destinationId, destinationId))
+        .limit(1)
+
+    if (healthRecord.length === 0) {
+        return true // Assume healthy if no record
+    }
+
+    const health = healthRecord[0]
+    return health.status === 'healthy' && health.circuitBreakerState === 'closed'
+}
+```
+
+**Section sources**
+- [schema.ts](file://packages\audit-db\src\db\schema.ts) - *Updated in recent commit*

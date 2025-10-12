@@ -16,12 +16,16 @@
 - [init-primary.sql](file://docker\pgvector\init-primary.sql) - *Added in recent commit*
 - [0007_keen_ego.sql](file://packages\audit-db\drizzle\migrations\0007_keen_ego.sql) - *Updated in recent commit*
 - [0008_swift_black_panther.sql](file://packages\audit-db\drizzle\migrations\0008_swift_black_panther.sql) - *Updated in recent commit*
+- [0017_past_bishop.sql](file://packages\audit-db\drizzle\migrations\0017_past_bishop.sql) - *Added in recent commit*
+- [circuit-breaker.ts](file://packages\audit-db\src\db\circuit-breaker.ts) - *Updated in recent commit*
+- [optimized-lru-cache.ts](file://packages\audit-db\src\cache\optimized-lru-cache.ts) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
-- Added new section on pseudonymization strategy and unique index for original ID in pseudonym_mapping table
-- Updated GDPR Pseudonymization and Compliance section to include new strategy field and unique constraint
-- Enhanced pseudonym_mapping data model with strategy field and unique index on originalId
+- Added new section on delivery system database schema including deliveryDestinations, deliveryLogs, deliveryQueue, and destinationHealth tables
+- Added new section on enhanced resilience patterns with circuit breaker and optimized LRU cache implementations
+- Updated GDPR Pseudonymization and Compliance section to include new strategy field and unique index for original ID in pseudonym_mapping table
+- Enhanced pseudonym_mapping data model with strategy field and unique constraint on originalId
 - Updated section sources to reflect new and modified migration files related to pseudonymization
 - Added details about index creation and constraint changes in migration files
 
@@ -38,7 +42,9 @@
 10. [Alert Persistence with Database Integration](#alert-persistence-with-database-integration)
 11. [GDPR Pseudonymization and Compliance](#gdpr-pseudonymization-and-compliance)
 12. [Organization Role Management](#organization-role-management)
-13. [Conclusion](#conclusion)
+13. [Delivery System Database Schema](#delivery-system-database-schema)
+14. [Enhanced Resilience Patterns](#enhanced-resilience-patterns)
+15. [Conclusion](#conclusion)
 
 ## Introduction
 
@@ -268,9 +274,83 @@ text description
 jsonb permissions
 jsonb inherits
 }
+delivery_destinations {
+integer id PK
+varchar organization_id
+varchar type
+varchar label
+text description
+varchar icon
+text instructions
+varchar disabled
+timestamp disabled_at
+varchar disabled_by
+integer count_usage
+timestamp last_used_at
+jsonb config
+timestamp created_at
+timestamp updated_at
+}
+delivery_logs {
+integer id PK
+varchar delivery_id
+integer destination_id
+varchar organization_id
+jsonb object_details
+varchar status
+jsonb attempts
+timestamp last_attempt_at
+timestamp delivered_at
+text failure_reason
+varchar cross_system_reference
+varchar correlation_id
+varchar idempotency_key
+jsonb details
+timestamp created_at
+timestamp updated_at
+}
+delivery_queue {
+varchar id PK
+varchar organization_id
+integer destination_id
+jsonb payload
+integer priority
+timestamp scheduled_at
+timestamp processed_at
+varchar status
+varchar correlation_id
+varchar idempotency_key
+integer retry_count
+integer max_retries
+timestamp next_retry_at
+jsonb metadata
+timestamp created_at
+timestamp updated_at
+}
+destination_health {
+integer destination_id PK
+varchar status
+timestamp last_check_at
+integer consecutive_failures
+integer total_failures
+integer total_deliveries
+varchar success_rate
+integer average_response_time
+timestamp last_failure_at
+timestamp last_success_at
+timestamp disabled_at
+text disabled_reason
+varchar circuit_breaker_state
+timestamp circuit_breaker_opened_at
+jsonb metadata
+timestamp updated_at
+}
 audit_log ||--o{ audit_integrity_log : "1:N"
 scheduled_reports ||--o{ report_executions : "1:N"
 report_templates ||--o{ scheduled_reports : "1:N"
+delivery_destinations ||--o{ delivery_logs : "1:N"
+delivery_destinations ||--o{ delivery_queue : "1:N"
+delivery_destinations ||--o{ destination_health : "1:1"
 ```
 
 **Diagram sources**
@@ -837,7 +917,17 @@ drizzle/migrations/
 ├── 0005_marvelous_christian_walker.sql
 ├── 0006_silly_tyger_tiger.sql
 ├── 0007_keen_ego.sql
-└── 0008_swift_black_panther.sql
+├── 0008_swift_black_panther.sql
+├── 0009_ambiguous_carnage.sql
+├── 0010_thin_revanche.sql
+├── 0011_shiny_quasar.sql
+├── 0012_good_carnage.sql
+├── 0013_happy_leo.sql
+├── 0014_low_molecule_man.sql
+├── 0015_broad_jazinda.sql
+├── 0016_fresh_fallen_one.sql
+├── 0017_past_bishop.sql
+└── 0018_nebulous_mole_man.sql
 ```
 
 Each migration file contains the SQL statements needed to upgrade the database schema, along with a corresponding rollback section.
@@ -1375,6 +1465,342 @@ if (role) {
 - [authz.ts](file://packages\auth\src\permissions.ts)
 - [organization_role](file://packages\auth\drizzle\0005_fluffy_donald_blake.sql)
 
+## Delivery System Database Schema
+
+The Audit Database now includes a comprehensive delivery system for managing and tracking the delivery of audit data, reports, and other content to various destinations.
+
+### Delivery System Architecture
+
+```mermaid
+graph TD
+DS[Delivery System] --> DD[DeliveryDestinations]
+DD --> DL[DeliveryLogs]
+DD --> DQ[DeliveryQueue]
+DD --> DH[DestinationHealth]
+DQ --> DB[(PostgreSQL)]
+DL --> DB
+DH --> DB
+DD --> DB
+subgraph "Delivery System"
+DD
+DL
+DQ
+DH
+end
+subgraph "Data Storage"
+DB
+end
+style DD fill:#f96,stroke:#333
+style DL fill:#f96,stroke:#333
+style DQ fill:#f96,stroke:#333
+style DH fill:#f96,stroke:#333
+style DB fill:#bbf,stroke:#333
+```
+
+**Diagram sources**
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
+- [0017_past_bishop.sql](file://packages\audit-db\drizzle\migrations\0017_past_bishop.sql)
+
+**Section sources**
+- [schema.ts](file://packages\audit-db\src\db\schema.ts)
+- [0017_past_bishop.sql](file://packages\audit-db\drizzle\migrations\0017_past_bishop.sql)
+
+### Core Delivery Entities
+
+#### deliveryDestinations
+Stores configuration for delivery destinations where audit data, reports, and other content can be sent.
+
+**Fields:**
+- **id**: serial - Primary key
+- **organizationId**: varchar(255) - Tenant identifier for multi-organizational support
+- **type**: varchar(50) - Destination type ('email', 's3', 'ftp', 'webhook', etc.)
+- **label**: varchar(255) - Human-readable label for the destination
+- **description**: text - Description of the destination
+- **icon**: varchar(255) - URL or icon name for visual representation
+- **instructions**: text - Setup or usage instructions
+- **disabled**: varchar(10) - Whether the destination is disabled ('true'/'false')
+- **disabledAt**: timestamp - Timestamp when disabled
+- **disabledBy**: varchar(255) - User who disabled the destination
+- **countUsage**: integer - Usage count (number of deliveries)
+- **lastUsedAt**: timestamp - Timestamp of last delivery
+- **config**: jsonb - Configuration details specific to the destination type
+- **createdAt**: timestamp - Creation timestamp
+- **updatedAt**: timestamp - Last update timestamp
+
+#### deliveryLogs
+Tracks the delivery history and status of all delivery attempts.
+
+**Fields:**
+- **id**: serial - Primary key
+- **deliveryId**: varchar(255) - Global delivery identifier
+- **destinationId**: integer - Foreign key to delivery_destinations
+- **organizationId**: varchar(255) - Tenant identifier for multi-organizational support
+- **objectDetails**: jsonb - Details about the delivered object (type, id, name, size, format, etc.)
+- **status**: varchar(20) - Delivery status ('pending', 'delivered', 'failed', 'retrying')
+- **attempts**: jsonb - Array of attempt timestamps and statuses
+- **lastAttemptAt**: timestamp - Timestamp of last delivery attempt
+- **deliveredAt**: timestamp - Timestamp when successfully delivered
+- **failureReason**: text - Reason for delivery failure
+- **crossSystemReference**: varchar(255) - External tracking reference
+- **correlationId**: varchar(255) - For request correlation
+- **idempotencyKey**: varchar(255) - For duplicate detection
+- **details**: jsonb - Additional delivery details
+- **createdAt**: timestamp - Creation timestamp
+- **updatedAt**: timestamp - Last update timestamp
+
+#### deliveryQueue
+Manages the queue of pending deliveries with priority and retry logic.
+
+**Fields:**
+- **id**: varchar(255) - Primary key (UUID)
+- **organizationId**: varchar(255) - Tenant identifier for multi-organizational support
+- **destinationId**: integer - Foreign key to delivery_destinations
+- **payload**: jsonb - Delivery payload (content to be delivered)
+- **priority**: integer - Delivery priority (0-10, higher = more priority)
+- **scheduledAt**: timestamp - Scheduled delivery time
+- **processedAt**: timestamp - Timestamp when processed
+- **status**: varchar(20) - Queue status ('pending', 'processing', 'completed', 'failed')
+- **correlationId**: varchar(255) - For request correlation
+- **idempotencyKey**: varchar(255) - For duplicate detection
+- **retryCount**: integer - Number of retry attempts
+- **maxRetries**: integer - Maximum number of retries allowed
+- **nextRetryAt**: timestamp - Next retry scheduled time
+- **metadata**: jsonb - Additional metadata
+- **createdAt**: timestamp - Creation timestamp
+- **updatedAt**: timestamp - Last update timestamp
+
+#### destinationHealth
+Monitors the health and performance of delivery destinations.
+
+**Fields:**
+- **destinationId**: integer - Primary key (foreign key to delivery_destinations)
+- **status**: varchar(20) - Health status ('healthy', 'degraded', 'unhealthy', 'disabled')
+- **lastCheckAt**: timestamp - Timestamp of last health check
+- **consecutiveFailures**: integer - Number of consecutive failures
+- **totalFailures**: integer - Total number of failures
+- **totalDeliveries**: integer - Total number of deliveries
+- **successRate**: varchar(10) - Success rate percentage as string
+- **averageResponseTime**: integer - Average response time in milliseconds
+- **lastFailureAt**: timestamp - Timestamp of last failure
+- **lastSuccessAt**: timestamp - Timestamp of last success
+- **disabledAt**: timestamp - Timestamp when disabled
+- **disabledReason**: text - Reason for disabling
+- **circuitBreakerState**: varchar(20) - Circuit breaker state ('closed', 'open', 'half-open')
+- **circuitBreakerOpenedAt**: timestamp - Timestamp when circuit breaker opened
+- **metadata**: jsonb - Additional health metadata
+- **updatedAt**: timestamp - Last update timestamp
+
+### Delivery System Features
+
+- **Multi-destination support**: Supports various delivery types including email, S3, FTP, and webhooks
+- **Priority queuing**: Deliveries can be prioritized based on importance
+- **Retry logic**: Failed deliveries are automatically retried with exponential backoff
+- **Idempotency**: Idempotency keys prevent duplicate deliveries
+- **Health monitoring**: Continuous monitoring of destination health and performance
+- **Circuit breaker integration**: Prevents overwhelming failing destinations
+- **Comprehensive logging**: Detailed logs of all delivery attempts and outcomes
+- **Multi-tenancy**: Full organizational isolation for all delivery operations
+
+### Usage Patterns
+
+The delivery system supports several key usage patterns:
+
+1. **Scheduled report delivery**: Automatically deliver compliance reports to designated recipients
+2. **Real-time alert notifications**: Send security and compliance alerts to stakeholders
+3. **Data exports**: Deliver audit data exports to external systems or partners
+4. **Backup and archival**: Send audit data to backup storage locations
+5. **Integration with external systems**: Connect with third-party services through webhooks
+6. **Health monitoring and alerting**: Monitor delivery destination health and alert on issues
+
+## Enhanced Resilience Patterns
+
+The Audit Database has been enhanced with advanced resilience patterns to improve system reliability and fault tolerance.
+
+### Resilience Architecture
+
+```mermaid
+graph TD
+EC[EnhancedClient] --> CB[CircuitBreaker]
+EC --> LRU[OptimizedLRUCache]
+CB --> DB[(PostgreSQL)]
+LRU --> Redis[(Redis)]
+CB --> Redis
+subgraph "Resilience Layer"
+CB
+LRU
+end
+subgraph "Data Storage"
+DB
+Redis
+end
+style CB fill:#f96,stroke:#333
+style LRU fill:#f96,stroke:#333
+style DB fill:#bbf,stroke:#333
+style Redis fill:#bbf,stroke:#333
+```
+
+**Diagram sources**
+- [circuit-breaker.ts](file://packages\audit-db\src\db\circuit-breaker.ts)
+- [optimized-lru-cache.ts](file://packages\audit-db\src\cache\optimized-lru-cache.ts)
+
+**Section sources**
+- [circuit-breaker.ts](file://packages\audit-db\src\db\circuit-breaker.ts)
+- [optimized-lru-cache.ts](file://packages\audit-db\src\cache\optimized-lru-cache.ts)
+
+### Circuit Breaker Implementation
+
+The CircuitBreaker class implements the circuit breaker pattern to prevent cascading failures and improve system resilience.
+
+```typescript
+class CircuitBreaker implements ICircuitBreaker {
+  private state: CircuitBreakerState = CircuitBreakerState.CLOSED
+  private failureCount = 0
+  private successCount = 0
+  private nextAttemptTime: Date | null = null
+  private metrics: CircuitBreakerMetrics
+  private readonly logger: StructuredLogger
+
+  constructor(
+    private readonly name: string,
+    private readonly config: CircuitBreakerConfig
+  ) {
+    // Initialize logger and metrics
+  }
+
+  async execute<T>(operation: () => Promise<T>): Promise<T>
+  getState(): CircuitBreakerState
+  reset(): void
+  getStatus(): CircuitBreakerStatus
+  private onSuccess(): void
+  private onFailure(error: Error): void
+  private openCircuit(): void
+  private shouldAttemptReset(): boolean
+  private calculateBackoff(): number
+}
+```
+
+#### Circuit Breaker States
+
+- **CLOSED**: Normal operation, requests are allowed
+- **OPEN**: Circuit is broken, requests are rejected
+- **HALF_OPEN**: Circuit is testing recovery, limited requests allowed
+
+#### Circuit Breaker Configuration
+
+```typescript
+interface CircuitBreakerConfig {
+  failureThreshold: number // Number of failures before opening circuit
+  timeoutMs: number // Operation timeout in milliseconds
+  resetTimeoutMs: number // Time to wait before attempting reset
+}
+```
+
+#### Key Features
+
+- **Failure threshold**: Automatically opens circuit after configurable number of failures
+- **Timeout protection**: Prevents hanging operations with configurable timeouts
+- **Exponential backoff**: Increases wait time between retry attempts
+- **Jitter**: Adds randomness to backoff to prevent thundering herd
+- **Metrics collection**: Tracks requests, failures, timeouts, and circuit state changes
+- **Logging**: Comprehensive logging for monitoring and debugging
+- **Registry**: Central registry for managing multiple circuit breakers
+
+### Optimized LRU Cache
+
+The OptimizedLRUCache class provides a high-performance LRU cache implementation with O(1) operations.
+
+```typescript
+class OptimizedLRUCache<T = any> implements IQueryCache {
+  private readonly keyMap = new Map<string, CacheNode<T>>()
+  private readonly head: CacheNode<T>
+  private readonly tail: CacheNode<T>
+  private currentSizeBytes = 0
+  private metrics: CacheMetrics
+  private cleanupTimer: NodeJS.Timeout | null = null
+  private readonly logger: StructuredLogger
+
+  constructor(private config: OptimizedLRUConfig)
+
+  async get<U = T>(key: string): Promise<U | null>
+  async set<U = T>(key: string, value: U, ttlSeconds?: number): Promise<void>
+  async invalidate(pattern: string): Promise<number>
+  async stats(): Promise<QueryCacheStats>
+  async delete(key: string): Promise<boolean>
+  clear(): void
+  cleanup(): number
+  destroy(): void
+}
+```
+
+#### Cache Configuration
+
+```typescript
+interface OptimizedLRUConfig {
+  maxSizeMB: number // Maximum cache size in MB
+  defaultTTL: number // Default time-to-live in seconds
+  keyPrefix: string // Key prefix for namespacing
+  enabled: boolean // Whether cache is enabled
+  maxKeys: number // Maximum number of keys
+  cleanupInterval: number // Interval for cleaning expired entries
+}
+```
+
+#### Key Features
+
+- **O(1) operations**: HashMap + Doubly Linked List implementation ensures constant time complexity
+- **Memory tracking**: Tracks memory usage in bytes for size-based eviction
+- **TTL support**: Time-to-live for automatic expiration of entries
+- **Size-based eviction**: Evicts entries when cache exceeds maximum size
+- **Count-based eviction**: Limits maximum number of keys
+- **Periodic cleanup**: Regular cleanup of expired entries
+- **Pattern invalidation**: Invalidate entries by pattern matching
+- **Detailed metrics**: Comprehensive metrics for monitoring and optimization
+- **Size estimation**: Estimates object size in bytes for accurate memory tracking
+
+### Resilience Integration
+
+The enhanced client integrates both circuit breaker and cache patterns to provide comprehensive resilience:
+
+```typescript
+class EnhancedAuditDatabaseClient {
+  private circuitBreaker: CircuitBreaker
+  private cache: OptimizedLRUCache
+
+  constructor(config: EnhancedClientConfig) {
+    this.circuitBreaker = createCircuitBreaker('audit-db', config.circuitBreaker)
+    this.cache = createOptimizedLRUCache(config.cache)
+  }
+
+  async query<T>(sql: string, params?: any[]): Promise<T> {
+    return this.circuitBreaker.execute(async () => {
+      const cacheKey = this.generateCacheKey(sql, params)
+      const cached = await this.cache.get<T>(cacheKey)
+      
+      if (cached) {
+        return cached
+      }
+
+      const result = await this.executeQuery(sql, params)
+      await this.cache.set(cacheKey, result, this.config.cache.defaultTTL)
+      
+      return result
+    })
+  }
+}
+```
+
+### Usage Patterns
+
+The resilience patterns support several key usage patterns:
+
+1. **Database operation protection**: Wrap database operations with circuit breaker for fault tolerance
+2. **Query caching**: Cache frequent queries to reduce database load
+3. **Health monitoring**: Monitor circuit breaker state and cache metrics for system health
+4. **Performance optimization**: Use cache hit ratio and operation times to identify optimization opportunities
+5. **Failure recovery**: Automatically recover from temporary failures with circuit breaker
+6. **Resource protection**: Prevent overwhelming downstream services with circuit breaker
+7. **Memory management**: Control cache memory usage with size and count limits
+
 ## Conclusion
 
 The Audit Database is a comprehensive, high-performance system designed to meet the demanding requirements of modern audit and compliance scenarios. By implementing advanced database techniques such as time-based partitioning, Redis caching, and comprehensive performance monitoring, the system delivers excellent performance even with large volumes of audit data.
@@ -1389,5 +1815,7 @@ Key strengths of the system include:
 - **Alert Persistence**: The new DatabaseAlertHandler provides reliable, persistent storage of alerts with multi-organizational support and comprehensive querying capabilities.
 - **GDPR Compliance**: The GDPRComplianceService and pseudonym_mapping table provide robust support for data subject rights and privacy-by-design principles, now enhanced with strategy tracking and unique constraints.
 - **Organization Role Management**: The AuthorizationService and organization_role table provide fine-grained access control with Redis caching and PostgreSQL persistence.
+- **Delivery System**: The new delivery system with deliveryDestinations, deliveryLogs, deliveryQueue, and destinationHealth tables provides comprehensive delivery management with priority queuing, retry logic, and health monitoring.
+- **Enhanced Resilience**: The CircuitBreaker and OptimizedLRUCache implementations provide advanced fault tolerance and performance optimization patterns.
 
 The system is well-positioned to serve as the foundation for audit and compliance capabilities across various domains, with particular strength in healthcare applications requiring HIPAA compliance. By following the documented patterns and best practices, organizations can ensure their audit data is secure, reliable, and available when needed.

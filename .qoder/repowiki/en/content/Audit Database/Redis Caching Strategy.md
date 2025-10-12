@@ -2,13 +2,15 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [cache-factory.ts](file://packages\audit-db\src\cache\cache-factory.ts) - *Updated with hybrid cache configuration*
+- [cache-factory.ts](file://packages\audit-db\src\cache\cache-factory.ts) - *Updated with hybrid cache configuration and LRU optimizations*
 - [query-cache.ts](file://packages\audit-db\src\cache\query-cache.ts) - *Base cache implementation*
 - [redis-query-cache.ts](file://packages\audit-db\src\cache\redis-query-cache.ts) - *Main Redis cache implementation with L1/L2 support*
 - [cached-query-executor.ts](file://packages\audit-db\src\cache\cached-query-executor.ts) - *Query execution with caching logic*
 - [enhanced-client.ts](file://packages\audit-db\src\db\enhanced-client.ts) - *Integration with enhanced database client*
 - [REDIS_CACHE_GUIDE.md](file://packages\audit-db\REDIS_CACHE_GUIDE.md) - *Additional usage documentation*
 - [permissions.ts](file://packages\auth\src\permissions.ts) - *Added Redis caching for organization role management*
+- [redis-transport.ts](file://packages\logs\src\transports\redis-transport.ts) - *Redis transport with circuit breaker and retry logic*
+- [config.ts](file://packages\logs\src\types\config.ts) - *Redis transport configuration schema*
 </cite>
 
 ## Update Summary
@@ -19,6 +21,8 @@
 - Updated performance considerations with hybrid caching benefits
 - Added new section on cache configuration strategies for different environments
 - Integrated documentation of Redis caching for authorization layer and organization role management
+- Added comprehensive documentation for Redis transport in logging system with circuit breaker, retry logic, and connection resilience
+- Updated source references to include new Redis transport implementation and configuration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -30,10 +34,11 @@
 7. [Performance Considerations](#performance-considerations)
 8. [Troubleshooting Guide](#troubleshooting-guide)
 9. [Authorization Layer Caching](#authorization-layer-caching)
-10. [Conclusion](#conclusion)
+10. [Logging System Redis Transport](#logging-system-redis-transport)
+11. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides a comprehensive overview of the Redis-based query caching system implemented in the audit-db package. The caching strategy is designed to optimize performance for audit data retrieval operations by reducing database load through intelligent caching of frequently accessed query results. The system features a pluggable architecture with factory patterns, TTL management, and cache invalidation policies tailored for audit data workloads. Recent updates include a hybrid L1/L2 caching strategy with local memory as L1 cache and Redis as L2 cache for improved performance of organization role queries and other frequently accessed data. The system has been extended to include Redis caching for authorization layer operations, particularly for organization role management.
+This document provides a comprehensive overview of the Redis-based query caching system implemented in the audit-db package. The caching strategy is designed to optimize performance for audit data retrieval operations by reducing database load through intelligent caching of frequently accessed query results. The system features a pluggable architecture with factory patterns, TTL management, and cache invalidation policies tailored for audit data workloads. Recent updates include a hybrid L1/L2 caching strategy with local memory as L1 cache and Redis as L2 cache for improved performance of organization role queries and other frequently accessed data. The system has been extended to include Redis caching for authorization layer operations, particularly for organization role management. Additionally, a new Redis transport has been implemented in the logging system with comprehensive resilience features including circuit breaker, retry logic, and connection management.
 
 ## Project Structure
 The Redis caching implementation is located within the `packages/audit-db/src/cache` directory. This modular structure separates caching concerns from database operations while maintaining tight integration with the enhanced database client.
@@ -381,5 +386,123 @@ async clearCache(): Promise<void> {
 **Section sources**
 - [permissions.ts](file://packages\auth\src\permissions.ts#L300-L330)
 
+## Logging System Redis Transport
+The logging system now includes a comprehensive Redis transport implementation with advanced resilience features for reliable log delivery.
+
+### Redis Transport Architecture
+The Redis transport implements a robust architecture with multiple resilience layers:
+
+- **Circuit Breaker**: Prevents cascading failures by detecting and isolating failing Redis endpoints
+- **Retry Manager**: Implements exponential backoff retry strategy for transient failures
+- **Batch Manager**: Optimizes performance by batching log entries before transmission
+- **Connection Management**: Handles both single instance and cluster connections with automatic reconnection
+
+```mermaid
+sequenceDiagram
+participant App as "Application"
+participant Logger as "StructuredLogger"
+participant Transport as "RedisTransport"
+participant Redis as "Redis Server"
+App->>Logger : log(message)
+Logger->>Transport : send(entries)
+Transport->>BatchManager : add(entries)
+BatchManager->>RetryManager : executeWithRetry()
+RetryManager->>CircuitBreaker : canExecute()
+CircuitBreaker-->>RetryManager : true/false
+alt Circuit Closed
+RetryManager->>Transport : sendToRedis()
+Transport->>Redis : LPUSH (pipeline)
+Redis-->>Transport : Success
+Transport-->>RetryManager : Success
+RetryManager-->>BatchManager : Success
+end
+alt Circuit Open
+RetryManager-->>BatchManager : Failure
+BatchManager-->>Logger : Failure
+end
+```
+
+**Section sources**
+- [redis-transport.ts](file://packages\logs\src\transports\redis-transport.ts#L31-L781)
+- [config.ts](file://packages\logs\src\types\config.ts#L150-L200)
+
+### Configuration Options
+The Redis transport supports comprehensive configuration options for different deployment scenarios:
+
+```typescript
+const redisConfig = {
+  name: 'redis',
+  enabled: true,
+  host: 'localhost',
+  port: 6379,
+  password: 'secret',
+  database: 0,
+  keyPrefix: 'logs:',
+  listName: 'application-logs',
+  maxRetries: 3,
+  connectTimeoutMs: 10000,
+  commandTimeoutMs: 5000,
+  enableAutoPipelining: true,
+  enableOfflineQueue: false,
+  dataStructure: 'list',
+  enableCluster: false,
+  enableTLS: true,
+  tlsOptions: {
+    rejectUnauthorized: true,
+    ca: 'ca-cert.pem',
+    cert: 'client-cert.pem',
+    key: 'client-key.pem'
+  }
+}
+```
+
+**Section sources**
+- [config.ts](file://packages\logs\src\types\config.ts#L150-L200)
+
+### Resilience Features
+The Redis transport implements several resilience features to ensure reliable log delivery:
+
+- **Circuit Breaker**: Automatically opens when failure threshold is reached, preventing system overload
+- **Retry Logic**: Implements exponential backoff with configurable parameters
+- **Health Checks**: Regular PING commands verify Redis connectivity
+- **Reconnection**: Automatic reconnection with exponential backoff strategy
+- **Error Classification**: Distinguishes between retryable and non-retryable errors
+
+```mermaid
+stateDiagram-v2
+[*] --> Healthy
+Healthy --> Degraded : Error threshold reached
+Degraded --> Unhealthy : Multiple failures
+Unhealthy --> Degraded : Reset timeout expired
+Degraded --> Healthy : Successful operations
+Healthy --> Healthy : Normal operation
+Unhealthy --> Unhealthy : Still failing
+```
+
+**Section sources**
+- [redis-transport.ts](file://packages\logs\src\transports\redis-transport.ts#L150-L300)
+
+### Monitoring and Diagnostics
+The Redis transport provides comprehensive monitoring capabilities:
+
+```typescript
+// Get transport health status
+console.log('Is Healthy:', transport.isHealthy())
+console.log('Last Error:', transport.getLastError())
+console.log('Connection Status:', transport.getConnectionStatus())
+console.log('Circuit State:', transport.getCircuitBreakerState())
+
+// Get detailed connection information
+const connectionInfo = transport.getConnectionInfo()
+console.log('Connection Info:', connectionInfo)
+
+// Get batch processing statistics
+const batchStats = transport.getBatchStats()
+console.log('Pending Logs:', batchStats.pendingCount)
+```
+
+**Section sources**
+- [redis-transport.ts](file://packages\logs\src\transports\redis-transport.ts#L350-L450)
+
 ## Conclusion
-The Redis-based query caching system provides a robust solution for improving performance of audit data retrieval operations. By implementing a clean separation of concerns through the CacheFactory, QueryCache, and CachedQueryExecutor components, the system offers both high performance and maintainability. The architecture supports easy configuration, monitoring, and troubleshooting, making it a reliable component of the overall audit data infrastructure. Recent enhancements include Redis caching for organization roles and hybrid L1/L2 caching strategies. The authorization layer now also leverages Redis caching for permission checks and role management, further reducing database load and improving system responsiveness. For optimal results, monitor cache hit ratios and adjust TTL values based on access patterns and data volatility requirements.
+The Redis-based query caching system provides a robust solution for improving performance of audit data retrieval operations. By implementing a clean separation of concerns through the CacheFactory, QueryCache, and CachedQueryExecutor components, the system offers both high performance and maintainability. The architecture supports easy configuration, monitoring, and troubleshooting, making it a reliable component of the overall audit data infrastructure. Recent enhancements include Redis caching for organization roles and hybrid L1/L2 caching strategies. The authorization layer now also leverages Redis caching for permission checks and role management, further reducing database load and improving system responsiveness. Additionally, the logging system's Redis transport provides enterprise-grade reliability with circuit breaker, retry logic, and comprehensive connection management. For optimal results, monitor cache hit ratios and adjust TTL values based on access patterns and data volatility requirements.

@@ -2,19 +2,24 @@
 
 <cite>
 **Referenced Files in This Document**
-- [alerting.ts](file://packages/audit/src/monitor/alerting.ts)
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts)
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts)
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts)
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts)
-- [monitoring.md](file://packages/audit/docs/api-reference/monitoring.md)
-- [architecture.md](file://apps/app/docs/alerts/architecture.md)
-- [setup.md](file://apps/app/docs/alerts/setup.md)
-- [api-integration.md](file://apps/app/docs/alerts/api-integration.md)
-- [troubleshooting.md](file://apps/app/docs/alerts/troubleshooting.md)
-- [user-guide.md](file://apps/app/docs/alerts/user-guide.md)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts) - *Updated in recent commit*
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts) - *Updated in recent commit*
+- [monitoring-types.ts](file://packages\audit\src\monitor\monitoring-types.ts) - *Updated in recent commit*
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts) - *Updated in recent commit*
+- [architecture.md](file://apps\app\docs\alerts\architecture.md)
+- [setup.md](file://apps\app\docs\alerts\setup.md)
+- [api-integration.md](file://apps\app\docs\alerts\api-integration.md)
+- [troubleshooting.md](file://apps\app\docs\alerts\troubleshooting.md)
+- [user-guide.md](file://apps\app\docs\alerts\user-guide.md)
 </cite>
+
+## Update Summary
+- Updated documentation to reflect the introduction of the AlertingService class and AlertHandler interface
+- Added detailed information about alert deduplication and distribution mechanisms
+- Enhanced API reference with new methods and parameters
+- Updated integration patterns to include notification delivery logic
+- Improved troubleshooting guide with new error handling scenarios
+- Added ConsoleAlertHandler implementation details
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -79,9 +84,9 @@ HC --> RC
 ```
 
 **Diagram sources**
-- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L1-L50)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L100)
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L50)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts#L1-L50)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L100)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L50)
 
 ## Core Components
 
@@ -168,12 +173,12 @@ AlertHandler <|.. ConsoleAlertHandler
 ```
 
 **Diagram sources**
-- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L1-L100)
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L1-L50)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts#L1-L100)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts#L1-L50)
 
 **Section sources**
-- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L1-L386)
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L1-L100)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts#L1-L386)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L1-L100)
 
 ## Alert Management
 
@@ -246,8 +251,8 @@ The system categorizes alerts into multiple types and severity levels:
 | INFO | General notifications | As needed | System updates |
 
 **Section sources**
-- [monitoring.ts](file://packages/audit/src/monitor/monitoring.ts#L100-L300)
-- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L150-L250)
+- [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L100-L300)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts#L150-L250)
 
 ## Monitoring and Health Checks
 
@@ -293,7 +298,7 @@ ComponentHealthCheck <|.. QueueHealthCheck
 ```
 
 **Diagram sources**
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L100)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L100)
 
 ### Metrics Collection
 
@@ -348,8 +353,8 @@ interface AuditMetrics {
 ```
 
 **Section sources**
-- [health-check.ts](file://packages/audit/src/monitor/health-check.ts#L1-L491)
-- [metrics-collector.ts](file://packages/audit/src/monitor/metrics-collector.ts#L1-L386)
+- [health-check.ts](file://packages\audit\src\monitor\health-check.ts#L1-L491)
+- [metrics-collector.ts](file://packages\audit\src\monitor\metrics-collector.ts#L1-L386)
 
 ## Integration Patterns
 
@@ -434,11 +439,11 @@ Note over MS,SLACK : Alert delivered through multiple channels
 ```
 
 **Diagram sources**
-- [alerting.ts](file://packages/audit/src/monitor/alerting.ts#L80-L120)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts#L80-L120)
 
 **Section sources**
-- [database-alert-handler.ts](file://packages/audit/src/monitor/database-alert-handler.ts#L1-L200)
-- [api-integration.md](file://apps/app/docs/alerts/api-integration.md#L1-L200)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts#L1-L200)
+- [api-integration.md](file://apps\app\docs\alerts\api-integration.md#L1-L200)
 
 ## API Reference
 
@@ -552,8 +557,8 @@ await alertingService.resolveAlert(
 ```
 
 **Section sources**
-- [monitoring-types.ts](file://packages/audit/src/monitor/monitoring-types.ts#L1-L233)
-- [monitoring.md](file://packages/audit/docs/api-reference/monitoring.md#L1-L826)
+- [monitoring-types.ts](file://packages\audit\src\monitor\monitoring-types.ts#L1-L233)
+- [monitoring.md](file://packages\audit\docs\api-reference\monitoring.md#L1-L826)
 
 ## Setup and Configuration
 
@@ -666,7 +671,7 @@ CREATE INDEX idx_alerts_timestamp ON alerts(created_at);
 ```
 
 **Section sources**
-- [setup.md](file://apps/app/docs/alerts/setup.md#L1-L741)
+- [setup.md](file://apps\app\docs\alerts\setup.md#L1-L741)
 
 ## Troubleshooting Guide
 
@@ -788,7 +793,7 @@ class CircuitBreaker {
 ```
 
 **Section sources**
-- [troubleshooting.md](file://apps/app/docs/alerts/troubleshooting.md#L1-L629)
+- [troubleshooting.md](file://apps\app\docs\alerts\troubleshooting.md#L1-L629)
 
 ## Best Practices
 

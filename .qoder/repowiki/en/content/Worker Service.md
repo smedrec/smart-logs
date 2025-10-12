@@ -14,6 +14,9 @@
 - [tracer.ts](file://packages\audit\src\observability\tracer.ts) - *Updated to use OTLP exporter and fix auth header usage*
 - [otlp-configuration.md](file://packages\audit\docs\observability\otlp-configuration.md) - *Documentation for OTLP configuration*
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts) - *Contains GDPR compliance service with pseudonymization functionality*
+- [index.ts](file://apps\worker\src\index.ts) - *Updated to integrate Bull Board for queue monitoring*
+- [Dockerfile](file://apps\worker\Dockerfile) - *Updated to expose port 5601 for Bull Board*
+- [docker-compose.yml](file://docker-compose.yml) - *Updated to map port 5601 for Bull Board*
 </cite>
 
 ## Update Summary
@@ -34,7 +37,12 @@
 - Updated architecture overview to include pseudonymization phase
 - Added detailed analysis of pseudonymization implementation
 - Updated performance considerations to include pseudonymization metrics
-- Enhanced troubleshooting guide with pseudonymization-related issues
+- Added Bull Board integration for queue monitoring with web UI on port 5601
+- Updated Dockerfile to expose port 5601 for Bull Board
+- Updated docker-compose.yml to map port 5601 for Bull Board access
+- Added new section on Bull Board configuration and access
+- Updated architecture overview diagram to include Bull Board component
+- Added new troubleshooting entries for Bull Board issues
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -76,21 +84,23 @@ A --> D[Queue Processor]
 A --> E[CryptoService]
 A --> F[Archival Service]
 A --> G[GDPR Compliance]
+A --> H[Bull Board]
 B --> E
-B --> H[Metrics Collector]
-B --> I[Alert Handlers]
-C --> J[Distributed Tracing]
-C --> K[Performance Dashboard]
-D --> L[Circuit Breaker]
-D --> M[Dead Letter Queue]
-E --> N[Hash Verification]
-F --> O[Data Archival]
-F --> P[Retention Policies]
-G --> Q[Pseudonymization]
-G --> R[Data Export]
-G --> S[Retention Policies]
-H --> Q[(Redis)]
-I --> R[(PostgreSQL)]
+B --> I[Metrics Collector]
+B --> J[Alert Handlers]
+C --> K[Distributed Tracing]
+C --> L[Performance Dashboard]
+D --> M[Circuit Breaker]
+D --> N[Dead Letter Queue]
+E --> O[Hash Verification]
+F --> P[Data Archival]
+F --> Q[Retention Policies]
+G --> R[Pseudonymization]
+G --> S[Data Export]
+G --> T[Retention Policies]
+H --> D
+I --> U[(Redis)]
+J --> V[(PostgreSQL)]
 ```
 
 **Diagram sources**
@@ -100,6 +110,7 @@ I --> R[(PostgreSQL)]
 - [crypto.ts](file://packages\audit\src\crypto.ts)
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [index.ts](file://apps\worker\src\index.ts) - *Updated for Bull Board integration*
 
 **Section sources**
 - [index.ts](file://apps\worker\src\index.ts)
@@ -120,6 +131,7 @@ The Worker Service's functionality is driven by several core components:
 - **SecretDetector**: Detects and handles internal secret exposure within the worker process.
 - **Sentry**: Error tracking and monitoring service for production issues.
 - **GDPRComplianceService**: Implements GDPR requirements including data pseudonymization, export, and retention policies.
+- **Bull Board**: Web-based dashboard for monitoring BullMQ queues, providing visibility into job processing, queue depth, and dead letter queue status.
 
 These components are orchestrated through dependency injection and support pluggable handlers for extensibility.
 
@@ -132,6 +144,7 @@ These components are orchestrated through dependency injection and support plugg
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
 - [index.ts](file://apps\worker\src\index.ts)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [index.ts](file://apps\worker\src\index.ts) - *Updated for Bull Board integration*
 
 ## Architecture Overview
 The Worker Service follows an event-driven, microservices-inspired architecture. It consumes audit log events from a message queue (via Inngest), processes them for compliance and security monitoring, and emits alerts and metrics.
@@ -163,6 +176,7 @@ Archival[ArchivalService]
 SecretDetector[SecretDetector]
 SentryClient[Sentry]
 GDPR[GDPRComplianceService]
+BullBoard[Bull Board]
 end
 S3 --> Inngest
 MQ --> Inngest
@@ -189,6 +203,9 @@ Inngest --> GDPR
 GDPR --> DB
 GDPR --> KMS
 GDPR --> Logger
+Inngest --> BullBoard
+BullBoard --> MQ
+BullBoard --> DLQ[(Dead Letter Queue)]
 ```
 
 **Diagram sources**
@@ -201,6 +218,7 @@ GDPR --> Logger
 - [archival-service.ts](file://packages\audit\src\archival\archival-service.ts)
 - [index.ts](file://apps\worker\src\index.ts)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts)
+- [index.ts](file://apps\worker\src\index.ts) - *Updated for Bull Board integration*
 
 ## Detailed Component Analysis
 
@@ -563,6 +581,36 @@ Worker->>Worker : continue processing
 - [index.ts](file://apps\worker\src\index.ts#L1-L799)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L1-L818)
 
+### Bull Board Integration
+The worker service now includes Bull Board integration, providing a web-based dashboard for monitoring BullMQ queues. This feature enables real-time visibility into job processing status, queue depth, and dead letter queue contents.
+
+```mermaid
+sequenceDiagram
+participant Worker as Worker Service
+participant BullBoard as Bull Board
+participant UI as Web Browser
+participant Queue as BullMQ Queue
+participant DLQ as Dead Letter Queue
+Worker->>BullBoard : createBullBoard()
+BullBoard->>Queue : Register queue adapter
+BullBoard->>DLQ : Register dead letter queue adapter
+BullBoard->>UI : Serve dashboard on port 5601
+UI->>BullBoard : HTTP GET /ui
+BullBoard->>Queue : Fetch queue metrics
+BullBoard->>DLQ : Fetch dead letter queue metrics
+BullBoard->>UI : Render dashboard with metrics
+```
+
+**Diagram sources**
+- [index.ts](file://apps\worker\src\index.ts#L850-L900)
+- [Dockerfile](file://apps\worker\Dockerfile)
+- [docker-compose.yml](file://docker-compose.yml)
+
+**Section sources**
+- [index.ts](file://apps\worker\src\index.ts#L850-L900)
+- [Dockerfile](file://apps\worker\Dockerfile)
+- [docker-compose.yml](file://docker-compose.yml)
+
 ## Dependency Analysis
 The Worker Service has a layered dependency structure:
 
@@ -586,6 +634,9 @@ Audit --> GDPR[@repo/audit/src/gdpr]
 GDPR --> Logs[@repo/logs]
 GDPR --> InfisicalKMS[@repo/infisical-kms]
 Worker --> Sentry[@sentry/node]
+Worker --> BullBoard[@bull-board/api]
+BullBoard --> BullMQAdapter[@bull-board/api/bullMQAdapter]
+BullBoard --> HonoAdapter[@bull-board/hono]
 ```
 
 All shared packages are managed via the monorepo's `pnpm-workspace.yaml`, ensuring version consistency and efficient development.
@@ -617,6 +668,7 @@ The worker is optimized for high-throughput, low-latency processing:
 - **Error Tracking**: Integrates Sentry for comprehensive error monitoring and performance insights.
 - **Pseudonymization**: Implements efficient pseudonymization using hash-based strategy with caching to avoid redundant operations. The pseudonymization phase adds minimal overhead while ensuring GDPR compliance.
 - **Data Retention**: Implements automated data retention policies with configurable archival and deletion schedules to manage storage costs while maintaining compliance.
+- **Bull Board**: Provides real-time monitoring of queue status with minimal performance impact through efficient polling and caching mechanisms.
 
 The system is horizontally scalable via Kubernetes, with each worker instance maintaining independent state while sharing Redis and PostgreSQL backends.
 
@@ -640,6 +692,9 @@ Common issues and their resolutions:
 - **Configuration Manager Errors**: Verify that the CONFIG_PATH environment variable points to a valid S3 location. Check S3 bucket permissions and network connectivity. Ensure the configuration file is valid JSON.
 - **Pseudonymization Failures**: Check that the KMS service is available and properly configured. Verify that the PSEUDONYM_SALT environment variable is set. Ensure that the pseudonym_mapping table exists in the database.
 - **GDPR Compliance Issues**: Verify that retention policies are properly configured in the audit_retention_policy table. Check that the KMS service is available for encryption/decryption operations. Ensure that the pseudonymization service has proper database permissions.
+- **Bull Board Not Accessible**: Verify that port 5601 is exposed in the Dockerfile and mapped in docker-compose.yml. Check that the Bull Board server is properly initialized in the worker service. Ensure that the network configuration allows access to port 5601.
+- **Bull Board Queue Metrics Missing**: Verify that the BullMQ queue adapter is properly registered with Bull Board. Check that the queue connection is established and healthy. Ensure that the queue name matches between the worker and Bull Board configuration.
+- **Bull Board Authentication Issues**: If authentication is enabled, verify that the appropriate credentials are configured. Check that the authentication middleware is properly integrated with the Bull Board server.
 
 **Section sources**
 - [monitoring.ts](file://packages\audit\src\monitor\monitoring.ts#L500-L600)
@@ -653,6 +708,9 @@ Common issues and their resolutions:
 - [index.ts](file://apps\worker\src\index.ts#L1-L784)
 - [connection.ts](file://packages\redis-client\src\connection.ts#L48-L119)
 - [gdpr-compliance.ts](file://packages\audit\src\gdpr\gdpr-compliance.ts#L1-L818)
+- [index.ts](file://apps\worker\src\index.ts#L850-L900)
+- [Dockerfile](file://apps\worker\Dockerfile)
+- [docker-compose.yml](file://docker-compose.yml)
 
 ## Conclusion
 The Worker Service is a robust, scalable background processor designed for real-time compliance and security monitoring. Its modular architecture, deep observability, and resilience patterns make it well-suited for mission-critical audit processing.
@@ -670,5 +728,7 @@ A new internal secret detection mechanism has been implemented to prevent accide
 The service now includes Redis connection retry logic, improving resilience during startup in environments with transient network issues. Additionally, Sentry has been integrated for comprehensive error tracking and monitoring, providing valuable insights into production issues.
 
 The most significant recent addition is the pseudonymization phase, which implements GDPR compliance requirements for data privacy. The `GDPRComplianceService` ensures that personal data is pseudonymized while maintaining referential integrity through secure mapping storage. This feature enables the system to meet regulatory requirements while preserving the ability to perform compliance investigations when authorized.
+
+The integration of Bull Board provides a powerful web-based interface for monitoring queue status, job processing, and dead letter queue contents. This enhancement improves operational visibility and simplifies troubleshooting of message processing issues.
 
 Future enhancements could include ML-based anomaly detection, integration with SIEM systems, and enhanced cryptographic features such as digital signatures and certificate-based authentication. The codebase demonstrates strong separation of concerns, extensive testing, and clear extensibility points through pluggable alert handlers and metrics collectors.

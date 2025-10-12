@@ -2,27 +2,31 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx) - *Updated in recent commit*
-- [AlertDataTable.tsx](file://apps/app/src/components/alerts/data/AlertDataTable.tsx) - *Refactored for modularity*
-- [details-dialog.tsx](file://apps/app/src/components/alerts/data/details-dialog.tsx) - *Added in recent commit*
-- [AlertColumns.tsx](file://apps/app/src/components/alerts/data/AlertColumns.tsx) - *Updated in recent commit*
-- [AlertList.tsx](file://apps/app/src/components/alerts/core/AlertList.tsx) - *Standardized properties*
-- [app-sidebar.tsx](file://apps/app/src/components/app-sidebar.tsx) - *Added navigation*
-- [routes.ts](file://apps/app/src/lib/routes.ts) - *Added new route*
-- [page-header.tsx](file://apps/app/src/components/navigation/page-header.tsx) - *Added keyboard shortcuts*
-- [active.tsx](file://apps/app/src/routes/_authenticated/alerts/active.tsx) - *Added page header*
-- [alerts.ts](file://apps/server/src/routes/alerts.ts) - *Refactored to dedicated service*
-- [context.ts](file://apps/server/src/lib/hono/context.ts) - *Modified for new service*
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx) - *Updated in recent commit*
+- [AlertDataTable.tsx](file://apps\app\src\components\alerts\data\AlertDataTable.tsx) - *Refactored for modularity*
+- [details-dialog.tsx](file://apps\app\src\components\alerts\data\details-dialog.tsx) - *Added in recent commit*
+- [AlertColumns.tsx](file://apps\app\src\components\alerts\data\AlertColumns.tsx) - *Updated in recent commit*
+- [AlertList.tsx](file://apps\app\src\components\alerts\core\AlertList.tsx) - *Standardized properties*
+- [app-sidebar.tsx](file://apps\app\src\components\app-sidebar.tsx) - *Added navigation*
+- [routes.ts](file://apps\app\src\lib\routes.ts) - *Added new route*
+- [page-header.tsx](file://apps\app\src\components\navigation\page-header.tsx) - *Added keyboard shortcuts*
+- [active.tsx](file://apps\app\src\routes\_authenticated\alerts\active.tsx) - *Added page header*
+- [alerts.ts](file://apps\server\src\routes\alerts.ts) - *Refactored to dedicated service*
+- [context.ts](file://apps\server\src\lib\hono\context.ts) - *Modified for new service*
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts) - *Introduced AlertingService class*
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts) - *Integrated with AlertingService*
+- [architecture.md](file://apps\app\docs\alerts\architecture.md) - *Updated for AlertingService*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated documentation to reflect new alert details view and all alerts data page
-- Added documentation for keyboard shortcuts and page headers
-- Updated component structure to reflect refactored data table and standardized properties
-- Added new route and navigation documentation
-- Updated API integration section to reflect service extraction
-- Enhanced source tracking with specific file references and change annotations
+- Updated documentation to reflect new AlertingService class and its centralized alert management capabilities
+- Added documentation for Redis-based deduplication and severity handling in the AlertingService
+- Updated architecture overview to show the new centralized alert generation and distribution pattern
+- Enhanced detailed component analysis with new class diagrams for AlertingService
+- Updated dependency analysis to include the new AlertingService and its relationships
+- Added new troubleshooting section for deduplication and notification issues
+- Updated source tracking with new file references and change annotations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -39,6 +43,8 @@
 The Alert Management System is a comprehensive solution for monitoring, managing, and responding to system alerts within the SMEDREC healthcare audit platform. This system provides real-time alert notifications, comprehensive filtering capabilities, and multiple visualization options for alert data. The system is designed to handle various alert types including system, security, performance, compliance, and custom alerts with different severity levels from critical to informational.
 
 The Alert Management System integrates with the existing Audit Client and leverages TanStack Query for efficient data management, TanStack Router for navigation, and WebSocket connections for real-time updates. The system follows a modular architecture with clearly defined components for different aspects of alert management, ensuring maintainability and scalability.
+
+A significant enhancement has been introduced with the AlertingService class, which centralizes alert generation, deduplication, distribution, and notification. This new service replaces the previous distributed alert logic with a more robust and maintainable approach that uses Redis-based deduplication to prevent duplicate alerts and handles severity-based notification routing.
 
 ## Project Structure
 The Alert Management System is organized in a modular structure within the application's components directory. The system follows a feature-based organization pattern with dedicated subdirectories for different functional areas.
@@ -93,14 +99,14 @@ J --> J4[use-alert-responsive]
 ```
 
 **Diagram sources**
-- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx)
-- [AlertFilters.tsx](file://apps/app/src/components/alerts/forms/AlertFilters.tsx)
-- [AlertDataTable.tsx](file://apps/app/src/components/alerts/data/AlertDataTable.tsx)
-- [details-dialog.tsx](file://apps/app/src/components/alerts/data/details-dialog.tsx)
-- [alert-types.ts](file://apps/app/src/components/alerts/types/alert-types.ts)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx)
+- [AlertFilters.tsx](file://apps\app\src\components\alerts\forms\AlertFilters.tsx)
+- [AlertDataTable.tsx](file://apps\app\src\components\alerts\data\AlertDataTable.tsx)
+- [details-dialog.tsx](file://apps\app\src\components\alerts\data\details-dialog.tsx)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
 
 **Section sources**
-- [README.md](file://apps/app/src/components/alerts/README.md)
+- [README.md](file://apps\app\src\components\alerts\README.md)
 
 ## Core Components
 The Alert Management System consists of several core components that work together to provide a comprehensive alert management solution. The system is built around a modular architecture with clearly defined responsibilities for each component.
@@ -111,16 +117,21 @@ The system also includes notification components such as NotificationBell and No
 
 A new AlertDetailsDialog component has been added to display detailed alert information in a modal dialog, accessible from the data table. The system now includes a dedicated ALERTS_DATA route for viewing all alerts, with navigation available in the app sidebar.
 
+The most significant enhancement is the introduction of the AlertingService class, which centralizes alert generation, deduplication, distribution, and notification. This service replaces the previous distributed alert logic with a more robust approach that uses Redis-based deduplication to prevent duplicate alerts and handles severity-based notification routing. The AlertingService coordinates with multiple alert handlers, including the DatabaseAlertHandler for persistent storage and the ConsoleAlertHandler for development and testing.
+
 **Section sources**
-- [AlertDashboard.tsx](file://apps/app/src/components/alerts/core/AlertDashboard.tsx)
-- [AlertDataTable.tsx](file://apps/app/src/components/alerts/data/AlertDataTable.tsx)
-- [AlertFilters.tsx](file://apps/app/src/components/alerts/forms/AlertFilters.tsx)
-- [NotificationPanel.tsx](file://apps/app/src/components/alerts/notifications/NotificationPanel.tsx)
-- [AlertCard.tsx](file://apps/app/src/components/alerts/core/AlertCard.tsx)
-- [details-dialog.tsx](file://apps/app/src/components/alerts/data/details-dialog.tsx)
+- [AlertDashboard.tsx](file://apps\app\src\components\alerts\core\AlertDashboard.tsx)
+- [AlertDataTable.tsx](file://apps\app\src\components\alerts\data\AlertDataTable.tsx)
+- [AlertFilters.tsx](file://apps\app\src\components\alerts\forms\AlertFilters.tsx)
+- [NotificationPanel.tsx](file://apps\app\src\components\alerts\notifications\NotificationPanel.tsx)
+- [AlertCard.tsx](file://apps\app\src\components\alerts\core\AlertCard.tsx)
+- [details-dialog.tsx](file://apps\app\src\components\alerts\data\details-dialog.tsx)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
 
 ## Architecture Overview
 The Alert Management System follows a layered architecture with clear separation of concerns between presentation, business logic, and data access layers. The system leverages React Context for global state management and TanStack Query for data fetching and caching.
+
+The architecture has been enhanced with the introduction of the AlertingService class, which centralizes alert generation, deduplication, distribution, and notification. This service acts as the central coordinator for all alert-related operations, replacing the previous distributed alert logic with a more maintainable and robust approach.
 
 ```mermaid
 graph TD
@@ -135,6 +146,10 @@ I --> A
 J[User Actions] --> A
 A --> K[Query Client]
 K --> L[Cache]
+M[AlertingService] --> N[DatabaseAlertHandler]
+M --> O[ConsoleAlertHandler]
+M --> P[Redis Metrics Collector]
+E --> M
 style A fill:#f9f,stroke:#333
 style B fill:#bbf,stroke:#333
 style C fill:#bbf,stroke:#333
@@ -147,13 +162,18 @@ style I fill:#bbf,stroke:#333
 style J fill:#ff9,stroke:#333
 style K fill:#bbf,stroke:#333
 style L fill:#bbf,stroke:#333
+style M fill:#f96,stroke:#333
+style N fill:#69f,stroke:#333
+style O fill:#69f,stroke:#333
+style P fill:#69f,stroke:#333
 ```
 
 **Diagram sources**
-- [alert-provider.tsx](file://apps/app/src/contexts/alert-provider.tsx)
-- [alert-api.ts](file://apps/app/src/lib/services/alert-api.ts)
-- [use-alert-queries.ts](file://apps/app/src/components/alerts/hooks/use-alert-queries.ts)
-- [use-alert-websocket.ts](file://apps/app/src/components/alerts/hooks/use-alert-websocket.ts)
+- [alert-provider.tsx](file://apps\app\src\contexts\alert-provider.tsx)
+- [alert-api.ts](file://apps\app\src\lib\services\alert-api.ts)
+- [use-alert-queries.ts](file://apps\app\src\components\alerts\hooks\use-alert-queries.ts)
+- [use-alert-websocket.ts](file://apps\app\src\components\alerts\hooks\use-alert-websocket.ts)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
 
 ## Detailed Component Analysis
 
@@ -220,10 +240,10 @@ AlertProvider --> AlertContextValue : "provides"
 ```
 
 **Diagram sources**
-- [alert-provider.tsx](file://apps/app/src/contexts/alert-provider.tsx)
+- [alert-provider.tsx](file://apps\app\src\contexts\alert-provider.tsx)
 
 **Section sources**
-- [alert-provider.tsx](file://apps/app/src/contexts/alert-provider.tsx)
+- [alert-provider.tsx](file://apps\app\src\contexts\alert-provider.tsx)
 
 ### Data Model and Type Definitions
 The Alert Management System uses a comprehensive type system to ensure type safety and provide clear interfaces for alert data.
@@ -306,10 +326,102 @@ AlertNotification --> AlertSeverity
 ```
 
 **Diagram sources**
-- [alert-types.ts](file://apps/app/src/components/alerts/types/alert-types.ts)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
 
 **Section sources**
-- [alert-types.ts](file://apps/app/src/components/alerts/types/alert-types.ts)
+- [alert-types.ts](file://apps\app\src\components\alerts\types\alert-types.ts)
+
+### Alerting Service Architecture
+The AlertingService class has been introduced to centralize alert generation, deduplication, distribution, and notification. This service replaces the previous distributed alert logic with a more robust and maintainable approach.
+
+```mermaid
+classDiagram
+class AlertingService {
+- alertPrefix : string
+- cooldownPrefix : string
+- config : MonitoringConfig
+- alertHandlers : AlertHandler[]
+- metricsCollector : MetricsCollector
+- logger : any
++ constructor(config : MonitoringConfig, metricsCollector? : MetricsCollector, logger? : any)
++ addAlertHandler(handler : AlertHandler) : void
++ sendExternalAlert(alert : Alert) : Promise~void~
++ getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++ getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++ generateAlert(alert : Alert) : Promise~void~
++ numberOfActiveAlerts(organizationId? : string) : Promise~number~
++ getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
++ resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{success : boolean}~
++ acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{success : boolean}~
++ dismissAlert(alertId : string, dismissedBy : string) : Promise~{success : boolean}~
+- checkDuplicateAlert(alert : Alert) : Promise~boolean~
+- createAlertHash(alert : Alert) : string
+- sendNotifications(alert : Alert) : Promise~void~
+- sendCriticalAlertNotification(alert : Alert) : Promise~void~
+}
+class AlertHandler {
+<<interface>>
++ handlerName() : string
++ sendAlert(alert : Alert) : Promise~void~
++ acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{success : boolean}~
++ resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{success : boolean}~
++ dismissAlert(alertId : string, dismissedBy : string) : Promise~{success : boolean}~
++ getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++ getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++ numberOfActiveAlerts(organizationId? : string) : Promise~number~
++ getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
+}
+class DatabaseAlertHandler {
++ handlerName() : string
++ sendAlert(alert : Alert) : Promise~void~
++ acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{success : boolean}~
++ resolveAlert(alertId : string, resolvedBy : string, resolutionData? : AlertResolution) : Promise~{success : boolean}~
++ dismissAlert(alertId : string, dismissedBy : string) : Promise~{success : boolean}~
++ getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++ getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++ numberOfActiveAlerts(organizationId? : string) : Promise~number~
++ getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
+- mapDatabaseAlertToAlert(dbAlert : any) : Alert
+}
+class ConsoleAlertHandler {
++ handlerName() : string
++ sendAlert(alert : Alert) : Promise~void~
++ acknowledgeAlert(alertId : string, acknowledgedBy : string) : Promise~{success : boolean}~
++ resolveAlert(alertId : string, resolvedBy : string) : Promise~{success : boolean}~
++ dismissAlert(alertId : string, dismissedBy : string) : Promise~{success : boolean}~
++ getAlerts(filters : AlertQueryFilters) : Promise~Alert[]~
++ getActiveAlerts(organizationId? : string) : Promise~Alert[]~
++ numberOfActiveAlerts(organizationId? : string) : Promise~number~
++ getAlertStatistics(organizationId? : string) : Promise~AlertStatistics~
+}
+class MetricsCollector {
+<<interface>>
++ recordAlertGenerated() : void
++ isOnCooldown(key : string) : Promise~boolean~
++ setCooldown(key : string, seconds : number) : Promise~void~
+}
+class RedisMetricsCollector {
++ recordAlertGenerated() : void
++ isOnCooldown(key : string) : Promise~boolean~
++ setCooldown(key : string, seconds : number) : Promise~void~
+}
+AlertingService --> MetricsCollector
+AlertingService --> AlertHandler
+AlertingService --> DatabaseAlertHandler
+AlertingService --> ConsoleAlertHandler
+AlertingService --> RedisMetricsCollector
+DatabaseAlertHandler ..|> AlertHandler
+ConsoleAlertHandler ..|> AlertHandler
+RedisMetricsCollector ..|> MetricsCollector
+```
+
+**Diagram sources**
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts)
+
+**Section sources**
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
+- [database-alert-handler.ts](file://packages\audit\src\monitor\database-alert-handler.ts)
 
 ### API Integration and Data Flow
 The Alert Management System integrates with the backend through a service layer that handles API communication and data transformation. The API routes have been refactored to a dedicated alerts service for better modularity and standardization.
@@ -321,39 +433,47 @@ participant Context as AlertContext
 participant Query as TanStack Query
 participant Service as AlertApiService
 participant Client as AuditClient
+participant Alerting as AlertingService
+participant Handler as DatabaseAlertHandler
 participant API as REST API
 participant Server as Server
 UI->>Context : Request alert data
 Context->>Query : Query with filters
 Query->>Service : getAlerts(request)
 Service->>Client : metrics.getAlerts(params)
-Client->>API : HTTP Request
+Client->>Alerting : getAlerts(filters)
+Alerting->>Handler : getAlerts(filters)
+Handler->>API : Query Database
 API->>Server : Process request
 Server-->>API : Return data
-API-->>Client : Response
-Client-->>Service : Alert data
+API-->>Handler : Alert data
+Handler-->>Alerting : Transformed data
+Alerting-->>Client : Alert data
+Client-->>Service : Transformed data
 Service-->>Query : Transformed data
 Query-->>Context : Data with metadata
 Context-->>UI : Alert data
 Note over UI,Context : Data fetching flow
 Server->>Client : WebSocket message
-Client->>Service : onAlertCreated
-Service->>Query : setQueryData
-Query->>Context : Invalidate queries
-Context->>UI : Real-time update
-Note over Server,UI : Real-time update flow
+Client->>Alerting : generateAlert(alert)
+Alerting->>Alerting : checkDuplicateAlert(alert)
+Alerting-->>Alerting : isDuplicate = true
+Alerting-->>Client : Duplicate alert suppressed
+Note over Server,UI : Real-time update flow with deduplication
 ```
 
 **Diagram sources**
-- [alerts.ts](file://apps/server/src/routes/alerts.ts)
-- [context.ts](file://apps/server/src/lib/hono/context.ts)
-- [use-alert-queries.ts](file://apps/app/src/components/alerts/hooks/use-alert-queries.ts)
-- [use-alert-websocket.ts](file://apps/app/src/components/alerts/hooks/use-alert-websocket.ts)
+- [alerts.ts](file://apps\server\src\routes\alerts.ts)
+- [context.ts](file://apps\server\src\lib\hono\context.ts)
+- [use-alert-queries.ts](file://apps\app\src\components\alerts\hooks\use-alert-queries.ts)
+- [use-alert-websocket.ts](file://apps\app\src\components\alerts\hooks\use-alert-websocket.ts)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
 
 **Section sources**
-- [alerts.ts](file://apps/server/src/routes/alerts.ts)
-- [context.ts](file://apps/server/src/lib/hono/context.ts)
-- [use-alert-queries.ts](file://apps/app/src/components/alerts/hooks/use-alert-queries.ts)
+- [alerts.ts](file://apps\server\src\routes\alerts.ts)
+- [context.ts](file://apps\server\src\lib\hono\context.ts)
+- [use-alert-queries.ts](file://apps\app\src\components\alerts\hooks\use-alert-queries.ts)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
 
 ### API Interface and Integration Patterns
 The Alert Management System exposes a comprehensive API interface for integration with other systems and components.
@@ -405,12 +525,12 @@ AN --> AO
 ```
 
 **Diagram sources**
-- [alerts.ts](file://apps/server/src/routes/alerts.ts)
-- [context.ts](file://apps/server/src/lib/hono/context.ts)
+- [alerts.ts](file://apps\server\src\routes\alerts.ts)
+- [context.ts](file://apps\server\src\lib\hono\context.ts)
 
 **Section sources**
-- [alerts.ts](file://apps/server/src/routes/alerts.ts)
-- [context.ts](file://apps/server/src/lib/hono/context.ts)
+- [alerts.ts](file://apps\server\src\routes\alerts.ts)
+- [context.ts](file://apps\server\src\lib\hono\context.ts)
 
 ## Dependency Analysis
 The Alert Management System has a well-defined dependency structure that ensures loose coupling between components while maintaining clear integration points with external systems.
@@ -421,35 +541,42 @@ A[Alert Components] --> B[Alert Context]
 B --> C[TanStack Query]
 C --> D[Alert API Service]
 D --> E[Audit Client]
-E --> F[REST API]
-F --> G[Server]
-H[WebSocket] --> B
-I[User Actions] --> A
-J[Theme Provider] --> A
-K[Auth Provider] --> B
-L[Query Client] --> C
-M[Cache] --> C
+E --> F[AlertingService]
+F --> G[DatabaseAlertHandler]
+F --> H[RedisMetricsCollector]
+G --> I[PostgreSQL]
+H --> J[Redis]
+K[WebSocket] --> B
+L[User Actions] --> A
+M[Theme Provider] --> A
+N[Auth Provider] --> B
+O[Query Client] --> C
+P[Cache] --> C
 style A fill:#f9f,stroke:#333
 style B fill:#bbf,stroke:#333
 style C fill:#bbf,stroke:#333
 style D fill:#bbf,stroke:#333
 style E fill:#bbf,stroke:#333
 style F fill:#f96,stroke:#333
-style G fill:#f96,stroke:#333
-style H fill:#6f9,stroke:#333
-style I fill:#ff9,stroke:#333
-style J fill:#99f,stroke:#333
-style K fill:#99f,stroke:#333
-style L fill:#99f,stroke:#333
+style G fill:#69f,stroke:#333
+style H fill:#69f,stroke:#333
+style I fill:#f96,stroke:#333
+style J fill:#f96,stroke:#333
+style K fill:#6f9,stroke:#333
+style L fill:#ff9,stroke:#333
 style M fill:#99f,stroke:#333
+style N fill:#99f,stroke:#333
+style O fill:#99f,stroke:#333
+style P fill:#99f,stroke:#333
 ```
 
 **Diagram sources**
 - [package.json](file://package.json)
 
 **Section sources**
-- [alert-provider.tsx](file://apps/app/src/contexts/alert-provider.tsx)
-- [alert-api.ts](file://apps/app/src/lib/services/alert-api.ts)
+- [alert-provider.tsx](file://apps\app\src\contexts\alert-provider.tsx)
+- [alert-api.ts](file://apps\app\src\lib\services\alert-api.ts)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
 
 ## Performance Considerations
 The Alert Management System incorporates several performance optimizations to ensure responsive user experience even with large datasets:
@@ -470,13 +597,18 @@ The Alert Management System incorporates several performance optimizations to en
 
 8. **Efficient Re-renders**: The system uses React's memoization features and careful state management to minimize unnecessary re-renders.
 
+9. **Alert Deduplication**: The AlertingService implements Redis-based deduplication to prevent duplicate alerts from being processed and displayed. This reduces database load and prevents alert fatigue by ensuring similar alerts within a 5-minute cooldown period are suppressed.
+
+10. **Batch Processing**: The system supports bulk operations for acknowledging, resolving, or dismissing multiple alerts simultaneously, reducing the number of API calls needed for common operations.
+
 ## Troubleshooting Guide
 This section provides guidance for common issues encountered when working with the Alert Management System.
 
 **Section sources**
-- [alert-provider.tsx](file://apps/app/src/contexts/alert-provider.tsx)
-- [alert-api.ts](file://apps/app/src/lib/services/alert-api.ts)
-- [use-alert-websocket.ts](file://apps/app/src/components/alerts/hooks/use-alert-websocket.ts)
+- [alert-provider.tsx](file://apps\app\src\contexts\alert-provider.tsx)
+- [alert-api.ts](file://apps\app\src\lib\services\alert-api.ts)
+- [use-alert-websocket.ts](file://apps\app\src\components\alerts\hooks\use-alert-websocket.ts)
+- [alerting.ts](file://packages\audit\src\monitor\alerting.ts)
 
 ### Common Issues and Solutions
 
@@ -525,12 +657,31 @@ This section provides guidance for common issues encountered when working with t
      - Implement proper error handling and retry logic
      - Ensure consistent data transformation across components
 
+6. **Duplicate Alert Issues**
+   - **Symptoms**: Similar alerts appearing multiple times, alert fatigue
+   - **Causes**: Deduplication not working, Redis connection issues, incorrect alert content hashing
+   - **Solutions**:
+     - Verify Redis connection for the AlertingService
+     - Check that the alert hash is being generated correctly from source, title, severity, and description
+     - Ensure the cooldown period (5 minutes) is properly configured
+     - Review logs for deduplication debug messages
+
+7. **Notification Delivery Problems**
+   - **Symptoms**: Alerts not being delivered to external notification systems
+   - **Causes**: Notification service configuration issues, network connectivity problems, authentication failures
+   - **Solutions**:
+     - Verify notification service URL and credentials in configuration
+     - Check network connectivity to the notification service
+     - Ensure the notification service is properly configured to receive alerts
+     - Review logs for notification delivery errors
+
 ### Debugging Tools and Techniques
 - **Browser Developer Tools**: Use the Network tab to monitor API requests and WebSocket connections
 - **Console Logging**: Enable debug logging in development mode to trace data flow
 - **Query Devtools**: Use TanStack Query Devtools to inspect query states and cache contents
 - **Error Boundaries**: The system includes AlertErrorBoundary components to catch and display errors gracefully
 - **Performance Profiling**: Use React DevTools to identify performance bottlenecks and unnecessary re-renders
+- **AlertingService Logs**: Monitor logs from the AlertingService for deduplication events and notification delivery status
 
 ## Conclusion
 The Alert Management System provides a comprehensive solution for monitoring and managing system alerts within the SMEDREC healthcare audit platform. The system's modular architecture, real-time capabilities, and comprehensive feature set make it well-suited for handling the complex alert management needs of healthcare applications.
@@ -538,5 +689,7 @@ The Alert Management System provides a comprehensive solution for monitoring and
 Key strengths of the system include its real-time WebSocket integration for immediate alert notifications, flexible filtering and visualization options, and robust error handling. The system's integration with TanStack Query provides efficient data management with caching and background updates, while the modular component structure ensures maintainability and scalability.
 
 The system has been enhanced with new features including a detailed alert view, keyboard shortcuts for improved accessibility, and a dedicated route for viewing all alerts. The API has been refactored to a dedicated service for better modularity and standardization, and alert properties have been standardized to snake_case for consistency.
+
+The most significant enhancement is the introduction of the AlertingService class, which centralizes alert generation, deduplication, distribution, and notification. This service replaces the previous distributed alert logic with a more robust and maintainable approach that uses Redis-based deduplication to prevent duplicate alerts and handles severity-based notification routing. This improvement reduces alert fatigue, improves system performance, and provides a more reliable alert management experience.
 
 Overall, the Alert Management System represents a well-designed, production-ready solution that effectively addresses the requirements for comprehensive alert management in a healthcare audit context.

@@ -30,35 +30,37 @@
 - [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts) - *Refactored to new AlertingService class*
 - [monitor/monitoring.ts](file://packages\audit\src\monitor\monitoring.ts) - *Updated to use AlertingService*
 - [middleware/monitoring.ts](file://apps\server\src\lib\middleware\monitoring.ts) - *Updated alert method calls and hash content*
+- [lib/logger.ts](file://packages\audit\src\lib\logger.ts) - *Refactored to use StructuredLogger*
+- [core/audit-processor.ts](file://packages\audit\src\core\audit-processor.ts) - *Updated with new logging architecture*
+- [services/event-service.ts](file://packages\audit\src\services\event-service.ts) - *Updated with new logging architecture*
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts) - *New logging architecture implementation*
+- [logger-factory.ts](file://packages\logs\src\core\logger-factory.ts) - *New logging factory implementation*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Refactored alert handling functionality from MonitoringService to new AlertingService class
-- Updated alert method calls and enhanced hash content for deduplication
-- Added new AlertingService class with improved alert handling and notification capabilities
-- Updated MonitoringService to use the new AlertingService for alert generation and management
-- Enhanced alert deduplication mechanism with improved hash content
-- Updated monitoring middleware to use corrected alert method calls
-- Added ConsoleAlertHandler for development and testing purposes
-- Improved alert notification system with severity-based handling
-- Updated source tracking system to include new and modified files
+- Replaced legacy LoggerFactory with StructuredLogger across audit packages
+- Implemented new logging architecture with LogProcessor and enhanced transports
+- Updated logging initialization and usage patterns in Audit class
+- Enhanced error handling and performance monitoring in logging system
+- Added support for multiple transport types (console, file, OTLP, Redis)
+- Improved structured logging with better metadata collection and context management
+- Updated source tracking system to reflect changes in logging implementation
 
 **List of new sections added**
-- Alerting Service Architecture
-- Alert Deduplication Mechanism
-- Console Alert Handler
+- Structured Logging Architecture
+- Log Processor Implementation
+- Transport Configuration
 
 **List of deprecated/removed sections**
-- None
+- Legacy LoggerFactory Implementation
 
 **Source tracking system updates and new source files**
-- Added annotations for new AlertingService implementation
-- Updated section sources to reflect changes in alert handling
-- Added new sources for alerting functionality
-- Updated sources for monitoring service to reflect dependency on AlertingService
-- Added sources for console alert handler implementation
-- Updated sources for monitoring middleware with corrected alert method calls
+- Added annotations for new StructuredLogger implementation
+- Updated section sources to reflect changes in logging architecture
+- Added new sources for log processor and transport implementations
+- Updated sources for Audit class to reflect new logging initialization
+- Added sources for enhanced logging transports and configuration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -77,11 +79,13 @@
 14. [Plugin Architecture](#plugin-architecture)
 15. [Observability and OTLP Exporter Configuration](#observability-and-otlp-exporter-configuration)
 16. [KMS Encryption in Configuration Management](#kms-encryption-in-configuration-management)
-17. [Structured Logging Implementation](#structured-logging-implementation)
-18. [Database Preset Handler with Organization Priority](#database-preset-handler-with-organization-priority)
-19. [Alerting Service Architecture](#alerting-service-architecture)
-20. [Alert Deduplication Mechanism](#alert-deduplication-mechanism)
-21. [Console Alert Handler](#console-alert-handler)
+17. [Structured Logging Architecture](#structured-logging-architecture)
+18. [Log Processor Implementation](#log-processor-implementation)
+19. [Transport Configuration](#transport-configuration)
+20. [Database Preset Handler with Organization Priority](#database-preset-handler-with-organization-priority)
+21. [Alerting Service Architecture](#alerting-service-architecture)
+22. [Alert Deduplication Mechanism](#alert-deduplication-mechanism)
+23. [Console Alert Handler](#console-alert-handler)
 
 ## Introduction
 
@@ -149,8 +153,8 @@ L --> AM[Notification System]
 - [queue/reliable-processor.ts](file://packages\audit\src\queue\reliable-processor.ts)
 - [gdpr/gdpr-compliance.ts](file://c:\Users\josea\Documents\WORK\smedrec\smart-los\packages\audit\src\gdpr\gdpr-compliance.ts)
 - [observability/tracer.ts](file://packages\audit\src\observability\tracer.ts)
-- [logging.ts](file://packages\logs\src\logging.ts)
-- [loggerFactory.ts](file://packages\logs\src\logging.ts)
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts)
+- [logger-factory.ts](file://packages\logs\src\core\logger-factory.ts)
 - [preset/database-preset-handler.ts](file://packages\audit\src\preset\database-preset-handler.ts)
 - [monitor/alerting.ts](file://packages\audit\src\monitor\alerting.ts)
 - [monitor/monitoring.ts](file://packages\audit\src\monitor\monitoring.ts)
@@ -1036,9 +1040,9 @@ The `InfisicalKmsClient` class provides a robust interface for interacting with 
 - [infisical-kms/client.ts](file://packages\infisical-kms\src\client.ts)
 - [infisical-kms/types.ts](file://packages\infisical-kms\src\types.ts)
 
-## Structured Logging Implementation
+## Structured Logging Architecture
 
-The Audit Core System has been updated to replace the legacy ConsoleLogger with a modern StructuredLogger and LoggerFactory system. This enhancement provides consistent, factory-based logging across the system with improved observability, performance metrics, and error tracking capabilities.
+The Audit Core System has been updated to replace the legacy LoggerFactory with a modern StructuredLogger and LoggerFactory system. This enhancement provides consistent, factory-based logging across the system with improved observability, performance metrics, and error tracking capabilities.
 
 ```mermaid
 classDiagram
@@ -1106,7 +1110,8 @@ StructuredLogger --> OTPLConfig : uses
 ```
 
 **Diagram sources**
-- [logging.ts](file://packages\logs\src\logging.ts)
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts)
+- [logger-factory.ts](file://packages\logs\src\core\logger-factory.ts)
 - [audit.ts](file://packages\audit\src\audit.ts)
 
 The structured logging system provides several key features:
@@ -1151,85 +1156,213 @@ The structured logger provides specialized methods for common logging scenarios:
 - **Security Events**: `logSecurityEvent` for logging security incidents with severity levels
 - **Performance Metrics**: `logPerformanceMetrics` for capturing operation-specific performance data
 
-The OTLP output supports robust error handling with exponential backoff and circuit breaking for client errors:
+**Section sources**
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts)
+- [logger-factory.ts](file://packages\logs\src\core\logger-factory.ts)
+- [audit.ts](file://packages\audit\src\audit.ts)
 
-```typescript
-private async outputToOtpl(logEntry: LogEntry): Promise<void> {
-    if (!this.config.otplConfig) {
-        throw new Error('OTLP exporter not configured')
-    }
+## Log Processor Implementation
 
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'User-Agent': `audit-system-logger/1.0.0`,
-        ...this.config.otplConfig.headers,
-    }
+The LogProcessor is the core component responsible for handling log entries and routing them to appropriate transports. It implements a robust processing pipeline with error handling, batching, and health monitoring.
 
-    let body = JSON.stringify(logEntry)
+```mermaid
+classDiagram
+class LogProcessor {
++transports : Transport[]
++isHealthy() : boolean
++addTransport(transport : Transport) : void
++removeTransport(name : string) : void
++processLogEntry(entry : LogEntry) : Promise~void~
++flush() : Promise~void~
++close() : Promise~void~
++getHealthStatus() : { name : string; healthy : boolean; lastError? : Error }[]
+}
+class Transport {
+<<interface>>
++name : string
++enabled : boolean
++processLogEntry(entry : LogEntry) : Promise~void~
++flush() : Promise~void~
++close() : Promise~void~
++isHealthy() : boolean
+}
+class ConsoleTransport {
++processLogEntry(entry : LogEntry) : Promise~void~
++flush() : Promise~void~
++close() : Promise~void~
++isHealthy() : boolean
+}
+class FileTransport {
++processLogEntry(entry : LogEntry) : Promise~void~
++flush() : Promise~void~
++close() : Promise~void~
++isHealthy() : boolean
+}
+class OTLPTransport {
++processLogEntry(entry : LogEntry) : Promise~void~
++flush() : Promise~void~
++close() : Promise~void~
++isHealthy() : boolean
+}
+class RedisTransport {
++processLogEntry(entry : LogEntry) : Promise~void~
++flush() : Promise~void~
++close() : Promise~void~
++isHealthy() : boolean
+}
+LogProcessor --> Transport : uses
+Transport <|-- ConsoleTransport
+Transport <|-- FileTransport
+Transport <|-- OTLPTransport
+Transport <|-- RedisTransport
+```
 
-    // Add compression if large payload
-    if (body.length > 1024) {
-        const compressed = await this.compressPayload(body)
-        if (compressed) {
-            body = compressed.data
-            headers['Content-Encoding'] = compressed.encoding
-        }
-    }
+**Diagram sources**
+- [log-processor.ts](file://packages\logs\src\core\log-processor.ts)
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts)
 
-    const requestConfig: RequestInit = {
-        method: 'POST',
-        headers,
-        body,
-    }
+The LogProcessor provides the following key features:
 
-    const maxRetries = 3
-    let retryDelay = 1000
+- **Transport Management**: Dynamically add, remove, and manage multiple transport instances
+- **Error Resilience**: Implements circuit breaker pattern and fallback mechanisms for failed transports
+- **Batch Processing**: Supports batched processing for improved performance with external systems
+- **Health Monitoring**: Tracks transport health and provides status information for monitoring
+- **Graceful Shutdown**: Ensures all pending log operations are completed during shutdown
+- **Performance Monitoring**: Integrates with performance monitoring systems to track processing latency
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-            const response = await fetch(this.config.otplConfig.endpoint, requestConfig)
+The processor uses a concurrent processing model with configurable maximum concurrency to balance performance and resource usage. It also implements a fallback logging mechanism to ensure log entries are not lost when primary transports fail.
 
-            if (response.ok) {
-                console.debug(`Successfully exported log to OTLP`)
-                return
-            }
+**Section sources**
+- [log-processor.ts](file://packages\logs\src\core\log-processor.ts)
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts)
 
-            // Handle different error scenarios
-            if (response.status === 429) {
-                // Rate limited - implement backoff
-                const retryAfter = response.headers.get('Retry-After')
-                retryDelay = retryAfter ? parseInt(retryAfter) * 1000 : retryDelay * 2
-            } else if (response.status >= 400 && response.status < 500) {
-                // Client error - don't retry
-                throw new Error(`Client error: ${response.status} ${response.statusText}`)
-            }
+## Transport Configuration
 
-            if (attempt === maxRetries) {
-                throw new Error(
-                    `Failed after ${maxRetries} attempts: ${response.status} ${response.statusText}`
-                )
-            }
+The logging system supports multiple transport types, each with configurable options for different deployment scenarios.
 
-            // Wait before retry
-            await new Promise((resolve) => setTimeout(resolve, retryDelay))
-            retryDelay *= 2 // Exponential backoff
-        } catch (error) {
-            if (attempt === maxRetries) {
-                throw error
-            }
-
-            // Wait before retry for network errors
-            await new Promise((resolve) => setTimeout(resolve, retryDelay))
-            retryDelay *= 2
-        }
-    }
+```mermaid
+classDiagram
+class ConsoleConfig {
++name : string
++enabled : boolean
++format : 'json' | 'pretty'
++colorize : boolean
++level : 'debug' | 'info' | 'warn' | 'error'
+}
+class FileConfig {
++name : string
++enabled : boolean
++filename : string
++maxSize : number
++maxFiles : number
++rotateDaily : boolean
++rotationInterval : string
++compress : boolean
++retentionDays : number
+}
+class OTLPConfig {
++name : string
++enabled : boolean
++endpoint : string
++timeoutMs : number
++batchSize : number
++batchTimeoutMs : number
++maxConcurrency : number
++circuitBreakerThreshold : number
++circuitBreakerResetMs : number
+}
+class RedisConfig {
++name : string
++enabled : boolean
++host : string
++port : number
++database : number
++keyPrefix : string
++listName : string
++maxRetries : number
++connectTimeoutMs : number
++commandTimeoutMs : number
++enableAutoPipelining : boolean
++enableOfflineQueue : boolean
++dataStructure : 'list' | 'stream'
++enableCluster : boolean
++enableTLS : boolean
 }
 ```
 
+**Diagram sources**
+- [config.ts](file://packages\logs\src\types\config.ts)
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts)
+
+### Console Transport
+The console transport provides human-readable output with optional colorization:
+
+```typescript
+const consoleConfig = {
+  name: 'console',
+  enabled: true,
+  format: 'pretty',
+  colorize: true,
+  level: 'info',
+}
+```
+
+### File Transport
+The file transport writes logs to rotating files with compression and retention:
+
+```typescript
+const fileConfig = {
+  name: 'file',
+  enabled: true,
+  filename: 'application.log',
+  maxSize: 10 * 1024 * 1024, // 10MB
+  maxFiles: 5,
+  rotateDaily: true,
+  compress: true,
+  retentionDays: 30,
+}
+```
+
+### OTLP Transport
+The OTLP transport exports logs to observability platforms:
+
+```typescript
+const otlpConfig = {
+  name: 'otlp',
+  enabled: true,
+  endpoint: 'http://localhost:5080/api/default/default/_json',
+  batchSize: 100,
+  batchTimeoutMs: 5000,
+  timeoutMs: 30000,
+  circuitBreakerThreshold: 5,
+  circuitBreakerResetMs: 60000,
+}
+```
+
+### Redis Transport
+The Redis transport sends logs to Redis for aggregation and processing:
+
+```typescript
+const redisConfig = {
+  name: 'redis',
+  enabled: true,
+  host: 'localhost',
+  port: 6379,
+  listName: 'audit-logs',
+  maxRetries: 3,
+  connectTimeoutMs: 10000,
+  commandTimeoutMs: 10000,
+  enableAutoPipelining: true,
+  dataStructure: 'list',
+}
+```
+
+Each transport can be enabled or disabled independently, allowing flexible configuration for different environments.
+
 **Section sources**
-- [logging.ts](file://packages\logs\src\logging.ts)
+- [config.ts](file://packages\logs\src\types\config.ts)
+- [structured-logger.ts](file://packages\logs\src\core\structured-logger.ts)
 - [audit.ts](file://packages\audit\src\audit.ts)
-- [observability/tracer.ts](file://packages\audit\src\observability\tracer.ts)
 
 ## Database Preset Handler with Organization Priority
 

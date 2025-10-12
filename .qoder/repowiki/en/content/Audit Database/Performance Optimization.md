@@ -15,6 +15,10 @@
 - [audit.ts](file://packages/audit/src/audit.ts) - *Updated with new audit features*
 - [init.ts](file://apps/server/src/lib/hono/init.ts) - *Updated with new initialization features*
 - [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts) - *Updated with new preset handling features*
+- [OPTIMIZATION_SUMMARY.md](file://packages/audit-db/OPTIMIZATION_SUMMARY.md) - *Added with performance benchmark results*
+- [config-loader.ts](file://packages/logs/src/config/config-loader.ts) - *Added with configuration management features*
+- [performance-monitor.ts](file://packages/logs/src/utils/performance-monitor.ts) - *Added with performance monitoring features*
+- [performance-benchmark.test.ts](file://packages/audit-db/src/__tests__/performance-benchmark.test.ts) - *Added with performance benchmarks*
 </cite>
 
 ## Update Summary
@@ -28,6 +32,10 @@
 - Updated code examples to show new query optimization patterns
 - Maintained all existing performance optimization documentation
 - Updated source references to include new and modified files
+- Added performance benchmark results from OPTIMIZATION_SUMMARY.md
+- Integrated configuration management features from config-loader.ts
+- Added performance monitoring capabilities from performance-monitor.ts
+- Included performance benchmark test results and targets
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -41,6 +49,8 @@
 9. [Performance Benchmarks and Improvements](#performance-benchmarks-and-improvements)
 10. [Scalability and Capacity Planning](#scalability-and-capacity-planning)
 11. [Optimized Preset Queries with Organization Priority](#optimized-preset-queries-with-organization-priority)
+12. [Configuration Management and Hot-Reloading](#configuration-management-and-hot-reloading)
+13. [Performance Monitoring and Sampling](#performance-monitoring-and-sampling)
 
 ## Introduction
 
@@ -1166,3 +1176,309 @@ The system ensures that organization-specific presets always take precedence ove
 - [database-preset-handler.ts](file://packages/audit/src/preset/database-preset-handler.ts#L1-L284)
 - [audit.ts](file://packages/audit/src/audit.ts#L1-L910)
 - [init.ts](file://apps/server/src/lib/hono/init.ts#L1-L402)
+
+## Configuration Management and Hot-Reloading
+
+The system implements comprehensive configuration management with file loading, environment variable parsing, and hot-reloading support. The ConfigLoader class provides a unified interface for loading configuration from multiple sources with proper precedence.
+
+### Configuration Loading Architecture
+
+```mermaid
+classDiagram
+class ConfigLoader {
++load(providedConfig)
++loadFromFile(configPath)
++loadFromEnvironment()
++getDefaults()
++validate(config)
++parseBoolean(value)
++parseNumber(value, envVarName)
++parseFloat(value, envVarName)
++removeUndefinedValues(obj)
+}
+```
+
+**Diagram sources**
+- [config-loader.ts](file://packages/logs/src/config/config-loader.ts#L1-L530)
+
+**Section sources**
+- [config-loader.ts](file://packages/logs/src/config/config-loader.ts#L1-L530)
+
+### Key Implementation Details
+
+#### Configuration Precedence
+
+The configuration system follows a specific precedence order: defaults < config file < environment variables < provided config. This allows for flexible configuration management across different environments.
+
+```typescript
+static load(providedConfig: Partial<LoggingConfig> = {}): LoggingConfig {
+    // Start with defaults
+    const defaults = this.getDefaults()
+
+    // Load from configuration file if it exists
+    const fileConfig = this.loadFromFile()
+
+    // Extract configuration from environment variables
+    const envConfig = this.loadFromEnvironment()
+
+    // Merge configurations with proper precedence
+    const mergedConfig = {
+        ...defaults,
+        ...fileConfig,
+        ...envConfig,
+        ...providedConfig,
+    }
+
+    // Validate the final configuration
+    return ConfigValidator.validate(mergedConfig)
+}
+```
+
+**Section sources**
+- [config-loader.ts](file://packages/logs/src/config/config-loader.ts#L1-L530)
+
+#### Environment Variable Support
+
+The system supports loading configuration from environment variables with proper type conversion. This enables easy configuration in containerized environments and cloud deployments.
+
+```typescript
+private static loadFromEnvironment(): Partial<LoggingConfig> {
+    const config: Partial<LoggingConfig> = {}
+
+    // Core settings
+    if (process.env.LOG_LEVEL) {
+        config.level = process.env.LOG_LEVEL as any
+    }
+    if (process.env.LOG_SERVICE) {
+        config.service = process.env.LOG_SERVICE
+    }
+    if (process.env.LOG_ENVIRONMENT) {
+        config.environment = process.env.LOG_ENVIRONMENT
+    }
+    if (process.env.LOG_VERSION) {
+        config.version = process.env.LOG_VERSION
+    }
+
+    // Performance settings
+    const performanceConfig = this.loadPerformanceConfig()
+    if (performanceConfig) {
+        config.performance = performanceConfig
+    }
+
+    // Remove undefined values to allow proper merging
+    return this.removeUndefinedValues(config)
+}
+```
+
+**Section sources**
+- [config-loader.ts](file://packages/logs/src/config/config-loader.ts#L1-L530)
+
+#### File Configuration Support
+
+The system supports loading configuration from JSON files with standard naming conventions. It searches for configuration files in the current directory and supports multiple file formats.
+
+```typescript
+static loadFromFile(configPath?: string): Partial<LoggingConfig> {
+    let filePath: string | undefined
+
+    if (configPath) {
+        // Use provided path
+        filePath = resolve(configPath)
+    } else {
+        // Search for config files in current directory
+        filePath = this.CONFIG_FILE_NAMES.map((name) => resolve(process.cwd(), name)).find((path) =>
+            existsSync(path)
+        )
+    }
+
+    if (!filePath || !existsSync(filePath)) {
+        return {}
+    }
+
+    try {
+        const content = readFileSync(filePath, 'utf-8')
+
+        if (filePath.endsWith('.json')) {
+            return JSON.parse(content)
+        } else if (filePath.endsWith('.js')) {
+            // For .js files, we would need dynamic import, but for now just support JSON
+            throw new Error('JavaScript config files are not yet supported. Please use JSON format.')
+        }
+
+        return JSON.parse(content)
+    } catch (error) {
+        throw new Error(
+            `Failed to load configuration from ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+    }
+}
+```
+
+**Section sources**
+- [config-loader.ts](file://packages/logs/src/config/config-loader.ts#L1-L530)
+
+## Performance Monitoring and Sampling
+
+The system implements comprehensive performance monitoring with configurable sampling rates to balance monitoring overhead with performance insights. The PerformanceMonitor class provides detailed metrics collection and analysis capabilities.
+
+### Performance Monitoring Architecture
+
+```mermaid
+classDiagram
+class PerformanceMonitor {
++shouldSample()
++startTiming()
++getCurrentCpuUsage()
++getCurrentMemoryUsage()
++startSystemMetricsCollection()
++addSample(sample)
++getAggregatedMetrics()
++getMetrics()
++calculateStats(values)
++calculateStatsWithPercentiles(values)
++getCurrentMetrics()
++reset()
++stop()
++getConfig()
++updateConfig(newConfig)
+}
+```
+
+**Diagram sources**
+- [performance-monitor.ts](file://packages/logs/src/utils/performance-monitor.ts#L65-L396)
+
+**Section sources**
+- [performance-monitor.ts](file://packages/logs/src/utils/performance-monitor.ts#L65-L396)
+
+### Key Implementation Details
+
+#### Sampling Strategy
+
+The performance monitoring system uses a configurable sampling rate to balance monitoring overhead with performance insights. This allows for efficient monitoring in production environments while maintaining detailed metrics for analysis.
+
+```typescript
+constructor(config: Partial<PerformanceMonitorConfig> = {}) {
+    // Support legacy/test-friendly key `metricsIntervalMs` as an alias
+    const systemMetricsInterval = (config as any).metricsIntervalMs ?? config.systemMetricsInterval
+    this.config = {
+        enabled: config.enabled ?? false,
+        sampleRate: Math.max(0, Math.min(1, config.sampleRate ?? 0.1)),
+        systemMetricsInterval: systemMetricsInterval ?? 5000,
+        maxSamples: config.maxSamples ?? 1000,
+    }
+
+    if (this.config.enabled) {
+        this.startSystemMetricsCollection()
+    }
+
+    // In test environment, register this monitor globally so tests that
+    // construct their own monitor instance can have the logger pick it up.
+    if (process.env.NODE_ENV === 'test') {
+        try {
+            registerGlobalPerformanceMonitor(this)
+        } catch {
+            // ignore
+        }
+    }
+}
+```
+
+**Section sources**
+- [performance-monitor.ts](file://packages/logs/src/utils/performance-monitor.ts#L65-L396)
+
+#### Timing Operations
+
+The system provides a simple interface for timing operations and collecting performance metrics. The startTiming method returns a function that, when called, records the duration and memory usage of the operation.
+
+```typescript
+startTiming(): () => PerformanceMetrics | null {
+    if (!this.shouldSample()) {
+        return () => null
+    }
+
+    const startTime = performance.now()
+    const startMemory = process.memoryUsage()
+
+    return (): PerformanceMetrics => {
+        const endTime = performance.now()
+        const endMemory = process.memoryUsage()
+        const duration = endTime - startTime
+
+        const metrics: PerformanceMetrics = {
+            duration,
+            memoryUsage: endMemory.heapUsed - startMemory.heapUsed,
+        }
+
+        // Add to samples for aggregation
+        this.addSample({
+            timestamp: new Date(),
+            duration,
+            memoryUsage: metrics.memoryUsage,
+        })
+
+        return metrics
+    }
+}
+```
+
+**Section sources**
+- [performance-monitor.ts](file://packages/logs/src/utils/performance-monitor.ts#L65-L396)
+
+#### Aggregated Metrics
+
+The system collects and aggregates performance metrics over time, providing statistical analysis including percentiles (p95, p99) for operation duration, CPU usage, and memory usage.
+
+```typescript
+getAggregatedMetrics(): AggregatedMetrics | null {
+    if (!this.config.enabled || this.samples.length === 0) {
+        return null
+    }
+
+    // Return cached metrics if available and recent
+    if (
+        this.aggregatedMetrics &&
+        Date.now() - this.aggregatedMetrics.lastUpdated.getTime() < 30000
+    ) {
+        return this.aggregatedMetrics
+    }
+
+    // Calculate aggregated metrics
+    const cpuSamples = this.samples.filter((s) => s.cpuUsage !== undefined).map((s) => s.cpuUsage!)
+    const memorySamples = this.samples
+        .filter((s) => s.memoryUsage !== undefined)
+        .map((s) => s.memoryUsage!)
+    const durationSamples = this.samples
+        .filter((s) => s.duration !== undefined)
+        .map((s) => s.duration!)
+
+    this.aggregatedMetrics = {
+        cpuUsage: this.calculateStats(cpuSamples),
+        memoryUsage: this.calculateStats(memorySamples),
+        operationDuration: this.calculateStatsWithPercentiles(durationSamples),
+        lastUpdated: new Date(),
+    }
+
+    return this.aggregatedMetrics
+}
+```
+
+**Section sources**
+- [performance-monitor.ts](file://packages/logs/src/utils/performance-monitor.ts#L65-L396)
+
+#### Performance Benchmark Results
+
+The system has been validated against comprehensive performance benchmarks, achieving all design targets for production readiness:
+
+| Performance Metric | Design Target | Achieved | Status |
+|-------------------|---------------|----------|--------|
+| **Query Response Time (Cached)** | < 100ms | < 100ms | ✅ |
+| **Partition Creation Time** | < 5 seconds | < 5 seconds | ✅ |
+| **Cache Hit Ratio** | > 90% | > 90% | ✅ |
+| **Concurrent Connections** | 1000+ | 1000+ | ✅ |
+| **Cache Operations Complexity** | O(1) | O(1) | ✅ |
+| **Partition Lookup Complexity** | O(log N) | O(log N) | ✅ |
+| **Database Uptime** | 99.9% | 99.9% | ✅ |
+
+**Section sources**
+- [OPTIMIZATION_SUMMARY.md](file://packages/audit-db/OPTIMIZATION_SUMMARY.md)
+- [performance-benchmark.test.ts](file://packages/audit-db/src/__tests__/performance-benchmark.test.ts)

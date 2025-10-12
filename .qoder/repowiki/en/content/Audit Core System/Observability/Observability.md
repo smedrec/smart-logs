@@ -19,6 +19,12 @@
 - [alerting.ts](file://packages/audit/src/monitor/alerting.ts) - *Added in recent commit as AlertingService*
 - [health.ts](file://apps/server/src/lib/services/health.ts) - *Updated in recent commit*
 - [health-api.ts](file://apps/server/src/routes/health-api.ts) - *Updated in recent commit*
+- [structured-logger.ts](file://packages/logs/src/core/structured-logger.ts) - *Updated in recent commit to replace LoggerFactory*
+- [log-processor.ts](file://packages/logs/src/core/log-processor.ts) - *Updated in recent commit to manage multiple transports*
+- [otlp-transport.ts](file://packages/logs/src/transports/otlp-transport.ts) - *Added in recent commit for OTLP export*
+- [file-transport.ts](file://packages/logs/src/transports/file-transport.ts) - *Added in recent commit for file output*
+- [redis-transport.ts](file://packages/logs/src/transports/redis-transport.ts) - *Added in recent commit for Redis output*
+- [console-transport.ts](file://packages/logs/src/transports/console-transport.ts) - *Added in recent commit for console output*
 </cite>
 
 ## Update Summary
@@ -31,6 +37,8 @@
 - Enhanced source tracking with commit annotations
 - Updated MonitoringService section to reflect refactoring that extracted alert handling to AlertingService
 - Added documentation for the new AlertingService class and its integration with MonitoringService
+- Added comprehensive documentation for new logging transports (OTLP, File, Redis, Console)
+- Documented the LogProcessor architecture for managing multiple transports
 - Maintained all technical content while updating references
 
 ## Table of Contents
@@ -45,7 +53,7 @@
 9. [Best Practices](#best-practices)
 
 ## Introduction
-The Observability system provides comprehensive monitoring, metrics collection, and health checking capabilities for the audit pipeline. This documentation details the implementation of observability features across the system, including event processing latency tracking, error rate monitoring, system resource usage collection, health check endpoints, distributed tracing, and data visualization through dashboards. The system is designed to provide full visibility into the audit pipeline's performance and reliability, enabling proactive issue detection and resolution. Recent updates have enhanced the system with structured logging and improved OTLP exporter capabilities, including KMS encryption and more robust authentication mechanisms.
+The Observability system provides comprehensive monitoring, metrics collection, and health checking capabilities for the audit pipeline. This documentation details the implementation of observability features across the system, including event processing latency tracking, error rate monitoring, system resource usage collection, health check endpoints, distributed tracing, and data visualization through dashboards. The system is designed to provide full visibility into the audit pipeline's performance and reliability, enabling proactive issue detection and resolution. Recent updates have enhanced the system with structured logging and improved OTLP exporter capabilities, including KMS encryption and more robust authentication mechanisms. The logging architecture has been completely overhauled with the introduction of multiple transport mechanisms for console, file, Redis, and OTLP output.
 
 ## Core Components
 The Observability system consists of several interconnected components that work together to provide comprehensive monitoring capabilities. The system is built around a modular architecture that separates concerns between metrics collection, health checking, distributed tracing, and data visualization. Recent updates have introduced a structured logging framework and enhanced the OTLP exporter with encryption and improved reliability features.
@@ -69,19 +77,24 @@ E --> O[Alerts]
 D --> P[StructuredLogger]
 P --> Q[Log Aggregation]
 P --> R[OTLP Export]
+P --> S[File Transport]
+P --> T[Redis Transport]
+P --> U[Console Transport]
 ```
 
 **Diagram sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L50)
 - [dashboard.ts](file://packages/audit/src/observability/dashboard.ts#L1-L50)
 - [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L50)
-- [logging.ts](file://packages/logs/src/logging.ts#L1-L50)
+- [structured-logger.ts](file://packages/logs/src/core/structured-logger.ts#L1-L50)
+- [log-processor.ts](file://packages/logs/src/core/log-processor.ts#L1-L50)
 
 **Section sources**
 - [tracer.ts](file://packages/audit/src/observability/tracer.ts#L1-L50)
 - [dashboard.ts](file://packages/audit/src/observability/dashboard.ts#L1-L50)
 - [metrics-collector.ts](file://packages/audit/src/observability/metrics-collector.ts#L1-L50)
-- [logging.ts](file://packages/logs/src/logging.ts#L1-L50)
+- [structured-logger.ts](file://packages/logs/src/core/structured-logger.ts#L1-L50)
+- [log-processor.ts](file://packages/logs/src/core/log-processor.ts#L1-L50)
 
 ## Metrics Collection
 The metrics collection system captures performance data at various stages of the audit pipeline, including event processing latency, error rates, and system resource usage. Metrics are collected using a Redis-based storage system that provides high-performance data storage and retrieval. The system has been updated to use structured logging for enhanced telemetry and debugging capabilities.
