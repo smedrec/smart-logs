@@ -357,6 +357,20 @@ export class DeadLetterHandler {
 	}
 
 	/**
+	 * Get queue
+	 */
+	getQueue(): Queue<DeadLetterEvent> {
+		return this.dlQueue
+	}
+
+	/**
+	 * Get worker
+	 */
+	getWorker(): Worker<DeadLetterEvent> | undefined {
+		return this.dlWorker
+	}
+
+	/**
 	 * Cleans up the dead letter queue
 	 */
 	async cleanup(): Promise<void> {

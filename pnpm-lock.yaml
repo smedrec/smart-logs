@@ -678,6 +678,12 @@ importers:
 
   apps/worker:
     dependencies:
+      '@bull-board/api':
+        specifier: ^6.13.0
+        version: 6.13.0(@bull-board/ui@6.13.0)
+      '@bull-board/hono':
+        specifier: ^6.13.0
+        version: 6.13.0(hono@4.9.7)
       '@hono/node-server':
         specifier: 1.19.2
         version: 1.19.2(hono@4.9.7)
@@ -2309,6 +2315,19 @@ packages:
 
   '@bufbuild/protobuf@2.8.0':
     resolution: {integrity: sha512-r1/0w5C9dkbcdjyxY8ZHsC5AOWg4Pnzhm2zu7LO4UHSounp2tMm6Y+oioV9zlGbLveE7YaWRDUk48WLxRDgoqg==}
+
+  '@bull-board/api@6.13.0':
+    resolution: {integrity: sha512-GZ0On0VeL5uZVS1x7UdU90F9GV1kdmHa1955hW3Ow1PmslCY/2YwmvnapVdbvCUSVBqluTfbVZsE9X3h79r1kw==}
+    peerDependencies:
+      '@bull-board/ui': 6.13.0
+
+  '@bull-board/hono@6.13.0':
+    resolution: {integrity: sha512-4prwT26T5Oi+v//r6JlHgO7jH7uPuxbuVkcYt3bLwYaVthIagTmk/OxMoAII8drpPDELQEGyWgx28wNKx9AI0w==}
+    peerDependencies:
+      hono: ^4
+
+  '@bull-board/ui@6.13.0':
+    resolution: {integrity: sha512-63I6b3nZnKWI5ok6mw/Tk2rIObuzMTY/tLGyO51p0GW4rAImdXxrK6mT7j4SgEuP2B+tt/8L1jU7sLu8MMcCNw==}
 
   '@canvas/image-data@1.0.0':
     resolution: {integrity: sha512-BxOqI5LgsIQP1odU5KMwV9yoijleOPzHL18/YvNqF9KFSGF2K/DLlYAbDQsWqd/1nbaFuSkYD/191dpMtNh4vw==}
@@ -11623,6 +11642,9 @@ packages:
     resolution: {integrity: sha512-1qny3OExCf0UvUV/5wpYKf2YwPcOqXzkwKKSmKHiE6ZMQs5heeE/c8eXK+PNllPvmjgAbfnsbpkGZWy8cBpn9w==}
     engines: {node: '>=4'}
 
+  redis-info@3.1.0:
+    resolution: {integrity: sha512-ER4L9Sh/vm63DkIE0bkSjxluQlioBiBgf5w1UuldaW/3vPcecdljVDisZhmnCMvsxHNiARTTDDHGg9cGwTfrKg==}
+
   redis-parser@3.0.0:
     resolution: {integrity: sha512-DJnGAeenTdpMEH6uAJRK/uiyEIH9WVsUmoLwzudwGJUwZPp80PDBWPHXSAGNPwNvIXAbe7MSUB1zQFugFml66A==}
     engines: {node: '>=4'}
@@ -15519,6 +15541,22 @@ snapshots:
   '@better-fetch/fetch@1.1.18': {}
 
   '@bufbuild/protobuf@2.8.0': {}
+
+  '@bull-board/api@6.13.0(@bull-board/ui@6.13.0)':
+    dependencies:
+      '@bull-board/ui': 6.13.0
+      redis-info: 3.1.0
+
+  '@bull-board/hono@6.13.0(hono@4.9.7)':
+    dependencies:
+      '@bull-board/api': 6.13.0(@bull-board/ui@6.13.0)
+      '@bull-board/ui': 6.13.0
+      ejs: 3.1.10
+      hono: 4.9.7
+
+  '@bull-board/ui@6.13.0':
+    dependencies:
+      '@bull-board/api': 6.13.0(@bull-board/ui@6.13.0)
 
   '@canvas/image-data@1.0.0': {}
 
@@ -27093,6 +27131,10 @@ snapshots:
       vfile: 6.0.3
 
   redis-errors@1.2.0: {}
+
+  redis-info@3.1.0:
+    dependencies:
+      lodash: 4.17.21
 
   redis-parser@3.0.0:
     dependencies:

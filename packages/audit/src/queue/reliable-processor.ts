@@ -403,6 +403,34 @@ export class ReliableEventProcessor<T = AuditLogEvent> {
 	}
 
 	/**
+	 * Get queue
+	 */
+	getQueue(): Queue<T> {
+		return this.queue
+	}
+
+	/**
+	 * GET worker
+	 */
+	getWorker(): Worker<T> | undefined {
+		return this.worker
+	}
+
+	/**
+	 * Get DeadLetterHandler
+	 */
+	getDeadLetterHandler(): DeadLetterHandler {
+		return this.deadLetterHandler
+	}
+
+	/**
+	 * Get CircuitBreaker
+	 */
+	getCircuitBreaker(): CircuitBreaker {
+		return this.circuitBreaker
+	}
+
+	/**
 	 * Cleanup resources
 	 */
 	async cleanup(): Promise<void> {

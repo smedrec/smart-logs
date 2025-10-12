@@ -74,6 +74,7 @@ WORKDIR /app/apps/worker
 
 # Expose ports for healthcheck
 EXPOSE 5600
+EXPOSE 5601
 
 # Set environment variables
 ENV NODE_ENV=development

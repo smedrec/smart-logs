@@ -7,6 +7,7 @@ services:
     restart: always
     ports:
       - ${AUDIT_WORKER_PORT}:${AUDIT_WORKER_PORT}
+      - 5601:5601
     environment:
       - NODE_ENV=${NODE_ENV}
       - S3_ENDPOINT=${S3_ENDPOINT}

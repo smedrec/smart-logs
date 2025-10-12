@@ -1,10 +1,16 @@
 import 'dotenv/config'
 
+import { createBullBoard } from '@bull-board/api'
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
+import { HonoAdapter } from '@bull-board/hono'
 import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
 import * as Sentry from '@sentry/node'
 import { Hono } from 'hono'
+import { showRoutes } from 'hono/dev'
 
 import {
+	AlertingService,
 	Audit,
 	AuditBottleneckAnalyzer,
 	AuditLogEvent,
@@ -46,17 +52,13 @@ import {
 	errorLog,
 } from '@repo/audit-db'
 import { InfisicalKmsClient } from '@repo/infisical-kms'
-import { LoggerFactory } from '@repo/logs'
+import { StructuredLogger } from '@repo/logs'
 import {
 	closeSharedRedisConnection,
 	getRedisConnectionStatus,
 	getSharedRedisConnectionWithConfig,
 	Redis,
 } from '@repo/redis-client'
-
-import type { LogLevel } from 'workers-tagged-logger'
-
-const LOG_LEVEL = (process.env.LOG_LEVEL || 'info') as LogLevel
 
 Sentry.init({
 	dsn: 'https://af6b20a8261b4d4981f0283f26d7795c@bugsink.smedrec.qzz.io/1',
@@ -71,23 +73,26 @@ Sentry.init({
 
 // Initialize enhanced structured logger
 
-LoggerFactory.setDefaultConfig({
-	level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
-	enablePerformanceLogging: true,
-	enableErrorTracking: true,
-	enableMetrics: false,
-	format: 'pretty',
-	outputs: ['console', 'otpl'],
-	otplConfig: {
-		endpoint: process.env.OTLP_ENDPOINT || 'http://localhost:5080/api/default/default/_json',
+const logger = new StructuredLogger({
+	service: 'worker',
+	environment: 'development',
+	console: {
+		name: 'console',
+		enabled: true,
+		format: 'json',
+		colorize: false,
+		level: 'info',
+	},
+	otlp: {
+		name: 'otpl',
+		enabled: true,
+		level: 'info',
+		endpoint: 'http://192.168.1.114:5080/api/default',
 		headers: {
 			Authorization: process.env.OTLP_AUTH_HEADER || '',
+			'stream-name': 'default',
 		},
 	},
-})
-
-const logger = LoggerFactory.createLogger({
-	service: 'worker',
 })
 
 // Configuration manager
@@ -116,6 +121,7 @@ let reliableProcessor: ReliableEventProcessor<AuditLogEvent> | undefined = undef
 let databaseAlertHandler: DatabaseAlertHandler | undefined = undefined
 let metricsCollector: RedisMetricsCollector | undefined = undefined
 let monitoringService: MonitoringService | undefined = undefined
+let alertingService: AlertingService | undefined = undefined
 let healthCheckService: HealthCheckService | undefined = undefined
 
 // Observability services
@@ -134,8 +140,9 @@ const observabilityConfig: ObservabilityConfig = {
 		serviceName: 'audit-system',
 		sampleRate: 1.0,
 		exporterType: 'otlp' as const,
-		exporterEndpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+		exporterEndpoint: 'http://192.168.1.114:5080/api/default',
 		headers: {
+			Authorization: process.env.OTLP_AUTH_HEADER || '',
 			'stream-name': 'default',
 		},
 	},
@@ -180,10 +187,12 @@ app.get('/healthz', async (c) => {
 		}
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(
-			`Health check failed with error: ${errorMessage}`,
-			error instanceof Error ? error : new Error('Unknown error')
-		)
+		logger.error(`Health check failed with error: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(503)
 		return c.json({
 			status: 'CRITICAL',
@@ -215,10 +224,12 @@ app.get('/metrics', async (c) => {
 		})
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(
-			`Failed to collect metrics: ${errorMessage}`,
-			error instanceof Error ? error : new Error('Unknown error')
-		)
+		logger.error(`Failed to collect metrics: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(500)
 		return c.json({
 			error: 'Failed to collect metrics',
@@ -253,10 +264,12 @@ app.get('/health/:component', async (c) => {
 		return c.json(componentHealth)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(
-			`Failed to check component health: ${errorMessage}`,
-			error instanceof Error ? error : new Error('Unknown error')
-		)
+		logger.error(`Failed to check component health: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(500)
 		return c.json({
 			error: 'Failed to check component health',
@@ -277,10 +290,12 @@ app.get('/observability/dashboard', async (c) => {
 		return c.json(dashboardData)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(
-			`Failed to get dashboard data: ${errorMessage}`,
-			error instanceof Error ? error : new Error('Unknown error')
-		)
+		logger.error(`Failed to get dashboard data: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(500)
 		return c.json({
 			error: 'Failed to get dashboard data',
@@ -307,10 +322,12 @@ app.get('/observability/metrics/enhanced', async (c) => {
 		return c.json(JSON.parse(metrics))
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(
-			`Failed to export enhanced metrics: ${errorMessage}`,
-			error instanceof Error ? error : new Error('Unknown error')
-		)
+		logger.error(`Failed to export enhanced metrics: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(500)
 		return c.json({
 			error: 'Failed to export enhanced metrics',
@@ -330,7 +347,12 @@ app.get('/observability/bottlenecks', async (c) => {
 		return c.json(bottlenecks)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get bottleneck analysis: ${errorMessage}`)
+		logger.error(`Failed to get bottleneck analysis: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(500)
 		return c.json({
 			error: 'Failed to get bottleneck analysis',
@@ -356,10 +378,12 @@ app.get('/observability/traces', async (c) => {
 		return c.json(activeSpans)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(
-			`Failed to get trace data: ${errorMessage}`,
-			error instanceof Error ? error : new Error('Unknown error')
-		)
+		logger.error(`Failed to get trace data: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(500)
 		return c.json({
 			error: 'Failed to get trace data',
@@ -379,10 +403,12 @@ app.get('/observability/profiling', async (c) => {
 		return c.json(profilingResults)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(
-			`Failed to get profiling results: ${errorMessage}`,
-			error instanceof Error ? error : new Error('Unknown error')
-		)
+		logger.error(`Failed to get profiling results: ${errorMessage}`, {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		c.status(500)
 		return c.json({
 			error: 'Failed to get profiling results',
@@ -410,7 +436,12 @@ async function main() {
 					? error.message
 					: 'Unknown error during configuration manager initialization'
 			const err = new Error(message)
-			logger.error(`🔴 Configuration manager initialization failed: ${message}`, err)
+			logger.error(`🔴 Configuration manager initialization failed: ${message}`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: message,
+			})
 			throw err
 		}
 	}
@@ -427,9 +458,15 @@ async function main() {
 			if (!retryResult.success) {
 				const err =
 					retryResult.error instanceof Error ? retryResult.error : new Error('Unknown error')
-				logger.error('🔴 Halting worker start due to redis connection failure.', err, {
-					attempts: retryResult.attempts,
+				logger.error('🔴 Halting worker start due to redis connection failure.', {
+					attempts: JSON.stringify(retryResult.attempts),
 					totalDuration: retryResult.totalDuration,
+					error: {
+						name: err.name,
+						message: err.message,
+						stack: err.stack,
+						cause: err.cause instanceof Error ? err.cause.message : undefined,
+					},
 				})
 				throw err
 			}
@@ -439,7 +476,12 @@ async function main() {
 	} catch (error) {
 		// TODO: Optionally, implement retry logic here or ensure process exits.
 		const err = error instanceof Error ? error : new Error('Unknown error')
-		logger.error('🔴 Halting worker start due to redis connection failure.', err)
+		logger.error('🔴 Halting worker start due to redis connection failure.', {
+			error:
+				error instanceof Error
+					? { name: error.name, message: error.message, stack: error.stack }
+					: 'Unknown error',
+		})
 		throw err
 	}
 
@@ -515,8 +557,12 @@ async function main() {
 	}
 	if (!monitoringService) {
 		monitoringService = new MonitoringService(config.monitoring, metricsCollector)
-		monitoringService.addAlertHandler(new ConsoleAlertHandler())
-		monitoringService.addAlertHandler(databaseAlertHandler)
+	}
+
+	if (!alertingService) {
+		alertingService = new AlertingService(config.monitoring, metricsCollector)
+		alertingService.addAlertHandler(new ConsoleAlertHandler())
+		alertingService.addAlertHandler(databaseAlertHandler)
 	}
 
 	// 5.1. Initialize observability services
@@ -739,10 +785,14 @@ async function main() {
 				)
 			}
 
-			logger.error(
-				`❌ Failed to process audit event: ${err.message} (${totalTime.toFixed(2)}ms)`,
-				err
-			)
+			logger.error(`❌ Failed to process audit event: ${err.message} (${totalTime.toFixed(2)}ms)`, {
+				error: {
+					name: err.name,
+					message: err.message,
+					stack: err.stack,
+					cause: err.cause instanceof Error ? err.cause.message : undefined,
+				},
+			})
 			throw err // Re-throw to trigger retry mechanism
 		} finally {
 			tracer!.finishSpan(span)
@@ -785,10 +835,12 @@ async function main() {
 			await reliableProcessor.start()
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : error
-			logger.error(
-				`Failed to start reliable processor: ${errorMessage}`,
-				error instanceof Error ? error : new Error('Unknown error')
-			)
+			logger.error(`Failed to start reliable processor: ${errorMessage}`, {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Unknown error',
+			})
 			throw error
 		}
 	}
@@ -827,6 +879,23 @@ async function main() {
 		port: config.worker.port,
 	})
 
+	const ui = new Hono()
+	const uiServerAdapter = new HonoAdapter(serveStatic)
+	createBullBoard({
+		queues: [
+			new BullMQAdapter(reliableProcessor.getQueue()),
+			new BullMQAdapter(reliableProcessor.getDeadLetterHandler().getQueue()),
+		],
+		serverAdapter: uiServerAdapter,
+	})
+	const basePath = '/ui'
+	uiServerAdapter.setBasePath(basePath)
+	ui.route(basePath, uiServerAdapter.registerPlugin())
+	showRoutes(ui)
+	const uiServer = serve({ fetch: ui.fetch, port: config.worker.port + 1 }, ({ address, port }) => {
+		logger.info(`🎮 Bull Dashboard on http://localhost:${port}/ui`)
+	})
+
 	// System startup
 	audit.logSystem({
 		action: 'startup',
@@ -841,17 +910,20 @@ async function main() {
 	})
 
 	logger.info(`👂 Healthcheck server listening on port ${config.worker.port}`)
+	logger.info(`👂 UI server listening on port ${config.worker.port + 1}`)
 
 	// Graceful shutdown
 	const gracefulShutdown = async (signal: string) => {
 		logger.info(`🚦 Received ${signal}. Shutting down gracefully...`)
 		server.close()
+		uiServer.close()
 		if (reliableProcessor) {
 			await reliableProcessor.stop()
 		}
 		await closeSharedRedisConnection() // Use client's close function
 		await auditDbService?.end()
 		logger.info('🚪 Reliable processor, Postgres and Redis connections closed. Exiting.')
+		await logger.close()
 		process.exit(0)
 	}
 
@@ -862,11 +934,14 @@ async function main() {
 // Start the application
 main().catch(async (error) => {
 	const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-	logger.error(
-		`💥 Unhandled error in main application scope: ${errorMessage}`,
-		error instanceof Error ? error : new Error(errorMessage)
-	)
+	logger.error(`💥 Unhandled error in main application scope: ${errorMessage}`, {
+		error:
+			error instanceof Error
+				? { name: error.name, message: error.message, stack: error.stack }
+				: 'Unknown error',
+	})
 	await auditDbService?.end()
 	// Ensure Redis connection is closed on fatal error
 	void closeSharedRedisConnection().finally(() => process.exit(1))
+	await logger.close()
 })
