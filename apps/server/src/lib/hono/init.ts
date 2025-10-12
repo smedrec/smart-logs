@@ -13,7 +13,6 @@ import {
 	DatabaseHealthCheck,
 	DataExportService,
 	DEFAULT_DASHBOARD_CONFIG,
-	DEFAULT_OBSERVABILITY_CONFIG,
 	ErrorHandler,
 	GDPRComplianceService,
 	HealthCheckService,
@@ -185,23 +184,6 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 
 		// Initialize enhanced structured logger
 		if (!structuredLogger) {
-			/**LoggerFactory.setDefaultConfig({
-				level: config.server.monitoring.logLevel,
-				enablePerformanceLogging: true,
-				enableErrorTracking: true,
-				enableMetrics: config.server.monitoring.enableMetrics,
-				format: config.server.environment === 'development' ? 'pretty' : 'json',
-				outputs: ['console', 'otpl'],
-				otplConfig: {
-					endpoint: config.logging.exporterEndpoint || '',
-					headers: config.logging.exporterHeaders || {},
-				},
-			})
-
-			structuredLogger = LoggerFactory.createLogger({
-				requestId,
-				service: application,
-			})*/
 			structuredLogger = new StructuredLogger({
 				service: 'api',
 				environment: 'development',
@@ -217,7 +199,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 					enabled: true,
 					level: 'info',
 					endpoint: config.logging.exporterEndpoint || '',
-					headers: config.logging.exporterHeaders || {},
+					//headers: config.logging.exporterHeaders || {},
 				},
 			})
 		}
@@ -325,12 +307,12 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		}
 
 		if (!tracer) {
-			tracer = new AuditTracer(DEFAULT_OBSERVABILITY_CONFIG.tracing)
+			tracer = new AuditTracer(config.observability.tracing)
 		}
 		if (!enhancedMetricsCollector) {
 			enhancedMetricsCollector = new RedisEnhancedMetricsCollector(
 				monitoringService,
-				DEFAULT_OBSERVABILITY_CONFIG.metrics,
+				config.observability.metrics,
 				connection
 			)
 		}

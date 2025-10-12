@@ -7,6 +7,7 @@ import { Redis as RedisInstance } from 'ioredis'
 
 import { getSharedRedisConnection } from '@repo/redis-client'
 
+import { ObservabilityConfig } from '../config/types.js'
 import { MonitoringService } from '../monitor/monitoring.js'
 
 import type { RedisOptions, Redis as RedisType } from 'ioredis'
@@ -14,7 +15,6 @@ import type {
 	AuditOperationMetrics,
 	ComponentHealthMetrics,
 	DashboardMetrics,
-	ObservabilityConfig,
 	PerformanceMetrics,
 	SystemMetrics,
 	TimeSeriesMetrics,

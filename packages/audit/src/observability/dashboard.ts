@@ -10,7 +10,6 @@ import type {
 	BottleneckAnalysis,
 	ComponentHealthMetrics,
 	DashboardMetrics,
-	ObservabilityConfig,
 	TimeSeriesMetrics,
 } from './types.js'
 

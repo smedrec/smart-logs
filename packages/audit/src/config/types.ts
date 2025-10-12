@@ -47,6 +47,9 @@ export interface AuditConfig {
 	/** Monitoring configuration */
 	monitoring: MonitoringConfig
 
+	/** Observability configuration */
+	observability: ObservabilityConfig
+
 	/** Security configuration */
 	security: SecurityConfig
 
@@ -443,6 +446,45 @@ export interface MonitoringConfig {
 			/** Pattern detection notification template */
 			patternDetection: string
 		}
+	}
+}
+
+/**
+ * Observability configuration
+ */
+export interface ObservabilityConfig {
+	// Tracing configuration
+	tracing: {
+		enabled: boolean
+		serviceName: string
+		sampleRate: number
+		exporterType: 'console' | 'jaeger' | 'zipkin' | 'otlp'
+		exporterEndpoint?: string
+		headers?: Record<string, string>
+	}
+
+	// Metrics configuration
+	metrics: {
+		enabled: boolean
+		collectionInterval: number
+		retentionPeriod: number
+		exporterType: 'prometheus' | 'console' | 'custom'
+		exporterEndpoint?: string
+	}
+
+	// Profiling configuration
+	profiling: {
+		enabled: boolean
+		sampleRate: number
+		maxProfiles: number
+		profileDuration: number
+	}
+
+	// Dashboard configuration
+	dashboard: {
+		enabled: boolean
+		refreshInterval: number
+		historyRetention: number
 	}
 }
 

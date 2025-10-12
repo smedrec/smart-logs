@@ -3,7 +3,9 @@
  */
 import { randomBytes } from 'crypto'
 
-import type { ObservabilityConfig, Span, SpanLog, SpanStatus, TraceContext } from './types.js'
+import { ObservabilityConfig } from '../config/types.js'
+
+import type { Span, SpanLog, SpanStatus, TraceContext } from './types.js'
 
 /**
  * Tracer interface for distributed tracing

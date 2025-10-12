@@ -27,8 +27,6 @@ import {
 	DatabaseHealthCheck,
 	DatabasePresetHandler,
 	DEFAULT_DASHBOARD_CONFIG,
-	DEFAULT_OBSERVABILITY_CONFIG,
-	DEFAULT_RELIABLE_PROCESSOR_CONFIG,
 	ErrorHandler,
 	executeWithRetry,
 	GDPRComplianceService,
@@ -87,11 +85,12 @@ const logger = new StructuredLogger({
 		name: 'otpl',
 		enabled: true,
 		level: 'info',
-		endpoint: 'http://192.168.1.114:5080/api/default',
-		headers: {
-			Authorization: process.env.OTLP_AUTH_HEADER || '',
-			'stream-name': 'default',
-		},
+		endpoint: 'http://192.168.1.114:4318/v1/logs',
+		/**headers: {
+			'Content-Type': 'application/json',
+			//Authorization: process.env.OTLP_AUTH_HEADER || '',
+			//'stream-name': 'default',
+		},*/
 	},
 })
 
@@ -140,10 +139,11 @@ const observabilityConfig: ObservabilityConfig = {
 		serviceName: 'audit-system',
 		sampleRate: 1.0,
 		exporterType: 'otlp' as const,
-		exporterEndpoint: 'http://192.168.1.114:5080/api/default',
+		exporterEndpoint: 'http://192.168.1.114:4318/v1/traces',
 		headers: {
-			Authorization: process.env.OTLP_AUTH_HEADER || '',
-			'stream-name': 'default',
+			'Content-Type': 'application/json',
+			//Authorization: process.env.OTLP_AUTH_HEADER || '',
+			//'stream-name': 'default',
 		},
 	},
 	metrics: {
@@ -567,12 +567,12 @@ async function main() {
 
 	// 5.1. Initialize observability services
 	if (!tracer) {
-		tracer = new AuditTracer(observabilityConfig.tracing)
+		tracer = new AuditTracer(config.observability.tracing)
 	}
 	if (!enhancedMetricsCollector) {
 		enhancedMetricsCollector = new RedisEnhancedMetricsCollector(
 			monitoringService,
-			DEFAULT_OBSERVABILITY_CONFIG.metrics,
+			config.observability.metrics,
 			connection
 		)
 	}

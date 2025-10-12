@@ -170,7 +170,7 @@ export function createDevelopmentConfig(): AuditConfig {
 				},
 			},
 			api: {
-				enableTrpc: true,
+				enableTrpc: false,
 				enableRest: true,
 				enableGraphql: true,
 				trpcPath: '/trpc',
@@ -258,6 +258,35 @@ export function createDevelopmentConfig(): AuditConfig {
 				},
 			},
 		},
+		observability: {
+			tracing: {
+				enabled: true,
+				serviceName: 'audit-system',
+				sampleRate: 1.0,
+				exporterType: 'otlp',
+				exporterEndpoint: process.env.OTLP_TRACES_ENDPOINT || 'http://192.168.1.114:4318/v1/traces',
+				//headers: {},
+			},
+			metrics: {
+				enabled: true,
+				collectionInterval: 30000, // 30 seconds
+				retentionPeriod: 86400, // 24 hours
+				exporterType: 'console' as const,
+				exporterEndpoint:
+					process.env.OTLP_METRICS_ENDPOINT || 'http://192.168.1.114:4318/v1/metrics',
+			},
+			profiling: {
+				enabled: true,
+				sampleRate: 0.1, // 10% sampling
+				maxProfiles: 100,
+				profileDuration: 60000, // 1 minute
+			},
+			dashboard: {
+				enabled: true,
+				refreshInterval: 30000, // 30 seconds
+				historyRetention: 86400, // 24 hours
+			},
+		},
 		security: {
 			enableIntegrityVerification: true,
 			hashAlgorithm: 'SHA-256',
@@ -318,7 +347,7 @@ export function createDevelopmentConfig(): AuditConfig {
 			enableCorrelationIds: true,
 			retentionDays: 30,
 			exporterType: 'otlp',
-			exporterEndpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+			exporterEndpoint: process.env.OTLP_LOGS_ENDPOINT || 'http://localhost:4318/v1/logs',
 			exporterHeaders: {
 				...getAuthHeaders(),
 			},
@@ -462,6 +491,9 @@ export function createStagingConfig(): AuditConfig {
 				memoryUsage: 0.75,
 			},
 			healthCheckInterval: 15000,
+		},
+		observability: {
+			...baseConfig.observability,
 		},
 		security: {
 			...baseConfig.security,
@@ -640,6 +672,9 @@ export function createProductionConfig(): AuditConfig {
 			},
 			healthCheckInterval: 10000,
 		},
+		observability: {
+			...baseConfig.observability,
+		},
 		security: {
 			...baseConfig.security,
 			enableIntegrityVerification: true,
@@ -742,6 +777,9 @@ export function createTestConfig(): AuditConfig {
 			enabled: false,
 			metricsInterval: 60000,
 			healthCheckInterval: 60000,
+		},
+		observability: {
+			...baseConfig.observability,
 		},
 		security: {
 			...baseConfig.security,
