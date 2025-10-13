@@ -19,6 +19,32 @@ receivers:
   httplogreceiver/json:
     endpoint: 0.0.0.0:8082
     source: json
+  postgresql:
+    # The endpoint of the postgresql server. Whether using TCP or Unix sockets, this value should be host:port. If transport is set to unix, the endpoint will internally be translated from host:port to /host.s.PGSQL.port
+    endpoint: ${env:POSTGRESQL_ENDPOINT}
+    # The frequency at which to collect metrics from the Postgres instance.
+    collection_interval: 60s
+    # The username used to access the postgres instance
+    username: ${env:POSTGRESQL_USERNAME}
+    # The password used to access the postgres instance
+    password: ${env:POSTGRESQL_PASSWORD}
+    # The list of databases for which the receiver will attempt to collect statistics. If an empty list is provided, the receiver will attempt to collect statistics for all non-template databases
+    databases: ['audit_dev', 'smart_logs_auth_dev']
+    # # Defines the network to use for connecting to the server. Valid Values are `tcp` or `unix`
+    # transport: tcp
+    tls:
+      # set to false if SSL is enabled on the server
+      insecure: true
+    #   ca_file: /etc/ssl/certs/ca-certificates.crt
+    #   cert_file: /etc/ssl/certs/postgres.crt
+    #   key_file: /etc/ssl/certs/postgres.key
+    metrics:
+      postgresql.database.locks:
+        enabled: true
+      postgresql.deadlocks:
+        enabled: true
+      postgresql.sequential_scans:
+        enabled: true
 processors:
   batch:
     send_batch_size: 10000
@@ -28,6 +54,11 @@ processors:
     # Using OTEL_RESOURCE_ATTRIBUTES envvar, env detector adds custom labels.
     detectors: [env, system]
     timeout: 2s
+  resourcedetection/system:
+    # add additional detectors if needed
+    detectors: ['system']
+    system:
+      hostname_sources: ['os']
   signozspanmetrics/delta:
     metrics_exporter: signozclickhousemetrics
     metrics_flush_interval: 60s
@@ -88,6 +119,10 @@ exporters:
     dsn: tcp://clickhouse:9000/signoz_logs
     timeout: 10s
     use_new_schema: true
+  otlp/postgres:
+    endpoint: localhost:4317
+    tls:
+      insecure: true
 service:
   telemetry:
     logs:
@@ -108,6 +143,10 @@ service:
       receivers: [prometheus]
       processors: [batch]
       exporters: [signozclickhousemetrics]
+    metrics/postgresql:
+      receivers: [postgresql]
+      processors: [resourcedetection/system]
+      exporters: [otlp/postgres]
     logs:
       receivers: [otlp, httplogreceiver/json]
       processors: [batch]
