@@ -134,6 +134,13 @@
       "when": 1760191251116,
       "tag": "0018_nebulous_mole_man",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1760535792205,
+      "tag": "0019_spotty_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }
