@@ -73,7 +73,10 @@ export interface DeliveryDestination {
 		}
 
 		download?: {
+			baseUrl?: string
 			expiryHours: number
+			maxAccess?: number
+			allowedIpRanges?: string[] // CIDR notation
 		}
 	}
 	createdAt: string

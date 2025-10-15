@@ -8,6 +8,14 @@ export { WebhookHandler } from './webhook-handler.js'
 export { WebhookSecurityManager, WebhookSecurityTestUtils } from './webhook-security.js'
 export { WebhookSecretManager, createWebhookSecretManager } from './webhook-secret-manager.js'
 export { EmailHandler } from './email-handler.js'
+export { DownloadHandler } from './download-handler.js'
+export { DownloadManager, createDownloadManager } from './download-manager.js'
+
+export type {
+	DownloadAnalytics,
+	CleanupResult,
+	AccessValidationResult,
+} from './download-manager.js'
 export {
 	EmailProviderFactory,
 	EmailRateLimiter,

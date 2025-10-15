@@ -5,7 +5,12 @@
 
 import { and, desc, eq, sql } from 'drizzle-orm'
 
-import { deliveryDestinations, destinationHealth, webhookSecrets } from '@repo/audit-db'
+import {
+	deliveryDestinations,
+	destinationHealth,
+	downloadLinks,
+	webhookSecrets,
+} from '@repo/audit-db'
 import { StructuredLogger } from '@repo/logs'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
@@ -111,6 +116,63 @@ export interface IWebhookSecretRepository {
 }
 
 /**
+ * Repository interface for download links
+ */
+export interface IDownloadLinkRepository {
+	createDownloadLink(link: {
+		id: string
+		organizationId: string
+		deliveryId?: string
+		objectId: string
+		objectType: string
+		objectMetadata: Record<string, any>
+		filePath: string
+		fileName: string
+		mimeType?: string
+		fileSize?: number
+		signedUrl: string
+		signature: string
+		algorithm: string
+		expiresAt: string
+		maxAccess?: number
+		accessCount: number
+		accessedBy: any[]
+		isActive: string
+		createdBy?: string
+		metadata: Record<string, any>
+	}): Promise<void>
+	findById(id: string): Promise<any | null>
+	findByOrganization(
+		organizationId: string,
+		options?: {
+			isActive?: boolean
+			objectType?: string
+			limit?: number
+			offset?: number
+		}
+	): Promise<any[]>
+	recordAccess(
+		id: string,
+		accessRecord: {
+			timestamp: string
+			userId?: string
+			ipAddress?: string
+			userAgent?: string
+			success: boolean
+			error?: string
+		}
+	): Promise<void>
+	revokeLink(id: string, revokedBy?: string, reason?: string): Promise<void>
+	cleanupExpired(): Promise<number>
+	getAccessStats(id: string): Promise<{
+		totalAccess: number
+		uniqueUsers: number
+		lastAccess?: string
+		accessHistory: any[]
+	}>
+}
+
+/**
  * Main delivery database client
  */
 export class DeliveryDatabaseClient {
@@ -120,6 +182,7 @@ export class DeliveryDatabaseClient {
 	private readonly queueRepo: DeliveryQueueRepository
 	private readonly healthRepo: DestinationHealthRepository
 	private readonly secretRepo: WebhookSecretRepository
+	private readonly downloadRepo: DownloadLinkRepository
 
 	constructor(private readonly enhancedClient: EnhancedAuditDatabaseClient) {
 		this.logger = new StructuredLogger({
@@ -140,6 +203,7 @@ export class DeliveryDatabaseClient {
 		this.queueRepo = new DeliveryQueueRepository(enhancedClient)
 		this.healthRepo = new DestinationHealthRepository(enhancedClient)
 		this.secretRepo = new WebhookSecretRepository(enhancedClient)
+		this.downloadRepo = new DownloadLinkRepository(enhancedClient)
 	}
 
 	get destinations(): IDeliveryDestinationRepository {
@@ -160,6 +224,10 @@ export class DeliveryDatabaseClient {
 
 	get secrets(): IWebhookSecretRepository {
 		return this.secretRepo
+	}
+
+	get downloads(): IDownloadLinkRepository {
+		return this.downloadRepo
 	}
 
 	/**
@@ -779,6 +847,226 @@ class WebhookSecretRepository implements IWebhookSecretRepository {
 			lastUsedAt: row.lastUsedAt,
 			createdAt: row.createdAt,
 			createdBy: row.createdBy,
+		}
+	}
+}
+
+class DownloadLinkRepository implements IDownloadLinkRepository {
+	constructor(private readonly client: EnhancedAuditDatabaseClient) {}
+
+	async createDownloadLink(link: {
+		id: string
+		organizationId: string
+		deliveryId?: string
+		objectId: string
+		objectType: string
+		objectMetadata: Record<string, any>
+		filePath: string
+		fileName: string
+		mimeType?: string
+		fileSize?: number
+		signedUrl: string
+		signature: string
+		algorithm: string
+		expiresAt: string
+		maxAccess?: number
+		accessCount: number
+		accessedBy: any[]
+		isActive: string
+		createdBy?: string
+		metadata: Record<string, any>
+	}): Promise<void> {
+		const db = this.client.getDatabase()
+
+		await db.insert(downloadLinks).values({
+			id: link.id,
+			organizationId: link.organizationId,
+			deliveryId: link.deliveryId,
+			objectId: link.objectId,
+			objectType: link.objectType,
+			objectMetadata: link.objectMetadata,
+			filePath: link.filePath,
+			fileName: link.fileName,
+			mimeType: link.mimeType,
+			fileSize: link.fileSize,
+			signedUrl: link.signedUrl,
+			signature: link.signature,
+			algorithm: link.algorithm,
+			expiresAt: link.expiresAt,
+			accessCount: link.accessCount,
+			maxAccess: link.maxAccess,
+			accessedBy: link.accessedBy,
+			isActive: link.isActive,
+			createdBy: link.createdBy,
+			metadata: link.metadata,
+		})
+	}
+
+	async findById(id: string): Promise<any | null> {
+		const db = this.client.getDatabase()
+
+		const [result] = await db.select().from(downloadLinks).where(eq(downloadLinks.id, id))
+
+		return result ? this.mapToDownloadLink(result) : null
+	}
+
+	async findByOrganization(
+		organizationId: string,
+		options?: {
+			isActive?: boolean
+			objectType?: string
+			limit?: number
+			offset?: number
+		}
+	): Promise<any[]> {
+		const db = this.client.getDatabase()
+
+		let query = db
+			.select()
+			.from(downloadLinks)
+			.where(eq(downloadLinks.organizationId, organizationId))
+
+		// Apply filters
+		const conditions = [eq(downloadLinks.organizationId, organizationId)]
+
+		if (options?.isActive !== undefined) {
+			conditions.push(eq(downloadLinks.isActive, options.isActive.toString()))
+		}
+
+		if (options?.objectType) {
+			conditions.push(eq(downloadLinks.objectType, options.objectType))
+		}
+
+		if (conditions.length > 1) {
+			query = query.where(and(...conditions)) as any
+		}
+
+		// Apply ordering
+		query = query.orderBy(desc(downloadLinks.createdAt)) as any
+
+		// Apply pagination
+		if (options?.limit) {
+			query = query.limit(options.limit) as any
+		}
+		if (options?.offset) {
+			query = query.offset(options.offset) as any
+		}
+
+		const results = await query
+		return results.map(this.mapToDownloadLink)
+	}
+
+	async recordAccess(
+		id: string,
+		accessRecord: {
+			timestamp: string
+			userId?: string
+			ipAddress?: string
+			userAgent?: string
+			success: boolean
+			error?: string
+		}
+	): Promise<void> {
+		const db = this.client.getDatabase()
+
+		// Get current link
+		const current = await this.findById(id)
+		if (!current) {
+			throw new Error(`Download link not found: ${id}`)
+		}
+
+		// Update access count and add access record
+		const newAccessCount = current.accessCount + 1
+		const newAccessedBy = [...current.accessedBy, accessRecord]
+
+		await db
+			.update(downloadLinks)
+			.set({
+				accessCount: newAccessCount,
+				accessedBy: newAccessedBy,
+				updatedAt: new Date().toISOString(),
+			})
+			.where(eq(downloadLinks.id, id))
+	}
+
+	async revokeLink(id: string, revokedBy?: string, reason?: string): Promise<void> {
+		const db = this.client.getDatabase()
+
+		await db
+			.update(downloadLinks)
+			.set({
+				isActive: 'false',
+				revokedAt: new Date().toISOString(),
+				revokedBy,
+				revokedReason: reason,
+				updatedAt: new Date().toISOString(),
+			})
+			.where(eq(downloadLinks.id, id))
+	}
+
+	async cleanupExpired(): Promise<number> {
+		const db = this.client.getDatabase()
+
+		// Delete expired links
+		const result = await db.delete(downloadLinks).where(sql`${downloadLinks.expiresAt} < NOW()`)
+
+		return result.rowCount || 0
+	}
+
+	async getAccessStats(id: string): Promise<{
+		totalAccess: number
+		uniqueUsers: number
+		lastAccess?: string
+		accessHistory: any[]
+	}> {
+		const link = await this.findById(id)
+		if (!link) {
+			throw new Error(`Download link not found: ${id}`)
+		}
+
+		const accessHistory = link.accessedBy || []
+		const uniqueUsers = new Set(
+			accessHistory.filter((access: any) => access.userId).map((access: any) => access.userId)
+		).size
+
+		const lastAccess =
+			accessHistory.length > 0 ? accessHistory[accessHistory.length - 1].timestamp : undefined
+
+		return {
+			totalAccess: link.accessCount,
+			uniqueUsers,
+			lastAccess,
+			accessHistory,
+		}
+	}
+
+	private mapToDownloadLink(row: any): any {
+		return {
+			id: row.id,
+			organizationId: row.organizationId,
+			deliveryId: row.deliveryId,
+			objectId: row.objectId,
+			objectType: row.objectType,
+			objectMetadata: row.objectMetadata || {},
+			filePath: row.filePath,
+			fileName: row.fileName,
+			mimeType: row.mimeType,
+			fileSize: row.fileSize,
+			signedUrl: row.signedUrl,
+			signature: row.signature,
+			algorithm: row.algorithm,
+			expiresAt: row.expiresAt,
+			accessCount: row.accessCount,
+			maxAccess: row.maxAccess,
+			accessedBy: row.accessedBy || [],
+			isActive: row.isActive === 'true',
+			revokedAt: row.revokedAt,
+			revokedBy: row.revokedBy,
+			revokedReason: row.revokedReason,
+			createdBy: row.createdBy,
+			metadata: row.metadata || {},
+			createdAt: row.createdAt,
+			updatedAt: row.updatedAt,
 		}
 	}
 }

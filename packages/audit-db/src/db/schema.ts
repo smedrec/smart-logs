@@ -949,6 +949,80 @@ export const webhookSecrets = pgTable(
 	}
 )
 
+/**
+ * Download links table for secure time-limited download URLs
+ * Requirements 1.1, 9.1, 9.2: Secure download link generation and tracking
+ */
+export const downloadLinks = pgTable(
+	'download_links',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(), // Unique download link ID
+		organizationId: varchar('organization_id', { length: 255 }).notNull(),
+		deliveryId: varchar('delivery_id', { length: 255 }), // Optional reference to delivery
+		objectId: varchar('object_id', { length: 255 }).notNull(), // ID of the object being downloaded
+		objectType: varchar('object_type', { length: 50 }).notNull(), // report, export, data, custom
+		objectMetadata: jsonb('object_metadata').notNull(), // Object details (name, size, format, etc.)
+		filePath: varchar('file_path', { length: 1000 }).notNull(), // Path to the actual file
+		fileName: varchar('file_name', { length: 255 }).notNull(), // Original filename
+		mimeType: varchar('mime_type', { length: 100 }), // MIME type of the file
+		fileSize: integer('file_size'), // File size in bytes
+		signedUrl: text('signed_url').notNull(), // The actual signed download URL
+		signature: varchar('signature', { length: 255 }).notNull(), // Cryptographic signature for validation
+		algorithm: varchar('algorithm', { length: 50 }).notNull().default('HMAC-SHA256'), // Signature algorithm
+		expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }).notNull(), // URL expiration
+		accessCount: integer('access_count').notNull().default(0), // Number of times accessed
+		maxAccess: integer('max_access'), // Maximum allowed accesses (optional)
+		accessedBy: jsonb('accessed_by').notNull().default('[]'), // Array of access records
+		// Access records structure:
+		// [
+		//   {
+		//     "timestamp": "2023-10-01T12:00:00Z",
+		//     "userId": "user123",
+		//     "ipAddress": "192.168.1.1",
+		//     "userAgent": "Mozilla/5.0...",
+		//     "success": true
+		//   }
+		// ]
+		isActive: varchar('is_active', { length: 10 }).notNull().default('true'), // Whether link is active
+		revokedAt: timestamp('revoked_at', { withTimezone: true, mode: 'string' }), // When link was revoked
+		revokedBy: varchar('revoked_by', { length: 255 }), // Who revoked the link
+		revokedReason: text('revoked_reason'), // Reason for revocation
+		createdBy: varchar('created_by', { length: 255 }), // Who created the link
+		metadata: jsonb('metadata').notNull().default('{}'), // Additional metadata
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => {
+		return [
+			// Primary indexes for queries
+			index('download_links_organization_id_idx').on(table.organizationId),
+			index('download_links_delivery_id_idx').on(table.deliveryId),
+			index('download_links_object_id_idx').on(table.objectId),
+			index('download_links_object_type_idx').on(table.objectType),
+			index('download_links_expires_at_idx').on(table.expiresAt),
+			index('download_links_is_active_idx').on(table.isActive),
+			index('download_links_access_count_idx').on(table.accessCount),
+			index('download_links_created_at_idx').on(table.createdAt),
+			index('download_links_created_by_idx').on(table.createdBy),
+			index('download_links_revoked_at_idx').on(table.revokedAt),
+
+			// Composite indexes for common queries
+			index('download_links_org_active_idx').on(table.organizationId, table.isActive),
+			index('download_links_org_expires_idx').on(table.organizationId, table.expiresAt),
+			index('download_links_active_expires_idx').on(table.isActive, table.expiresAt),
+			index('download_links_object_active_idx').on(table.objectId, table.isActive),
+			index('download_links_org_object_type_idx').on(table.organizationId, table.objectType),
+
+			// Cleanup indexes for maintenance
+			index('download_links_expired_cleanup_idx').on(table.expiresAt, table.isActive),
+		]
+	}
+)
+
 // Add foreign key reference from scheduled_reports to report_templates
 // Note: This creates a soft reference since templateId is nullable
 
