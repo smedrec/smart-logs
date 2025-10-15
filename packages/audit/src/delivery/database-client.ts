@@ -921,10 +921,7 @@ class DownloadLinkRepository implements IDownloadLinkRepository {
 	): Promise<any[]> {
 		const db = this.client.getDatabase()
 
-		let query = db
-			.select()
-			.from(downloadLinks)
-			.where(eq(downloadLinks.organizationId, organizationId))
+		let query = db.select().from(downloadLinks)
 
 		// Apply filters
 		const conditions = [eq(downloadLinks.organizationId, organizationId)]
@@ -937,7 +934,7 @@ class DownloadLinkRepository implements IDownloadLinkRepository {
 			conditions.push(eq(downloadLinks.objectType, options.objectType))
 		}
 
-		if (conditions.length > 1) {
+		if (conditions.length > 0) {
 			query = query.where(and(...conditions)) as any
 		}
 
@@ -1008,9 +1005,12 @@ class DownloadLinkRepository implements IDownloadLinkRepository {
 		const db = this.client.getDatabase()
 
 		// Delete expired links
-		const result = await db.delete(downloadLinks).where(sql`${downloadLinks.expiresAt} < NOW()`)
+		const result = await db
+			.delete(downloadLinks)
+			.where(sql`${downloadLinks.expiresAt} < NOW()`)
+			.returning({ deletedId: downloadLinks.id })
 
-		return result.rowCount || 0
+		return result.length || 0
 	}
 
 	async getAccessStats(id: string): Promise<{

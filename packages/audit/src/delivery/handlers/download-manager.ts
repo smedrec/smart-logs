@@ -231,7 +231,7 @@ export class DownloadManager {
 				{} as Record<string, number>
 			)
 
-			const topObjectTypes = Object.entries(objectTypeCounts)
+			const topObjectTypes = (Object.entries(objectTypeCounts) as [string, number][])
 				.map(([type, count]) => ({ type, count }))
 				.sort((a, b) => b.count - a.count)
 				.slice(0, 10)
@@ -333,7 +333,12 @@ export class DownloadManager {
 				cleanupDuration,
 			}
 
-			this.logger.info('Download link cleanup completed', result)
+			this.logger.info('Download link cleanup completed', {
+				expiredLinksRemoved,
+				inactiveLinksRemoved,
+				totalSpaceFreed,
+				cleanupDuration,
+			})
 
 			return result
 		} catch (error) {
@@ -399,7 +404,7 @@ export class DownloadManager {
 				{} as Record<string, number>
 			)
 
-			const userAgents = Object.entries(userAgentCounts)
+			const userAgents = (Object.entries(userAgentCounts) as [string, number][])
 				.map(([userAgent, count]) => ({ userAgent, count }))
 				.sort((a, b) => b.count - a.count)
 				.slice(0, 10)
@@ -415,7 +420,7 @@ export class DownloadManager {
 				{} as Record<string, number>
 			)
 
-			const ipAddresses = Object.entries(ipCounts)
+			const ipAddresses = (Object.entries(ipCounts) as [string, number][])
 				.map(([ip, count]) => ({ ip, count }))
 				.sort((a, b) => b.count - a.count)
 				.slice(0, 10)
