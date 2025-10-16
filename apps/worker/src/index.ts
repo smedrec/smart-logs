@@ -69,33 +69,11 @@ Sentry.init({
 	tracesSampleRate: 0,
 })
 
-// Initialize enhanced structured logger
-
-const logger = new StructuredLogger({
-	service: 'worker',
-	environment: 'development',
-	console: {
-		name: 'console',
-		enabled: true,
-		format: 'json',
-		colorize: false,
-		level: 'info',
-	},
-	otlp: {
-		name: 'otpl',
-		enabled: true,
-		level: 'info',
-		endpoint: 'http://192.168.1.114:4318/v1/logs',
-		/**headers: {
-			'Content-Type': 'application/json',
-			//Authorization: process.env.OTLP_AUTH_HEADER || '',
-			//'stream-name': 'default',
-		},*/
-	},
-})
-
 // Configuration manager
 let configManager: ConfigurationManager | undefined = undefined
+
+// Enhanced structured logger
+let logger: StructuredLogger | undefined = undefined
 
 // Using configuration manager
 let connection: Redis | undefined = undefined
@@ -170,7 +148,7 @@ const app = new Hono()
 
 app.get('/healthz', async (c) => {
 	if (!healthCheckService) {
-		logger.warn('Health check called before services are initialized.')
+		logger?.warn('Health check called before services are initialized.')
 		c.status(503)
 		return c.text('Service Unavailable: Services not initialized')
 	}
@@ -181,13 +159,13 @@ app.get('/healthz', async (c) => {
 		if (healthStatus.status === 'OK') {
 			return c.json(healthStatus)
 		} else {
-			logger.warn(`Health check failed with status: ${healthStatus.status}`)
+			logger?.warn(`Health check failed with status: ${healthStatus.status}`)
 			c.status(healthStatus.status === 'CRITICAL' ? 503 : 200)
 			return c.json(healthStatus)
 		}
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Health check failed with error: ${errorMessage}`, {
+		logger?.error(`Health check failed with error: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -224,7 +202,7 @@ app.get('/metrics', async (c) => {
 		})
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to collect metrics: ${errorMessage}`, {
+		logger?.error(`Failed to collect metrics: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -264,7 +242,7 @@ app.get('/health/:component', async (c) => {
 		return c.json(componentHealth)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to check component health: ${errorMessage}`, {
+		logger?.error(`Failed to check component health: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -290,7 +268,7 @@ app.get('/observability/dashboard', async (c) => {
 		return c.json(dashboardData)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get dashboard data: ${errorMessage}`, {
+		logger?.error(`Failed to get dashboard data: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -322,7 +300,7 @@ app.get('/observability/metrics/enhanced', async (c) => {
 		return c.json(JSON.parse(metrics))
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to export enhanced metrics: ${errorMessage}`, {
+		logger?.error(`Failed to export enhanced metrics: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -347,7 +325,7 @@ app.get('/observability/bottlenecks', async (c) => {
 		return c.json(bottlenecks)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get bottleneck analysis: ${errorMessage}`, {
+		logger?.error(`Failed to get bottleneck analysis: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -378,7 +356,7 @@ app.get('/observability/traces', async (c) => {
 		return c.json(activeSpans)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get trace data: ${errorMessage}`, {
+		logger?.error(`Failed to get trace data: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -403,7 +381,7 @@ app.get('/observability/profiling', async (c) => {
 		return c.json(profilingResults)
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-		logger.error(`Failed to get profiling results: ${errorMessage}`, {
+		logger?.error(`Failed to get profiling results: ${errorMessage}`, {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -421,11 +399,11 @@ app.get('/observability/profiling', async (c) => {
 
 // Main function to start the worker
 async function main() {
-	logger.info('🏁 Audit worker starting...')
-
 	// 0. Initialize configuration manager
 	if (!configManager) {
-		logger.info('🔗 Initializing configuration manager...')
+		logger
+			? logger.info('🔗 Initializing configuration manager...')
+			: console.log('🔗 Initializing configuration manager...')
 		configManager = new ConfigurationManager(process.env.CONFIG_PATH!, 's3')
 		try {
 			await configManager.initialize()
@@ -436,29 +414,41 @@ async function main() {
 					? error.message
 					: 'Unknown error during configuration manager initialization'
 			const err = new Error(message)
-			logger.error(`🔴 Configuration manager initialization failed: ${message}`, {
-				error:
-					error instanceof Error
-						? { name: error.name, message: error.message, stack: error.stack }
-						: message,
-			})
+			logger
+				? logger.error(`🔴 Configuration manager initialization failed: ${message}`, {
+						error:
+							error instanceof Error
+								? { name: error.name, message: error.message, stack: error.stack }
+								: message,
+					})
+				: console.error(`🔴 Configuration manager initialization failed: ${message}`, err)
 			throw err
 		}
 	}
 
 	const config = configManager.getConfig()
 
+	// Initialize enhanced structured logger
+
+	if (!logger) {
+		logger = new StructuredLogger({
+			...config.logging,
+			service: 'worker',
+		})
+	}
+
+	logger?.info('🏁 Audit worker starting...')
 	// 1. Initialize Redis connection
 	try {
 		if (!connection) {
-			logger.info('🔗 Connecting to Redis...')
+			logger?.info('🔗 Connecting to Redis...')
 			const retryResult = await executeWithRetry<Redis>(async () =>
 				getSharedRedisConnectionWithConfig(config.redis)
 			)
 			if (!retryResult.success) {
 				const err =
 					retryResult.error instanceof Error ? retryResult.error : new Error('Unknown error')
-				logger.error('🔴 Halting worker start due to redis connection failure.', {
+				logger?.error('🔴 Halting worker start due to redis connection failure.', {
 					attempts: JSON.stringify(retryResult.attempts),
 					totalDuration: retryResult.totalDuration,
 					error: {
@@ -476,7 +466,7 @@ async function main() {
 	} catch (error) {
 		// TODO: Optionally, implement retry logic here or ensure process exits.
 		const err = error instanceof Error ? error : new Error('Unknown error')
-		logger.error('🔴 Halting worker start due to redis connection failure.', {
+		logger?.error('🔴 Halting worker start due to redis connection failure.', {
 			error:
 				error instanceof Error
 					? { name: error.name, message: error.message, stack: error.stack }
@@ -486,13 +476,13 @@ async function main() {
 	}
 
 	// Optional: Log connection status from the client
-	logger.info(`Redis connection status: ${getRedisConnectionStatus()}`)
+	logger?.info(`Redis connection status: ${getRedisConnectionStatus()}`)
 
 	// Events 'connect' and 'error' are handled within the shared client.
 	// We can add listeners here too, but it might be redundant if the shared client's logging is sufficient.
 	// For example, if specific actions for this worker are needed on 'error':
 	/**connection.on('error', (err) => {
-		logger.error(
+		logger?.error(
 			'🔴 Redis connection error impacting BullMQ worker:',
 			err instanceof Error ? err : new Error('Unknown error')
 		)
@@ -509,7 +499,7 @@ async function main() {
 	// 3. Check database connection
 	const dbConnected = await auditDbService.checkAuditDbConnection()
 	if (!dbConnected) {
-		logger.error('🔴 Halting worker start due to database connection failure.')
+		logger?.error('🔴 Halting worker start due to database connection failure.')
 		// TODO: Optionally, implement retry logic here or ensure process exits.
 		// For simplicity, exiting if DB is not available on startup.
 		await closeSharedRedisConnection() // Use client's close function
@@ -611,7 +601,7 @@ async function main() {
 				'audit.targetResourceType': eventData.targetResourceType,
 			})
 
-			logger.info(`Processing audit event for action: ${eventData.action}`)
+			logger?.info(`Processing audit event for action: ${eventData.action}`)
 
 			// Validation phase
 			const validationTimer = new PerformanceTimer()
@@ -731,7 +721,7 @@ async function main() {
 				spanId: span.spanId,
 			})
 
-			logger.info(
+			logger?.info(
 				`✅ Audit event processed successfully. Action '${action}' stored in ${totalTime.toFixed(2)}ms`
 			)
 		} catch (error) {
@@ -785,14 +775,17 @@ async function main() {
 				)
 			}
 
-			logger.error(`❌ Failed to process audit event: ${err.message} (${totalTime.toFixed(2)}ms)`, {
-				error: {
-					name: err.name,
-					message: err.message,
-					stack: err.stack,
-					cause: err.cause instanceof Error ? err.cause.message : undefined,
-				},
-			})
+			logger?.error(
+				`❌ Failed to process audit event: ${err.message} (${totalTime.toFixed(2)}ms)`,
+				{
+					error: {
+						name: err.name,
+						message: err.message,
+						stack: err.stack,
+						cause: err.cause instanceof Error ? err.cause.message : undefined,
+					},
+				}
+			)
 			throw err // Re-throw to trigger retry mechanism
 		} finally {
 			tracer!.finishSpan(span)
@@ -835,7 +828,7 @@ async function main() {
 			await reliableProcessor.start()
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : error
-			logger.error(`Failed to start reliable processor: ${errorMessage}`, {
+			logger?.error(`Failed to start reliable processor: ${errorMessage}`, {
 				error:
 					error instanceof Error
 						? { name: error.name, message: error.message, stack: error.stack }
@@ -870,7 +863,7 @@ async function main() {
 		})
 	)
 
-	logger.info(
+	logger?.info(
 		`👂 Reliable processor listening for jobs on queue: "${config.reliableProcessor.queueName}"`
 	)
 
@@ -893,7 +886,7 @@ async function main() {
 	ui.route(basePath, uiServerAdapter.registerPlugin())
 	showRoutes(ui)
 	const uiServer = serve({ fetch: ui.fetch, port: config.worker.port + 1 }, ({ address, port }) => {
-		logger.info(`🎮 Bull Dashboard on http://localhost:${port}/ui`)
+		logger?.info(`🎮 Bull Dashboard on http://localhost:${port}/ui`)
 	})
 
 	// System startup
@@ -909,12 +902,12 @@ async function main() {
 		},
 	})
 
-	logger.info(`👂 Healthcheck server listening on port ${config.worker.port}`)
-	logger.info(`👂 UI server listening on port ${config.worker.port + 1}`)
+	logger?.info(`👂 Healthcheck server listening on port ${config.worker.port}`)
+	logger?.info(`👂 UI server listening on port ${config.worker.port + 1}`)
 
 	// Graceful shutdown
 	const gracefulShutdown = async (signal: string) => {
-		logger.info(`🚦 Received ${signal}. Shutting down gracefully...`)
+		logger?.info(`🚦 Received ${signal}. Shutting down gracefully...`)
 		server.close()
 		uiServer.close()
 		if (reliableProcessor) {
@@ -922,8 +915,8 @@ async function main() {
 		}
 		await closeSharedRedisConnection() // Use client's close function
 		await auditDbService?.end()
-		logger.info('🚪 Reliable processor, Postgres and Redis connections closed. Exiting.')
-		await logger.close()
+		logger?.info('🚪 Reliable processor, Postgres and Redis connections closed. Exiting.')
+		await logger?.close()
 		process.exit(0)
 	}
 
@@ -934,7 +927,7 @@ async function main() {
 // Start the application
 main().catch(async (error) => {
 	const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-	logger.error(`💥 Unhandled error in main application scope: ${errorMessage}`, {
+	logger?.error(`💥 Unhandled error in main application scope: ${errorMessage}`, {
 		error:
 			error instanceof Error
 				? { name: error.name, message: error.message, stack: error.stack }
@@ -943,5 +936,5 @@ main().catch(async (error) => {
 	await auditDbService?.end()
 	// Ensure Redis connection is closed on fatal error
 	void closeSharedRedisConnection().finally(() => process.exit(1))
-	await logger.close()
+	await logger?.close()
 })
