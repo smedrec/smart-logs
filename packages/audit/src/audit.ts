@@ -106,24 +106,8 @@ export class Audit {
 		this.presetsService = presetsService
 
 		this.logger = new StructuredLogger({
-			service: '@repo/audit - audit',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
+			...this.config.logging,
+			service: '@repo/audit - Audit',
 		})
 
 		const defaultDirectOptions: RedisOptions = {

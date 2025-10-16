@@ -7,6 +7,7 @@ import { ArchiveConfig } from '../archival/archival-service.js'
 import { DeliveryConfig } from '../report/scheduled-reporting.js'
 import { ValidationConfig } from '../validation.js'
 
+import type { LoggingConfig } from '@repo/logs'
 import type { ReliableProcessorConfig } from '../queue/reliable-processor.js'
 import type { RetryConfig } from '../retry.js'
 
@@ -535,31 +536,32 @@ export interface SecurityConfig {
 	}
 }
 
-export interface LoggingConfig {
-	/** Log level */
-	level: 'debug' | 'info' | 'warn' | 'error'
+// use @repo/logs type
+//export interface LoggingConfig {
+/** Log level */
+//level: 'debug' | 'info' | 'warn' | 'error'
 
-	/** Enable structured logging */
-	structured: boolean
+/** Enable structured logging */
+//structured: boolean
 
-	/** Log format */
-	format: 'json' | 'text'
+/** Log format */
+//format: 'json' | 'text'
 
-	/** Enable log correlation IDs */
-	enableCorrelationIds: boolean
+/** Enable log correlation IDs */
+//enableCorrelationIds: boolean
 
-	/** Log retention period in days */
-	retentionDays: number
+/** Log retention period in days */
+//retentionDays: number
 
-	/** Export type for log messages */
-	exporterType: 'console' | 'jaeger' | 'zipkin' | 'otlp'
+/** Export type for log messages */
+//exporterType: 'console' | 'jaeger' | 'zipkin' | 'otlp'
 
-	/** Exporter endpoint */
-	exporterEndpoint?: string
+/** Exporter endpoint */
+//exporterEndpoint?: string
 
-	/** Exporter headers */
-	exporterHeaders?: Record<string, string>
-}
+/** Exporter headers */
+//exporterHeaders?: Record<string, string>
+//}
 
 /**
  * Configuration validation error

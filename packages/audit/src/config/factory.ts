@@ -342,14 +342,35 @@ export function createDevelopmentConfig(): AuditConfig {
 		},
 		logging: {
 			level: 'debug',
-			structured: true,
-			format: 'json',
+			service: 'Audit/core',
+			environment: 'development',
+			version: '0.1.0',
+			shutdownTimeoutMs: 30000,
 			enableCorrelationIds: true,
-			retentionDays: 30,
-			exporterType: 'otlp',
-			exporterEndpoint: process.env.OTLP_LOGS_ENDPOINT || 'http://localhost:4318/v1/logs',
-			exporterHeaders: {
-				...getAuthHeaders(),
+			enableRequestTracking: true,
+			enableDebugMode: true,
+			prettyPrint: true,
+			console: {
+				name: 'console',
+				enabled: true,
+				format: 'pretty',
+				colorize: true,
+				level: 'debug',
+			},
+			otlp: {
+				name: 'otpl',
+				enabled: true,
+				level: 'debug',
+				timeoutMs: 30000,
+				batchSize: 100,
+				batchTimeoutMs: 5000,
+				maxConcurrency: 10,
+				circuitBreakerThreshold: 5,
+				circuitBreakerResetMs: 60000,
+				endpoint: process.env.OTLP_LOGS_ENDPOINT || 'http://localhost:4318/v1/logs',
+				headers: {
+					...getAuthHeaders(),
+				},
 			},
 		},
 	}
@@ -520,7 +541,8 @@ export function createStagingConfig(): AuditConfig {
 		logging: {
 			...baseConfig.logging,
 			level: 'info',
-			retentionDays: 90,
+			environment: 'staging',
+			enableDebugMode: false,
 		},
 	}
 }
@@ -702,7 +724,8 @@ export function createProductionConfig(): AuditConfig {
 		logging: {
 			...baseConfig.logging,
 			level: 'warn',
-			retentionDays: 365,
+			environment: 'production',
+			enableDebugMode: false,
 		},
 	}
 }
@@ -811,7 +834,7 @@ export function createTestConfig(): AuditConfig {
 		logging: {
 			...baseConfig.logging,
 			level: 'error',
-			retentionDays: 1,
+			environment: 'test',
 		},
 	}
 }
