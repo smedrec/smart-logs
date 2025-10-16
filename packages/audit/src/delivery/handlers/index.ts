@@ -63,6 +63,8 @@ export {
 	StorageQuotaExceededError,
 } from './storage-handler.js'
 
+export { SftpHandler } from './sftp-handler.js'
+
 export type {
 	IStorageProvider,
 	StorageProvider,

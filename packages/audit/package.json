@@ -42,13 +42,15 @@
 		"@repo/infisical-kms": "workspace:*",
 		"@repo/logs": "workspace:*",
 		"@repo/redis-client": "workspace:*",
+		"@types/ssh2-sftp-client": "^9.0.5",
 		"bullmq": "5.58.5",
 		"dotenv": "17.2.0",
 		"drizzle-orm": "0.44.5",
 		"inngest": "3.40.2",
 		"ioredis": "5.8.0",
 		"nodemailer": "6.9.15",
-		"postgres": "3.4.7"
+		"postgres": "3.4.7",
+		"ssh2-sftp-client": "^12.0.1"
 	},
 	"devDependencies": {
 		"@repo/eslint-config": "workspace:*",
