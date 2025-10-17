@@ -25,6 +25,19 @@ export type { IDestinationManager } from './destination-manager.js'
 export { HealthMonitor, createHealthMonitor } from './health-monitor.js'
 export type { HealthMonitorConfig } from './health-monitor.js'
 
+// Delivery scheduler
+export { DeliveryScheduler, createDeliveryScheduler } from './delivery-scheduler.js'
+export type { DeliverySchedulerConfig, QueueMetrics } from './delivery-scheduler.js'
+
+// Queue manager
+export { QueueManager, createQueueManager } from './queue-manager.js'
+export type {
+	QueueManagerConfig,
+	QueueHealth,
+	QueueMetrics as QueueManagerMetrics,
+	QueueAlert,
+} from './queue-manager.js'
+
 // Validation components
 export { DestinationValidator } from './validation/destination-validator.js'
 export { ConnectionTester } from './validation/connection-tester.js'

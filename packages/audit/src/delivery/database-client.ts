@@ -7,6 +7,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 
 import {
 	deliveryDestinations,
+	deliveryQueue,
 	destinationHealth,
 	downloadLinks,
 	webhookSecrets,
@@ -81,6 +82,27 @@ export interface IDeliveryQueueRepository {
 		failedCount: number
 		retryingCount: number
 	}>
+	findByDeliveryId(deliveryId: string): Promise<any[]>
+	getRecentProcessedItems(limit?: number): Promise<any[]>
+	getOldestPendingItem(): Promise<any | null>
+	deleteCompletedItems(cutoffTime: string): Promise<number>
+	cancelByDeliveryId(deliveryId: string): Promise<void>
+	getQueueDepthByOrganization(organizationId: string): Promise<{
+		pendingCount: number
+		processingCount: number
+		averageWaitTime: number
+	}>
+	findByStatus(
+		status: string,
+		options?: {
+			organizationId?: string
+			limit?: number
+			offset?: number
+		}
+	): Promise<any[]>
+	updateItem(id: string, updates: Partial<any>): Promise<void>
+	deleteItem(id: string): Promise<void>
+	deleteItemsByStatusAndAge(status: string, cutoffTime: string): Promise<number>
 }
 
 /**
@@ -251,6 +273,13 @@ export class DeliveryDatabaseClient {
 	}
 
 	/**
+	 * Get default destinations for an organization
+	 */
+	async getDefaultDestinations(organizationId: string): Promise<DeliveryDestination[]> {
+		return this.destinationRepo.getDefaultDestinations(organizationId)
+	}
+
+	/**
 	 * Health check for delivery database operations
 	 */
 	async healthCheck(): Promise<{ healthy: boolean; details: any }> {
@@ -348,6 +377,24 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 			.select()
 			.from(deliveryDestinations)
 			.where(eq(deliveryDestinations.organizationId, organizationId))
+
+		return results.map(this.mapToDeliveryDestination)
+	}
+
+	async getDefaultDestinations(organizationId: string): Promise<DeliveryDestination[]> {
+		const db = this.client.getDatabase()
+
+		// For now, return all enabled destinations for the organization
+		// In a future task, we can add a specific "default" flag to destinations
+		const results = await db
+			.select()
+			.from(deliveryDestinations)
+			.where(
+				and(
+					eq(deliveryDestinations.organizationId, organizationId),
+					eq(deliveryDestinations.disabled, 'false')
+				)
+			)
 
 		return results.map(this.mapToDeliveryDestination)
 	}
@@ -534,39 +581,361 @@ class DeliveryLogRepository implements IDeliveryLogRepository {
 class DeliveryQueueRepository implements IDeliveryQueueRepository {
 	constructor(private readonly client: EnhancedAuditDatabaseClient) {}
 
-	async enqueue(item: any): Promise<void> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+	async enqueue(item: {
+		id: string
+		organizationId: string
+		destinationId: number
+		payload: any
+		priority?: number
+		scheduledAt?: string
+		correlationId?: string
+		idempotencyKey?: string
+		metadata?: any
+	}): Promise<void> {
+		const db = this.client.getDatabase()
+
+		await db.insert(deliveryQueue).values({
+			id: item.id,
+			organizationId: item.organizationId,
+			destinationId: item.destinationId,
+			payload: item.payload,
+			priority: item.priority || 0,
+			scheduledAt: item.scheduledAt || new Date().toISOString(),
+			status: 'pending',
+			correlationId: item.correlationId,
+			idempotencyKey: item.idempotencyKey,
+			retryCount: 0,
+			maxRetries: 5,
+			metadata: item.metadata || {},
+		})
 	}
 
-	async dequeue(limit?: number): Promise<any[]> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+	async dequeue(limit: number = 10): Promise<any[]> {
+		const db = this.client.getDatabase()
+
+		// Get pending items ordered by priority (desc) and scheduled time (asc)
+		// Only get items that are scheduled to run now or in the past
+		const results = await db
+			.select()
+			.from(deliveryQueue)
+			.where(
+				and(
+					eq(deliveryQueue.status, 'pending'),
+					sql`${deliveryQueue.scheduledAt} <= NOW()`,
+					sql`(${deliveryQueue.nextRetryAt} IS NULL OR ${deliveryQueue.nextRetryAt} <= NOW())`
+				)
+			)
+			.orderBy(desc(deliveryQueue.priority), deliveryQueue.scheduledAt)
+			.limit(limit)
+
+		return results.map(this.mapToQueueItem)
 	}
 
 	async updateStatus(id: string, status: string, processedAt?: string): Promise<void> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		const updateData: any = {
+			status,
+			updatedAt: new Date().toISOString(),
+		}
+
+		if (processedAt) {
+			updateData.processedAt = processedAt
+		}
+
+		await db.update(deliveryQueue).set(updateData).where(eq(deliveryQueue.id, id))
 	}
 
 	async scheduleRetry(id: string, nextRetryAt: string, retryCount: number): Promise<void> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		await db
+			.update(deliveryQueue)
+			.set({
+				status: 'pending',
+				nextRetryAt,
+				retryCount,
+				updatedAt: new Date().toISOString(),
+			})
+			.where(eq(deliveryQueue.id, id))
 	}
 
 	async findById(id: string): Promise<any | null> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		const [result] = await db.select().from(deliveryQueue).where(eq(deliveryQueue.id, id))
+
+		return result ? this.mapToQueueItem(result) : null
 	}
 
-	async getQueueStats(): Promise<any> {
-		// TODO: Implement in subsequent tasks
+	async getQueueStats(): Promise<{
+		pendingCount: number
+		processingCount: number
+		completedCount: number
+		failedCount: number
+		retryingCount: number
+	}> {
+		const db = this.client.getDatabase()
+
+		// Get counts for each status
+		const [pendingResult] = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(deliveryQueue)
+			.where(eq(deliveryQueue.status, 'pending'))
+
+		const [processingResult] = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(deliveryQueue)
+			.where(eq(deliveryQueue.status, 'processing'))
+
+		const [completedResult] = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(deliveryQueue)
+			.where(eq(deliveryQueue.status, 'completed'))
+
+		const [failedResult] = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(deliveryQueue)
+			.where(eq(deliveryQueue.status, 'failed'))
+
+		// Count retrying items (pending with retry count > 0)
+		const [retryingResult] = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(deliveryQueue)
+			.where(and(eq(deliveryQueue.status, 'pending'), sql`${deliveryQueue.retryCount} > 0`))
+
 		return {
-			pendingCount: 0,
-			processingCount: 0,
-			completedCount: 0,
-			failedCount: 0,
-			retryingCount: 0,
+			pendingCount: pendingResult.count,
+			processingCount: processingResult.count,
+			completedCount: completedResult.count,
+			failedCount: failedResult.count,
+			retryingCount: retryingResult.count,
+		}
+	}
+
+	/**
+	 * Get queue items by delivery ID for multi-destination deliveries
+	 */
+	async findByDeliveryId(deliveryId: string): Promise<any[]> {
+		const db = this.client.getDatabase()
+
+		const results = await db
+			.select()
+			.from(deliveryQueue)
+			.where(sql`${deliveryQueue.payload}->>'deliveryId' = ${deliveryId}`)
+
+		return results.map(this.mapToQueueItem)
+	}
+
+	/**
+	 * Get recent processed items for metrics calculation
+	 */
+	async getRecentProcessedItems(limit: number = 100): Promise<any[]> {
+		const db = this.client.getDatabase()
+
+		const results = await db
+			.select()
+			.from(deliveryQueue)
+			.where(sql`${deliveryQueue.status} IN ('completed', 'failed')`)
+			.orderBy(desc(deliveryQueue.processedAt))
+			.limit(limit)
+
+		return results.map(this.mapToQueueItem)
+	}
+
+	/**
+	 * Get oldest pending item for queue age calculation
+	 */
+	async getOldestPendingItem(): Promise<any | null> {
+		const db = this.client.getDatabase()
+
+		const [result] = await db
+			.select()
+			.from(deliveryQueue)
+			.where(eq(deliveryQueue.status, 'pending'))
+			.orderBy(deliveryQueue.createdAt)
+			.limit(1)
+
+		return result ? this.mapToQueueItem(result) : null
+	}
+
+	/**
+	 * Delete completed items older than specified time
+	 */
+	async deleteCompletedItems(cutoffTime: string): Promise<number> {
+		const db = this.client.getDatabase()
+
+		const result = await db
+			.delete(deliveryQueue)
+			.where(
+				and(
+					sql`${deliveryQueue.status} IN ('completed', 'failed')`,
+					sql`${deliveryQueue.processedAt} < ${cutoffTime}`
+				)
+			)
+			.returning({ deletedId: deliveryQueue.id })
+
+		return result.length
+	}
+
+	/**
+	 * Delete queue item by ID
+	 */
+	async deleteItem(id: string): Promise<void> {
+		const db = this.client.getDatabase()
+
+		await db.delete(deliveryQueue).where(eq(deliveryQueue.id, id))
+	}
+
+	/**
+	 * Delete items by status and age
+	 */
+	async deleteItemsByStatusAndAge(status: string, cutoffTime: string): Promise<number> {
+		const db = this.client.getDatabase()
+
+		const result = await db
+			.delete(deliveryQueue)
+			.where(and(eq(deliveryQueue.status, status), sql`${deliveryQueue.updatedAt} < ${cutoffTime}`))
+			.returning({ deletedId: deliveryQueue.id })
+
+		return result.length
+	}
+
+	/**
+	 * Cancel pending deliveries by delivery ID
+	 */
+	async cancelByDeliveryId(deliveryId: string): Promise<void> {
+		const db = this.client.getDatabase()
+
+		await db
+			.update(deliveryQueue)
+			.set({
+				status: 'cancelled',
+				updatedAt: new Date().toISOString(),
+			})
+			.where(
+				and(
+					sql`${deliveryQueue.payload}->>'deliveryId' = ${deliveryId}`,
+					eq(deliveryQueue.status, 'pending')
+				)
+			)
+	}
+
+	/**
+	 * Get queue depth by organization for monitoring
+	 */
+	async getQueueDepthByOrganization(organizationId: string): Promise<{
+		pendingCount: number
+		processingCount: number
+		averageWaitTime: number
+	}> {
+		const db = this.client.getDatabase()
+
+		const [pendingResult] = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(deliveryQueue)
+			.where(
+				and(eq(deliveryQueue.organizationId, organizationId), eq(deliveryQueue.status, 'pending'))
+			)
+
+		const [processingResult] = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(deliveryQueue)
+			.where(
+				and(
+					eq(deliveryQueue.organizationId, organizationId),
+					eq(deliveryQueue.status, 'processing')
+				)
+			)
+
+		// Calculate average wait time for pending items
+		const [avgWaitResult] = await db
+			.select({
+				avgWait: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (NOW() - ${deliveryQueue.createdAt})) * 1000), 0)`,
+			})
+			.from(deliveryQueue)
+			.where(
+				and(eq(deliveryQueue.organizationId, organizationId), eq(deliveryQueue.status, 'pending'))
+			)
+
+		return {
+			pendingCount: pendingResult.count,
+			processingCount: processingResult.count,
+			averageWaitTime: Math.round(avgWaitResult.avgWait || 0),
+		}
+	}
+
+	/**
+	 * Get queue items by status with pagination
+	 */
+	async findByStatus(
+		status: string,
+		options?: {
+			organizationId?: string
+			limit?: number
+			offset?: number
+		}
+	): Promise<any[]> {
+		const db = this.client.getDatabase()
+
+		let query = db.select().from(deliveryQueue)
+
+		// Build query with filters
+		const conditions = []
+		conditions.push(eq(deliveryQueue.status, status))
+
+		if (options?.organizationId) {
+			conditions.push(eq(deliveryQueue.organizationId, options.organizationId))
+		}
+
+		query = query.where(and(...conditions)) as any
+
+		query = query.orderBy(desc(deliveryQueue.createdAt)) as any
+
+		if (options?.limit) {
+			query = query.limit(options.limit) as any
+		}
+
+		if (options?.offset) {
+			query = query.offset(options.offset) as any
+		}
+
+		const results = await query
+		return results.map(this.mapToQueueItem)
+	}
+
+	/**
+	 * Update queue item with partial data
+	 */
+	async updateItem(id: string, updates: Partial<any>): Promise<void> {
+		const db = this.client.getDatabase()
+
+		const updateData = {
+			...updates,
+			updatedAt: new Date().toISOString(),
+		}
+
+		await db.update(deliveryQueue).set(updateData).where(eq(deliveryQueue.id, id))
+	}
+
+	private mapToQueueItem(row: any): any {
+		return {
+			id: row.id,
+			organizationId: row.organizationId,
+			destinationId: row.destinationId,
+			payload: row.payload,
+			priority: row.priority,
+			scheduledAt: row.scheduledAt,
+			processedAt: row.processedAt,
+			status: row.status,
+			correlationId: row.correlationId,
+			idempotencyKey: row.idempotencyKey,
+			retryCount: row.retryCount,
+			maxRetries: row.maxRetries,
+			nextRetryAt: row.nextRetryAt,
+			metadata: row.metadata || {},
+			createdAt: row.createdAt,
+			updatedAt: row.updatedAt,
 		}
 	}
 }
