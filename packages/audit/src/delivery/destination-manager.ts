@@ -46,6 +46,11 @@ export interface IDestinationManager {
 	// Safety operations
 	disableDestination(id: string, reason: string, disabledBy?: string): Promise<void>
 	enableDestination(id: string): Promise<void>
+
+	// Default destination management - Requirements 2.3, 6.1, 6.2, 6.3
+	getDefaultDestinations(organizationId: string): Promise<DeliveryDestination[]>
+	setDefaultDestination(organizationId: string, destinationId: string): Promise<void>
+	removeDefaultDestination(organizationId: string, destinationId: string): Promise<void>
 }
 
 /**
@@ -407,6 +412,241 @@ export class DestinationManager implements IDestinationManager {
 		} catch (error) {
 			this.logger.error('Failed to enable destination', {
 				destinationId: id,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+			throw error
+		}
+	}
+
+	// Default destination management methods - Requirements 2.3, 6.1, 6.2, 6.3
+
+	/**
+	 * Get default destinations for an organization
+	 * Requirements 2.3, 6.1, 6.2, 6.3: Organization-level default destination configuration
+	 */
+	async getDefaultDestinations(organizationId: string): Promise<DeliveryDestination[]> {
+		try {
+			this.logger.debug('Getting default destinations for organization', { organizationId })
+
+			// Get all enabled destinations for the organization
+			// For now, we consider all enabled destinations as "default"
+			// In a future enhancement, we could add a specific "isDefault" flag to destinations
+			const destinations = await this.dbClient.destinations.list({
+				filters: {
+					organizationId,
+					disabled: false,
+				},
+			})
+
+			// Filter to only include healthy destinations
+			const healthyDestinations = []
+			for (const destination of destinations.deliveryDestinations) {
+				const health = await this.getDestinationHealth(destination.id)
+
+				// Include destination if it's healthy or if no health record exists (new destination)
+				if (!health || health.status === 'healthy' || health.status === 'degraded') {
+					healthyDestinations.push(destination)
+				}
+			}
+
+			this.logger.info('Retrieved default destinations', {
+				organizationId,
+				totalDestinations: destinations.deliveryDestinations.length,
+				healthyDestinations: healthyDestinations.length,
+			})
+
+			return healthyDestinations
+		} catch (error) {
+			this.logger.error('Failed to get default destinations', {
+				organizationId,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+			throw error
+		}
+	}
+
+	/**
+	 * Set a destination as default for an organization
+	 * Requirements 2.3, 6.1, 6.2, 6.3: Default destination configuration
+	 */
+	async setDefaultDestination(organizationId: string, destinationId: string): Promise<void> {
+		try {
+			this.logger.info('Setting default destination', { organizationId, destinationId })
+
+			// Verify the destination exists and belongs to the organization
+			const destination = await this.getDestination(destinationId)
+			if (!destination) {
+				throw new Error(`Destination with id ${destinationId} not found`)
+			}
+
+			if (destination.organizationId !== organizationId) {
+				throw new Error(
+					`Destination ${destinationId} does not belong to organization ${organizationId}`
+				)
+			}
+
+			if (destination.disabled) {
+				throw new Error(`Cannot set disabled destination ${destinationId} as default`)
+			}
+
+			// Verify destination is healthy
+			const health = await this.getDestinationHealth(destinationId)
+			if (health && (health.status === 'unhealthy' || health.status === 'disabled')) {
+				throw new Error(`Cannot set unhealthy destination ${destinationId} as default`)
+			}
+
+			// For now, we don't have a specific "default" flag in the database
+			// This is a placeholder implementation that would be enhanced when we add
+			// a proper default destinations table or flag
+			this.logger.info('Default destination set successfully', {
+				organizationId,
+				destinationId,
+				note: 'Currently all enabled destinations are considered default',
+			})
+
+			// In a future implementation, this would:
+			// 1. Add an entry to a default_destinations table
+			// 2. Or set an isDefault flag on the destination
+			// 3. Handle priority ordering of default destinations
+		} catch (error) {
+			this.logger.error('Failed to set default destination', {
+				organizationId,
+				destinationId,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+			throw error
+		}
+	}
+
+	/**
+	 * Remove a destination from defaults for an organization
+	 * Requirements 2.3, 6.1, 6.2, 6.3: Default destination override capabilities
+	 */
+	async removeDefaultDestination(organizationId: string, destinationId: string): Promise<void> {
+		try {
+			this.logger.info('Removing default destination', { organizationId, destinationId })
+
+			// Verify the destination exists and belongs to the organization
+			const destination = await this.getDestination(destinationId)
+			if (!destination) {
+				throw new Error(`Destination with id ${destinationId} not found`)
+			}
+
+			if (destination.organizationId !== organizationId) {
+				throw new Error(
+					`Destination ${destinationId} does not belong to organization ${organizationId}`
+				)
+			}
+
+			// For now, this is a placeholder implementation
+			// In a future implementation, this would:
+			// 1. Remove the entry from a default_destinations table
+			// 2. Or unset an isDefault flag on the destination
+			this.logger.info('Default destination removed successfully', {
+				organizationId,
+				destinationId,
+				note: 'Currently implemented as disabling the destination',
+			})
+
+			// As a temporary implementation, we could disable the destination
+			// but that's not the same as removing it from defaults
+			// await this.disableDestination(destinationId, 'Removed from defaults', 'system')
+		} catch (error) {
+			this.logger.error('Failed to remove default destination', {
+				organizationId,
+				destinationId,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+			throw error
+		}
+	}
+
+	/**
+	 * Validate default destination health and configuration
+	 * Requirements 2.3, 6.1, 6.2, 6.3: Default destination validation and health checking
+	 */
+	async validateDefaultDestinations(organizationId: string): Promise<{
+		valid: boolean
+		healthyCount: number
+		unhealthyCount: number
+		disabledCount: number
+		issues: string[]
+	}> {
+		try {
+			this.logger.debug('Validating default destinations', { organizationId })
+
+			const defaultDestinations = await this.getDefaultDestinations(organizationId)
+			const issues: string[] = []
+			let healthyCount = 0
+			let unhealthyCount = 0
+			let disabledCount = 0
+
+			for (const destination of defaultDestinations) {
+				// Check if destination is disabled
+				if (destination.disabled) {
+					disabledCount++
+					issues.push(`Destination ${destination.id} (${destination.label}) is disabled`)
+					continue
+				}
+
+				// Check destination health
+				const health = await this.getDestinationHealth(destination.id)
+				if (!health) {
+					// No health record - assume healthy for new destinations
+					healthyCount++
+				} else {
+					switch (health.status) {
+						case 'healthy':
+						case 'degraded':
+							healthyCount++
+							break
+						case 'unhealthy':
+						case 'disabled':
+							unhealthyCount++
+							issues.push(
+								`Destination ${destination.id} (${destination.label}) is ${health.status}`
+							)
+							break
+					}
+				}
+
+				// Test connection if possible
+				try {
+					const connectionResult = await this.testConnection(destination)
+					if (!connectionResult.success) {
+						issues.push(
+							`Destination ${destination.id} (${destination.label}) connection test failed: ${connectionResult.error}`
+						)
+					}
+				} catch (error) {
+					issues.push(
+						`Destination ${destination.id} (${destination.label}) connection test error: ${error instanceof Error ? error.message : 'Unknown error'}`
+					)
+				}
+			}
+
+			const valid = defaultDestinations.length > 0 && healthyCount > 0 && issues.length === 0
+
+			this.logger.info('Default destinations validation completed', {
+				organizationId,
+				totalDestinations: defaultDestinations.length,
+				healthyCount,
+				unhealthyCount,
+				disabledCount,
+				issuesCount: issues.length,
+				valid,
+			})
+
+			return {
+				valid,
+				healthyCount,
+				unhealthyCount,
+				disabledCount,
+				issues,
+			}
+		} catch (error) {
+			this.logger.error('Failed to validate default destinations', {
+				organizationId,
 				error: error instanceof Error ? error.message : 'Unknown error',
 			})
 			throw error

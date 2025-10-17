@@ -533,48 +533,532 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 class DeliveryLogRepository implements IDeliveryLogRepository {
 	constructor(private readonly client: EnhancedAuditDatabaseClient) {}
 
+	/**
+	 * Create a new delivery log entry
+	 * Requirements 9.1, 9.2: Delivery status tracking and cross-system references
+	 */
 	async create(log: Omit<DeliveryStatusResponse, 'id'>): Promise<string> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+		const logId = `dl_${Date.now()}_${Math.random().toString(36).substring(2)}`
+
+		try {
+			// For now, we'll store delivery logs in a simple format
+			// In a real implementation, this would use a proper delivery_logs table
+			// Since we don't have that table yet, we'll use the queue metadata to track delivery status
+
+			// Create a delivery log entry by updating queue items with delivery status
+			const queueItems = await db
+				.select()
+				.from(deliveryQueue)
+				.where(sql`${deliveryQueue.payload}->>'deliveryId' = ${log.deliveryId}`)
+
+			for (const item of queueItems) {
+				const currentMetadata = item.metadata || {}
+				const deliveryLog = {
+					id: logId,
+					deliveryId: log.deliveryId,
+					status: log.status,
+					destinations: log.destinations,
+					createdAt: log.createdAt,
+					updatedAt: log.updatedAt,
+					metadata: log.metadata,
+				}
+
+				await db
+					.update(deliveryQueue)
+					.set({
+						metadata: {
+							...currentMetadata,
+							deliveryLog,
+						},
+						updatedAt: new Date().toISOString(),
+					})
+					.where(eq(deliveryQueue.id, item.id))
+			}
+
+			return logId
+		} catch (error) {
+			throw new Error(
+				`Failed to create delivery log: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
 	}
 
+	/**
+	 * Update an existing delivery log
+	 * Requirements 9.1, 9.2: Real-time status updates
+	 */
 	async update(id: string, updates: Partial<DeliveryStatusResponse>): Promise<void> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		try {
+			// Find queue items with this delivery log ID
+			const queueItems = await db
+				.select()
+				.from(deliveryQueue)
+				.where(sql`${deliveryQueue.metadata}->>'deliveryLog'->>'id' = ${id}`)
+
+			for (const item of queueItems) {
+				const currentMetadata = (item.metadata as any) || {}
+				const currentLog = (currentMetadata as any).deliveryLog || {}
+
+				const updatedLog = {
+					...currentLog,
+					...updates,
+					updatedAt: new Date().toISOString(),
+				}
+
+				await db
+					.update(deliveryQueue)
+					.set({
+						metadata: {
+							...currentMetadata,
+							deliveryLog: updatedLog,
+						},
+						updatedAt: new Date().toISOString(),
+					})
+					.where(eq(deliveryQueue.id, item.id))
+			}
+		} catch (error) {
+			throw new Error(
+				`Failed to update delivery log: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
 	}
 
+	/**
+	 * Find delivery log by ID
+	 * Requirements 9.1, 9.2: Status tracking and retrieval
+	 */
 	async findById(id: string): Promise<DeliveryStatusResponse | null> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		try {
+			const [result] = await db
+				.select()
+				.from(deliveryQueue)
+				.where(sql`${deliveryQueue.metadata}->>'deliveryLog'->>'id' = ${id}`)
+				.limit(1)
+
+			if (!result || !(result.metadata as any)?.deliveryLog) {
+				return null
+			}
+
+			return this.mapToDeliveryStatusResponse((result.metadata as any).deliveryLog)
+		} catch (error) {
+			throw new Error(
+				`Failed to find delivery log: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
 	}
 
+	/**
+	 * Find all delivery logs for a specific delivery ID
+	 * Requirements 9.1, 9.2: Multi-destination delivery tracking
+	 */
 	async findByDeliveryId(deliveryId: string): Promise<DeliveryStatusResponse[]> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		try {
+			const results = await db
+				.select()
+				.from(deliveryQueue)
+				.where(sql`${deliveryQueue.payload}->>'deliveryId' = ${deliveryId}`)
+
+			// Aggregate delivery status from all queue items for this delivery
+			const destinationStatuses = results.map((item) => {
+				const payload = (item.payload as any) || {}
+				const metadata = (item.metadata as any) || {}
+
+				return {
+					destinationId: item.destinationId.toString(),
+					status: this.mapQueueStatusToDeliveryStatus(item.status),
+					attempts: item.retryCount + 1,
+					lastAttemptAt: metadata.lastAttemptAt || item.updatedAt,
+					deliveredAt: item.status === 'completed' ? item.processedAt || undefined : undefined,
+					failureReason: item.status === 'failed' ? metadata.lastError : undefined,
+					crossSystemReference: metadata.crossSystemReference,
+				}
+			})
+
+			// Determine overall delivery status
+			let overallStatus: 'queued' | 'processing' | 'completed' | 'failed' = 'completed'
+
+			const hasProcessing = destinationStatuses.some((d) => d.status === 'retrying')
+			const hasPending = destinationStatuses.some((d) => d.status === 'pending')
+			const hasFailed = destinationStatuses.some((d) => d.status === 'failed')
+			const allCompleted = destinationStatuses.every((d) => d.status === 'delivered')
+
+			if (hasProcessing) {
+				overallStatus = 'processing'
+			} else if (hasPending) {
+				overallStatus = 'queued'
+			} else if (hasFailed && !allCompleted) {
+				overallStatus = 'failed'
+			}
+
+			// Get timestamps
+			const createdAt = Math.min(...results.map((r) => new Date(r.createdAt).getTime()))
+			const updatedAt = Math.max(...results.map((r) => new Date(r.updatedAt).getTime()))
+
+			const deliveryStatus: DeliveryStatusResponse = {
+				deliveryId,
+				status: overallStatus,
+				destinations: destinationStatuses,
+				createdAt: new Date(createdAt).toISOString(),
+				updatedAt: new Date(updatedAt).toISOString(),
+				metadata: (results[0]?.payload as any)?.metadata || {},
+			}
+
+			return [deliveryStatus]
+		} catch (error) {
+			throw new Error(
+				`Failed to find delivery logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
 	}
 
+	/**
+	 * List delivery logs with filtering and pagination
+	 * Requirements 9.1, 9.2: Delivery history and audit trail
+	 */
 	async list(options: DeliveryListOptions): Promise<DeliveryListResponse> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		try {
+			let query = db.select().from(deliveryQueue)
+
+			// Build conditions
+			const conditions = []
+
+			if (options.organizationId) {
+				conditions.push(eq(deliveryQueue.organizationId, options.organizationId))
+			}
+
+			if (options.destinationId) {
+				conditions.push(eq(deliveryQueue.destinationId, parseInt(options.destinationId, 10)))
+			}
+
+			if (options.status) {
+				const queueStatus = this.mapDeliveryStatusToQueueStatus(options.status)
+				conditions.push(eq(deliveryQueue.status, queueStatus))
+			}
+
+			if (options.startDate) {
+				conditions.push(sql`${deliveryQueue.createdAt} >= ${options.startDate}`)
+			}
+
+			if (options.endDate) {
+				conditions.push(sql`${deliveryQueue.createdAt} <= ${options.endDate}`)
+			}
+
+			// Apply conditions
+			if (conditions.length > 0) {
+				query = query.where(and(...conditions)) as any
+			}
+
+			// Apply sorting
+			if (options.sortBy === 'createdAt') {
+				query =
+					options.sortOrder === 'desc'
+						? (query.orderBy(desc(deliveryQueue.createdAt)) as any)
+						: (query.orderBy(deliveryQueue.createdAt) as any)
+			} else if (options.sortBy === 'updatedAt') {
+				query =
+					options.sortOrder === 'desc'
+						? (query.orderBy(desc(deliveryQueue.updatedAt)) as any)
+						: (query.orderBy(deliveryQueue.updatedAt) as any)
+			}
+
+			// Apply pagination
+			if (options.limit) {
+				query = query.limit(options.limit) as any
+			}
+			if (options.offset) {
+				query = query.offset(options.offset) as any
+			}
+
+			const results = await query
+
+			// Group by delivery ID and create delivery status responses
+			const deliveryMap = new Map<string, any[]>()
+
+			for (const item of results) {
+				const deliveryId = (item.payload as any)?.deliveryId || 'unknown'
+				if (!deliveryMap.has(deliveryId)) {
+					deliveryMap.set(deliveryId, [])
+				}
+				deliveryMap.get(deliveryId)!.push(item)
+			}
+
+			const deliveries: DeliveryStatusResponse[] = []
+
+			for (const [deliveryId, items] of deliveryMap) {
+				const destinationStatuses = items.map((item) => ({
+					destinationId: item.destinationId.toString(),
+					status: this.mapQueueStatusToDeliveryStatus(item.status),
+					attempts: item.retryCount + 1,
+					lastAttemptAt: (item.metadata as any)?.lastAttemptAt || item.updatedAt,
+					deliveredAt: item.status === 'completed' ? item.processedAt || undefined : undefined,
+					failureReason: item.status === 'failed' ? (item.metadata as any)?.lastError : undefined,
+					crossSystemReference: (item.metadata as any)?.crossSystemReference,
+				}))
+
+				// Determine overall status
+				let overallStatus: 'queued' | 'processing' | 'completed' | 'failed' = 'completed'
+
+				const hasProcessing = destinationStatuses.some((d) => d.status === 'retrying')
+				const hasPending = destinationStatuses.some((d) => d.status === 'pending')
+				const hasFailed = destinationStatuses.some((d) => d.status === 'failed')
+				const allCompleted = destinationStatuses.every((d) => d.status === 'delivered')
+
+				if (hasProcessing) {
+					overallStatus = 'processing'
+				} else if (hasPending) {
+					overallStatus = 'queued'
+				} else if (hasFailed && !allCompleted) {
+					overallStatus = 'failed'
+				}
+
+				const createdAt = Math.min(...items.map((r) => new Date(r.createdAt).getTime()))
+				const updatedAt = Math.max(...items.map((r) => new Date(r.updatedAt).getTime()))
+
+				deliveries.push({
+					deliveryId,
+					status: overallStatus,
+					destinations: destinationStatuses,
+					createdAt: new Date(createdAt).toISOString(),
+					updatedAt: new Date(updatedAt).toISOString(),
+					metadata: (items[0]?.payload as any)?.metadata || {},
+				})
+			}
+
+			// Get total count for pagination
+			const totalCount = await this.getTotalDeliveryCount(options)
+
+			return {
+				deliveries,
+				totalCount,
+			}
+		} catch (error) {
+			throw new Error(
+				`Failed to list delivery logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
 	}
 
+	/**
+	 * Record a delivery attempt
+	 * Requirements 9.1, 9.2: Attempt tracking and audit trail
+	 */
 	async recordAttempt(id: string, attempt: any): Promise<void> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		try {
+			// Find the queue item and update its attempt history
+			const [item] = await db.select().from(deliveryQueue).where(eq(deliveryQueue.id, id))
+
+			if (!item) {
+				throw new Error(`Queue item not found: ${id}`)
+			}
+
+			const currentMetadata = (item.metadata as any) || {}
+			const attempts = currentMetadata.attempts || []
+
+			attempts.push({
+				...attempt,
+				timestamp: new Date().toISOString(),
+			})
+
+			await db
+				.update(deliveryQueue)
+				.set({
+					metadata: {
+						...currentMetadata,
+						attempts,
+						lastAttemptAt: new Date().toISOString(),
+					},
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(deliveryQueue.id, id))
+		} catch (error) {
+			throw new Error(
+				`Failed to record attempt: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
 	}
 
+	/**
+	 * Mark delivery as successfully delivered
+	 * Requirements 9.1, 9.2, 9.3, 9.4: Cross-system reference tracking
+	 */
 	async markDelivered(
 		id: string,
 		deliveredAt: string,
 		crossSystemReference?: string
 	): Promise<void> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		try {
+			const updateData: any = {
+				status: 'completed',
+				processedAt: deliveredAt,
+				updatedAt: new Date().toISOString(),
+			}
+
+			// Add cross-system reference to metadata if provided
+			if (crossSystemReference) {
+				const [item] = await db.select().from(deliveryQueue).where(eq(deliveryQueue.id, id))
+
+				if (item) {
+					const currentMetadata = item.metadata || {}
+					updateData.metadata = {
+						...currentMetadata,
+						crossSystemReference,
+						deliveredAt,
+					}
+				}
+			}
+
+			await db.update(deliveryQueue).set(updateData).where(eq(deliveryQueue.id, id))
+		} catch (error) {
+			throw new Error(
+				`Failed to mark as delivered: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
 	}
 
+	/**
+	 * Mark delivery as failed
+	 * Requirements 9.1, 9.2: Failure tracking and audit trail
+	 */
 	async markFailed(id: string, reason: string): Promise<void> {
-		// TODO: Implement in subsequent tasks
-		throw new Error('Not implemented')
+		const db = this.client.getDatabase()
+
+		try {
+			const [item] = await db.select().from(deliveryQueue).where(eq(deliveryQueue.id, id))
+
+			if (!item) {
+				throw new Error(`Queue item not found: ${id}`)
+			}
+
+			const currentMetadata = item.metadata || {}
+
+			await db
+				.update(deliveryQueue)
+				.set({
+					status: 'failed',
+					metadata: {
+						...currentMetadata,
+						failureReason: reason,
+						failedAt: new Date().toISOString(),
+						lastError: reason,
+					},
+					updatedAt: new Date().toISOString(),
+				})
+				.where(eq(deliveryQueue.id, id))
+		} catch (error) {
+			throw new Error(
+				`Failed to mark as failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+			)
+		}
+	}
+
+	/**
+	 * Helper method to get total delivery count for pagination
+	 */
+	private async getTotalDeliveryCount(options: DeliveryListOptions): Promise<number> {
+		const db = this.client.getDatabase()
+
+		// Build conditions
+		const conditions = []
+
+		if (options.organizationId) {
+			conditions.push(eq(deliveryQueue.organizationId, options.organizationId))
+		}
+
+		if (options.destinationId) {
+			conditions.push(eq(deliveryQueue.destinationId, parseInt(options.destinationId, 10)))
+		}
+
+		if (options.status) {
+			const queueStatus = this.mapDeliveryStatusToQueueStatus(options.status)
+			conditions.push(eq(deliveryQueue.status, queueStatus))
+		}
+
+		if (options.startDate) {
+			conditions.push(sql`${deliveryQueue.createdAt} >= ${options.startDate}`)
+		}
+
+		if (options.endDate) {
+			conditions.push(sql`${deliveryQueue.createdAt} <= ${options.endDate}`)
+		}
+
+		// Count unique delivery IDs
+		let countQuery = db
+			.select({
+				deliveryId: sql`DISTINCT ${deliveryQueue.payload}->>'deliveryId'`,
+			})
+			.from(deliveryQueue)
+
+		if (conditions.length > 0) {
+			countQuery = countQuery.where(and(...conditions)) as any
+		}
+
+		const results = await countQuery
+		return results.length
+	}
+
+	/**
+	 * Map queue status to delivery status
+	 */
+	private mapQueueStatusToDeliveryStatus(
+		queueStatus: string
+	): 'pending' | 'delivered' | 'failed' | 'retrying' {
+		switch (queueStatus) {
+			case 'pending':
+				return 'pending'
+			case 'processing':
+				return 'pending'
+			case 'completed':
+				return 'delivered'
+			case 'failed':
+				return 'failed'
+			default:
+				return 'pending'
+		}
+	}
+
+	/**
+	 * Map delivery status to queue status
+	 */
+	private mapDeliveryStatusToQueueStatus(deliveryStatus: string): string {
+		switch (deliveryStatus) {
+			case 'pending':
+				return 'pending'
+			case 'delivered':
+				return 'completed'
+			case 'failed':
+				return 'failed'
+			case 'retrying':
+				return 'pending'
+			default:
+				return 'pending'
+		}
+	}
+
+	/**
+	 * Map delivery log data to DeliveryStatusResponse
+	 */
+	private mapToDeliveryStatusResponse(logData: any): DeliveryStatusResponse {
+		return {
+			deliveryId: logData.deliveryId,
+			status: logData.status,
+			destinations: logData.destinations || [],
+			createdAt: logData.createdAt,
+			updatedAt: logData.updatedAt,
+			metadata: logData.metadata || {},
+		}
 	}
 }
 
