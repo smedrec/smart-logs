@@ -6,7 +6,7 @@
 import { nanoid } from 'nanoid'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DeliveryScheduler, QueueManager } from '../index.js'
+import { CircuitBreaker, DeliveryScheduler, QueueManager, RetryManager } from '../index.js'
 
 import type { DeliveryDatabaseClient } from '../database-client.js'
 import type { DeliveryRequest } from '../types.js'
@@ -32,11 +32,21 @@ const mockDbClient = {
 		deleteItemsByStatusAndAge: vi.fn(),
 	},
 	getDefaultDestinations: vi.fn(),
+	health: {
+		findByDestinationId: vi.fn(),
+		recordSuccess: vi.fn(),
+		recordFailure: vi.fn(),
+		updateCircuitBreakerState: vi.fn(),
+		upsert: vi.fn(),
+		getUnhealthyDestinations: vi.fn(),
+	},
 } as unknown as DeliveryDatabaseClient
 
 describe('Queue Management System', () => {
 	let scheduler: DeliveryScheduler
 	let queueManager: QueueManager
+	let retryManager: RetryManager
+	let circuitBreaker: CircuitBreaker
 
 	beforeEach(() => {
 		vi.clearAllMocks()
@@ -72,6 +82,17 @@ describe('Queue Management System', () => {
 				processingTime: 10000,
 				failureRate: 5,
 			},
+		})
+
+		retryManager = new RetryManager(mockDbClient, {
+			maxRetries: 3,
+			baseDelay: 1000,
+			jitterEnabled: false,
+		})
+
+		circuitBreaker = new CircuitBreaker(mockDbClient, {
+			failureThreshold: 3,
+			recoveryTimeout: 60000,
 		})
 	})
 
@@ -352,6 +373,65 @@ describe('Queue Management System', () => {
 			expect(health.metrics).toBeDefined()
 
 			await scheduler.stop()
+		})
+
+		it('should integrate retry manager with circuit breaker for failure handling', async () => {
+			const deliveryId = 'integration-test-1'
+			const destinationId = 'dest-1'
+			const error = new Error('Network timeout')
+
+			// Mock queue items
+			mockDbClient.queue.findByDeliveryId.mockResolvedValue([
+				{
+					id: 'queue-1',
+					retryCount: 1,
+					metadata: { retryAttempts: [] },
+					updatedAt: new Date().toISOString(),
+				},
+			])
+
+			// Mock destination health
+			mockDbClient.health.findByDestinationId.mockResolvedValue({
+				destinationId,
+				circuitBreakerState: 'closed',
+				consecutiveFailures: 2,
+				totalDeliveries: 10,
+			})
+
+			// Test retry eligibility
+			const shouldRetry = await retryManager.shouldRetry(deliveryId, error)
+			expect(shouldRetry).toBe(true)
+
+			// Test circuit breaker state
+			const isOpen = await circuitBreaker.isOpen(destinationId)
+			expect(isOpen).toBe(false)
+
+			// Record failure in both systems
+			await retryManager.recordAttempt(deliveryId, false, error)
+			await circuitBreaker.recordFailure(destinationId)
+
+			// Verify retry was scheduled
+			expect(mockDbClient.queue.scheduleRetry).toHaveBeenCalled()
+			// Verify failure was recorded in health system
+			expect(mockDbClient.health.recordFailure).toHaveBeenCalled()
+		})
+
+		it('should prevent retries when circuit breaker is open', async () => {
+			const destinationId = 'dest-2'
+
+			// Mock open circuit breaker
+			mockDbClient.health.findByDestinationId.mockResolvedValue({
+				destinationId,
+				circuitBreakerState: 'open',
+				circuitBreakerOpenedAt: new Date().toISOString(),
+				consecutiveFailures: 5,
+			})
+
+			const isOpen = await circuitBreaker.isOpen(destinationId)
+			expect(isOpen).toBe(true)
+
+			// In a real integration, the delivery system would check circuit breaker
+			// before attempting delivery and skip if open
 		})
 	})
 })

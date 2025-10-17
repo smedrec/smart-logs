@@ -38,6 +38,14 @@ export type {
 	QueueAlert,
 } from './queue-manager.js'
 
+// Retry manager
+export { RetryManager, createRetryManager } from './retry-manager.js'
+export type { RetryManagerConfig, RetryAttempt } from './retry-manager.js'
+
+// Circuit breaker
+export { CircuitBreaker, createCircuitBreaker } from './circuit-breaker.js'
+export type { CircuitBreakerConfig, CircuitBreakerMetrics } from './circuit-breaker.js'
+
 // Validation components
 export { DestinationValidator } from './validation/destination-validator.js'
 export { ConnectionTester } from './validation/connection-tester.js'
