@@ -46,6 +46,17 @@ export type { RetryManagerConfig, RetryAttempt } from './retry-manager.js'
 export { CircuitBreaker, createCircuitBreaker } from './circuit-breaker.js'
 export type { CircuitBreakerConfig, CircuitBreakerMetrics } from './circuit-breaker.js'
 
+// Alert manager
+export { AlertManager } from './alert-manager.js'
+export type { AlertType, AlertSeverity } from './alert-manager.js'
+
+// Alert debouncer
+export { AlertDebouncer, createAlertDebouncer } from './alert-debouncer.js'
+
+// Alert access control
+export { AlertAccessControl, createAlertAccessControl } from './alert-access-control.js'
+export type { AlertUserContext, AlertRole, AlertPermission } from './alert-access-control.js'
+
 // Validation components
 export { DestinationValidator } from './validation/destination-validator.js'
 export { ConnectionTester } from './validation/connection-tester.js'
