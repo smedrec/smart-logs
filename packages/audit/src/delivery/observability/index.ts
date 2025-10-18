@@ -3,26 +3,26 @@
  * Requirements 8.1, 8.2, 8.3, 8.4, 8.5: OpenTelemetry observability and metrics
  */
 
-import { createDeliveryMetricsCollector } from './metrics'
-import { createDeliveryPerformanceMonitor } from './performance'
-import { createDeliveryTracer } from './tracer'
-import { DeliveryObservabilityConfig } from './types'
+import { createDeliveryMetricsCollector } from './metrics.js'
+import { createDeliveryPerformanceMonitor } from './performance.js'
+import { createDeliveryTracer } from './tracer.js'
+import { DeliveryObservabilityConfig } from './types.js'
 
 // Tracing
-export { DeliveryTracer, traceDeliveryOperation, createDeliveryTracer } from './tracer'
-export type { IDeliveryTracer, DeliverySpanContext, DeliverySpan } from './tracer'
+export { DeliveryTracer, traceDeliveryOperation, createDeliveryTracer } from './tracer.js'
+export type { IDeliveryTracer, DeliverySpanContext, DeliverySpan } from './tracer.js'
 
 // Metrics
-export { DeliveryMetricsCollector, createDeliveryMetricsCollector } from './metrics'
-export type { IDeliveryMetricsCollector } from './metrics'
+export { DeliveryMetricsCollector, createDeliveryMetricsCollector } from './metrics.js'
+export type { IDeliveryMetricsCollector } from './metrics.js'
 
 // Performance monitoring
 export {
 	DeliveryPerformanceMonitor,
 	PerformanceTimer,
 	createDeliveryPerformanceMonitor,
-} from './performance'
-export type { IDeliveryPerformanceMonitor, PerformanceMetrics } from './performance'
+} from './performance.js'
+export type { IDeliveryPerformanceMonitor, PerformanceMetrics } from './performance.js'
 
 // Types
 export type {
@@ -32,7 +32,7 @@ export type {
 	DeliverySpanEvent,
 	DeliveryCustomMetrics,
 	DeliveryMetricsData,
-} from './types'
+} from './types.js'
 
 // Factory function for creating complete observability stack
 export function createDeliveryObservabilityStack(config: DeliveryObservabilityConfig) {

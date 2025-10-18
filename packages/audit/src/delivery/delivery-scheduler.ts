@@ -7,12 +7,31 @@ import { nanoid } from 'nanoid'
 
 import { StructuredLogger } from '@repo/logs'
 
+import { createCircuitBreaker } from './circuit-breaker.js'
+import { createDestinationManager } from './destination-manager.js'
+import {
+	DownloadHandler,
+	EmailHandler,
+	SftpHandler,
+	StorageHandler,
+	WebhookHandler,
+} from './handlers/index.js'
 import { QueueManager } from './queue-manager.js'
+import { createRetryManager } from './retry-manager.js'
 
+import type { CircuitBreaker } from './circuit-breaker.js'
 import type { DeliveryDatabaseClient } from './database-client.js'
-import type { IDeliveryScheduler } from './interfaces.js'
+import type { IDestinationManager } from './destination-manager.js'
+import type { IDeliveryScheduler, IDestinationHandler, IRetryManager } from './interfaces.js'
 import type { QueueManagerConfig } from './queue-manager.js'
-import type { DeliveryRequest, QueueStatus } from './types.js'
+import type { RetryManager } from './retry-manager.js'
+import type {
+	DeliveryPayload,
+	DeliveryRequest,
+	DeliveryResult,
+	DestinationType,
+	QueueStatus,
+} from './types.js'
 
 /**
  * Configuration for the delivery scheduler
@@ -63,6 +82,10 @@ export class DeliveryScheduler implements IDeliveryScheduler {
 	private readonly logger: StructuredLogger
 	private readonly config: DeliverySchedulerConfig
 	private readonly queueManager: QueueManager
+	private readonly destinationManager: IDestinationManager
+	private readonly retryManager: IRetryManager
+	private readonly circuitBreaker: CircuitBreaker
+	private readonly destinationHandlers: Map<DestinationType, IDestinationHandler>
 	private isRunning = false
 	private processingInterval?: NodeJS.Timeout
 	private cleanupInterval?: NodeJS.Timeout
@@ -78,6 +101,19 @@ export class DeliveryScheduler implements IDeliveryScheduler {
 		this.config = { ...DEFAULT_SCHEDULER_CONFIG, ...config }
 		this.startTime = Date.now()
 		this.queueManager = new QueueManager(dbClient, queueManagerConfig)
+
+		// Initialize delivery components
+		this.destinationManager = createDestinationManager(dbClient)
+		this.retryManager = createRetryManager(dbClient)
+		this.circuitBreaker = createCircuitBreaker(dbClient)
+
+		// Initialize destination handlers
+		this.destinationHandlers = new Map()
+		this.destinationHandlers.set('webhook', new WebhookHandler())
+		this.destinationHandlers.set('email', new EmailHandler())
+		this.destinationHandlers.set('storage', new StorageHandler())
+		this.destinationHandlers.set('sftp', new SftpHandler())
+		this.destinationHandlers.set('download', new DownloadHandler())
 
 		this.logger = new StructuredLogger({
 			service: '@repo/audit - DeliveryScheduler',
@@ -254,7 +290,7 @@ export class DeliveryScheduler implements IDeliveryScheduler {
 	}
 
 	/**
-	 * Process a single queue item
+	 * Process a single queue item with destination handler integration
 	 */
 	private async processQueueItem(item: any): Promise<void> {
 		const startTime = Date.now()
@@ -264,19 +300,88 @@ export class DeliveryScheduler implements IDeliveryScheduler {
 			// Mark as processing
 			await this.dbClient.queue.updateStatus(item.id, 'processing')
 
-			// TODO: This will be implemented in later tasks when destination handlers are available
-			// For now, we'll simulate processing
 			this.logger.info('Processing queue item', {
 				queueItemId: item.id,
 				deliveryId: item.payload.deliveryId,
 				destinationId: item.destinationId,
 			})
 
-			// Simulate processing delay
-			await new Promise((resolve) => setTimeout(resolve, 100))
+			// Get destination information
+			const destination = await this.destinationManager.getDestination(
+				item.destinationId.toString()
+			)
+			if (!destination) {
+				throw new Error(`Destination ${item.destinationId} not found`)
+			}
 
-			// Mark as completed (temporary - will be replaced with actual delivery logic)
+			// Check circuit breaker before attempting delivery
+			const isCircuitOpen = await this.circuitBreaker.isOpen(destination.id)
+			if (isCircuitOpen) {
+				throw new Error(`Circuit breaker is open for destination ${destination.id}`)
+			}
+
+			// Get the appropriate destination handler
+			const handler = this.destinationHandlers.get(destination.type)
+			if (!handler) {
+				throw new Error(`No handler available for destination type: ${destination.type}`)
+			}
+
+			// Prepare delivery payload
+			const deliveryPayload: DeliveryPayload = {
+				deliveryId: item.payload.deliveryId,
+				organizationId: item.organizationId,
+				type: item.payload.type,
+				data: item.payload.data,
+				metadata: {
+					...item.payload.metadata,
+					queueItemId: item.id,
+					attemptNumber: (item.retryCount || 0) + 1,
+					scheduledAt: item.scheduledAt,
+					processedAt: new Date().toISOString(),
+				},
+				correlationId: item.payload.correlationId,
+				idempotencyKey: item.payload.idempotencyKey,
+			}
+
+			// Perform the actual delivery
+			const deliveryResult: DeliveryResult = await handler.deliver(
+				deliveryPayload,
+				destination.config
+			)
+
+			// Record successful delivery
+			await this.circuitBreaker.recordSuccess(destination.id)
+			await this.destinationManager.updateDestinationHealth(destination.id, {
+				status: 'healthy',
+				lastSuccessAt: new Date().toISOString(),
+				averageResponseTime: Date.now() - startTime,
+			})
+
+			// Mark as completed
 			await this.dbClient.queue.updateStatus(item.id, 'completed', new Date().toISOString())
+
+			// Create delivery log entry
+			await this.dbClient.logs.create({
+				deliveryId: item.payload.deliveryId,
+				status: 'completed',
+				destinations: [
+					{
+						destinationId: destination.id,
+						status: 'delivered',
+						attempts: (item.retryCount || 0) + 1,
+						deliveredAt: new Date().toISOString(),
+						crossSystemReference: deliveryResult.crossSystemReference,
+					},
+				],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+				metadata: {
+					...item.payload.metadata,
+					organizationId: item.organizationId,
+					deliveryResult,
+					processingTime: Date.now() - startTime,
+				},
+			})
 
 			// Update metrics
 			if (this.config.enableMetrics) {
@@ -286,29 +391,122 @@ export class DeliveryScheduler implements IDeliveryScheduler {
 
 			this.logger.info('Queue item processed successfully', {
 				queueItemId: item.id,
+				deliveryId: item.payload.deliveryId,
+				destinationId: destination.id,
+				destinationType: destination.type,
 				processingTime: Date.now() - startTime,
+				crossSystemReference: deliveryResult.crossSystemReference,
 			})
 		} catch (error) {
+			const processingTime = Date.now() - startTime
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
 			this.logger.error('Failed to process queue item', {
 				queueItemId: item.id,
-				error: error instanceof Error ? error.message : 'Unknown error',
+				deliveryId: item.payload?.deliveryId,
+				destinationId: item.destinationId,
+				error: errorMessage,
+				processingTime,
 			})
 
-			// Mark as failed and schedule retry if applicable
-			const shouldRetry = item.retryCount < item.maxRetries
+			// Get destination for circuit breaker and health updates
+			let destination
+			try {
+				destination = await this.destinationManager.getDestination(item.destinationId.toString())
+			} catch (destError) {
+				this.logger.error('Failed to get destination for error handling', {
+					destinationId: item.destinationId,
+					error: destError instanceof Error ? destError.message : 'Unknown error',
+				})
+			}
 
-			if (shouldRetry) {
-				const nextRetryAt = new Date(
-					Date.now() + this.calculateRetryDelay(item.retryCount)
-				).toISOString()
-				await this.dbClient.queue.scheduleRetry(item.id, nextRetryAt, item.retryCount + 1)
+			// Record failure in circuit breaker and health monitoring
+			if (destination) {
+				await this.circuitBreaker.recordFailure(destination.id)
+				await this.destinationManager.updateDestinationHealth(destination.id, {
+					status: 'unhealthy',
+					lastFailureAt: new Date().toISOString(),
+					consecutiveFailures: (destination as any).consecutiveFailures + 1 || 1,
+				})
+			}
+
+			// Check if we should retry
+			const shouldRetry = await this.retryManager.shouldRetry(
+				item.payload?.deliveryId || item.id,
+				error instanceof Error ? error : new Error(errorMessage)
+			)
+
+			if (shouldRetry && (item.retryCount || 0) < this.config.maxRetries) {
+				// Calculate backoff delay and schedule retry
+				const backoffDelay = this.retryManager.calculateBackoff(item.retryCount || 0)
+				const nextRetryAt = new Date(Date.now() + backoffDelay).toISOString()
+
+				await this.dbClient.queue.scheduleRetry(item.id, nextRetryAt, (item.retryCount || 0) + 1)
+
+				// Record retry attempt
+				await this.retryManager.recordAttempt(
+					item.payload?.deliveryId || item.id,
+					false,
+					error instanceof Error ? error : new Error(errorMessage)
+				)
+
+				this.logger.info('Delivery scheduled for retry', {
+					queueItemId: item.id,
+					deliveryId: item.payload?.deliveryId,
+					retryCount: (item.retryCount || 0) + 1,
+					nextRetryAt,
+					backoffDelay,
+				})
 			} else {
+				// Mark as permanently failed
 				await this.dbClient.queue.updateStatus(item.id, 'failed')
+
+				// Record final failure attempt
+				if (item.payload?.deliveryId) {
+					await this.retryManager.recordAttempt(
+						item.payload.deliveryId,
+						false,
+						error instanceof Error ? error : new Error(errorMessage)
+					)
+				}
+
+				// Create delivery log entry for failure
+				if (destination && item.payload?.deliveryId) {
+					await this.dbClient.logs.create({
+						deliveryId: item.payload.deliveryId,
+						status: 'failed',
+						destinations: [
+							{
+								destinationId: destination.id,
+								status: 'failed',
+								attempts: (item.retryCount || 0) + 1,
+								failureReason: errorMessage,
+								lastAttemptAt: new Date().toISOString(),
+							},
+						],
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString(),
+						metadata: {
+							...item.payload.metadata,
+							organizationId: item.organizationId,
+							finalError: errorMessage,
+							totalProcessingTime: processingTime,
+							maxRetriesReached: true,
+						},
+					})
+				}
+
+				this.logger.warn('Delivery permanently failed', {
+					queueItemId: item.id,
+					deliveryId: item.payload?.deliveryId,
+					destinationId: item.destinationId,
+					totalAttempts: (item.retryCount || 0) + 1,
+					finalError: errorMessage,
+				})
 			}
 
 			// Update metrics
 			if (this.config.enableMetrics) {
-				const processingTime = Date.now() - startTime
 				this.updateProcessingMetrics(processingTime, false)
 			}
 		} finally {
@@ -611,6 +809,42 @@ export class DeliveryScheduler implements IDeliveryScheduler {
 	 */
 	getQueueManager(): QueueManager {
 		return this.queueManager
+	}
+
+	/**
+	 * Get destination manager for advanced operations
+	 */
+	getDestinationManager(): IDestinationManager {
+		return this.destinationManager
+	}
+
+	/**
+	 * Get retry manager for advanced operations
+	 */
+	getRetryManager(): IRetryManager {
+		return this.retryManager
+	}
+
+	/**
+	 * Get circuit breaker for advanced operations
+	 */
+	getCircuitBreaker(): CircuitBreaker {
+		return this.circuitBreaker
+	}
+
+	/**
+	 * Get destination handler for a specific type
+	 */
+	getDestinationHandler(type: DestinationType): IDestinationHandler | undefined {
+		return this.destinationHandlers.get(type)
+	}
+
+	/**
+	 * Register a custom destination handler
+	 */
+	registerDestinationHandler(type: DestinationType, handler: IDestinationHandler): void {
+		this.destinationHandlers.set(type, handler)
+		this.logger.info('Registered destination handler', { type })
 	}
 
 	/**

@@ -436,3 +436,16 @@ export interface MetricsOptions {
  * Destination configuration type alias
  */
 export type DestinationConfig = DeliveryDestination['config']
+
+/**
+ * Delivery observability configuration
+ * Requirements 8.1, 8.2, 8.3, 8.4, 8.5: Observability and metrics
+ */
+export type {
+	DeliveryObservabilityConfig,
+	DeliverySpanAttributes,
+	DeliveryOperation,
+	DeliverySpanEvent,
+	DeliveryCustomMetrics,
+	DeliveryMetricsData,
+} from './observability/types.js'

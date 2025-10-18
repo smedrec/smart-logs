@@ -741,7 +741,7 @@ class DeliveryLogRepository implements IDeliveryLogRepository {
 		const logId = `dl_${Date.now()}_${Math.random().toString(36).substring(2)}`
 
 		try {
-			// For now, we'll store delivery logs in a simple format
+			// TODO: For now, we'll store delivery logs in a simple format
 			// In a real implementation, this would use a proper delivery_logs table
 			// Since we don't have that table yet, we'll use the queue metadata to track delivery status
 

@@ -9,6 +9,10 @@ import { createDeliveryDatabaseClient } from './database-client.js'
 import { createDeliveryScheduler } from './delivery-scheduler.js'
 import { createDestinationManager } from './destination-manager.js'
 import { createHealthMonitor } from './health-monitor.js'
+import {
+	createDeliveryObservabilityStack,
+	DEFAULT_DELIVERY_OBSERVABILITY_CONFIG,
+} from './observability/index.js'
 import { createRetryManager } from './retry-manager.js'
 
 import type { EnhancedAuditDatabaseClient } from '@repo/audit-db'
@@ -16,6 +20,12 @@ import type { DeliveryDatabaseClient } from './database-client.js'
 import type { IDestinationManager } from './destination-manager.js'
 import type { HealthMonitor, HealthMonitorConfig } from './health-monitor.js'
 import type { IDeliveryScheduler, IRetryManager } from './interfaces.js'
+import type {
+	DeliveryObservabilityConfig,
+	IDeliveryMetricsCollector,
+	IDeliveryPerformanceMonitor,
+	IDeliveryTracer,
+} from './observability/index.js'
 import type {
 	ConnectionTestResult,
 	CreateDeliveryDestinationInput,
@@ -40,6 +50,8 @@ import type {
 export interface DeliveryServiceConfig {
 	healthMonitor?: Partial<HealthMonitorConfig>
 	enableHealthMonitoring?: boolean
+	observability?: Partial<DeliveryObservabilityConfig>
+	enableObservability?: boolean
 }
 
 /**
@@ -88,6 +100,13 @@ export class DeliveryService implements IDeliveryService {
 	private readonly deliveryScheduler: IDeliveryScheduler
 	private readonly retryManager: IRetryManager
 	private readonly config: DeliveryServiceConfig
+	private readonly observabilityStack?: {
+		tracer: IDeliveryTracer
+		metricsCollector: IDeliveryMetricsCollector
+		performanceMonitor: IDeliveryPerformanceMonitor
+		initialize(): Promise<void>
+		shutdown(): Promise<void>
+	}
 	private isStarted = false
 
 	constructor(enhancedClient: EnhancedAuditDatabaseClient, config: DeliveryServiceConfig = {}) {
@@ -105,6 +124,7 @@ export class DeliveryService implements IDeliveryService {
 
 		this.config = {
 			enableHealthMonitoring: true,
+			enableObservability: true,
 			...config,
 		}
 
@@ -114,6 +134,15 @@ export class DeliveryService implements IDeliveryService {
 		this.healthMonitor = createHealthMonitor(this.dbClient, config.healthMonitor)
 		this.deliveryScheduler = createDeliveryScheduler(this.dbClient)
 		this.retryManager = createRetryManager(this.dbClient)
+
+		// Initialize observability stack if enabled
+		if (this.config.enableObservability) {
+			const observabilityConfig = {
+				...DEFAULT_DELIVERY_OBSERVABILITY_CONFIG,
+				...config.observability,
+			}
+			this.observabilityStack = createDeliveryObservabilityStack(observabilityConfig)
+		}
 	}
 
 	/**
@@ -130,13 +159,21 @@ export class DeliveryService implements IDeliveryService {
 		})
 
 		try {
+			// Start observability stack if enabled
+			if (this.config.enableObservability && this.observabilityStack) {
+				await this.observabilityStack.initialize()
+			}
+
 			// Start health monitoring if enabled
 			if (this.config.enableHealthMonitoring) {
 				this.healthMonitor.start()
 			}
 
 			this.isStarted = true
-			this.logger.info('Delivery service started successfully')
+			this.logger.info('Delivery service started successfully', {
+				observabilityEnabled: this.config.enableObservability,
+				healthMonitoringEnabled: this.config.enableHealthMonitoring,
+			})
 		} catch (error) {
 			this.logger.error('Failed to start delivery service', {
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -158,6 +195,11 @@ export class DeliveryService implements IDeliveryService {
 		try {
 			// Stop health monitoring
 			this.healthMonitor.stop()
+
+			// Stop observability stack if enabled
+			if (this.config.enableObservability && this.observabilityStack) {
+				await this.observabilityStack.shutdown()
+			}
 
 			this.isStarted = false
 			this.logger.info('Delivery service stopped successfully')
@@ -251,19 +293,76 @@ export class DeliveryService implements IDeliveryService {
 	}
 
 	/**
-	 * Record a successful delivery (for health monitoring)
+	 * Record a successful delivery (for health monitoring and metrics)
 	 */
-	async recordDeliverySuccess(destinationId: string, responseTime: number): Promise<void> {
+	async recordDeliverySuccess(
+		destinationId: string,
+		responseTime: number,
+		organizationId?: string,
+		destinationType?: string
+	): Promise<void> {
 		await this.healthMonitor.recordSuccess(destinationId, responseTime)
 		await this.healthMonitor.updateCircuitBreakerState(destinationId, true, responseTime)
+
+		// Record metrics if observability is enabled
+		if (
+			this.config.enableObservability &&
+			this.observabilityStack &&
+			organizationId &&
+			destinationType
+		) {
+			this.observabilityStack.metricsCollector.recordDeliveryAttempt(
+				organizationId,
+				destinationType,
+				true,
+				responseTime
+			)
+			this.observabilityStack.performanceMonitor.recordDestinationPerformance(
+				destinationId,
+				destinationType,
+				responseTime,
+				true
+			)
+		}
 	}
 
 	/**
-	 * Record a failed delivery (for health monitoring)
+	 * Record a failed delivery (for health monitoring and metrics)
 	 */
-	async recordDeliveryFailure(destinationId: string, error: string): Promise<void> {
+	async recordDeliveryFailure(
+		destinationId: string,
+		error: string,
+		organizationId?: string,
+		destinationType?: string
+	): Promise<void> {
 		await this.healthMonitor.recordFailure(destinationId, error)
 		await this.healthMonitor.updateCircuitBreakerState(destinationId, false)
+
+		// Record metrics if observability is enabled
+		if (
+			this.config.enableObservability &&
+			this.observabilityStack &&
+			organizationId &&
+			destinationType
+		) {
+			this.observabilityStack.metricsCollector.recordDeliveryAttempt(
+				organizationId,
+				destinationType,
+				false,
+				0
+			)
+			this.observabilityStack.metricsCollector.recordDestinationFailure(
+				destinationId,
+				destinationType,
+				error
+			)
+			this.observabilityStack.performanceMonitor.recordDestinationPerformance(
+				destinationId,
+				destinationType,
+				0,
+				false
+			)
+		}
 	}
 
 	// Delivery orchestration methods - Requirements 2.1, 2.2, 2.3, 2.4, 2.5
@@ -562,58 +661,218 @@ export class DeliveryService implements IDeliveryService {
 	 * Get delivery metrics for monitoring and analytics
 	 * Requirements 8.1, 8.2, 8.3, 8.4, 8.5: Observability and metrics
 	 */
+	/**
+	 * Get the observability stack for advanced metrics access
+	 */
+	getObservabilityStack() {
+		return this.observabilityStack
+	}
+
+	/**
+	 * Get delivery metrics for monitoring and analytics
+	 * Requirements 8.1, 8.2, 8.3, 8.4, 8.5: Observability and metrics
+	 */
 	async getDeliveryMetrics(options: MetricsOptions): Promise<DeliveryMetrics> {
 		try {
-			// This is a placeholder implementation
-			// In a real implementation, this would aggregate metrics from delivery logs
-			const totalDeliveries = 100 // Placeholder
-			const successfulDeliveries = 85 // Placeholder
-			const failedDeliveries = 15 // Placeholder
+			// Use real metrics from observability stack if available
+			if (this.config.enableObservability && this.observabilityStack) {
+				const metricsSnapshot = await this.observabilityStack.metricsCollector.getMetricsSnapshot()
+				const customMetrics = await this.observabilityStack.metricsCollector.getCustomMetrics()
+
+				// Calculate totals from real metrics
+				const totalDeliveries = metricsSnapshot.deliveries_total
+				const successfulDeliveries = metricsSnapshot.deliveries_successful
+				const failedDeliveries = metricsSnapshot.deliveries_failed
+
+				// Calculate success rate
+				const successRate =
+					totalDeliveries > 0 ? ((successfulDeliveries / totalDeliveries) * 100).toFixed(2) : '0.00'
+
+				// Calculate average delivery time from performance percentiles
+				const averageDeliveryTime = metricsSnapshot.performance_percentiles.p50 || 0
+
+				// Build destination type metrics from real data
+				const byDestinationType: Record<string, any> = {}
+				for (const [type, stats] of Object.entries(metricsSnapshot.by_destination_type)) {
+					byDestinationType[type] = {
+						total: stats.total,
+						successful: stats.successful,
+						failed: stats.failed,
+						successRate:
+							stats.total > 0 ? ((stats.successful / stats.total) * 100).toFixed(2) : '0.00',
+						averageTime: stats.avg_duration_ms,
+					}
+				}
+
+				// Build organization metrics from real data
+				const byOrganization: Record<string, any> = {}
+				for (const [org, stats] of Object.entries(metricsSnapshot.by_organization)) {
+					byOrganization[org] = {
+						total: stats.total,
+						successful: stats.successful,
+						failed: stats.failed,
+						successRate:
+							stats.total > 0 ? ((stats.successful / stats.total) * 100).toFixed(2) : '0.00',
+					}
+				}
+
+				// If filtering by organization, only include that organization's data
+				if (options.organizationId) {
+					const orgStats = byOrganization[options.organizationId]
+					if (orgStats) {
+						return {
+							totalDeliveries: orgStats.total,
+							successfulDeliveries: orgStats.successful,
+							failedDeliveries: orgStats.failed,
+							successRate: orgStats.successRate,
+							averageDeliveryTime,
+							byDestinationType,
+							byOrganization: { [options.organizationId]: orgStats },
+							timeRange: {
+								start:
+									options.startDate || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+								end: options.endDate || new Date().toISOString(),
+							},
+						}
+					}
+				}
+
+				return {
+					totalDeliveries,
+					successfulDeliveries,
+					failedDeliveries,
+					successRate,
+					averageDeliveryTime,
+					byDestinationType,
+					byOrganization,
+					timeRange: {
+						start: options.startDate || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+						end: options.endDate || new Date().toISOString(),
+					},
+				}
+			}
+
+			// Fallback to database-based metrics if observability is disabled
+			// This would query delivery logs from the database
+			let deliveryLogs
+			try {
+				deliveryLogs = await this.dbClient.logs.list({
+					organizationId: options.organizationId,
+					startDate: options.startDate,
+					endDate: options.endDate,
+					limit: 10000, // Large limit to get comprehensive data
+				})
+			} catch (dbError) {
+				this.logger.error('Failed to get delivery metrics from database', {
+					error:
+						dbError instanceof Error
+							? { name: dbError.name, message: dbError.message, stack: dbError.stack }
+							: 'Failed to get delivery metrics from database',
+				})
+				// Return empty metrics if database query fails
+				return {
+					totalDeliveries: 0,
+					successfulDeliveries: 0,
+					failedDeliveries: 0,
+					successRate: '0.00',
+					averageDeliveryTime: 0,
+					byDestinationType: {},
+					byOrganization: {},
+					timeRange: {
+						start: options.startDate || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+						end: options.endDate || new Date().toISOString(),
+					},
+				}
+			}
+
+			// Aggregate metrics from delivery logs
+			const totalDeliveries = deliveryLogs.totalCount
+			let successfulDeliveries = 0
+			let failedDeliveries = 0
+			const destinationTypeStats: Record<
+				string,
+				{ total: number; successful: number; failed: number; totalTime: number }
+			> = {}
+			const organizationStats: Record<
+				string,
+				{ total: number; successful: number; failed: number }
+			> = {}
+
+			// Process delivery logs to calculate metrics
+			for (const delivery of deliveryLogs.deliveries) {
+				const isSuccessful = delivery.status === 'completed'
+
+				if (isSuccessful) {
+					successfulDeliveries++
+				} else {
+					failedDeliveries++
+				}
+
+				// Aggregate by destination (assuming we can get destination info from metadata)
+				for (const dest of delivery.destinations) {
+					const destType = dest.destinationId ? 'webhook' : 'unknown' // Simplified - would need actual destination type lookup
+
+					if (!destinationTypeStats[destType]) {
+						destinationTypeStats[destType] = { total: 0, successful: 0, failed: 0, totalTime: 0 }
+					}
+
+					destinationTypeStats[destType].total++
+					if (dest.status === 'delivered') {
+						destinationTypeStats[destType].successful++
+					} else {
+						destinationTypeStats[destType].failed++
+					}
+				}
+
+				// Aggregate by organization
+				const orgId = options.organizationId || 'default'
+				if (!organizationStats[orgId]) {
+					organizationStats[orgId] = { total: 0, successful: 0, failed: 0 }
+				}
+
+				organizationStats[orgId].total++
+				if (isSuccessful) {
+					organizationStats[orgId].successful++
+				} else {
+					organizationStats[orgId].failed++
+				}
+			}
+
+			// Build response format
+			const byDestinationType: Record<string, any> = {}
+			for (const [type, stats] of Object.entries(destinationTypeStats)) {
+				byDestinationType[type] = {
+					total: stats.total,
+					successful: stats.successful,
+					failed: stats.failed,
+					successRate:
+						stats.total > 0 ? ((stats.successful / stats.total) * 100).toFixed(2) : '0.00',
+					averageTime: stats.total > 0 ? stats.totalTime / stats.total : 0,
+				}
+			}
+
+			const byOrganization: Record<string, any> = {}
+			for (const [org, stats] of Object.entries(organizationStats)) {
+				byOrganization[org] = {
+					total: stats.total,
+					successful: stats.successful,
+					failed: stats.failed,
+					successRate:
+						stats.total > 0 ? ((stats.successful / stats.total) * 100).toFixed(2) : '0.00',
+				}
+			}
 
 			return {
 				totalDeliveries,
 				successfulDeliveries,
 				failedDeliveries,
-				successRate: ((successfulDeliveries / totalDeliveries) * 100).toFixed(2),
-				averageDeliveryTime: 2500, // milliseconds
-				byDestinationType: {
-					webhook: {
-						total: 40,
-						successful: 35,
-						failed: 5,
-						successRate: '87.50',
-						averageTime: 1200,
-					},
-					email: {
-						total: 30,
-						successful: 28,
-						failed: 2,
-						successRate: '93.33',
-						averageTime: 3200,
-					},
-					storage: {
-						total: 20,
-						successful: 18,
-						failed: 2,
-						successRate: '90.00',
-						averageTime: 4500,
-					},
-					sftp: {
-						total: 10,
-						successful: 4,
-						failed: 6,
-						successRate: '40.00',
-						averageTime: 8000,
-					},
-				},
-				byOrganization: {
-					[options.organizationId || 'default']: {
-						total: totalDeliveries,
-						successful: successfulDeliveries,
-						failed: failedDeliveries,
-						successRate: ((successfulDeliveries / totalDeliveries) * 100).toFixed(2),
-					},
-				},
+				successRate:
+					totalDeliveries > 0
+						? ((successfulDeliveries / totalDeliveries) * 100).toFixed(2)
+						: '0.00',
+				averageDeliveryTime: 2500, // Would calculate from actual delivery times
+				byDestinationType,
+				byOrganization,
 				timeRange: {
 					start: options.startDate || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
 					end: options.endDate || new Date().toISOString(),

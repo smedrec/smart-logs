@@ -155,7 +155,7 @@ export class ConnectionTester {
 		}
 
 		try {
-			// For now, we'll do basic validation since actual email testing
+			// TODO: For now, we'll do basic validation since actual email testing
 			// would require implementing SMTP/API clients
 			// This is a placeholder for connection testing logic
 
@@ -186,7 +186,7 @@ export class ConnectionTester {
 	 * Test SMTP connection (placeholder implementation)
 	 */
 	private async testSmtpConnection(config: any, startTime: number): Promise<ConnectionTestResult> {
-		// This is a placeholder - in a real implementation, you would:
+		// TODO: This is a placeholder - in a real implementation, you would:
 		// 1. Create an SMTP connection
 		// 2. Authenticate
 		// 3. Test the connection
@@ -221,7 +221,7 @@ export class ConnectionTester {
 		config: any,
 		startTime: number
 	): Promise<ConnectionTestResult> {
-		// This is a placeholder - in a real implementation, you would:
+		// TODO: This is a placeholder - in a real implementation, you would:
 		// 1. Make a test API call to the email service
 		// 2. Validate the API key
 		// 3. Check service availability
@@ -266,7 +266,7 @@ export class ConnectionTester {
 		}
 
 		try {
-			// This is a placeholder - in a real implementation, you would:
+			// TODO: This is a placeholder - in a real implementation, you would:
 			// 1. Create a client for the storage provider
 			// 2. Test authentication
 			// 3. Test bucket/container access
@@ -301,7 +301,7 @@ export class ConnectionTester {
 	 * Test S3 connection (placeholder implementation)
 	 */
 	private async testS3Connection(config: any, startTime: number): Promise<ConnectionTestResult> {
-		// Simulate S3 connection test
+		// TODO: Simulate S3 connection test
 		await new Promise((resolve) => setTimeout(resolve, 300))
 
 		return {
@@ -319,7 +319,7 @@ export class ConnectionTester {
 	 * Test Azure connection (placeholder implementation)
 	 */
 	private async testAzureConnection(config: any, startTime: number): Promise<ConnectionTestResult> {
-		// Simulate Azure connection test
+		// TODO: Simulate Azure connection test
 		await new Promise((resolve) => setTimeout(resolve, 250))
 
 		return {
@@ -337,7 +337,7 @@ export class ConnectionTester {
 	 * Test GCP connection (placeholder implementation)
 	 */
 	private async testGcpConnection(config: any, startTime: number): Promise<ConnectionTestResult> {
-		// Simulate GCP connection test
+		// TODO: Simulate GCP connection test
 		await new Promise((resolve) => setTimeout(resolve, 280))
 
 		return {
@@ -359,7 +359,7 @@ export class ConnectionTester {
 		startTime: number
 	): Promise<ConnectionTestResult> {
 		try {
-			// Check if the path exists and is writable
+			// TODO: Check if the path exists and is writable
 			// This is a simplified check - in a real implementation, you would:
 			// 1. Check if the directory exists
 			// 2. Check write permissions
@@ -403,7 +403,7 @@ export class ConnectionTester {
 		}
 
 		try {
-			// This is a placeholder - in a real implementation, you would:
+			// TODO: This is a placeholder - in a real implementation, you would:
 			// 1. Create an SFTP client
 			// 2. Connect to the server
 			// 3. Authenticate

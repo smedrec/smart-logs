@@ -495,7 +495,7 @@ export class DestinationManager implements IDestinationManager {
 				throw new Error(`Cannot set unhealthy destination ${destinationId} as default`)
 			}
 
-			// For now, we don't have a specific "default" flag in the database
+			// TODO: For now, we don't have a specific "default" flag in the database
 			// This is a placeholder implementation that would be enhanced when we add
 			// a proper default destinations table or flag
 			this.logger.info('Default destination set successfully', {
@@ -504,7 +504,7 @@ export class DestinationManager implements IDestinationManager {
 				note: 'Currently all enabled destinations are considered default',
 			})
 
-			// In a future implementation, this would:
+			// TODO: In a future implementation, this would:
 			// 1. Add an entry to a default_destinations table
 			// 2. Or set an isDefault flag on the destination
 			// 3. Handle priority ordering of default destinations
@@ -538,7 +538,7 @@ export class DestinationManager implements IDestinationManager {
 				)
 			}
 
-			// For now, this is a placeholder implementation
+			// TODO: For now, this is a placeholder implementation
 			// In a future implementation, this would:
 			// 1. Remove the entry from a default_destinations table
 			// 2. Or unset an isDefault flag on the destination
