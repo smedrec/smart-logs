@@ -770,3 +770,10 @@ export class AlertManager implements IAlertManager {
 		return `alert_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 	}
 }
+
+/**
+ * Factory function for creating alert manager
+ */
+export function createAlertManager(dbClient: DeliveryDatabaseClient) {
+	return new AlertManager(dbClient)
+}

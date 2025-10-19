@@ -156,7 +156,7 @@ export class DeliveryServiceFactory {
 		enhancedClient: EnhancedAuditDatabaseClient
 	): Promise<DeliveryServiceContainer> {
 		this.logger.info('Creating delivery service container', {
-			config: this.config,
+			config: JSON.stringify(this.config),
 			version: this.version,
 		})
 
@@ -216,8 +216,10 @@ export class DeliveryServiceFactory {
 			)
 
 			this.logger.info('Delivery service container created successfully', {
-				components: Object.keys(container).filter(
-					(key) => !key.startsWith('_') && typeof (container as any)[key] !== 'function'
+				components: JSON.stringify(
+					Object.keys(container).filter(
+						(key) => !key.startsWith('_') && typeof (container as any)[key] !== 'function'
+					)
 				),
 				enabledFeatures: {
 					healthMonitoring: !!healthMonitor,
@@ -282,13 +284,23 @@ export class DeliveryServiceFactory {
 			errors.push('Invalid log level. Must be debug, info, warn, or error')
 		}
 
-		// Validate observability config if enabled
-		if (this.config.enableObservability && this.config.observability) {
+		// Validate observability tracing config if enabled
+		if (this.config.enableObservability && this.config.observability?.tracing) {
 			if (
-				this.config.observability.serviceName &&
-				typeof this.config.observability.serviceName !== 'string'
+				this.config.observability.tracing.serviceName &&
+				typeof this.config.observability.tracing.serviceName !== 'string'
 			) {
-				errors.push('Observability service name must be a string')
+				errors.push('Observability tracing service name must be a string')
+			}
+		}
+
+		// Validate observability metrics config if enabled
+		if (this.config.enableObservability && this.config.observability?.metrics) {
+			if (
+				this.config.observability.metrics.serviceName &&
+				typeof this.config.observability.metrics.serviceName !== 'string'
+			) {
+				errors.push('Observability metrics service name must be a string')
 			}
 		}
 
