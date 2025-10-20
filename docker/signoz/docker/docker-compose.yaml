@@ -1,20 +1,20 @@
-version: "3"
 x-common: &common
   networks:
+    - default
     - signoz-net
   restart: unless-stopped
   logging:
     options:
       max-size: 50m
-      max-file: "3"
+      max-file: '3'
 x-clickhouse-defaults: &clickhouse-defaults
   !!merge <<: *common
   image: clickhouse/clickhouse-server:25.5.6
   tty: true
   labels:
-    signoz.io/scrape: "true"
-    signoz.io/port: "9363"
-    signoz.io/path: "/metrics"
+    signoz.io/scrape: 'true'
+    signoz.io/port: '9363'
+    signoz.io/path: '/metrics'
   depends_on:
     init-clickhouse:
       condition: service_completed_successfully
@@ -42,9 +42,9 @@ x-zookeeper-defaults: &zookeeper-defaults
   image: signoz/zookeeper:3.7.1
   user: root
   labels:
-    signoz.io/scrape: "true"
-    signoz.io/port: "9141"
-    signoz.io/path: "/metrics"
+    signoz.io/scrape: 'true'
+    signoz.io/port: '9141'
+    signoz.io/path: '/metrics'
   healthcheck:
     test:
       - CMD-SHELL
@@ -115,8 +115,8 @@ services:
     container_name: signoz
     command:
       - --config=/root/config/prometheus.yml
-    ports:
-      - "8080:8080" # signoz port
+    #ports:
+    #  - '8080:8080' # signoz port
     #   - "6060:6060"     # pprof port
     volumes:
       - ../common/signoz/prometheus.yml:/root/config/prometheus.yml
@@ -160,11 +160,11 @@ services:
       - POSTGRESQL_ENDPOINT=${POSTGRESQL_ENDPOINT}
       - POSTGRESQL_USERNAME=${POSTGRESQL_USERNAME}
       - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
-    ports:
-      # - "1777:1777"     # pprof extension
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver
-      - "8082:8082"
+    #ports:
+    # - "1777:1777"     # pprof extension
+    # - '4317:4317' # OTLP gRPC receiver
+    # - '4318:4318' # OTLP HTTP receiver
+    # - '8082:8082'
     depends_on:
       signoz:
         condition: service_healthy
@@ -189,9 +189,14 @@ services:
       - --dsn=tcp://clickhouse:9000
       - --up=
     restart: on-failure
+
 networks:
+  default:
+    external: true
+    name: nginx-proxy-manager_default
   signoz-net:
     name: signoz-net
+
 volumes:
   clickhouse:
     name: signoz-clickhouse

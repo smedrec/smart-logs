@@ -758,7 +758,7 @@ export const deliveryLogs = pgTable(
 	{
 		id: serial('id').primaryKey(),
 		deliveryId: varchar('delivery_id', { length: 255 }).notNull(), // Global delivery identifier
-		destinationId: integer('destination_id').notNull(),
+		destinations: jsonb('destinations').notNull().default('[]'), //
 		organizationId: varchar('organization_id', { length: 255 }).notNull(), // For organizational isolation
 		objectDetails: jsonb('object_details').notNull(), // Details about the delivered object
 		// Details about the delivered object
@@ -798,7 +798,7 @@ export const deliveryLogs = pgTable(
 	(table) => {
 		return [
 			index('delivery_logs_delivery_id_idx').on(table.deliveryId),
-			index('delivery_logs_destination_id_idx').on(table.destinationId),
+			index('delivery_logs_destinations_idx').on(table.destinations),
 			index('delivery_logs_organization_id_idx').on(table.organizationId),
 			index('delivery_logs_status_idx').on(table.status),
 			index('delivery_logs_attempts_idx').on(table.attempts),
@@ -810,7 +810,7 @@ export const deliveryLogs = pgTable(
 			index('delivery_logs_created_at_idx').on(table.createdAt),
 			index('delivery_logs_updated_at_idx').on(table.updatedAt),
 			// Composite indexes for common queries
-			index('delivery_logs_destination_status_idx').on(table.destinationId, table.status),
+			index('delivery_logs_destinations_status_idx').on(table.destinations, table.status),
 			index('delivery_logs_status_attempts_idx').on(table.status, table.attempts),
 			index('delivery_logs_org_status_idx').on(table.organizationId, table.status),
 			index('delivery_logs_org_created_idx').on(table.organizationId, table.createdAt),

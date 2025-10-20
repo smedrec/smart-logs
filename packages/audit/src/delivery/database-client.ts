@@ -725,10 +725,8 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 }
 
 /**
- * Placeholder implementations for other repositories
- * These will be implemented in subsequent tasks
+ * Delivery log repository implementation
  */
-
 class DeliveryLogRepository implements IDeliveryLogRepository {
 	constructor(private readonly client: EnhancedAuditDatabaseClient) {}
 

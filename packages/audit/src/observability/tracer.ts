@@ -88,14 +88,14 @@ export class AuditSpan implements Span {
 	}
 
 	/**
-	 * Generate a unique trace ID
+	 * Generate a unique trace ID (128-bit = 16 bytes = 32 hex chars)
 	 */
 	private generateTraceId(): string {
 		return randomBytes(16).toString('hex')
 	}
 
 	/**
-	 * Generate a unique span ID
+	 * Generate a unique span ID (64-bit = 8 bytes = 16 hex chars)
 	 */
 	private generateSpanId(): string {
 		return randomBytes(8).toString('hex')
@@ -383,6 +383,22 @@ export class AuditTracer implements Tracer {
 			...this.config.headers,
 		}
 
+		// Debug log the payload structure
+		console.debug('OTLP Payload:', JSON.stringify(otlpPayload, null, 2))
+
+		// Debug log the first span's IDs
+		if (spans.length > 0) {
+			const firstSpan = spans[0]
+			console.debug('First span debug:', {
+				traceIdHex: firstSpan.traceId,
+				traceIdLength: firstSpan.traceId.length,
+				spanIdHex: firstSpan.spanId,
+				spanIdLength: firstSpan.spanId.length,
+				traceIdNormalized: this.normalizeHexId(firstSpan.traceId, 32),
+				spanIdNormalized: this.normalizeHexId(firstSpan.spanId, 16),
+			})
+		}
+
 		let body = JSON.stringify(otlpPayload)
 
 		// Add compression if large payload
@@ -412,6 +428,9 @@ export class AuditTracer implements Tracer {
 					return
 				}
 
+				// Get response body for better error debugging
+				const responseText = await response.text().catch(() => 'Unable to read response body')
+
 				// Handle different error scenarios
 				if (response.status === 429) {
 					// Rate limited - implement backoff
@@ -419,12 +438,16 @@ export class AuditTracer implements Tracer {
 					retryDelay = retryAfter ? parseInt(retryAfter) * 1000 : retryDelay * 2
 				} else if (response.status >= 400 && response.status < 500) {
 					// Client error - don't retry
-					throw new Error(`Client error: ${response.status} ${response.statusText}`)
+					console.error('OTLP Client Error Response:', responseText)
+					throw new Error(
+						`Client error: ${response.status} ${response.statusText} - ${responseText}`
+					)
 				}
 
 				if (attempt === maxRetries) {
+					console.error('OTLP Final Error Response:', responseText)
 					throw new Error(
-						`Failed after ${maxRetries} attempts: ${response.status} ${response.statusText}`
+						`Failed after ${maxRetries} attempts: ${response.status} ${response.statusText} - ${responseText}`
 					)
 				}
 
@@ -477,9 +500,11 @@ export class AuditTracer implements Tracer {
 								version: '1.0.0',
 							},
 							spans: spans.map((span) => ({
-								traceId: this.hexToBase64(span.traceId),
-								spanId: this.hexToBase64(span.spanId),
-								parentSpanId: span.parentSpanId ? this.hexToBase64(span.parentSpanId) : undefined,
+								traceId: this.normalizeHexId(span.traceId, 32),
+								spanId: this.normalizeHexId(span.spanId, 16),
+								parentSpanId: span.parentSpanId
+									? this.normalizeHexId(span.parentSpanId, 16)
+									: undefined,
 								name: span.operationName,
 								kind: this.getSpanKind(span.tags['span.kind']),
 								startTimeUnixNano: this.timestampToNanos(span.startTime),
@@ -533,17 +558,38 @@ export class AuditTracer implements Tracer {
 	}
 
 	/**
-	 * Convert hex string to base64 for OTLP
+	 * Convert hex string to bytes for OTLP (as base64 encoded string)
 	 */
-	private hexToBase64(hex: string): string {
-		return Buffer.from(hex, 'hex').toString('base64')
+	private hexToBytes(hex: string): string {
+		// Determine expected length based on hex string length
+		// TraceId should be 32 hex chars (16 bytes), SpanId should be 16 hex chars (8 bytes)
+		let expectedLength: number
+		if (hex.length <= 16) {
+			expectedLength = 16 // SpanId: 8 bytes = 16 hex chars
+		} else {
+			expectedLength = 32 // TraceId: 16 bytes = 32 hex chars
+		}
+
+		// Pad with zeros at the start if needed, or truncate if too long
+		const normalizedHex = hex.padStart(expectedLength, '0').slice(-expectedLength)
+
+		return Buffer.from(normalizedHex, 'hex').toString('base64')
+	}
+
+	/**
+	 * Normalize hex ID to expected length for OTLP
+	 */
+	private normalizeHexId(hex: string, expectedLength: number): string {
+		// Pad with zeros at the start if needed, or truncate if too long
+		return hex.padStart(expectedLength, '0').slice(-expectedLength)
 	}
 
 	/**
 	 * Convert timestamp to nanoseconds
 	 */
 	private timestampToNanos(timestamp: number): string {
-		return (timestamp * 1000000).toString()
+		// Convert milliseconds to nanoseconds (multiply by 1,000,000)
+		return (timestamp * 1_000_000).toString()
 	}
 
 	/**

@@ -370,11 +370,20 @@ const validationSchema: Record<string, ValidationRule> = {
 		type: 'string',
 		enum: ['debug', 'info', 'warn', 'error'],
 	},
-	'logging.structured': {
+	'logging.service': {
 		required: true,
-		type: 'boolean',
+		type: 'string',
 	},
-	'logging.format': {
+	'logging.environment': {
+		required: true,
+		type: 'string',
+		enum: ['development', 'staging', 'production', 'test'],
+	},
+	'logging.version': {
+		required: true,
+		type: 'string',
+	},
+	/**'logging.format': {
 		required: true,
 		type: 'string',
 		enum: ['json', 'text'],
@@ -388,7 +397,7 @@ const validationSchema: Record<string, ValidationRule> = {
 		type: 'number',
 		min: 1,
 		max: 365,
-	},
+	},*/
 }
 
 /**

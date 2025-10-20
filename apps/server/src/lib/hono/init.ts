@@ -185,22 +185,8 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		// Initialize enhanced structured logger
 		if (!structuredLogger) {
 			structuredLogger = new StructuredLogger({
+				...config.logging,
 				service: 'api',
-				environment: 'development',
-				console: {
-					name: 'console',
-					enabled: true,
-					format: 'pretty',
-					colorize: true,
-					level: 'info',
-				},
-				otlp: {
-					name: 'otpl',
-					enabled: true,
-					level: 'info',
-					endpoint: config.logging.exporterEndpoint || '',
-					//headers: config.logging.exporterHeaders || {},
-				},
 			})
 		}
 
