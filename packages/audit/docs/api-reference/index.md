@@ -7,16 +7,20 @@ Complete API documentation for the `@repo/audit` package. This reference provide
 The `@repo/audit` package provides a comprehensive audit logging system with the following main components:
 
 ### Core Classes
+
 - **[Audit Class](./audit-class.md)** - Main audit service class for logging events
 
 ### Data Types & Interfaces
+
 - **[Event Types](./event-types.md)** - Audit event interfaces and types
 
 ### System Components
+
 - **[Configuration](./configuration.md)** - Configuration management and validation
 - **[Cryptography](./cryptography.md)** - Cryptographic services and security
 - **[Monitoring](./monitoring.md)** - Real-time monitoring and alerting
 - **[Compliance](./compliance.md)** - HIPAA and GDPR compliance systems
+- **[Delivery Service](./delivery-service.md)** - Multi-destination delivery system with security and reliability
 - **[Utilities](./utilities.md)** - Validation, sanitization, and helper functions
 
 ## 🔧 Core API Components
@@ -35,14 +39,14 @@ await auditService.log(event)
 
 ### Main Exports
 
-| Export | Type | Description |
-|--------|------|-------------|
-| `Audit` | Class | Main audit service class |
-| `AuditConfig` | Interface | Configuration interface |
-| `AuditLogEvent` | Interface | Base audit event interface |
-| `CryptoService` | Class | Cryptographic operations |
-| `MonitoringService` | Class | System monitoring and health checks |
-| `ConfigurationManager` | Class | Configuration management |
+| Export                 | Type      | Description                         |
+| ---------------------- | --------- | ----------------------------------- |
+| `Audit`                | Class     | Main audit service class            |
+| `AuditConfig`          | Interface | Configuration interface             |
+| `AuditLogEvent`        | Interface | Base audit event interface          |
+| `CryptoService`        | Class     | Cryptographic operations            |
+| `MonitoringService`    | Class     | System monitoring and health checks |
+| `ConfigurationManager` | Class     | Configuration management            |
 
 ## 🏥 Healthcare-Specific APIs
 
@@ -53,11 +57,11 @@ import { HIPAAAuditService } from '@repo/audit'
 
 // Log PHI access with HIPAA compliance
 await HIPAAAuditService.logPHIAccess({
-  principalId: 'dr.smith',
-  patientId: 'patient-123',
-  action: 'chart_view',
-  accessReason: 'routine_checkup',
-  minimumNecessaryJustification: 'Reviewing vitals for appointment'
+	principalId: 'dr.smith',
+	patientId: 'patient-123',
+	action: 'chart_view',
+	accessReason: 'routine_checkup',
+	minimumNecessaryJustification: 'Reviewing vitals for appointment',
 })
 ```
 
@@ -68,10 +72,10 @@ import { GDPRAuditService } from '@repo/audit'
 
 // Log data processing with GDPR compliance
 await GDPRAuditService.logDataProcessing({
-  principalId: 'nurse-456',
-  dataSubjectId: 'patient-123',
-  processingPurpose: 'medical_treatment',
-  legalBasis: 'vital_interests'
+	principalId: 'nurse-456',
+	dataSubjectId: 'patient-123',
+	processingPurpose: 'medical_treatment',
+	legalBasis: 'vital_interests',
 })
 ```
 
@@ -103,7 +107,7 @@ For comprehensive monitoring and observability, see **[Monitoring API](./monitor
 ### Quick Example
 
 ```typescript
-import { MonitoringService, HealthCheckService } from '@repo/audit'
+import { HealthCheckService, MonitoringService } from '@repo/audit'
 
 // Initialize monitoring
 const monitoring = new MonitoringService(config)
@@ -126,8 +130,8 @@ import { ConfigurationManager } from '@repo/audit'
 
 // Initialize with hot reloading
 const configManager = new ConfigurationManager({
-  enableHotReload: true,
-  enableSecureStorage: true
+	enableHotReload: true,
+	enableSecureStorage: true,
 })
 
 // Load and validate
@@ -142,7 +146,7 @@ For HIPAA and GDPR compliance features, see **[Compliance API](./compliance.md)*
 ### Quick Example
 
 ```typescript
-import { HIPAAComplianceService, GDPRComplianceService } from '@repo/audit'
+import { GDPRComplianceService, HIPAAComplianceService } from '@repo/audit'
 
 // HIPAA compliance
 const hipaaService = new HIPAAComplianceService(config)
@@ -160,7 +164,7 @@ For validation, sanitization, and helper functions, see **[Utilities API](./util
 ### Quick Example
 
 ```typescript
-import { validateAuditEvent, sanitizeAuditEvent, GDPRUtils } from '@repo/audit'
+import { GDPRUtils, sanitizeAuditEvent, validateAuditEvent } from '@repo/audit'
 
 // Validate event
 const validation = validateAuditEvent(event)
@@ -181,10 +185,10 @@ import { ReliableEventProcessor } from '@repo/audit'
 
 // Configure reliable processing
 const processor = new ReliableEventProcessor({
-  maxRetries: 3,
-  retryDelay: 1000,
-  enableCircuitBreaker: true,
-  enableDLQ: true
+	maxRetries: 3,
+	retryDelay: 1000,
+	enableCircuitBreaker: true,
+	enableDLQ: true,
 })
 ```
 
@@ -205,8 +209,8 @@ import { CircuitBreaker } from '@repo/audit'
 
 // Monitor system health
 const breaker = new CircuitBreaker({
-  threshold: 10,
-  timeout: 30000
+	threshold: 10,
+	timeout: 30000,
 })
 
 const isOpen = breaker.isOpen()
@@ -234,56 +238,61 @@ type FHIRAuditAction = 'fhir.patient.read' | 'fhir.patient.create' | ...
 
 ```typescript
 interface AuditConfig {
-  version: string
-  environment: string
-  reliableProcessor: ReliableProcessorConfig
-  security: SecurityConfig
-  compliance: ComplianceConfig
-  observability: ObservabilityConfig
+	version: string
+	environment: string
+	reliableProcessor: ReliableProcessorConfig
+	security: SecurityConfig
+	compliance: ComplianceConfig
+	observability: ObservabilityConfig
 }
 ```
 
 ## 🔗 Quick Navigation
 
 ### Essential APIs
+
 - **[Audit Class](./audit-class.md)** - Core functionality
 - **[Event Types](./event-types.md)** - Event structures
 - **[Configuration](./configuration.md)** - System configuration
 - **[Cryptography](./cryptography.md)** - Security and integrity
 - **[Monitoring](./monitoring.md)** - System monitoring
 - **[Compliance](./compliance.md)** - Regulatory compliance
+- **[Delivery Service](./delivery-service.md)** - Multi-destination delivery system
 - **[Utilities](./utilities.md)** - Helper functions
 
 ## 💡 Usage Patterns
 
 ### Basic Usage
+
 ```typescript
 // Simple event logging
 await auditService.log({
-  principalId: 'user-123',
-  action: 'user.login',
-  status: 'success'
+	principalId: 'user-123',
+	action: 'user.login',
+	status: 'success',
 })
 ```
 
 ### Healthcare Usage
+
 ```typescript
 // PHI access with compliance
 await auditService.logFHIR({
-  principalId: 'dr.smith',
-  action: 'fhir.patient.read',
-  resourceId: 'patient-456',
-  status: 'success'
+	principalId: 'dr.smith',
+	action: 'fhir.patient.read',
+	resourceId: 'patient-456',
+	status: 'success',
 })
 ```
 
 ### Enterprise Usage
+
 ```typescript
 // High-volume with monitoring
 await auditService.logCritical(event, {
-  priority: 1,
-  compliance: ['hipaa'],
-  notify: ['security-team']
+	priority: 1,
+	compliance: ['hipaa'],
+	notify: ['security-team'],
 })
 ```
 

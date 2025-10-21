@@ -20,6 +20,7 @@ This audit system is purpose-built for healthcare environments, offering:
 - [Installation Guide](./getting-started/installation.md) - Setup and installation instructions
 - [Configuration](./getting-started/configuration.md) - Basic configuration options
 - [First Audit Event](./getting-started/first-audit-event.md) - Quick start tutorial
+- [Delivery Service](./getting-started/delivery-service.md) - Getting started with delivery destinations
 
 ### Tutorials
 
@@ -30,6 +31,7 @@ This audit system is purpose-built for healthcare environments, offering:
 - [Security Configuration](./tutorials/security-configuration.md) - Cryptographic setup
 - [Monitoring & Observability](./tutorials/monitoring-setup.md) - Monitoring and observability configuration
 - [Advanced Implementation](./tutorials/advanced-patterns.md) - Complex use cases
+- [Delivery Service](./tutorials/delivery-service.md) - Comprehensive delivery service tutorials
 
 ### API Reference
 
@@ -40,6 +42,7 @@ This audit system is purpose-built for healthcare environments, offering:
 - [Cryptography](./api-reference/cryptography.md) - Security functions
 - [Monitoring](./api-reference/monitoring.md) - Monitoring APIs
 - [Compliance](./api-reference/compliance.md) - Compliance APIs
+- [Delivery Service](./api-reference/delivery-service.md) - Multi-destination delivery system
 - [Utilities](./api-reference/utilities.md) - Utility functions
 
 ### Implementation Guides
@@ -61,20 +64,24 @@ This audit system is purpose-built for healthcare environments, offering:
 - [Authentication Flows](./examples/authentication-flows.md) - Auth audit patterns and security integration
 - [Batch Processing](./examples/batch-processing.md) - High-volume scenarios and performance optimization
 - [Integration Patterns](./examples/integration-patterns.md) - Healthcare system integrations and enterprise patterns
+- [Delivery Service](./examples/delivery-service.md) - Practical delivery service examples and use cases
 
 ### Troubleshooting & Support
 
 - [Troubleshooting Guide](./troubleshooting/) - Comprehensive troubleshooting and solutions
+- [Delivery Service Troubleshooting](./troubleshooting/delivery-service.md) - Delivery-specific issues and solutions
 
 ### FAQ
 
 - [Frequently Asked Questions](./faq/) - Common questions and answers
+- [Delivery Service FAQ](./faq/delivery-service.md) - Delivery service specific questions
 
 ### Future Development
 
 - [Future Enhancements](./future-enhancements/) - Development roadmap and contribution guide
 - [Roadmap](./future-enhancements/roadmap.md) - Development roadmap
 - [Unimplemented Features](./future-enhancements/unimplemented-features.md) - Missing features
+- [Delivery Service Unimplemented](./future-enhancements/delivery-service-unimplemented.md) - Delivery service TODOs and planned features
 - [Contribution Guide](./future-enhancements/contribution-guide.md) - Contribution guidelines
 
 ## 🚀 Quick Start
