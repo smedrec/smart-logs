@@ -3,6 +3,9 @@
  * Requirements 1.1, 2.1, 2.4, 3.1: Service interfaces and contracts
  */
 
+import { DebounceType } from './alert-debouncer.js'
+
+import type { Alert } from '../monitor/monitoring-types.js'
 import type {
 	ConnectionTestResult,
 	CreateDeliveryDestinationInput,
@@ -114,10 +117,8 @@ export interface IDestinationHandler {
  */
 export interface IAlertManager {
 	checkFailureThresholds(destinationId: string): Promise<void>
-	sendAlert(alert: DeliveryAlert): Promise<void>
-	acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<void>
-	resolveAlert(alertId: string, resolvedBy: string, notes?: string): Promise<void>
-	getActiveAlerts(organizationId: string): Promise<DeliveryAlert[]>
+	sendAlert(debounceType: DebounceType, alert: Alert): Promise<void>
+	getActiveAlerts(organizationId: string): Promise<Alert[]>
 	configureAlertThresholds(organizationId: string, config: AlertThresholdConfig): Promise<void>
 }
 
@@ -137,18 +138,6 @@ export interface ICircuitBreaker {
 /**
  * Supporting types for interfaces
  */
-
-export interface DeliveryAlert {
-	id: string
-	organizationId: string
-	destinationId: string
-	type: 'failure_rate' | 'consecutive_failures' | 'queue_backlog' | 'response_time'
-	severity: 'low' | 'medium' | 'high' | 'critical'
-	title: string
-	description: string
-	metadata: Record<string, any>
-	createdAt: string
-}
 
 export interface AlertThresholdConfig {
 	failureRateThreshold: number // percentage

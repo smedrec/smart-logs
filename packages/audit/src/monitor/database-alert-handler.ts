@@ -359,18 +359,16 @@ export class DatabaseAlertHandler implements AlertHandler {
 	/**
 	 * Get alert by ID for organization
 	 */
-	async getAlertById(alertId: string, organizationId: string): Promise<Alert | null> {
+	async getAlertById(alertId: string, organizationId?: string): Promise<Alert | null> {
+		let query = `SELECT * FROM alerts WHERE id = '${alertId}'`
+		if (organizationId !== undefined) {
+			query += ` AND organization_id = '${organizationId}'`
+		}
+		query += ' LIMIT 1'
 		try {
-			const result = await this.client.executeOptimizedQuery(
-				(db) =>
-					db.execute(sql`
-				SELECT * FROM alerts
-				WHERE id = ${alertId}
-				AND organization_id = ${organizationId}
-				LIMIT 1
-			`),
-				{ cacheKey: `get_alert_${alertId.slice(6)}` }
-			)
+			const result = await this.client.executeOptimizedQuery((db) => db.execute(sql.raw(query)), {
+				cacheKey: `get_alert_${alertId.slice(6)}`,
+			})
 
 			const rows = result || []
 			if (rows.length === 0) {
@@ -404,6 +402,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 					COUNT(CASE WHEN type = 'PERFORMANCE' THEN 1 END) as performance_type,
 					COUNT(CASE WHEN type = 'SYSTEM' THEN 1 END) as system_type,
 					COUNT(CASE WHEN type = 'METRICS' THEN 1 END) as metrics_type,
+					COUNT(CASE WHEN type = 'DELIVERY' THEN 1 END) as delivery_type,
 					COUNT(CASE WHEN type = 'CUSTOM' THEN 1 END) as custom_type,
 					COUNT(CASE WHEN source = 'health-monitor' THEN 1 END) as health_monitor_source,
 					COUNT(CASE WHEN source = 'performance-monitor' THEN 1 END) as performance_monitor_source,
@@ -467,6 +466,7 @@ export class DatabaseAlertHandler implements AlertHandler {
 					PERFORMANCE: parseInt(row.performance_type as string),
 					SYSTEM: parseInt(row.system_type as string),
 					METRICS: parseInt(row.metrics_type as string),
+					DELIVERY: parseInt(row.delivery_type as string),
 					CUSTOM: parseInt(row.custom_type as string),
 				},
 				bySource: {

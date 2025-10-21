@@ -233,7 +233,7 @@ export class DestinationManager implements IDestinationManager {
 				throw new Error(`Destination with id ${id} not found`)
 			}
 
-			// Safety check: Verify no active deliveries are pending for this destination
+			// TODO: Safety check: Verify no active deliveries are pending for this destination
 			// This would be implemented when delivery queue is available
 			// For now, we'll just log a warning
 			this.logger.warn('Deleting destination - ensure no active deliveries are pending', {

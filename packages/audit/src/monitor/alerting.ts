@@ -32,6 +32,20 @@ export class AlertingService {
 		await this.generateAlert(alert)
 	}
 
+	async getAlertById(alertId: string): Promise<Alert | null> {
+		for (const handler of this.alertHandlers) {
+			try {
+				if (handler.handlerName() === 'DatabaseAlertHandler') {
+					return await handler.getAlertById(alertId)
+				}
+			} catch (error) {
+				console.error('Failed to get alert by ID:', error)
+				throw error
+			}
+		}
+		return null
+	}
+
 	/**
 	 * Get alerts with optional filters
 	 */
@@ -137,6 +151,7 @@ export class AlertingService {
 				PERFORMANCE: 0,
 				SYSTEM: 0,
 				METRICS: 0,
+				DELIVERY: 0,
 				CUSTOM: 0,
 			},
 			bySource: {},
@@ -194,6 +209,10 @@ export class AlertingService {
 			}
 		}
 		return { success: false }
+	}
+
+	generateAlertId(): string {
+		return `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 	}
 
 	/**
@@ -342,6 +361,12 @@ export class ConsoleAlertHandler implements AlertHandler {
 		return []
 	}
 
+	async getAlertById(alertId: string): Promise<Alert | null> {
+		// Console handler doesn't store alerts
+		console.log(`📋 Getting alert by ID: ${alertId}`)
+		return null
+	}
+
 	async numberOfActiveAlerts(organizationId?: string): Promise<number> {
 		// Console handler doesn't store alerts
 		console.log(
@@ -376,6 +401,7 @@ export class ConsoleAlertHandler implements AlertHandler {
 				PERFORMANCE: 0,
 				SYSTEM: 0,
 				METRICS: 0,
+				DELIVERY: 0,
 				CUSTOM: 0,
 			},
 			bySource: {},

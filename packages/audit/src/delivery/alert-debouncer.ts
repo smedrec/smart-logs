@@ -3,7 +3,13 @@
  * Requirements 7.4, 7.5: Alert debouncing and rate limiting
  */
 
-import type { AlertSeverity, AlertType } from './alert-manager.js'
+import { AlertSeverity, AlertType } from '../monitor/monitoring-types'
+
+export type DebounceType =
+	| 'failure_rate'
+	| 'consecutive_failures'
+	| 'queue_backlog'
+	| 'response_time'
 
 /**
  * Debounce configuration for different alert types
@@ -37,7 +43,7 @@ interface MaintenanceWindow {
 	endTime: string // ISO 8601 datetime
 	timezone: string
 	reason: string
-	suppressAlertTypes: AlertType[]
+	suppressDebounceTypes: DebounceType[]
 	createdBy: string
 }
 
@@ -45,7 +51,7 @@ interface MaintenanceWindow {
  * Alert debounce state for tracking
  */
 interface AlertDebounceState {
-	alertType: AlertType
+	debounceType: DebounceType
 	destinationId: string
 	organizationId: string
 	windowStart: Date
@@ -63,7 +69,7 @@ interface AlertDebounceState {
 export class AlertDebouncer {
 	private readonly debounceStates = new Map<string, AlertDebounceState>()
 	private readonly maintenanceWindows = new Map<string, MaintenanceWindow>()
-	private readonly defaultConfigs: Record<AlertType, DebounceConfig> = {
+	private readonly defaultConfigs: Record<DebounceType, DebounceConfig> = {
 		failure_rate: {
 			windowMinutes: 15,
 			cooldownMinutes: 60,
@@ -94,22 +100,22 @@ export class AlertDebouncer {
 		levels: [
 			{
 				delayMinutes: 0,
-				severity: 'low',
+				severity: 'LOW',
 				channels: ['email'],
 			},
 			{
 				delayMinutes: 60,
-				severity: 'medium',
+				severity: 'MEDIUM',
 				channels: ['email', 'slack'],
 			},
 			{
 				delayMinutes: 240,
-				severity: 'high',
+				severity: 'HIGH',
 				channels: ['email', 'slack', 'pagerduty'],
 			},
 			{
 				delayMinutes: 1440, // 24 hours
-				severity: 'critical',
+				severity: 'CRITICAL',
 				channels: ['email', 'slack', 'pagerduty', 'phone'],
 			},
 		],
@@ -120,17 +126,17 @@ export class AlertDebouncer {
 	 * Requirements 7.4, 7.5: Time-based debouncing and cooldown periods
 	 */
 	shouldSendAlert(
-		alertType: AlertType,
+		debounceType: DebounceType,
 		destinationId: string,
 		organizationId: string,
 		customConfig?: Partial<DebounceConfig>
 	): boolean {
-		const debounceKey = this.getDebounceKey(alertType, destinationId, organizationId)
-		const config = { ...this.defaultConfigs[alertType], ...customConfig }
+		const debounceKey = this.getDebounceKey(debounceType, destinationId, organizationId)
+		const config = { ...this.defaultConfigs[debounceType], ...customConfig }
 		const now = new Date()
 
 		// Check if we're in a maintenance window
-		if (this.isInMaintenanceWindow(organizationId, destinationId, alertType)) {
+		if (this.isInMaintenanceWindow(organizationId, destinationId, debounceType)) {
 			return false
 		}
 
@@ -140,7 +146,7 @@ export class AlertDebouncer {
 		if (!state) {
 			// First alert for this combination - allow it immediately
 			state = {
-				alertType,
+				debounceType,
 				destinationId,
 				organizationId,
 				windowStart: now,
@@ -206,11 +212,11 @@ export class AlertDebouncer {
 	 * Requirements 7.4, 7.5: Alert escalation with progressive timing
 	 */
 	shouldEscalateAlert(
-		alertType: AlertType,
+		debounceType: DebounceType,
 		destinationId: string,
 		organizationId: string
 	): { shouldEscalate: boolean; newSeverity?: AlertSeverity; channels?: string[] } {
-		const debounceKey = this.getDebounceKey(alertType, destinationId, organizationId)
+		const debounceKey = this.getDebounceKey(debounceType, destinationId, organizationId)
 		const state = this.debounceStates.get(debounceKey)
 
 		if (!state || !state.nextEscalationAt) {
@@ -250,8 +256,12 @@ export class AlertDebouncer {
 	 * Reset debounce state when alert is resolved
 	 * Requirements 7.4, 7.5: Alert resolution and state cleanup
 	 */
-	resetDebounceState(alertType: AlertType, destinationId: string, organizationId: string): void {
-		const debounceKey = this.getDebounceKey(alertType, destinationId, organizationId)
+	resetDebounceState(
+		debounceType: DebounceType,
+		destinationId: string,
+		organizationId: string
+	): void {
+		const debounceKey = this.getDebounceKey(debounceType, destinationId, organizationId)
 		this.debounceStates.delete(debounceKey)
 	}
 
@@ -292,12 +302,12 @@ export class AlertDebouncer {
 	 * Suppress alerts for a specific period
 	 */
 	suppressAlerts(
-		alertType: AlertType,
+		debounceType: DebounceType,
 		destinationId: string,
 		organizationId: string,
 		suppressionMinutes: number
 	): void {
-		const debounceKey = this.getDebounceKey(alertType, destinationId, organizationId)
+		const debounceKey = this.getDebounceKey(debounceType, destinationId, organizationId)
 		const state = this.debounceStates.get(debounceKey)
 
 		if (state) {
@@ -381,7 +391,7 @@ export class AlertDebouncer {
 	private isInMaintenanceWindow(
 		organizationId: string,
 		destinationId: string,
-		alertType: AlertType
+		debounceType: DebounceType
 	): boolean {
 		const now = new Date()
 
@@ -396,7 +406,7 @@ export class AlertDebouncer {
 			}
 
 			// Check if alert type is suppressed
-			if (!window.suppressAlertTypes.includes(alertType)) {
+			if (!window.suppressDebounceTypes.includes(debounceType)) {
 				continue
 			}
 
@@ -416,11 +426,11 @@ export class AlertDebouncer {
 	 * Generate debounce key for state tracking
 	 */
 	private getDebounceKey(
-		alertType: AlertType,
+		debounceType: DebounceType,
 		destinationId: string,
 		organizationId: string
 	): string {
-		return `${alertType}-${destinationId}-${organizationId}`
+		return `${debounceType}-${destinationId}-${organizationId}`
 	}
 }
 

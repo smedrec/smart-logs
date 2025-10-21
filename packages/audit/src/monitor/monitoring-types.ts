@@ -74,12 +74,19 @@ export type AlertSeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 /**
  * Alert types for categorization
  */
-export type AlertType = 'SECURITY' | 'COMPLIANCE' | 'PERFORMANCE' | 'SYSTEM' | 'METRICS' | 'CUSTOM'
+export type AlertType =
+	| 'SECURITY'
+	| 'COMPLIANCE'
+	| 'PERFORMANCE'
+	| 'SYSTEM'
+	| 'METRICS'
+	| 'DELIVERY'
+	| 'CUSTOM'
 
 /**
  * Alert status
  */
-export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'dismissed'
+export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'dismissed' | 'suppressed'
 
 /**
  * Alert interface
@@ -227,6 +234,7 @@ export interface AlertHandler {
 	dismissAlert(alertId: string, dismissedBy: string): Promise<{ success: boolean }>
 	getAlerts(filters: AlertQueryFilters): Promise<Alert[]>
 	getActiveAlerts(organizationId?: string): Promise<Alert[]>
+	getAlertById(alertId: string, organizationId?: string): Promise<Alert | null>
 	numberOfActiveAlerts(organizationId?: string): Promise<number>
 	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
 }

@@ -2,27 +2,14 @@
  * Alert manager for delivery failure monitoring and alerting
  * Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5: Alerting and monitoring
  */
+import { AlertingService } from '../monitor/alerting.js'
 import { AlertAccessControl } from './alert-access-control.js'
-import { AlertDebouncer } from './alert-debouncer.js'
+import { AlertDebouncer, DebounceType } from './alert-debouncer.js'
 
+import type { Alert, AlertSeverity, AlertType } from '../monitor/monitoring-types.js'
 import type { AlertUserContext } from './alert-access-control.js'
 import type { DeliveryDatabaseClient } from './database-client.js'
-import type { AlertThresholdConfig, DeliveryAlert, IAlertManager } from './interfaces.js'
-
-/**
- * Alert types for different failure conditions
- */
-export type AlertType = 'failure_rate' | 'consecutive_failures' | 'queue_backlog' | 'response_time'
-
-/**
- * Alert severity levels
- */
-export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical'
-
-/**
- * Alert status for tracking lifecycle
- */
-export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'suppressed'
+import type { AlertThresholdConfig, IAlertManager } from './interfaces.js'
 
 /**
  * Sliding window metrics for failure rate analysis
@@ -58,6 +45,7 @@ interface AlertConfig {
  * Alert manager implementation with debouncing and organizational isolation
  */
 export class AlertManager implements IAlertManager {
+	private readonly alertService: AlertingService
 	private readonly dbClient: DeliveryDatabaseClient
 	private readonly alertConfigs = new Map<string, AlertConfig>()
 	private readonly debouncer: AlertDebouncer
@@ -65,10 +53,12 @@ export class AlertManager implements IAlertManager {
 	private readonly slidingWindowSize = 15 * 60 * 1000 // 15 minutes in milliseconds
 
 	constructor(
+		alertService: AlertingService,
 		dbClient: DeliveryDatabaseClient,
 		debouncer?: AlertDebouncer,
 		accessControl?: AlertAccessControl
 	) {
+		this.alertService = alertService
 		this.dbClient = dbClient
 		this.debouncer = debouncer || new AlertDebouncer()
 		this.accessControl = accessControl || new AlertAccessControl()
@@ -108,28 +98,30 @@ export class AlertManager implements IAlertManager {
 	 * Send an alert with debouncing logic
 	 * Requirements 7.4, 7.5: Alert debouncing and rate limiting
 	 */
-	async sendAlert(alert: DeliveryAlert): Promise<void> {
+	async sendAlert(debounceType: DebounceType, alert: Alert): Promise<void> {
 		// Check if alert should be sent based on debouncing rules
-		if (!this.debouncer.shouldSendAlert(alert.type, alert.destinationId, alert.organizationId)) {
+		if (
+			!this.debouncer.shouldSendAlert(
+				debounceType,
+				alert.metadata.destinationId,
+				alert.metadata.organizationId
+			)
+		) {
 			return
 		}
 
 		// Store alert in database
-		await this.dbClient.createAlert(alert)
-
-		// Send notification (implementation would integrate with notification service)
-		await this.sendNotification(alert)
+		await this.alertService.sendExternalAlert(alert)
 
 		// Check if alert should be escalated
 		const escalation = this.debouncer.shouldEscalateAlert(
-			alert.type,
-			alert.destinationId,
-			alert.organizationId
+			debounceType,
+			alert.metadata.destinationId,
+			alert.metadata.organizationId
 		)
 		if (escalation.shouldEscalate) {
 			const escalatedAlert = {
 				...alert,
-				id: this.generateAlertId(),
 				severity: escalation.newSeverity!,
 				title: `[ESCALATED] ${alert.title}`,
 				description: `${alert.description} (Escalated due to continued issues)`,
@@ -141,59 +133,16 @@ export class AlertManager implements IAlertManager {
 				},
 			}
 
-			await this.dbClient.createAlert(escalatedAlert)
-			await this.sendNotification(escalatedAlert)
+			await this.alertService.sendExternalAlert(escalatedAlert)
 		}
-	}
-
-	/**
-	 * Acknowledge an alert
-	 * Requirements 6.1, 6.2, 6.3: Organizational isolation and access control
-	 */
-	async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<void> {
-		const alert = await this.dbClient.getAlert(alertId)
-		if (!alert) {
-			throw new Error(`Alert ${alertId} not found`)
-		}
-
-		// Verify organizational access
-		await this.verifyOrganizationalAccess(alert.organizationId, acknowledgedBy)
-
-		await this.dbClient.updateAlertStatus(alertId, 'acknowledged', {
-			acknowledgedBy,
-			acknowledgedAt: new Date().toISOString(),
-		})
-	}
-
-	/**
-	 * Resolve an alert
-	 * Requirements 6.1, 6.2, 6.3: Organizational isolation and access control
-	 */
-	async resolveAlert(alertId: string, resolvedBy: string, notes?: string): Promise<void> {
-		const alert = await this.dbClient.getAlert(alertId)
-		if (!alert) {
-			throw new Error(`Alert ${alertId} not found`)
-		}
-
-		// Verify organizational access
-		await this.verifyOrganizationalAccess(alert.organizationId, resolvedBy)
-
-		await this.dbClient.updateAlertStatus(alertId, 'resolved', {
-			resolvedBy,
-			resolvedAt: new Date().toISOString(),
-			notes,
-		})
-
-		// Reset debounce state for this alert type
-		this.debouncer.resetDebounceState(alert.type, alert.destinationId, alert.organizationId)
 	}
 
 	/**
 	 * Get active alerts for an organization
 	 * Requirements 6.1, 6.2, 6.3: Organizational isolation
 	 */
-	async getActiveAlerts(organizationId: string): Promise<DeliveryAlert[]> {
-		return this.dbClient.getActiveAlerts(organizationId)
+	async getActiveAlerts(organizationId: string): Promise<Alert[]> {
+		return this.alertService.getActiveAlerts(organizationId)
 	}
 
 	/**
@@ -234,23 +183,28 @@ export class AlertManager implements IAlertManager {
 				config.consecutiveFailureThreshold
 			)
 
-			const alert: DeliveryAlert = {
-				id: this.generateAlertId(),
-				organizationId,
-				destinationId,
-				type: 'consecutive_failures',
+			const alert: Alert = {
+				id: this.alertService.generateAlertId(),
+				source: 'delivery-service',
+				type: 'DELIVERY',
 				severity,
+				status: 'active',
 				title: `Consecutive Failures Detected`,
 				description: `Destination has ${health.consecutiveFailures} consecutive failures (threshold: ${config.consecutiveFailureThreshold})`,
+				acknowledged: false,
+				resolved: false,
 				metadata: {
+					organizationId,
+					destinationId,
 					consecutiveFailures: health.consecutiveFailures,
 					threshold: config.consecutiveFailureThreshold,
 					lastFailureAt: health.lastFailureAt,
 				},
+				tags: ['consecutive-failures'],
 				createdAt: new Date().toISOString(),
 			}
 
-			await this.sendAlert(alert)
+			await this.sendAlert('consecutive_failures', alert)
 		}
 	}
 
@@ -268,15 +222,19 @@ export class AlertManager implements IAlertManager {
 		if (metrics.totalDeliveries >= 10 && metrics.failureRate >= config.failureRateThreshold) {
 			const severity = this.calculateSeverity(metrics.failureRate, config.failureRateThreshold)
 
-			const alert: DeliveryAlert = {
-				id: this.generateAlertId(),
-				organizationId,
-				destinationId,
-				type: 'failure_rate',
+			const alert: Alert = {
+				id: this.alertService.generateAlertId(),
+				source: 'delivery-service',
+				type: 'DELIVERY',
 				severity,
+				status: 'active',
 				title: `High Failure Rate Detected`,
 				description: `Destination has ${metrics.failureRate.toFixed(1)}% failure rate in the last 15 minutes (threshold: ${config.failureRateThreshold}%)`,
+				acknowledged: false,
+				resolved: false,
 				metadata: {
+					organizationId,
+					destinationId,
 					failureRate: metrics.failureRate,
 					threshold: config.failureRateThreshold,
 					totalDeliveries: metrics.totalDeliveries,
@@ -284,10 +242,11 @@ export class AlertManager implements IAlertManager {
 					windowStart: metrics.windowStart.toISOString(),
 					windowEnd: metrics.windowEnd.toISOString(),
 				},
+				tags: ['failure-rate'],
 				createdAt: new Date().toISOString(),
 			}
 
-			await this.sendAlert(alert)
+			await this.sendAlert('failure_rate', alert)
 		}
 	}
 
@@ -311,22 +270,27 @@ export class AlertManager implements IAlertManager {
 				config.responseTimeThreshold
 			)
 
-			const alert: DeliveryAlert = {
-				id: this.generateAlertId(),
-				organizationId,
-				destinationId,
-				type: 'response_time',
+			const alert: Alert = {
+				id: this.alertService.generateAlertId(),
+				source: 'delivery-service',
+				type: 'DELIVERY',
 				severity,
+				status: 'active',
 				title: `High Response Time Detected`,
 				description: `Destination average response time is ${health.averageResponseTime}ms (threshold: ${config.responseTimeThreshold}ms)`,
+				acknowledged: false,
+				resolved: false,
 				metadata: {
+					organizationId,
+					destinationId,
 					averageResponseTime: health.averageResponseTime,
 					threshold: config.responseTimeThreshold,
 				},
+				tags: ['response-time'],
 				createdAt: new Date().toISOString(),
 			}
 
-			await this.sendAlert(alert)
+			await this.sendAlert('response_time', alert)
 		}
 	}
 
@@ -343,23 +307,28 @@ export class AlertManager implements IAlertManager {
 				config.queueBacklogThreshold
 			)
 
-			const alert: DeliveryAlert = {
-				id: this.generateAlertId(),
-				organizationId,
-				destinationId: '', // Organization-wide alert
-				type: 'queue_backlog',
+			const alert: Alert = {
+				id: this.alertService.generateAlertId(),
+				source: 'delivery-service',
+				type: 'DELIVERY',
 				severity,
+				status: 'active',
 				title: `Queue Backlog Alert`,
 				description: `Delivery queue has ${queueStatus.pendingCount} pending deliveries (threshold: ${config.queueBacklogThreshold})`,
+				acknowledged: false,
+				resolved: false,
 				metadata: {
+					organizationId,
+					destinationId: '', // Organization-wide alert
 					pendingCount: queueStatus.pendingCount,
 					threshold: config.queueBacklogThreshold,
 					oldestPendingAge: queueStatus.oldestPendingAge,
 				},
+				tags: ['queue-backlog'],
 				createdAt: new Date().toISOString(),
 			}
 
-			await this.sendAlert(alert)
+			await this.sendAlert('queue_backlog', alert)
 		}
 	}
 
@@ -401,7 +370,7 @@ export class AlertManager implements IAlertManager {
 		endTime: string
 		timezone: string
 		reason: string
-		suppressAlertTypes: AlertType[]
+		suppressDebounceTypes: DebounceType[]
 		createdBy: string
 	}): void {
 		this.debouncer.addMaintenanceWindow(window)
@@ -425,12 +394,12 @@ export class AlertManager implements IAlertManager {
 	 * Suppress alerts for a specific period
 	 */
 	suppressAlerts(
-		alertType: AlertType,
+		debounceType: DebounceType,
 		destinationId: string,
 		organizationId: string,
 		suppressionMinutes: number
 	): void {
-		this.debouncer.suppressAlerts(alertType, destinationId, organizationId, suppressionMinutes)
+		this.debouncer.suppressAlerts(debounceType, destinationId, organizationId, suppressionMinutes)
 	}
 
 	/**
@@ -453,7 +422,7 @@ export class AlertManager implements IAlertManager {
 	 * Get alerts with organizational isolation
 	 * Requirements 6.1, 6.2, 6.3: Organizational isolation
 	 */
-	async getAlertsForUser(userContext: AlertUserContext): Promise<DeliveryAlert[]> {
+	async getAlertsForUser(userContext: AlertUserContext): Promise<Alert[]> {
 		// Verify user has permission to view alerts
 		const validation = this.accessControl.validateAlertOperation(userContext, 'view')
 		if (!validation.allowed) {
@@ -465,80 +434,6 @@ export class AlertManager implements IAlertManager {
 
 		// Filter alerts based on user access
 		return this.accessControl.filterAlerts(userContext, alerts)
-	}
-
-	/**
-	 * Acknowledge alert with access control
-	 * Requirements 6.1, 6.2, 6.3: Access control for alert operations
-	 */
-	async acknowledgeAlertWithAuth(alertId: string, userContext: AlertUserContext): Promise<void> {
-		const alert = await this.dbClient.getAlert(alertId)
-		if (!alert) {
-			throw new Error(`Alert ${alertId} not found`)
-		}
-
-		// Validate user can acknowledge this alert
-		const validation = this.accessControl.validateAlertOperation(userContext, 'acknowledge', alert)
-		if (!validation.allowed) {
-			throw new Error(`Access denied: ${validation.reason}`)
-		}
-
-		// Prevent cross-organization access
-		this.accessControl.preventCrossOrganizationAccess(userContext, alert.organizationId)
-
-		// Acknowledge the alert
-		await this.acknowledgeAlert(alertId, userContext.userId)
-
-		// Create audit log entry
-		const auditEntry = this.accessControl.createAuditLogEntry(
-			userContext,
-			'acknowledge',
-			'alert',
-			alertId,
-			{ alertType: alert.type, destinationId: alert.destinationId }
-		)
-
-		// Log the audit entry (implementation would store in audit log)
-		console.log('Alert audit log:', auditEntry)
-	}
-
-	/**
-	 * Resolve alert with access control
-	 * Requirements 6.1, 6.2, 6.3: Access control for alert operations
-	 */
-	async resolveAlertWithAuth(
-		alertId: string,
-		userContext: AlertUserContext,
-		notes?: string
-	): Promise<void> {
-		const alert = await this.dbClient.getAlert(alertId)
-		if (!alert) {
-			throw new Error(`Alert ${alertId} not found`)
-		}
-
-		// Validate user can resolve this alert
-		const validation = this.accessControl.validateAlertOperation(userContext, 'resolve', alert)
-		if (!validation.allowed) {
-			throw new Error(`Access denied: ${validation.reason}`)
-		}
-
-		// Prevent cross-organization access
-		this.accessControl.preventCrossOrganizationAccess(userContext, alert.organizationId)
-
-		// Resolve the alert
-		await this.resolveAlert(alertId, userContext.userId, notes)
-
-		// Create audit log entry
-		const auditEntry = this.accessControl.createAuditLogEntry(
-			userContext,
-			'resolve',
-			'alert',
-			alertId,
-			{ alertType: alert.type, destinationId: alert.destinationId, notes }
-		)
-
-		// Log the audit entry
-		console.log('Alert audit log:', auditEntry)
 	}
 
 	/**
@@ -583,7 +478,7 @@ export class AlertManager implements IAlertManager {
 			endTime: string
 			timezone: string
 			reason: string
-			suppressAlertTypes: AlertType[]
+			suppressDebounceTypes: DebounceType[]
 		}
 	): Promise<void> {
 		// Validate user can manage maintenance windows
@@ -620,7 +515,7 @@ export class AlertManager implements IAlertManager {
 	 */
 	async suppressAlertsWithAuth(
 		userContext: AlertUserContext,
-		alertType: AlertType,
+		debounceType: DebounceType,
 		destinationId: string,
 		suppressionMinutes: number
 	): Promise<void> {
@@ -639,7 +534,7 @@ export class AlertManager implements IAlertManager {
 		this.accessControl.preventCrossOrganizationAccess(userContext, destination.organizationId)
 
 		// Suppress alerts
-		this.suppressAlerts(alertType, destinationId, userContext.organizationId, suppressionMinutes)
+		this.suppressAlerts(debounceType, destinationId, userContext.organizationId, suppressionMinutes)
 
 		// Create audit log entry
 		const auditEntry = this.accessControl.createAuditLogEntry(
@@ -647,7 +542,7 @@ export class AlertManager implements IAlertManager {
 			'suppress_alerts',
 			'destination',
 			destinationId,
-			{ alertType, suppressionMinutes }
+			{ debounceType, suppressionMinutes }
 		)
 
 		// Log the audit entry
@@ -658,7 +553,7 @@ export class AlertManager implements IAlertManager {
 	 * Get sanitized alert data for user
 	 * Requirements 6.1, 6.2, 6.3: Data sanitization
 	 */
-	sanitizeAlertForUser(userContext: AlertUserContext, alert: DeliveryAlert): DeliveryAlert | null {
+	sanitizeAlertForUser(userContext: AlertUserContext, alert: Alert): Alert | null {
 		return this.accessControl.sanitizeAlertForUser(userContext, alert)
 	}
 
@@ -707,12 +602,12 @@ export class AlertManager implements IAlertManager {
 	 * Calculate alert severity based on threshold breach
 	 */
 	private calculateSeverity(value: number, threshold: number): AlertSeverity {
-		const ratio = value / threshold
+		const ratio = threshold > 0 ? value / threshold : 0
 
-		if (ratio >= 3) return 'critical'
-		if (ratio >= 2) return 'high'
-		if (ratio >= 1.5) return 'medium'
-		return 'low'
+		if (ratio >= 3) return 'CRITICAL'
+		if (ratio >= 2) return 'HIGH'
+		if (ratio >= 1.5) return 'MEDIUM'
+		return 'LOW'
 	}
 
 	/**
@@ -753,27 +648,14 @@ export class AlertManager implements IAlertManager {
 			throw new Error(`User ${userId} does not have access to organization ${organizationId}`)
 		}
 	}
-
-	/**
-	 * Send notification for alert (integration point)
-	 */
-	private async sendNotification(alert: DeliveryAlert): Promise<void> {
-		// Implementation would integrate with notification service
-		// This could be email, Slack, webhook, etc.
-		console.log(`Alert notification: ${alert.title} - ${alert.description}`)
-	}
-
-	/**
-	 * Generate unique alert ID
-	 */
-	private generateAlertId(): string {
-		return `alert_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-	}
 }
 
 /**
  * Factory function for creating alert manager
  */
-export function createAlertManager(dbClient: DeliveryDatabaseClient) {
-	return new AlertManager(dbClient)
+export function createAlertManager(
+	AlertingService: AlertingService,
+	dbClient: DeliveryDatabaseClient
+) {
+	return new AlertManager(AlertingService, dbClient)
 }

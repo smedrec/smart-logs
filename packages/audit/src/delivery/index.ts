@@ -74,7 +74,6 @@ export type { CircuitBreakerConfig, CircuitBreakerMetrics } from './circuit-brea
 
 // Alert manager
 export { AlertManager } from './alert-manager.js'
-export type { AlertType, AlertSeverity } from './alert-manager.js'
 
 // Alert debouncer
 export { AlertDebouncer, createAlertDebouncer } from './alert-debouncer.js'

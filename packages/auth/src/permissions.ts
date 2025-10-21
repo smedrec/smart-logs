@@ -101,6 +101,11 @@ export class AuthorizationService {
 					{ resource: 'audit.alerts', action: 'read' },
 					{ resource: 'audit.alerts', action: 'acknowledge' },
 					{ resource: 'audit.alerts', action: 'resolve' },
+					{ resource: 'audit.alerts', action: 'dismiss' },
+					{ resource: 'audit.alerts', action: 'supress' },
+					{ resource: 'audit.alerts', action: 'escalate' },
+					{ resource: 'audit.alerts', action: 'configure_thresholds' },
+					{ resource: 'audit.alerts', action: 'manage_maintenance_windows' },
 				],
 			},
 			{
@@ -662,6 +667,14 @@ export const PERMISSIONS = {
 			READ: { resource: 'audit.alerts', action: 'read' },
 			ACKNOWLEDGE: { resource: 'audit.alerts', action: 'acknowledge' },
 			RESOLVE: { resource: 'audit.alerts', action: 'resolve' },
+			DISMISS: { resource: 'audit.alerts', action: 'dismiss' },
+			SUPRESS: { resource: 'audit.alerts', action: 'supress' },
+			ESCALATE: { resource: 'audit.alerts', action: 'escalate' },
+			CONFIGURE_THRESHOLDS: { resource: 'audit.alerts', action: 'configure_thresholds' },
+			MANAGE_MAINTENANCE_WINDOWS: {
+				resource: 'audit.alerts',
+				action: 'manage_maintenance_windows',
+			},
 		},
 	},
 	ORGANIZATION: {
