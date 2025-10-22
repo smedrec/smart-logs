@@ -5,6 +5,7 @@
 
 import { StructuredLogger } from '@repo/logs'
 
+import { AlertingService } from '../monitor/alerting.js'
 import { createAlertManager } from './alert-manager.js'
 import { createDeliveryAPI } from './api.js'
 import { createCircuitBreaker } from './circuit-breaker.js'
@@ -129,11 +130,13 @@ export interface ServiceStatus {
  * Service factory for creating and managing delivery service components
  */
 export class DeliveryServiceFactory {
+	private readonly alertService: AlertingService
 	private readonly logger: StructuredLogger
 	private readonly config: DeliveryServiceFactoryConfig
 	private readonly version = '1.0.0'
 
-	constructor(config: Partial<DeliveryServiceFactoryConfig> = {}) {
+	constructor(alertService: AlertingService, config: Partial<DeliveryServiceFactoryConfig> = {}) {
+		this.alertService = alertService
 		this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
 
 		this.logger = new StructuredLogger({
@@ -182,7 +185,7 @@ export class DeliveryServiceFactory {
 			}
 
 			if (this.config.enableAlerting) {
-				alertManager = createAlertManager(databaseClient)
+				alertManager = createAlertManager(this.alertService, databaseClient)
 			}
 
 			if (this.config.enableObservability) {
@@ -321,7 +324,7 @@ export class DeliveryServiceFactory {
 	 * Update configuration (creates new factory instance)
 	 */
 	withConfig(updates: Partial<DeliveryServiceFactoryConfig>): DeliveryServiceFactory {
-		return new DeliveryServiceFactory({ ...this.config, ...updates })
+		return new DeliveryServiceFactory(this.alertService, { ...this.config, ...updates })
 	}
 }
 
@@ -554,19 +557,21 @@ class DeliveryServiceContainerImpl implements DeliveryServiceContainer {
  * Factory function for creating delivery service factory
  */
 export function createDeliveryServiceFactory(
+	alertService: AlertingService,
 	config?: Partial<DeliveryServiceFactoryConfig>
 ): DeliveryServiceFactory {
-	return new DeliveryServiceFactory(config)
+	return new DeliveryServiceFactory(alertService, config)
 }
 
 /**
  * Convenience function for creating a complete delivery service container
  */
 export async function createDeliveryServiceContainer(
+	alertService: AlertingService,
 	enhancedClient: EnhancedAuditDatabaseClient,
 	config?: Partial<DeliveryServiceFactoryConfig>
 ): Promise<DeliveryServiceContainer> {
-	const factory = createDeliveryServiceFactory(config)
+	const factory = createDeliveryServiceFactory(alertService, config)
 	return factory.createContainer(enhancedClient)
 }
 
@@ -574,9 +579,10 @@ export async function createDeliveryServiceContainer(
  * Convenience function for creating a minimal delivery service
  */
 export async function createMinimalDeliveryService(
+	alertService: AlertingService,
 	enhancedClient: EnhancedAuditDatabaseClient
 ): Promise<DeliveryService> {
-	const factory = createDeliveryServiceFactory({
+	const factory = createDeliveryServiceFactory(alertService, {
 		enableHealthMonitoring: false,
 		enableObservability: false,
 		enableAlerting: false,

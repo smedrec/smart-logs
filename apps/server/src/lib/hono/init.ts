@@ -13,6 +13,7 @@ import {
 	DatabaseHealthCheck,
 	DataExportService,
 	DEFAULT_DASHBOARD_CONFIG,
+	DeliveryService,
 	ErrorHandler,
 	GDPRComplianceService,
 	HealthCheckService,
@@ -105,6 +106,9 @@ let dataExportService: DataExportService | undefined = undefined
 let scheduledReportingService: ScheduledReportingService | undefined = undefined
 let presetDatabaseHandler: DatabasePresetHandler | undefined = undefined
 let gdprComplianceService: GDPRComplianceService | undefined = undefined
+
+// Delivery services
+let deliveryService: DeliveryService | undefined = undefined
 
 /**
  * Create delivery configuration from server config
@@ -349,6 +353,8 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			gdpr: gdprComplianceService,
 		}
 
+		if (!deliveryService) deliveryService = new DeliveryService(client)
+
 		// System startup
 		if (!connection || !auditDbInstance) {
 			audit.logSystem({
@@ -386,6 +392,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 			resilience: resilienceService,
 			error: errorHandler,
 			performance: performanceService,
+			delivery: deliveryService,
 			//cache,
 		})
 

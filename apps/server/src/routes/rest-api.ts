@@ -26,6 +26,7 @@ import { OpenAPIHono, z } from '@hono/zod-openapi'
 import { createAlertsAPI } from './alerts'
 import { createAuditAPI } from './audit-api'
 import { createComplianceAPI } from './compliance-api'
+import { createDeliveryAPI } from './delivery-api'
 import { createFunctionsAPI } from './functions-api'
 import { createHealthAPI } from './health-api'
 import { createMetricsAPI } from './metrics-api'
@@ -249,8 +250,12 @@ Pagination information is included in the response:
 				description: 'Compliance reporting and data export operations',
 			},
 			{
-				name: 'Scheduled Repotys',
+				name: 'Scheduled Reports',
 				description: 'Schedule reports',
+			},
+			{
+				name: 'Delivery',
+				description: 'Delivery operations',
 			},
 			{
 				name: 'Metrics',
@@ -300,6 +305,7 @@ Pagination information is included in the response:
 	app.use('/audit/*', requireAuthOrApiKey)
 	app.use('/compliance/*', requireAuthOrApiKey)
 	app.use('/scheduled-reports/*', requireAuthOrApiKey)
+	app.use('/delivery/*', requireAuthOrApiKey)
 	app.use('/metrics/*', requireAuthOrApiKey)
 	app.use('/alerts/*', requireAuthOrApiKey)
 	app.use('/observability/*', requireAuthOrApiKey)
@@ -312,6 +318,7 @@ Pagination information is included in the response:
 	app.use('/compliance/*', requireOrganizationAccess())
 	app.use('/alerts/*', requireOrganizationAccess())
 	app.use('/scheduled-reports/*', requireOrganizationAccess())
+	app.use('/delivery/*', requireOrganizationAccess())
 	app.use('/functions/*', requireOrganizationAccess())
 	app.use('/organization/*', requireOrganizationAccess())
 
@@ -324,6 +331,7 @@ Pagination information is included in the response:
 	app.route('/audit', createAuditAPI())
 	app.route('/compliance', createComplianceAPI())
 	app.route('/scheduled-reports', createscheduledReportAPI())
+	app.route('/delivery', createDeliveryAPI())
 	app.route('/health', createHealthAPI()) // Health check endpoints (no authentication required)
 	app.route('/metrics', createMetricsAPI())
 	app.route('/alerts', createAlertsAPI())

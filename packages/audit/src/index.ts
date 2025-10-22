@@ -73,3 +73,6 @@ export { createDefaultConfigFile } from './config/integration.js'
 
 // Export observability and metrics
 export * from './observability/index.js'
+
+// Export delivery services
+export { DeliveryService, createDeliveryService } from './delivery/delivery-service.js'

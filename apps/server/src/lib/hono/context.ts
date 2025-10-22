@@ -12,6 +12,7 @@ import type {
 	DatabaseAlertHandler,
 	DatabasePresetHandler,
 	DataExportService,
+	DeliveryService,
 	ErrorHandler,
 	GDPRComplianceService,
 	HealthCheckService,
@@ -75,6 +76,7 @@ export type ServiceContext = {
 	resilience: ResilienceService
 	error: ErrorHandler
 	performance: PerformanceService
+	delivery: DeliveryService
 }
 
 /** Variables can be extended */
