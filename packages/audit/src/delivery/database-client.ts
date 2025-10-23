@@ -10,6 +10,7 @@ import {
 	deliveryQueue,
 	destinationHealth,
 	downloadLinks,
+	organizationConfigs,
 	webhookSecrets,
 } from '@repo/audit-db'
 import { StructuredLogger } from '@repo/logs'
@@ -39,6 +40,7 @@ export interface IDeliveryDestinationRepository {
 	findByOrganization(organizationId: string): Promise<DeliveryDestination[]>
 	list(options: DeliveryDestinationListOptions): Promise<DeliveryDestinationListResponse>
 	incrementUsage(id: string): Promise<void>
+	setDefault(id: string, isDefault: boolean): Promise<void>
 	setDisabled(id: string, disabled: boolean, reason?: string, disabledBy?: string): Promise<void>
 }
 
@@ -364,52 +366,6 @@ export class DeliveryDatabaseClient {
 	}
 
 	/**
-	 * Save alert configuration for organization
-	 */
-	async saveAlertConfig(organizationId: string, config: any): Promise<void> {
-		const db = this.enhancedClient.getDatabase()
-
-		// Store config in queue metadata (simplified approach)
-		await db
-			.insert(deliveryQueue)
-			.values({
-				id: `alert_config_${organizationId}`,
-				organizationId,
-				destinationId: 0,
-				payload: { type: 'alert_config', config },
-				priority: 0,
-				scheduledAt: new Date().toISOString(),
-				status: 'config',
-				metadata: { alertConfig: config },
-			})
-			.onConflictDoUpdate({
-				target: deliveryQueue.id,
-				set: {
-					metadata: { alertConfig: config },
-					updatedAt: new Date().toISOString(),
-				},
-			})
-	}
-
-	/**
-	 * Get alert configuration for organization
-	 */
-	async getAlertConfig(organizationId: string): Promise<any | null> {
-		const db = this.enhancedClient.getDatabase()
-
-		const [result] = await db
-			.select()
-			.from(deliveryQueue)
-			.where(eq(deliveryQueue.id, `alert_config_${organizationId}`))
-
-		if (!result || !result.metadata) {
-			return null
-		}
-
-		return (result.metadata as any).alertConfig
-	}
-
-	/**
 	 * Verify user organization access
 	 */
 	async verifyUserOrganizationAccess(userId: string, organizationId: string): Promise<boolean> {
@@ -437,6 +393,7 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 				description: input.description,
 				icon: input.icon,
 				instructions: input.instructions,
+				isDefault: input.isDefault ? 'true' : 'false',
 				config: input.config,
 			})
 			.returning()
@@ -451,6 +408,7 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 			.update(deliveryDestinations)
 			.set({
 				...input,
+				isDefault: input.isDefault?.toString(),
 				disabled: input.disabled?.toString(),
 				updatedAt: new Date().toISOString(),
 			})
@@ -491,14 +449,13 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 	async getDefaultDestinations(organizationId: string): Promise<DeliveryDestination[]> {
 		const db = this.client.getDatabase()
 
-		// For now, return all enabled destinations for the organization
-		// In a future task, we can add a specific "default" flag to destinations
 		const results = await db
 			.select()
 			.from(deliveryDestinations)
 			.where(
 				and(
 					eq(deliveryDestinations.organizationId, organizationId),
+					eq(deliveryDestinations.isDefault, 'true'),
 					eq(deliveryDestinations.disabled, 'false')
 				)
 			)
@@ -518,6 +475,9 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 		}
 		if (options.filters?.type) {
 			conditions.push(eq(deliveryDestinations.type, options.filters.type))
+		}
+		if (options.filters?.isDefault !== undefined) {
+			conditions.push(eq(deliveryDestinations.isDefault, options.filters.isDefault.toString()))
 		}
 		if (options.filters?.disabled !== undefined) {
 			conditions.push(eq(deliveryDestinations.disabled, options.filters.disabled.toString()))
@@ -585,6 +545,17 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 			.where(eq(deliveryDestinations.id, parseInt(id)))
 	}
 
+	async setDefault(id: string, isDefault: boolean): Promise<void> {
+		const db = this.client.getDatabase()
+
+		await db
+			.update(deliveryDestinations)
+			.set({
+				disabled: isDefault.toString(),
+			})
+			.where(eq(deliveryDestinations.id, parseInt(id)))
+	}
+
 	private async getTotalCount(options: DeliveryDestinationListOptions): Promise<number> {
 		const db = this.client.getDatabase()
 
@@ -595,6 +566,9 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 		}
 		if (options.filters?.type) {
 			conditions.push(eq(deliveryDestinations.type, options.filters.type))
+		}
+		if (options.filters?.isDefault !== undefined) {
+			conditions.push(eq(deliveryDestinations.isDefault, options.filters.isDefault.toString()))
 		}
 		if (options.filters?.disabled !== undefined) {
 			conditions.push(eq(deliveryDestinations.disabled, options.filters.disabled.toString()))
@@ -620,6 +594,7 @@ class DeliveryDestinationRepository implements IDeliveryDestinationRepository {
 			description: row.description,
 			icon: row.icon,
 			instructions: row.instructions,
+			isDefault: row.isDefault === 'true',
 			disabled: row.disabled === 'true',
 			disabledAt: row.disabledAt,
 			disabledBy: row.disabledBy,

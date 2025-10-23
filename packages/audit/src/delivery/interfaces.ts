@@ -119,7 +119,11 @@ export interface IAlertManager {
 	checkFailureThresholds(destinationId: string): Promise<void>
 	sendAlert(debounceType: DebounceType, alert: Alert): Promise<void>
 	getActiveAlerts(organizationId: string): Promise<Alert[]>
-	configureAlertThresholds(organizationId: string, config: AlertThresholdConfig): Promise<void>
+	configureAlertThresholds(
+		organizationId: string,
+		userId: string,
+		config: AlertThresholdConfig
+	): Promise<void>
 }
 
 /**

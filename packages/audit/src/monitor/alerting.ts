@@ -2,7 +2,7 @@ import { MonitoringConfig } from '../config/types'
 import { MetricsCollector, RedisMetricsCollector } from './metrics-collector'
 
 import type { AlertQueryFilters, AlertResolution } from './database-alert-handler'
-import type { Alert, AlertHandler, AlertStatistics } from './monitoring-types'
+import type { Alert, AlertConfig, AlertHandler, AlertStatistics } from './monitoring-types'
 
 export class AlertingService {
 	private readonly alertPrefix = 'alerts:'
@@ -314,6 +314,43 @@ export class AlertingService {
 			},
 		})
 	}
+
+	/**
+	 * Save alert config for organization
+	 */
+	async saveAlertConfig(
+		organizationId: string,
+		userId: string,
+		alertConfig: AlertConfig
+	): Promise<{ success: boolean }> {
+		for (const handler of this.alertHandlers) {
+			try {
+				await handler.saveAlertConfig(organizationId, userId, alertConfig)
+				return { success: true }
+			} catch (error) {
+				console.error('Failed to save alert config through handler:', error)
+				throw error
+			}
+		}
+		return { success: false }
+	}
+
+	/**
+	 * Get alert config for organization
+	 */
+	async getAlertConfig(organizationId: string): Promise<AlertConfig | null> {
+		for (const handler of this.alertHandlers) {
+			try {
+				if (handler.handlerName() === 'DatabaseAlertHandler') {
+					return await handler.getAlertConfig(organizationId)
+				}
+			} catch (error) {
+				console.error('Failed to get alert config through handler:', error)
+				throw error
+			}
+		}
+		return null
+	}
 }
 
 /**
@@ -406,6 +443,42 @@ export class ConsoleAlertHandler implements AlertHandler {
 			},
 			bySource: {},
 			trends: [],
+		}
+	}
+
+	async saveAlertConfig(
+		organizationId: string,
+		userId: string,
+		config: AlertConfig
+	): Promise<{ success: boolean }> {
+		try {
+			console.log(`📋 Saving alert config for organization ${organizationId} by user ${userId}`)
+			return { success: true }
+		} catch (error) {
+			console.error('Failed to save alert config', {
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+		}
+		return { success: false }
+	}
+
+	async getAlertConfig(organizationId: string): Promise<AlertConfig | null> {
+		try {
+			console.log(`📋 Getting alert config for organization ${organizationId}`)
+			return {
+				failureRateThreshold: 10, // 10%
+				consecutiveFailureThreshold: 5,
+				queueBacklogThreshold: 1000,
+				responseTimeThreshold: 30000, // 30 seconds
+				debounceWindow: 15, // 15 minutes
+				escalationDelay: 60, // 1 hour
+				suppressionWindows: [],
+			} as AlertConfig
+		} catch (error) {
+			console.error('Failed to get alert config', {
+				error: error instanceof Error ? error.message : 'Unknown error',
+			})
+			return null
 		}
 	}
 }

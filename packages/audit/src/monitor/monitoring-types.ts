@@ -89,6 +89,24 @@ export type AlertType =
 export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'dismissed' | 'suppressed'
 
 /**
+ * Alert configuration with debouncing and escalation settings
+ */
+export interface AlertConfig {
+	failureRateThreshold: number // percentage (0-100)
+	consecutiveFailureThreshold: number
+	queueBacklogThreshold: number
+	responseTimeThreshold: number // milliseconds
+	debounceWindow: number // minutes
+	escalationDelay: number // minutes
+	suppressionWindows: Array<{
+		start: string // HH:MM format
+		end: string // HH:MM format
+		timezone: string
+		reason: string
+	}>
+}
+
+/**
  * Alert interface
  */
 export interface Alert {
@@ -237,4 +255,10 @@ export interface AlertHandler {
 	getAlertById(alertId: string, organizationId?: string): Promise<Alert | null>
 	numberOfActiveAlerts(organizationId?: string): Promise<number>
 	getAlertStatistics(organizationId?: string): Promise<AlertStatistics>
+	saveAlertConfig(
+		organizationId: string,
+		userId: string,
+		config: AlertConfig
+	): Promise<{ success: boolean }>
+	getAlertConfig(organizationId: string): Promise<AlertConfig | null>
 }

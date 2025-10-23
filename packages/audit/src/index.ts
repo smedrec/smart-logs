@@ -17,6 +17,7 @@ export { AlertingService, ConsoleAlertHandler } from './monitor/alerting.js'
 export { RedisMetricsCollector } from './monitor/metrics-collector.js'
 export type {
 	Alert,
+	AlertConfig,
 	AlertHandler,
 	AlertSeverity,
 	AlertType,

@@ -14,6 +14,7 @@ export interface DeliveryDestination {
 	description?: string
 	icon?: string // URL to an icon image
 	instructions?: string // Setup or usage instructions
+	isDefault: boolean
 	disabled: boolean
 	disabledAt?: string
 	disabledBy?: string
@@ -142,6 +143,7 @@ export interface CreateDeliveryDestinationInput {
 	description?: string
 	icon?: string
 	instructions?: string
+	isDefault?: boolean
 	config: DeliveryDestination['config']
 }
 
@@ -155,6 +157,7 @@ export interface UpdateDeliveryDestinationInput {
 	icon?: string
 	instructions?: string
 	config?: DeliveryDestination['config']
+	isDefault?: boolean
 	disabled?: boolean
 }
 
@@ -165,6 +168,7 @@ export interface UpdateDeliveryDestinationInput {
 export interface DeliveryDestinationFilters {
 	organizationId?: string
 	type?: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
+	isDefault?: boolean
 	disabled?: boolean
 }
 

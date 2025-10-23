@@ -3,17 +3,14 @@
  * Implements AlertHandler interface to store alerts in PostgreSQL with organization-based access control
  */
 
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
-import {
-	EnhancedAuditDatabaseClient,
-	EnhancedAuditDb,
-	EnhancedDatabaseClient,
-} from '@repo/audit-db'
+import { EnhancedAuditDatabaseClient, EnhancedAuditDb } from '@repo/audit-db'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
 	Alert,
+	AlertConfig,
 	AlertHandler,
 	AlertSeverity,
 	AlertStatistics,
@@ -506,6 +503,65 @@ export class DatabaseAlertHandler implements AlertHandler {
 			return result.length || 0
 		} catch (error) {
 			throw new Error(`Failed to cleanup resolved alerts: ${error}`)
+		}
+	}
+
+	/**
+	 * Save alert configuration for organization
+	 */
+	async saveAlertConfig(
+		organizationId: string,
+		userId: string,
+		config: AlertConfig
+	): Promise<{ success: boolean }> {
+		// Store config in organization configs
+		try {
+			const result = await this.db.execute(sql`
+				INSERT INTO organization_configs (id, organization_id, config, created_by)
+				VALUES (${`alert-config-${organizationId}`}, ${organizationId}, ${config as any}, ${userId})
+				ON CONFLICT (id) DO UPDATE
+				SET config = ${config as any}, updated_by = ${userId}, updated_at = ${new Date().toISOString()}
+			`)
+
+			return { success: true }
+		} catch (error) {
+			throw new Error(`Failed to save alert configuration: ${error}`)
+		}
+	}
+
+	/**
+	 * Get alert configuration for organization
+	 */
+	async getAlertConfig(organizationId: string): Promise<AlertConfig | null> {
+		try {
+			const result = await this.client.executeOptimizedQuery(
+				(db) =>
+					db.execute(sql`
+				SELECT config FROM organization_configs WHERE id = ${`alert-config-${organizationId}`}
+			`),
+				{
+					cacheKey: `get_alert_config_${organizationId}`,
+				}
+			)
+
+			if (!result || result.length === 0) {
+				return {
+					// Default config
+					failureRateThreshold: 10, // 10%
+					consecutiveFailureThreshold: 5,
+					queueBacklogThreshold: 1000,
+					responseTimeThreshold: 30000, // 30 seconds
+					debounceWindow: 15, // 15 minutes
+					escalationDelay: 60, // 1 hour
+					suppressionWindows: [],
+				} as AlertConfig
+			}
+
+			return typeof result[0].config === 'string'
+				? JSON.parse(result[0].config)
+				: (result[0].config as AlertConfig)
+		} catch (error) {
+			throw new Error(`Failed to retrieve alert configuration: ${error}`)
 		}
 	}
 

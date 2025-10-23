@@ -893,7 +893,7 @@ export class DeliveryService implements IDeliveryService {
 	 * Generate a unique delivery ID
 	 */
 	private generateDeliveryId(): string {
-		return `del_${Date.now()}_${Math.random().toString(36).substring(2)}`
+		return `delivery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 	}
 
 	/**

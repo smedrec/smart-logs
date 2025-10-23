@@ -434,6 +434,7 @@ export class DestinationManager implements IDestinationManager {
 			const destinations = await this.dbClient.destinations.list({
 				filters: {
 					organizationId,
+					isDefault: true,
 					disabled: false,
 				},
 			})
@@ -495,19 +496,12 @@ export class DestinationManager implements IDestinationManager {
 				throw new Error(`Cannot set unhealthy destination ${destinationId} as default`)
 			}
 
-			// TODO: For now, we don't have a specific "default" flag in the database
-			// This is a placeholder implementation that would be enhanced when we add
-			// a proper default destinations table or flag
+			await this.dbClient.destinations.setDefault(destinationId, true)
+
 			this.logger.info('Default destination set successfully', {
 				organizationId,
 				destinationId,
-				note: 'Currently all enabled destinations are considered default',
 			})
-
-			// TODO: In a future implementation, this would:
-			// 1. Add an entry to a default_destinations table
-			// 2. Or set an isDefault flag on the destination
-			// 3. Handle priority ordering of default destinations
 		} catch (error) {
 			this.logger.error('Failed to set default destination', {
 				organizationId,
@@ -538,19 +532,12 @@ export class DestinationManager implements IDestinationManager {
 				)
 			}
 
-			// TODO: For now, this is a placeholder implementation
-			// In a future implementation, this would:
-			// 1. Remove the entry from a default_destinations table
-			// 2. Or unset an isDefault flag on the destination
+			await this.dbClient.destinations.setDefault(destinationId, false)
+
 			this.logger.info('Default destination removed successfully', {
 				organizationId,
 				destinationId,
-				note: 'Currently implemented as disabling the destination',
 			})
-
-			// As a temporary implementation, we could disable the destination
-			// but that's not the same as removing it from defaults
-			// await this.disableDestination(destinationId, 'Removed from defaults', 'system')
 		} catch (error) {
 			this.logger.error('Failed to remove default destination', {
 				organizationId,

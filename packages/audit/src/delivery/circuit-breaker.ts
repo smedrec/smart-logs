@@ -438,7 +438,7 @@ export class CircuitBreaker implements ICircuitBreaker {
 	 * Get recent failure count within time window
 	 */
 	private async getRecentFailureCount(destinationId: string, since: number): Promise<number> {
-		// This would need to be implemented based on how delivery logs are stored
+		// TODO: This would need to be implemented based on how delivery logs are stored
 		// For now, return a conservative estimate based on consecutive failures
 		const health = await this.dbClient.health.findByDestinationId(destinationId)
 		return health?.consecutiveFailures || 0
@@ -448,7 +448,7 @@ export class CircuitBreaker implements ICircuitBreaker {
 	 * Get recent request count within time window
 	 */
 	private async getRecentRequestCount(destinationId: string, since: number): Promise<number> {
-		// This would need to be implemented based on how delivery logs are stored
+		// TODO: This would need to be implemented based on how delivery logs are stored
 		// For now, return a conservative estimate
 		const health = await this.dbClient.health.findByDestinationId(destinationId)
 		return Math.max(health?.consecutiveFailures || 0, this.config.volumeThreshold)

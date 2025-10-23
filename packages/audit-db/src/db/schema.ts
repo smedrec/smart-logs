@@ -46,7 +46,6 @@
 // - [key: string]: any -> jsonb 'details' - OK (nullable)
 // This looks good.
 
-import { count } from 'console'
 import { sql } from 'drizzle-orm'
 import {
 	index,
@@ -720,6 +719,7 @@ export const deliveryDestinations = pgTable(
 		description: text('description'),
 		icon: varchar('icon', { length: 255 }), // URL or icon name
 		instructions: text('instructions'), // Setup or usage instructions
+		isDefault: varchar('is_default', { length: 10 }).notNull().default('false'),
 		disabled: varchar('disabled', { length: 10 }).notNull().default('false'),
 		disabledAt: timestamp('disabled_at', { withTimezone: true, mode: 'string' }),
 		disabledBy: varchar('disabled_by', { length: 255 }),
@@ -1019,6 +1019,30 @@ export const downloadLinks = pgTable(
 
 			// Cleanup indexes for maintenance
 			index('download_links_expired_cleanup_idx').on(table.expiresAt, table.isActive),
+		]
+	}
+)
+
+export const organizationConfigs = pgTable(
+	'organization_configs',
+	{
+		id: varchar('id', { length: 255 }).primaryKey(),
+		organizationId: varchar('organization_id', { length: 255 }),
+		config: jsonb('config').notNull().default('{}'),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		createdBy: varchar('created_by', { length: 255 }).notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+			.notNull()
+			.defaultNow(),
+		updatedBy: varchar('updated_by', { length: 255 }),
+	},
+	(table) => {
+		return [
+			index('organization_configs_organization_id_idx').on(table.organizationId),
+			index('organization_configs_created_at_idx').on(table.createdAt),
+			index('organization_configs_updated_at_idx').on(table.updatedAt),
 		]
 	}
 )

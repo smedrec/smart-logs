@@ -6,7 +6,7 @@ import { AlertingService } from '../monitor/alerting.js'
 import { AlertAccessControl } from './alert-access-control.js'
 import { AlertDebouncer, DebounceType } from './alert-debouncer.js'
 
-import type { Alert, AlertSeverity, AlertType } from '../monitor/monitoring-types.js'
+import type { Alert, AlertConfig, AlertSeverity, AlertType } from '../monitor/monitoring-types.js'
 import type { AlertUserContext } from './alert-access-control.js'
 import type { DeliveryDatabaseClient } from './database-client.js'
 import type { AlertThresholdConfig, IAlertManager } from './interfaces.js'
@@ -20,25 +20,6 @@ interface SlidingWindowMetrics {
 	totalDeliveries: number
 	failedDeliveries: number
 	failureRate: number
-}
-
-/**
- * Alert configuration with debouncing and escalation settings
- */
-interface AlertConfig {
-	organizationId: string
-	failureRateThreshold: number // percentage (0-100)
-	consecutiveFailureThreshold: number
-	queueBacklogThreshold: number
-	responseTimeThreshold: number // milliseconds
-	debounceWindow: number // minutes
-	escalationDelay: number // minutes
-	suppressionWindows: Array<{
-		start: string // HH:MM format
-		end: string // HH:MM format
-		timezone: string
-		reason: string
-	}>
 }
 
 /**
@@ -151,16 +132,16 @@ export class AlertManager implements IAlertManager {
 	 */
 	async configureAlertThresholds(
 		organizationId: string,
+		userId: string,
 		config: AlertThresholdConfig
 	): Promise<void> {
 		const alertConfig: AlertConfig = {
-			organizationId,
 			...config,
 			suppressionWindows: [], // Default empty, can be configured separately
 		}
 
 		this.alertConfigs.set(organizationId, alertConfig)
-		await this.dbClient.saveAlertConfig(organizationId, alertConfig)
+		await this.alertService.saveAlertConfig(organizationId, userId, alertConfig)
 	}
 
 	/**
@@ -450,7 +431,7 @@ export class AlertManager implements IAlertManager {
 		}
 
 		// Configure thresholds for user's organization
-		await this.configureAlertThresholds(userContext.organizationId, config)
+		await this.configureAlertThresholds(userContext.organizationId, userContext.userId, config)
 
 		// Create audit log entry
 		const auditEntry = this.accessControl.createAuditLogEntry(
@@ -619,7 +600,7 @@ export class AlertManager implements IAlertManager {
 		if (!config) {
 			// Load from database or use defaults
 			config =
-				((await this.dbClient.getAlertConfig(organizationId)) as AlertConfig) ||
+				((await this.alertService.getAlertConfig(organizationId)) as AlertConfig) ||
 				({
 					organizationId,
 					failureRateThreshold: 10, // 10%
