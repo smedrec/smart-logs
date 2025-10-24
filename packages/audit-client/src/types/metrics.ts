@@ -450,6 +450,7 @@ export const AlertTypeSchema = z.enum([
 	'PERFORMANCE',
 	'SYSTEM',
 	'METRICS',
+	'DELIVERY',
 	'CUSTOM',
 ])
 export type AlertType = z.infer<typeof AlertTypeSchema>
@@ -559,6 +560,29 @@ export const PaginatedAlertsSchema = z.object({
 		.optional(),
 })
 export type PaginatedAlerts = z.infer<typeof PaginatedAlertsSchema>
+
+/**
+ * Alert config
+ */
+export const AlertConfigSchema = z.object({
+	failureRateThreshold: z.number().min(0).max(100), // percentage (0-100)
+	consecutiveFailureThreshold: z.number().int().min(1), // number of consecutive failures
+	queueBacklogThreshold: z.number().min(0), //
+	responseTimeThreshold: z.number().min(0), // milliseconds
+	debounceWindow: z.number().min(0), // minutes
+	escalationDelay: z.number().min(0), // minutes
+	suppressionWindows: z
+		.array(
+			z.object({
+				start: z.string(), // HH:MM format
+				end: z.string(), // HH:MM format
+				timezone: z.string(),
+				reason: z.string(),
+			})
+		)
+		.optional(),
+})
+export type AlertConfig = z.infer<typeof AlertConfigSchema>
 
 // ============================================================================
 // Type Guards

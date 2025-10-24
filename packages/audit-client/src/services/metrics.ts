@@ -28,6 +28,7 @@ import {
 import type {
 	Alert,
 	AlertActionResponse,
+	AlertConfig,
 	AlertSeverity,
 	AlertsParams,
 	AlertType,
@@ -384,6 +385,31 @@ export class MetricsService extends BaseResource {
 	async dismissAlert(id: string): Promise<AlertActionResponse> {
 		return this.request<AlertActionResponse>(`/alerts/${id}/dismiss`, {
 			method: 'POST',
+		})
+	}
+
+	/**
+	 * Save Alert configuration
+	 *
+	 * @param request Alert configuration details
+	 * @returns Promise<{ success: boolean }> Save result
+	 */
+	async saveAlertConfiguration(request: AlertConfig): Promise<AlertActionResponse> {
+		return this.request<AlertActionResponse>(`/alerts/config`, {
+			method: 'POST',
+			body: request,
+		})
+	}
+
+	/**
+	 * Get Alert configuration
+	 *
+	 * @param  organizationId Organization ID
+	 * @returns Promise<AlertConfig> Alert configuration details
+	 */
+	async getAlertConfiguration(organizationId: string): Promise<AlertConfig> {
+		return this.request<AlertConfig>(`/alerts/config`, {
+			method: 'GET',
 		})
 	}
 

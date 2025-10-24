@@ -28,6 +28,7 @@ import type {
 import type {
 	Alert,
 	AlertActionResponse,
+	AlertConfig,
 	AuditMetrics,
 	PaginatedAlerts,
 	PerformanceMetrics,

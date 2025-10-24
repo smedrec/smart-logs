@@ -12,6 +12,7 @@ import { openApiErrorResponses } from '@/lib/errors/openapi_responses'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 import type { HonoEnv } from '@/lib/hono/context'
+import type { AlertConfig } from '@repo/audit'
 
 const AlertSchema = z.object({
 	id: z.string(),
@@ -26,6 +27,28 @@ const AlertSchema = z.object({
 	resolved: z.boolean(),
 	tags: z.array(z.string()),
 	metadata: z.record(z.string(), z.any()).optional(),
+})
+
+/**
+ * Alert config
+ */
+export const AlertConfigSchema = z.object({
+	failureRateThreshold: z.number().min(0).max(100), // percentage (0-100)
+	consecutiveFailureThreshold: z.number().int().min(1), // number of consecutive failures
+	queueBacklogThreshold: z.number().min(0), //
+	responseTimeThreshold: z.number().min(0), // milliseconds
+	debounceWindow: z.number().min(0), // minutes
+	escalationDelay: z.number().min(0), // minutes
+	suppressionWindows: z
+		.array(
+			z.object({
+				start: z.string(), // HH:MM format
+				end: z.string(), // HH:MM format
+				timezone: z.string(),
+				reason: z.string(),
+			})
+		)
+		.optional(),
 })
 
 const AlertQuerySchema = z.object({
@@ -188,6 +211,53 @@ const dismissAlertRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: ResultSchema,
+				},
+			},
+		},
+		...openApiErrorResponses,
+	},
+})
+
+const saveAlertConfigurationRoute = createRoute({
+	method: 'post',
+	path: '/config',
+	tags: ['Alerts'],
+	summary: 'Save alert configuration',
+	description: 'Saves the alert configuration.',
+	request: {
+		body: {
+			content: {
+				'application/json': {
+					schema: AlertConfigSchema,
+				},
+			},
+		},
+	},
+	responses: {
+		200: {
+			description: 'Alert configuration saved successfully',
+			content: {
+				'application/json': {
+					schema: ResultSchema,
+				},
+			},
+		},
+		...openApiErrorResponses,
+	},
+})
+
+const getAlertConfigurationRoute = createRoute({
+	method: 'get',
+	path: '/config',
+	tags: ['Alerts'],
+	summary: 'Get alert configuration',
+	description: 'Retrieves the alert configuration.',
+	responses: {
+		200: {
+			description: 'Alert configuration retrieved successfully',
+			content: {
+				'application/json': {
+					schema: AlertConfigSchema,
 				},
 			},
 		},
@@ -462,6 +532,94 @@ export function createAlertsAPI(): OpenAPIHono<HonoEnv> {
 				requestId,
 				alertId: c.req.param('id'),
 				error: message,
+				userId: session?.session.userId,
+			})
+
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+		}
+	})
+
+	// Save alerts configuration
+	app.openapi(saveAlertConfigurationRoute, async (c) => {
+		const { monitor, logger } = c.get('services')
+		const session = c.get('session')
+		const requestId = c.get('requestId')
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+		const organizationId = session.session.activeOrganizationId as string
+		const userId = session?.session.userId
+		try {
+			const body = c.req.valid('json')
+
+			const config: AlertConfig = {
+				...body,
+				suppressionWindows: body.suppressionWindows ? body.suppressionWindows : [],
+			}
+
+			// Save alert configuration
+			const result = await monitor.alerts.saveAlertConfig(organizationId, userId, config)
+
+			logger.info('Alert configuration saved', {
+				requestId,
+				userId,
+			})
+
+			return c.json(result, 200)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error('Failed to save alert configuration', {
+				requestId,
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: message,
+				userId: session?.session.userId,
+			})
+
+			throw new ApiError({
+				code: 'INTERNAL_SERVER_ERROR',
+				message,
+			})
+		}
+	})
+
+	// Get alerts configuration
+	app.openapi(getAlertConfigurationRoute, async (c) => {
+		const { monitor, logger } = c.get('services')
+		const session = c.get('session')
+		const requestId = c.get('requestId')
+		if (!session) {
+			throw new ApiError({
+				code: 'UNAUTHORIZED',
+				message: 'Authentication required',
+			})
+		}
+		const organizationId = session.session.activeOrganizationId as string
+		try {
+			// Get alert configuration
+			const result = await monitor.alerts.getAlertConfig(organizationId)
+
+			logger.info('Alert configuration retrieved', {
+				requestId,
+				userId: session?.session.userId,
+			})
+
+			return c.json(result as AlertConfig, 200)
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			logger.error('Failed to get alert configuration', {
+				requestId,
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: message,
 				userId: session?.session.userId,
 			})
 
