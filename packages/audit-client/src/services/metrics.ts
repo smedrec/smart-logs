@@ -410,10 +410,9 @@ export class MetricsService extends BaseResource {
 	/**
 	 * Get Alert configuration
 	 *
-	 * @param  organizationId Organization ID
-	 * @returns Promise<AlertConfig> Alert configuration details
+	 * @returns Promise<AlertConfig> Alert configuration details for current organization
 	 */
-	async getAlertConfig(organizationId: string): Promise<AlertConfig> {
+	async getAlertConfig(): Promise<AlertConfig> {
 		return this.request<AlertConfig>(`/alerts/config`, {
 			method: 'GET',
 		})
