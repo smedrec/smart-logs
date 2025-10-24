@@ -29,6 +29,7 @@ import {
 } from '../types/health'
 import {
 	AlertSchema,
+	AlertsConfigurationSchema,
 	AlertsParamsSchema,
 	AuditMetricsParamsSchema,
 	SystemMetricsSchema,
@@ -374,6 +375,11 @@ export const validateUsageMetricsParams = createValidator(UsageMetricsParamsSche
 export const validateAlertsParams = createValidator(AlertsParamsSchema)
 
 /**
+ * Validates alerts configuration
+ */
+export const validateAlertsConfiguration = createValidator(AlertsConfigurationSchema)
+
+/**
  * Validates alert
  */
 export const validateAlert = createValidator(AlertSchema)
@@ -671,6 +677,7 @@ defaultSchemaRegistry.register('SystemMetrics', SystemMetricsSchema)
 defaultSchemaRegistry.register('AuditMetricsParams', AuditMetricsParamsSchema)
 defaultSchemaRegistry.register('UsageMetricsParams', UsageMetricsParamsSchema)
 defaultSchemaRegistry.register('AlertsParams', AlertsParamsSchema)
+defaultSchemaRegistry.register('AlertsConfiguration', AlertsConfigurationSchema)
 defaultSchemaRegistry.register('Alert', AlertSchema)
 
 defaultSchemaRegistry.register('HealthStatus', HealthStatusSchema)

@@ -1,5 +1,20 @@
-import z from 'zod'
-import { ZodNumberFormat } from 'zod/v4'
+import {
+	type Alert,
+	type AlertActionResponse,
+	type AlertConfig,
+	type AlertSeverity,
+	type AlertsParams,
+	type AlertType,
+	type AuditMetrics,
+	type AuditMetricsParams,
+	type CpuUsage,
+	type MemoryUsage,
+	type PaginatedAlerts,
+	type PerformanceMetrics,
+	type SystemMetrics,
+	type UsageMetrics,
+	type UsageMetricsParams,
+} from '@/types/metrics'
 
 import { BaseResource } from '../core/base-resource'
 import {
@@ -18,6 +33,7 @@ import {
 } from '../utils/type-guards'
 import {
 	validateAlert,
+	validateAlertsConfiguration,
 	validateAlertsParams,
 	validateAuditMetricsParams,
 	validateSystemMetrics,
@@ -25,23 +41,6 @@ import {
 	ValidationError,
 } from '../utils/validation'
 
-import type {
-	Alert,
-	AlertActionResponse,
-	AlertConfig,
-	AlertSeverity,
-	AlertsParams,
-	AlertType,
-	AuditMetrics,
-	AuditMetricsParams,
-	CpuUsage,
-	MemoryUsage,
-	PaginatedAlerts,
-	PerformanceMetrics,
-	SystemMetrics,
-	UsageMetrics,
-	UsageMetricsParams,
-} from '@/types/metrics'
 import type { RequestOptions } from '../core/base-resource'
 
 /**
@@ -394,7 +393,14 @@ export class MetricsService extends BaseResource {
 	 * @param request Alert configuration details
 	 * @returns Promise<{ success: boolean }> Save result
 	 */
-	async saveAlertConfiguration(request: AlertConfig): Promise<AlertActionResponse> {
+	async saveAlertConfig(request: AlertConfig): Promise<AlertActionResponse> {
+		// Validate input parameters
+		const validationResult = validateAlertsConfiguration(request)
+		if (!validationResult.success) {
+			throw new ValidationError('Invalid alerts configuration', {
+				...(validationResult.zodError && { originalError: validationResult.zodError }),
+			})
+		}
 		return this.request<AlertActionResponse>(`/alerts/config`, {
 			method: 'POST',
 			body: request,
@@ -407,7 +413,7 @@ export class MetricsService extends BaseResource {
 	 * @param  organizationId Organization ID
 	 * @returns Promise<AlertConfig> Alert configuration details
 	 */
-	async getAlertConfiguration(organizationId: string): Promise<AlertConfig> {
+	async getAlertConfig(organizationId: string): Promise<AlertConfig> {
 		return this.request<AlertConfig>(`/alerts/config`, {
 			method: 'GET',
 		})

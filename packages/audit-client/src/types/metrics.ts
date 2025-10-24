@@ -564,7 +564,7 @@ export type PaginatedAlerts = z.infer<typeof PaginatedAlertsSchema>
 /**
  * Alert config
  */
-export const AlertConfigSchema = z.object({
+export const AlertsConfigurationSchema = z.object({
 	failureRateThreshold: z.number().min(0).max(100), // percentage (0-100)
 	consecutiveFailureThreshold: z.number().int().min(1), // number of consecutive failures
 	queueBacklogThreshold: z.number().min(0), //
@@ -582,7 +582,7 @@ export const AlertConfigSchema = z.object({
 		)
 		.optional(),
 })
-export type AlertConfig = z.infer<typeof AlertConfigSchema>
+export type AlertConfig = z.infer<typeof AlertsConfigurationSchema>
 
 // ============================================================================
 // Type Guards
@@ -653,4 +653,11 @@ export const validateAlertsParams = (data: unknown) => {
  */
 export const validateAlert = (data: unknown) => {
 	return AlertSchema.safeParse(data)
+}
+
+/**
+ * Validates alert config
+ */
+export const validateAlertsConfiguration = (data: unknown) => {
+	return AlertsConfigurationSchema.safeParse(data)
 }
