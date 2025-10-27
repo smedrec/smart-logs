@@ -20,7 +20,9 @@ import {
 	scheduledReports,
 } from '@repo/audit-db'
 
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import { DeliveryService } from '../delivery/delivery-service.js'
+import { DeliveryResponse } from '../delivery/types.js'
+
 import type {
 	ComplianceReportingService,
 	ExportConfig,
@@ -29,26 +31,6 @@ import type {
 	ReportFormat,
 } from './compliance-reporting.js'
 import type { DataExportService, ExportResult } from './data-export.js'
-
-/**
- * Delivery status for scheduled reports
- */
-export type DeliveryStatus = 'pending' | 'delivered' | 'failed' | 'retrying'
-
-/**
- * Delivery attempt record
- */
-export interface DeliveryAttempt {
-	attemptId: string
-	timestamp: string
-	status: DeliveryStatus
-	method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
-	target: string
-	error?: Error | string
-	responseCode?: number
-	responseTime?: number
-	retryCount: number
-}
 
 /**
  * Scheduled report execution record
@@ -64,7 +46,7 @@ export interface ReportExecution {
 	recordsProcessed?: number
 	exportResult?: ExportResult
 	integrityReport?: IntegrityVerificationReport
-	deliveryAttempts: DeliveryAttempt[]
+	deliveryId?: string
 	error?: Error | string
 }
 
@@ -126,65 +108,7 @@ export interface ReportTemplate {
  * Delivery configuration for different methods
  */
 export interface DeliveryConfig {
-	method: 'email' | 'webhook' | 'storage' | 'sftp' | 'download'
-	email?: {
-		smtpConfig: {
-			host: string
-			port: number
-			secure: boolean
-			auth: {
-				user: string
-				pass: string
-			}
-		}
-		from: string
-		subject: string
-		bodyTemplate?: string
-		attachmentName?: string
-		recipients?: string[]
-	}
-
-	webhook?: {
-		url: string
-		method: 'POST' | 'PUT'
-		headers: Record<string, string>
-		timeout: number
-		retryConfig: {
-			maxRetries: number
-			backoffMultiplier: number
-			maxBackoffDelay: number
-		}
-	}
-
-	storage?: {
-		provider: 'local' | 's3' | 'azure' | 'gcp'
-		config: Record<string, any>
-		path: string
-		retention: {
-			days: number
-			autoCleanup: boolean
-		}
-	}
-
-	sftp?: {
-		host: string
-		port: number
-		username?: string
-		password?: string
-		privateKey?: string
-		path: string
-		filename?: string
-	}
-
-	download?: {
-		expiryHours: number
-	}
-
-	// General options
-	compression?: 'none' | 'gzip' | 'zip'
-	encryption?: boolean
-	encryptionKey?: string
-	retentionDays?: number
+	destinations: string[] | 'default'
 }
 
 export interface ScheduleConfig {
@@ -275,22 +199,21 @@ interface ListParams {
 export class ScheduledReportingService {
 	private reportService: ComplianceReportingService
 	private exportService: DataExportService
+	private deliveryService: DeliveryService
 	private client: EnhancedAuditDatabaseClient
 	private inngest: Inngest
-	private deliveryConfig: DeliveryConfig
 
 	constructor(
 		reportService: ComplianceReportingService,
 		exportService: DataExportService,
 		client: EnhancedAuditDatabaseClient,
-		inngest: Inngest,
-		deliveryConfig: DeliveryConfig
+		inngest: Inngest
 	) {
 		this.reportService = reportService
 		this.exportService = exportService
 		this.client = client
 		this.inngest = inngest
-		this.deliveryConfig = deliveryConfig
+		this.deliveryService = new DeliveryService(client)
 	}
 
 	/**
@@ -565,7 +488,7 @@ export class ScheduledReportingService {
 			executionTime: now,
 			status: 'running',
 			trigger: 'scheduled',
-			deliveryAttempts: [],
+			deliveryId: undefined,
 		}
 
 		try {
@@ -585,7 +508,7 @@ export class ScheduledReportingService {
 				recordsProcessed: null,
 				exportResult: null,
 				integrityReport: null,
-				deliveryAttempts: [],
+				deliveryId: null,
 				error: null,
 			}
 
@@ -598,7 +521,8 @@ export class ScheduledReportingService {
 				execution.exportResult = reportResult as ExportResult
 				execution.recordsProcessed = (reportResult as ExportResult).size
 				// Deliver the report
-				await this.deliverReport(config, reportResult, execution)
+				const { deliveryId } = await this.deliverReport(config, reportResult, execution)
+				execution.deliveryId = deliveryId
 			} else if (
 				reportResult &&
 				typeof reportResult === 'object' &&
@@ -621,7 +545,7 @@ export class ScheduledReportingService {
 					recordsProcessed: execution.recordsProcessed,
 					exportResult: execution.exportResult,
 					integrityReport: execution.integrityReport,
-					deliveryAttempts: execution.deliveryAttempts,
+					deliveryId: execution.deliveryId,
 				})
 				.where(eq(reportExecutions.id, executionId))
 
@@ -647,7 +571,6 @@ export class ScheduledReportingService {
 				.set({
 					status: 'failed',
 					error: execution.error,
-					deliveryAttempts: execution.deliveryAttempts,
 				})
 				.where(eq(reportExecutions.id, executionId))
 
@@ -688,7 +611,7 @@ export class ScheduledReportingService {
 			recordsProcessed: record.recordsProcessed || undefined,
 			exportResult: (record.exportResult as ExportResult) || undefined,
 			integrityReport: (record.integrityReport as IntegrityVerificationReport) || undefined,
-			deliveryAttempts: (record.deliveryAttempts as DeliveryAttempt[]) || [],
+			deliveryId: record.deliveryId || undefined,
 			error: record.error || undefined,
 		}))
 	}
@@ -876,23 +799,7 @@ export class ScheduledReportingService {
 				catchUpMissedRuns: false,
 			},
 			delivery: overrides.delivery || {
-				method: 'email',
-				email: {
-					smtpConfig: {
-						host: 'smtp.example.com',
-						port: 587,
-						secure: false,
-						auth: {
-							user: 'user',
-							pass: 'pass',
-						},
-					},
-					from: 'reports@smedrec.com',
-					subject: `Scheduled Report: ${template.name}`,
-					bodyTemplate: 'Please find the attached report.',
-					attachmentName: `report-${new Date().toISOString().split('T')[0]}.json`,
-					recipients: ['teste@exemplo.com'],
-				},
+				destinations: 'default',
 			},
 			export: overrides.export || {
 				format: 'json',
@@ -912,7 +819,7 @@ export class ScheduledReportingService {
 			metadata: overrides.metadata || {},
 		}
 
-		return this.createScheduledReport(reportConfig)
+		return await this.createScheduledReport(reportConfig)
 	}
 
 	/**
@@ -943,63 +850,6 @@ export class ScheduledReportingService {
 		}
 
 		return executions
-	}
-
-	/**
-	 * Retry failed deliveries
-	 */
-	async retryFailedDeliveries(maxAge: number = 24 * 60 * 60 * 1000): Promise<void> {
-		const cutoffTime = new Date(Date.now() - maxAge).toISOString()
-		const db = this.client.getDatabase()
-
-		// Get recent executions that might have failed deliveries
-		const recentExecutions = await this.client.executeOptimizedQuery(
-			(db) =>
-				db.select().from(reportExecutions).where(gte(reportExecutions.executionTime, cutoffTime)),
-			{ skipCache: true }
-		)
-
-		for (const executionRecord of recentExecutions) {
-			const deliveryAttempts = (executionRecord.deliveryAttempts as DeliveryAttempt[]) || []
-
-			const failedAttempts = deliveryAttempts.filter(
-				(attempt) => attempt.status === 'failed' && attempt.retryCount < 3
-			)
-
-			if (failedAttempts.length > 0) {
-				const execution: ReportExecution = {
-					executionId: executionRecord.id,
-					scheduledReportId: executionRecord.scheduledReportId,
-					scheduledTime: executionRecord.scheduledTime,
-					executionTime: executionRecord.executionTime,
-					status: executionRecord.status as 'running' | 'completed' | 'failed',
-					trigger: executionRecord.trigger as 'manual' | 'scheduled' | 'retry' | 'api' | 'catchup',
-					duration: executionRecord.duration || undefined,
-					recordsProcessed: executionRecord.recordsProcessed || undefined,
-					exportResult: (executionRecord.exportResult as ExportResult) || undefined,
-					integrityReport:
-						(executionRecord.integrityReport as IntegrityVerificationReport) || undefined,
-					deliveryAttempts,
-					error: executionRecord.error || undefined,
-				}
-
-				for (const attempt of failedAttempts) {
-					try {
-						await this.retryDelivery(execution, attempt)
-
-						// Update the execution record with the updated delivery attempts
-						await db
-							.update(reportExecutions)
-							.set({
-								deliveryAttempts: execution.deliveryAttempts,
-							})
-							.where(eq(reportExecutions.id, executionRecord.id))
-					} catch (error) {
-						console.error(`Failed to retry delivery ${attempt.attemptId}:`, error)
-					}
-				}
-			}
-		}
 	}
 
 	/**
@@ -1064,7 +914,7 @@ export class ScheduledReportingService {
 
 		if (schedule.timezone) {
 			// Note: Proper timezone handling would require a library like 'luxon' or 'date-fns-tz'
-			// This is a placeholder implementation assuming server is in UTC
+			// TODO: This is a placeholder implementation assuming server is in UTC
 			// In production, convert 'nextRun' to the specified timezone
 		}
 
@@ -1141,104 +991,39 @@ export class ScheduledReportingService {
 		config: ScheduledReportConfig,
 		reportResult: ExportResult,
 		execution: ReportExecution
-	): Promise<void> {
-		const deliveryAttempt: DeliveryAttempt = {
-			attemptId: this.generateId('delivery'),
-			timestamp: new Date().toISOString(),
-			status: 'pending',
-			method: config.delivery.method,
-			target: this.getDeliveryTarget(config.delivery),
-			retryCount: 0,
+	): Promise<DeliveryResponse> {
+		const deliveryRequest = {
+			organizationId: config.organizationId,
+			destinations: config.delivery.destinations,
+			payload: {
+				type: 'report' as const,
+				data: {
+					...reportResult,
+				},
+				metadata: {
+					reportId: config.id,
+					reportName: config.name,
+					reportType: config.reportType,
+					format: config.format,
+					recordsProcessed: execution.recordsProcessed,
+					executionTime: execution.executionTime,
+					scheduledTime: execution.scheduledTime,
+					scheduledReportId: execution.scheduledReportId,
+					trigger: execution.trigger,
+					executionId: execution.executionId,
+				},
+			},
+			options: {
+				correlationId: execution.executionId,
+				priority: Math.floor(Math.random() * 10),
+			},
 		}
 
-		execution.deliveryAttempts.push(deliveryAttempt)
-
 		try {
-			switch (config.delivery.method) {
-				case 'email':
-					await this.deliverViaEmail(config.delivery, reportResult, deliveryAttempt)
-					break
-				case 'webhook':
-					await this.deliverViaWebhook(config.delivery, reportResult, deliveryAttempt)
-					break
-				case 'storage':
-					await this.deliverViaStorage(config.delivery, reportResult, deliveryAttempt)
-					break
-				case 'sftp':
-				case 'download':
-					console.warn(`Delivery method ${config.delivery.method} not yet implemented`)
-					deliveryAttempt.status = 'failed'
-					deliveryAttempt.error = `Delivery method ${config.delivery.method} not yet implemented`
-					throw new Error(deliveryAttempt.error)
-				default:
-					throw new Error(`Unsupported delivery method: ${config.delivery.method}`)
-			}
-
-			deliveryAttempt.status = 'delivered'
+			return await this.deliveryService.deliver(deliveryRequest)
 		} catch (error) {
-			deliveryAttempt.status = 'failed'
-			deliveryAttempt.error = error instanceof Error ? error.message : 'Unknown error'
+			console.error(`Failed to deliver report ${config.id}:`, error)
 			throw error
-		}
-	}
-
-	private async deliverViaEmail(
-		delivery: ScheduledReportConfig['delivery'],
-		reportResult: ExportResult,
-		attempt: DeliveryAttempt
-	): Promise<void> {
-		// TODO Placeholder email delivery implementation
-		console.log(`Delivering report via email to: ${delivery.email?.recipients?.join(', ')}`)
-		attempt.responseTime = 250 // Placeholder
-	}
-
-	private async deliverViaWebhook(
-		delivery: ScheduledReportConfig['delivery'],
-		reportResult: ExportResult,
-		attempt: DeliveryAttempt
-	): Promise<void> {
-		// TODO Placeholder webhook delivery implementation
-		console.log(`Delivering report via webhook to: ${delivery.webhook?.url}`)
-		attempt.responseCode = 200
-		attempt.responseTime = 150 // Placeholder
-	}
-
-	private async deliverViaStorage(
-		delivery: ScheduledReportConfig['delivery'],
-		reportResult: ExportResult,
-		attempt: DeliveryAttempt
-	): Promise<void> {
-		// TODO Placeholder storage delivery implementation
-		console.log(`Storing report at: ${delivery.storage?.path}`)
-		attempt.responseTime = 100 // Placeholder
-	}
-
-	private async retryDelivery(execution: ReportExecution, attempt: DeliveryAttempt): Promise<void> {
-		const config = await this.getScheduledReport(execution.scheduledReportId)
-		if (!config || !execution.exportResult) return
-
-		attempt.retryCount++
-		attempt.status = 'retrying'
-		attempt.timestamp = new Date().toISOString()
-
-		try {
-			await this.deliverReport(config, execution.exportResult, execution)
-		} catch (error) {
-			attempt.status = 'failed'
-			attempt.error = error instanceof Error ? error.message : 'Unknown error'
-		}
-	}
-
-	private getDeliveryTarget(delivery: ScheduledReportConfig['delivery']): string {
-		switch (delivery.method) {
-			case 'email':
-				return delivery.email?.recipients?.join(', ') || 'unknown'
-			case 'webhook':
-				return delivery.webhook?.url || 'unknown'
-			case 'storage':
-				return delivery.storage?.path || 'unknown'
-			default:
-				return 'unknown'
 		}
 	}
 

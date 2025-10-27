@@ -597,7 +597,7 @@ export const reportExecutions = pgTable(
 		recordsProcessed: integer('records_processed'),
 		exportResult: jsonb('export_result'), // ExportResult as JSON
 		integrityReport: jsonb('integrity_report'), // IntegrityVerificationReport as JSON
-		deliveryAttempts: jsonb('delivery_attempts').notNull().default('[]'), // Array of DeliveryAttempt
+		deliveryId: varchar('delivery_id', { length: 255 }), // Delivery ID
 		error: text('error'), // TODO: alter to jsonb
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
 			.notNull()
@@ -612,6 +612,7 @@ export const reportExecutions = pgTable(
 			index('report_executions_trigger_idx').on(table.trigger),
 			index('report_executions_scheduled_time_idx').on(table.scheduledTime),
 			index('report_executions_execution_time_idx').on(table.executionTime),
+			index('report_executions_delivery_id_idx').on(table.deliveryId),
 			index('report_executions_created_at_idx').on(table.createdAt),
 
 			// Composite indexes for common queries
