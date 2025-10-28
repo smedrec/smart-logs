@@ -148,29 +148,3 @@ export const NotificationConfigSchema = z.object({
 	customMessage: z.string().optional(),
 })
 export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
-
-/**
- * Basic delivery configuration schema (to avoid circular imports)
- */
-export const DeliveryConfigSchema = z.object({
-	method: z.enum(['email', 'webhook', 'sftp', 'storage', 'download']),
-	email: z
-		.object({
-			recipients: z.array(z.string().email()).optional(),
-			subject: z.string().optional(),
-		})
-		.optional(),
-	webhook: z
-		.object({
-			url: z.string().url(),
-			method: z.enum(['POST', 'PUT']).optional(),
-		})
-		.optional(),
-	storage: z
-		.object({
-			provider: z.enum(['local', 's3', 'azure', 'gcp']),
-			config: z.record(z.string(), z.any()).optional(),
-		})
-		.optional(),
-})
-export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>

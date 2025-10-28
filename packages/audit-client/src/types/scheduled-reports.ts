@@ -2,8 +2,6 @@ import { z } from 'zod'
 
 import { ExportResultSchema, PaginationMetadataSchema, PaginationParamsSchema } from './api'
 import {
-	DeliveryConfigSchema as BaseDeliveryConfigSchema,
-	DeliveryStatusSchema,
 	ExecutionStatusSchema,
 	ExecutionTriggerSchema,
 	ExportConfigSchema,
@@ -118,122 +116,12 @@ export const ScheduleConfigSchema = z
 export type ScheduleConfig = z.infer<typeof ScheduleConfigSchema>
 
 /**
- * Full delivery configuration (extends the basic one from shared-schemas)
+ * Basic delivery configuration schema
  */
-export const FullDeliveryConfigSchema = z
-	.object({
-		method: z.enum(['email', 'webhook', 'sftp', 'storage', 'download']),
-
-		// Email delivery
-		email: z
-			.object({
-				smtpConfig: z.object({
-					host: z.string(),
-					port: z.number(),
-					secure: z.boolean(),
-					auth: z.object({
-						user: z.string(),
-						pass: z.string(),
-					}),
-				}),
-				from: z.string().email(),
-				replyTo: z.string().email().optional(),
-				subject: z.string(),
-				bodyTemplate: z.string().optional(),
-				attachmentName: z.string().optional(),
-				recipients: z.array(z.string().email()).optional(),
-			})
-			.optional(),
-
-		// Webhook delivery
-		webhook: z
-			.object({
-				url: z.string().url(),
-				method: z.enum(['POST', 'PUT']), //.default('POST'),
-				headers: z.record(z.string(), z.string()).optional(),
-				timeout: z.number().int().min(1000).max(300000), //.default(30000),
-				retryConfig: z.object({
-					maxRetries: z.number().int().min(0).max(5), //.default(3),
-					backoffMultiplier: z.number().int().min(1).max(10), //.default(2),
-					maxBackoffDelay: z.number().int().min(1000).max(300000), //.default(30000),
-				}),
-			})
-			.optional(),
-
-		// SFTP delivery
-		sftp: z
-			.object({
-				host: z.string(),
-				port: z.number().int().min(1).max(65535), //.default(22),
-				username: z.string().optional(),
-				password: z.string().optional(),
-				privateKey: z.string().optional(),
-				path: z.string(),
-				filename: z.string().optional(),
-			})
-			.optional(),
-
-		// Storage delivery
-		storage: z
-			.object({
-				provider: z.enum(['local', 's3', 'azure', 'gcp']),
-				config: z.record(z.string(), z.any()).optional(),
-				retention: z.object({
-					days: z.number().int().min(1).max(365),
-					autoCleanup: z.boolean(), //.default(true),
-				}),
-			})
-			.optional()
-			.transform((data) => {
-				if (data?.provider === 'local') {
-					return {
-						provider: 'local',
-						config: {
-							basePath: '/tmp/smart-reports',
-						},
-					}
-				}
-				return data
-			}),
-
-		download: z
-			.object({
-				expiryHours: z.number().int().min(1).max(168), //.default(24),
-			})
-			.optional(),
-
-		// General options
-		compression: z.enum(['none', 'gzip', 'zip']), //.default('none'),
-		encryption: z.boolean(), //.default(false),
-		encryptionKey: z.string().optional(),
-		retentionDays: z.number().int().min(1).max(365).optional(),
-	})
-	.refine(
-		(data) => {
-			// Validate required fields based on delivery method
-			switch (data.method) {
-				case 'email':
-					return data.email?.recipients && data.email.recipients.length > 0
-				case 'webhook':
-					return !!data.webhook?.url
-				case 'sftp':
-					return !!(data.sftp?.host && data.sftp.path)
-				case 'storage':
-					return !!(data.storage?.provider && data.storage?.config)
-				case 'download':
-					return !!data.download?.expiryHours
-				default:
-					return true
-			}
-		},
-		{
-			message: 'Missing required fields for the selected delivery method',
-		}
-	)
-export type DeliveryConfig = z.infer<typeof FullDeliveryConfigSchema>
-
-// Export the full schema as DeliveryConfigSchema for backward compatibility
-export const DeliveryConfigSchema = FullDeliveryConfigSchema
+export const DeliveryConfigSchema = z.object({
+	destinations: z.union([z.array(z.string()), z.literal('default')]),
+})
+export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>
 
 // Export and Notification configs are now imported from shared-schemas
 
@@ -324,29 +212,6 @@ export type UpdateScheduledReportInput = z.infer<typeof UpdateScheduledReportInp
 // ============================================================================
 
 /**
- * Delivery attempt record
- */
-export const DeliveryAttemptSchema = z.object({
-	attemptId: z.string(),
-	timestamp: z.string().datetime(),
-	status: DeliveryStatusSchema,
-	method: z.enum(['email', 'webhook', 'storage', 'download', 'sftp']),
-	target: z.string(),
-	error: z
-		.object({
-			code: z.string(),
-			message: z.string(),
-			details: z.record(z.string(), z.any()).optional(),
-			stackTrace: z.string().optional(),
-		})
-		.optional(),
-	responseCode: z.number().optional(),
-	responseTime: z.number().optional(),
-	retryCount: z.number().int().min(0),
-})
-export type DeliveryAttempt = z.infer<typeof DeliveryAttemptSchema>
-
-/**
  * Report execution
  */
 export const ReportExecutionSchema = z.object({
@@ -367,7 +232,7 @@ export const ReportExecutionSchema = z.object({
 	integrityReport: IntegrityVerificationReportSchema.optional(),
 
 	// Delivery tracking
-	deliveryAttempts: z.array(DeliveryAttemptSchema),
+	deliveryId: z.string().optional(),
 
 	// Error handling
 	error: z

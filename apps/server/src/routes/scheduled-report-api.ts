@@ -7,7 +7,6 @@
  * Requirements: 4.1, 4.4, 8.1
  */
 
-import { version } from 'os'
 import { ApiError } from '@/lib/errors'
 import { openApiErrorResponses } from '@/lib/errors/openapi_responses'
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
@@ -75,54 +74,7 @@ const CreateScheduledReportInputSchema = z.object({
 		holidayCalendarId: z.string().optional(),
 	}),
 	delivery: z.object({
-		method: z.enum(['email', 'webhook', 'storage']),
-		email: z
-			.object({
-				smtpConfig: z.object({
-					host: z.string(),
-					port: z.number().int().min(1).max(65535),
-					secure: z.boolean(),
-					auth: z.object({
-						user: z.string(),
-						pass: z.string(),
-					}),
-				}),
-				from: z.string().email(),
-				subject: z.string().optional(),
-				bodyTemplate: z.string().optional(),
-				attachmentName: z.string().optional(),
-				recipients: z.array(z.string().email()).optional(),
-			})
-			.optional(),
-		webhook: z
-			.object({
-				url: z.string().url(),
-				method: z.enum(['POST', 'PUT']),
-				headers: z.record(z.string(), z.string()).optional(),
-				timeout: z.number().int().min(1).max(300).optional(),
-				retryConfig: z.object({
-					maxRetries: z.number().int().min(0).max(10),
-					backoffDelay: z.number().int().min(100).max(10000),
-					backoffMultiplier: z.number().int().min(1).max(10),
-					maxBackoffDelay: z.number().int().min(100).max(10000),
-				}),
-			})
-			.optional(),
-		storage: z
-			.object({
-				storageType: z.enum(['s3', 'azure', 'gcs']),
-				config: z.record(z.string(), z.any()),
-				path: z.string(),
-				retention: z.object({
-					days: z.number().int().min(1).max(365),
-					autoCleanup: z.boolean(),
-				}),
-			})
-			.optional(),
-		compression: z.enum(['none', 'gzip', 'zip']).optional(),
-		encryption: z.boolean().optional(),
-		encryptionKey: z.string().optional(),
-		retentionDays: z.number().optional(),
+		destinations: z.union([z.array(z.string()), z.literal('default')]),
 	}),
 	export: z
 		.object({
@@ -383,26 +335,7 @@ const getExecutionHistoryRoute = createRoute({
 								duration: z.number().min(0).optional(),
 								reportId: z.string().optional(),
 								recordsProcessed: z.number().int().min(0).optional(),
-								deliveryAttempts: z.array(
-									z.object({
-										attemptId: z.string(),
-										timestamp: z.string().datetime(),
-										status: z.enum(['pending', 'delivered', 'failed', 'skipped']),
-										method: z.enum(['email', 'webhook', 'storage', 'download', 'sftp']),
-										target: z.string(),
-										error: z
-											.object({
-												code: z.string(),
-												message: z.string(),
-												details: z.record(z.string(), z.any()).optional(),
-												stackTrace: z.string().optional(),
-											})
-											.optional(),
-										responseCode: z.number().optional(),
-										responseTime: z.number().optional(),
-										retryCount: z.number().int().min(0),
-									})
-								),
+								deliveryId: z.string().optional(),
 								error: z
 									.object({
 										code: z.string(),

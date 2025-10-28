@@ -379,46 +379,8 @@ export class ScheduledReportsService extends BaseResource {
 	 * Validate delivery configuration
 	 */
 	private validateDeliveryConfig(delivery: DeliveryConfig): void {
-		if (!delivery.method) {
-			throw new Error('Delivery method is required')
-		}
-
-		const validMethods = ['email', 'webhook', 'storage']
-		if (!validMethods.includes(delivery.method)) {
-			throw new Error(`Invalid delivery method. Must be one of: ${validMethods.join(', ')}`)
-		}
-
-		if (delivery.method === 'email') {
-			if (!delivery.email?.recipients || delivery.email.recipients.length === 0) {
-				throw new Error('Email recipients are required for email delivery')
-			}
-
-			// Validate email addresses
-			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-			for (const email of delivery.email.recipients) {
-				if (!emailRegex.test(email)) {
-					throw new Error(`Invalid email address: ${email}`)
-				}
-			}
-		}
-
-		if (delivery.method === 'webhook') {
-			if (!delivery.webhook?.url) {
-				throw new Error('Webhook URL is required for webhook delivery')
-			}
-
-			// Validate webhook URL
-			try {
-				new URL(delivery.webhook.url)
-			} catch {
-				throw new Error('Invalid webhook URL format')
-			}
-		}
-
-		if (delivery.method === 'storage') {
-			if (!delivery.storage?.config) {
-				throw new Error('storage config is required for storage delivery')
-			}
+		if (!delivery.destinations) {
+			throw new Error('Delivery destinations is required')
 		}
 	}
 
@@ -580,28 +542,18 @@ export class ScheduledReportsService extends BaseResource {
 		}
 
 		if (input.delivery) {
-			// Validate partial delivery config
-			if (input.delivery.method) {
-				const validMethods = ['email', 'webhook', 'storage', 'sftp', 'download']
-				if (!validMethods.includes(input.delivery.method)) {
-					throw new Error(`Invalid delivery method. Must be one of: ${validMethods.join(', ')}`)
-				}
-			}
-
-			if (input.delivery.email?.recipients) {
-				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-				for (const email of input.delivery.email.recipients) {
-					if (!emailRegex.test(email)) {
-						throw new Error(`Invalid email address: ${email}`)
+			// Validate partial delivery
+			if (input.delivery.destinations) {
+				if (!Array.isArray(input.delivery.destinations)) {
+					if (input.delivery.destinations != 'default') {
+						throw new Error('Destinations must be an array or "default"')
 					}
 				}
-			}
 
-			if (input.delivery.webhook?.url) {
-				try {
-					new URL(input.delivery.webhook.url)
-				} catch {
-					throw new Error('Invalid webhook URL format')
+				if (Array.isArray(input.delivery.destinations)) {
+					if (input.delivery.destinations.length === 0) {
+						throw new Error('At least one destination is required')
+					}
 				}
 			}
 		}
