@@ -21,9 +21,7 @@ export type {
 } from './compliance-reporting.js'
 
 export type {
-	DeliveryStatus,
 	ScheduledReportConfig,
-	DeliveryAttempt,
 	ReportExecution,
 	ReportTemplate,
 	DeliveryConfig,

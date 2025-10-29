@@ -14,7 +14,6 @@ import type { AuditClientConfig } from '../core/config'
 import type { Logger } from '../infrastructure/logger'
 import type {
 	CreateScheduledReportInput,
-	DeliveryConfig,
 	ExecutionHistoryParams,
 	ListScheduledReportsParams,
 	PaginatedExecutions,
@@ -24,6 +23,7 @@ import type {
 	ScheduledReport,
 	UpdateScheduledReportInput,
 } from '../types/scheduled-reports'
+import type { DeliveryConfig } from '../types/shared-schemas'
 
 /**
  * ScheduledReportsService - Comprehensive scheduled report management

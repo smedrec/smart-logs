@@ -44,7 +44,6 @@ import type {
 } from './presets'
 import type {
 	CreateScheduledReportInput,
-	DeliveryAttempt,
 	PaginatedExecutions,
 	ReportExecution,
 	ScheduledReport,

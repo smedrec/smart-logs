@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { ExportResultSchema, PaginationMetadataSchema, PaginationParamsSchema } from './api'
 import {
+	DeliveryConfigSchema,
 	ExecutionStatusSchema,
 	ExecutionTriggerSchema,
 	ExportConfigSchema,
@@ -114,14 +115,6 @@ export const ScheduleConfigSchema = z
 		}
 	)
 export type ScheduleConfig = z.infer<typeof ScheduleConfigSchema>
-
-/**
- * Basic delivery configuration schema
- */
-export const DeliveryConfigSchema = z.object({
-	destinations: z.union([z.array(z.string()), z.literal('default')]),
-})
-export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>
 
 // Export and Notification configs are now imported from shared-schemas
 

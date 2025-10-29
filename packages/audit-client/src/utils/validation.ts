@@ -47,13 +47,13 @@ import {
 } from '../types/presets'
 import {
 	CreateScheduledReportInputSchema,
-	DeliveryConfigSchema,
 	ExecutionHistoryParamsSchema,
 	ListScheduledReportsParamsSchema,
 	ScheduleConfigSchema,
 	ScheduledReportSchema,
 	UpdateScheduledReportInputSchema,
 } from '../types/scheduled-reports'
+import { DeliveryConfigSchema } from '../types/shared-schemas'
 
 import type { ValidationResult, Validator } from '../types/utils'
 

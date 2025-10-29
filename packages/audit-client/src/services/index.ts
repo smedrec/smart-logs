@@ -49,7 +49,6 @@ export { ScheduledReportsService } from './scheduled-reports'
 
 export {
 	type ScheduleConfig,
-	type DeliveryConfig,
 	type ScheduledReport,
 	type CreateScheduledReportInput,
 	type UpdateScheduledReportInput,
@@ -135,6 +134,7 @@ export {
 } from '../types/health'
 
 export {
+	type DeliveryConfig,
 	type ExecutionStatus,
 	type ExecutionTrigger,
 	type ReportStatus,
