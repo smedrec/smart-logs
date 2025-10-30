@@ -7,6 +7,7 @@ export interface RedisConfig {
 	connectTimeout?: number
 	maxRetriesPerRequest?: number
 	enableOfflineQueue?: boolean
+	enableAutoPipelining?: boolean
 }
 
 export interface CacheOptions {

@@ -39,6 +39,7 @@ export class RedisService {
 			connectTimeout: this.config.connectTimeout || 10000,
 			maxRetriesPerRequest: this.config.maxRetriesPerRequest || 3,
 			enableOfflineQueue: this.config.enableOfflineQueue || true,
+			enableAutoPipelining: this.config.enableAutoPipelining || true,
 			retryStrategy: (times: number) => {
 				const delay = Math.min(times * 50, 2000)
 				return delay

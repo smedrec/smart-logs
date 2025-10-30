@@ -108,6 +108,45 @@ export class EnhancedPartitionManager implements IPartitionManager {
 	}
 
 	/**
+	 * Drop old partitions based on retention policy
+	 */
+	async dropExpiredPartitions(retentionDays: number): Promise<string[]> {
+		const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+		const droppedPartitions: string[] = []
+
+		// Get list of partitions older than retention period
+		const result = await this.db.execute(sql`
+			SELECT 
+				schemaname,
+				tablename,
+				pg_get_expr(c.relpartbound, c.oid) as partition_expression
+			FROM pg_tables t
+			JOIN pg_class c ON c.relname = t.tablename
+			WHERE t.tablename LIKE 'audit_log_%'
+			AND t.schemaname = 'public'
+			AND c.relispartition = true
+		`)
+
+		for (const row of result) {
+			const tableName = row.tablename as string
+			const partitionExpr = row.partition_expression as string
+
+			// Parse partition expression to get date range
+			const dateMatch = partitionExpr.match(/FROM \('([^']+)'\) TO \('([^']+)'\)/)
+			if (dateMatch) {
+				const partitionEndDate = new Date(dateMatch[2])
+				if (partitionEndDate < cutoffDate) {
+					//await this.db.execute(sql`DROP TABLE IF EXISTS ${sql.identifier(tableName)}`)
+					await this.dropPartition(tableName)
+					droppedPartitions.push(tableName)
+				}
+			}
+		}
+
+		return droppedPartitions
+	}
+
+	/**
 	 * Drop partition with safety checks
 	 */
 	async dropPartition(partitionName: string): Promise<void> {
@@ -230,8 +269,8 @@ export class EnhancedPartitionManager implements IPartitionManager {
 	/**
 	 * Create time-based partitions with enhanced error handling
 	 */
-	async createAuditLogPartitions(config: PartitionConfig): Promise<void> {
-		const { strategy, interval = 'monthly', retentionDays } = config
+	async createAuditLogPartitions(config: Partial<PartitionConfig>): Promise<void> {
+		const { strategy, interval = 'monthly', retentionDays = 2555 } = config
 
 		if (strategy !== 'range') {
 			throw new Error('Only range partitioning is supported for audit_log table')
@@ -268,6 +307,50 @@ export class EnhancedPartitionManager implements IPartitionManager {
 						: 'Failed to create audit log partitions',
 			})
 			throw error
+		}
+	}
+
+	/**
+	 * Analyze partition performance and suggest optimizations
+	 */
+	async analyzePartitionPerformance(): Promise<{
+		totalPartitions: number
+		totalSize: number
+		totalRecords: number
+		averagePartitionSize: number
+		recommendations: string[]
+	}> {
+		const partitions = await this.getPartitionStatus()
+		const recommendations: string[] = []
+
+		const totalPartitions = partitions.length
+		const totalSize = partitions.reduce((sum, p) => sum + (p.sizeBytes || 0), 0)
+		const totalRecords = partitions.reduce((sum, p) => sum + (p.recordCount || 0), 0)
+		const averagePartitionSize = totalSize / totalPartitions
+
+		// Generate recommendations
+		if (totalPartitions > 50) {
+			recommendations.push(
+				'Consider increasing partition interval or implementing partition pruning'
+			)
+		}
+
+		if (averagePartitionSize > 1024 * 1024 * 1024) {
+			// > 1GB average
+			recommendations.push('Large partition sizes detected - consider smaller partition intervals')
+		}
+
+		const emptyPartitions = partitions.filter((p) => (p.recordCount || 0) === 0).length
+		if (emptyPartitions > 5) {
+			recommendations.push(`${emptyPartitions} empty partitions found - consider cleanup`)
+		}
+
+		return {
+			totalPartitions,
+			totalSize,
+			totalRecords,
+			averagePartitionSize,
+			recommendations,
 		}
 	}
 
@@ -627,5 +710,84 @@ export class EnhancedPartitionManager implements IPartitionManager {
 			'last_optimized',
 			new Date().toISOString()
 		)
+	}
+}
+
+/**
+ * Partition maintenance scheduler
+ */
+export class PartitionMaintenanceScheduler {
+	private intervalId: NodeJS.Timeout | null = null
+
+	constructor(
+		private partitionManager: EnhancedPartitionManager,
+		private config: {
+			maintenanceInterval: number // in milliseconds
+			retentionDays: number
+			autoCreatePartitions: boolean
+			autoDropPartitions: boolean
+		}
+	) {}
+
+	/**
+	 * Start automatic partition maintenance
+	 */
+	start(): void {
+		if (this.intervalId) {
+			return // Already running
+		}
+
+		this.intervalId = setInterval(async () => {
+			try {
+				await this.performMaintenance()
+			} catch (error) {
+				console.error('Partition maintenance failed:', error)
+			}
+		}, this.config.maintenanceInterval)
+
+		console.log('Partition maintenance scheduler started')
+	}
+
+	/**
+	 * Stop automatic partition maintenance
+	 */
+	stop(): void {
+		if (this.intervalId) {
+			clearInterval(this.intervalId)
+			this.intervalId = null
+			console.log('Partition maintenance scheduler stopped')
+		}
+	}
+
+	/**
+	 * Perform maintenance tasks
+	 */
+	private async performMaintenance(): Promise<void> {
+		if (this.config.autoCreatePartitions) {
+			await this.partitionManager.createAuditLogPartitions({
+				strategy: 'range' as const,
+				partitionColumn: 'timestamp',
+				interval: 'monthly',
+				retentionDays: this.config.retentionDays,
+			})
+		}
+
+		if (this.config.autoDropPartitions) {
+			const droppedPartitions = await this.partitionManager.dropExpiredPartitions(
+				this.config.retentionDays
+			)
+			if (droppedPartitions.length > 0) {
+				console.log(`Dropped expired partitions: ${droppedPartitions.join(', ')}`)
+			}
+		}
+
+		// Log partition statistics
+		const stats = await this.partitionManager.analyzePartitionPerformance()
+		console.log('Partition statistics:', {
+			totalPartitions: stats.totalPartitions,
+			totalSizeGB: (stats.totalSize / (1024 * 1024 * 1024)).toFixed(2),
+			totalRecords: stats.totalRecords,
+			recommendations: stats.recommendations,
+		})
 	}
 }

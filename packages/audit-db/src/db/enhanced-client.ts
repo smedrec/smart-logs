@@ -3,7 +3,10 @@ import { createHash } from 'crypto'
 import { StructuredLogger } from '@repo/logs'
 
 import { EnhancedDatabaseClient } from './connection-pool.js'
-import { DatabasePartitionManager, PartitionMaintenanceScheduler } from './partitioning.js'
+import {
+	EnhancedPartitionManager,
+	PartitionMaintenanceScheduler,
+} from './enhanced-partition-manager.js'
 import { DatabasePerformanceMonitor } from './performance-monitoring.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
@@ -90,7 +93,8 @@ export class EnhancedAuditDatabaseClient {
 	private readonly metricsPrefix: string = 'metrics:'
 	private readonly retentionPeriod: number = 86400 // 24 hours in seconds
 	private client: EnhancedDatabaseClient
-	private partitionManager: DatabasePartitionManager
+	//private partitionManager: DatabasePartitionManager
+	private readonly partitionManager: EnhancedPartitionManager
 	private performanceMonitor: DatabasePerformanceMonitor
 	private partitionScheduler?: PartitionMaintenanceScheduler
 	private performanceReportInterval?: NodeJS.Timeout
@@ -131,7 +135,8 @@ export class EnhancedAuditDatabaseClient {
 		)
 
 		// Initialize partition manager
-		this.partitionManager = new DatabasePartitionManager(this.client.getDatabase())
+		//this.partitionManager = new DatabasePartitionManager(this.client.getDatabase())
+		this.partitionManager = new EnhancedPartitionManager(this.client.getDatabase(), this.connection)
 
 		// Initialize performance monitor
 		this.performanceMonitor = new DatabasePerformanceMonitor(this.client.getDatabase())
@@ -189,6 +194,24 @@ export class EnhancedAuditDatabaseClient {
 			interval: this.config.partitioning.interval,
 			retentionDays: this.config.partitioning.retentionDays,
 		})*/
+
+		try {
+			// Initialize partitioning if enabled
+			if (this.config.partitioning.autoMaintenance) {
+				await this.partitionManager.createAuditLogPartitions(this.config.partitioning)
+				this.logger.info('Partition management initialized')
+			}
+
+			this.logger.info('Enhanced audit database client initialized successfully')
+		} catch (error) {
+			this.logger.error('Failed to initialize enhanced database client:', {
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message, stack: error.stack }
+						: 'Failed to initialize enhanced database client',
+			})
+			throw error
+		}
 
 		// Setup automatic partition maintenance
 		if (this.config.partitioning.autoMaintenance) {
