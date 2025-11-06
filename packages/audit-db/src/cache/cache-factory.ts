@@ -1,8 +1,8 @@
+import { OptimizedLRUCache } from './optimized-lru-cache.js'
 import { QueryCache } from './query-cache.js'
 import { RedisQueryCache } from './redis-query-cache.js'
 
 import type { Redis as RedisType } from 'ioredis'
-import type { QueryCacheStats } from './query-cache.js'
 import type { RedisQueryCacheConfig } from './redis-query-cache.js'
 
 /**
@@ -10,6 +10,24 @@ import type { RedisQueryCacheConfig } from './redis-query-cache.js'
  */
 
 export type CacheType = 'local' | 'redis' | 'hybrid'
+
+export interface CacheEntry<T = any> {
+	data: T
+	timestamp: number
+	ttl: number
+	hits: number
+	size: number
+}
+
+export interface QueryCacheStats {
+	totalQueries: number
+	cacheHits: number
+	cacheMisses: number
+	hitRatio: number
+	totalSizeMB: number
+	averageQueryTime: number
+	evictions: number
+}
 
 export interface QueryCacheConfig {
 	/** Enable query result caching */
@@ -54,16 +72,22 @@ export interface IQueryCache {
 	cleanup(): Promise<number> | number
 }
 
-// Re-export types for convenience
-export type { QueryCacheStats, CacheEntry } from './query-cache.js'
-
 /**
  * Factory function to create appropriate cache instance
  */
 export function createQueryCache(connection: RedisType, config: CacheFactoryConfig): IQueryCache {
 	switch (config.type) {
 		case 'local':
-			return new LocalCacheAdapter(new QueryCache(config.queryCache))
+			return new LocalCacheAdapter(
+				new OptimizedLRUCache({
+					enabled: config.queryCache.enabled,
+					maxSizeMB: config.queryCache.maxSizeMB,
+					defaultTTL: config.queryCache.defaultTTL,
+					keyPrefix: config.queryCache.keyPrefix,
+					maxKeys: config.queryCache.maxQueries,
+					cleanupInterval: 60000,
+				})
+			)
 
 		case 'redis':
 			if (!config.redis) {
@@ -100,7 +124,7 @@ export function createQueryCache(connection: RedisType, config: CacheFactoryConf
  * Adapter to make local cache async-compatible
  */
 class LocalCacheAdapter implements IQueryCache {
-	constructor(private cache: QueryCache) {}
+	constructor(private cache: OptimizedLRUCache) {}
 
 	async get<T>(key: string): Promise<T | null> {
 		return this.cache.get<T>(key)

@@ -2,15 +2,19 @@ import { createHash } from 'crypto'
 
 import { StructuredLogger } from '@repo/logs'
 
+import { DatabaseCircuitBreakers } from './circuit-breaker.js'
 import { EnhancedDatabaseClient } from './connection-pool.js'
 import {
 	EnhancedPartitionManager,
 	PartitionMaintenanceScheduler,
 } from './enhanced-partition-manager.js'
+import { GlobalErrorHandler } from './error-handler.js'
+import { ErrorContext } from './interfaces.js'
 import { DatabasePerformanceMonitor } from './performance-monitoring.js'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
+import type { LoggingConfig } from '@repo/logs'
 import type { CacheFactoryConfig } from '../cache/cache-factory.js'
 import type { ConnectionPoolConfig, ReplicationConfig } from './connection-pool.js'
 import type * as schema from './schema.js'
@@ -36,6 +40,13 @@ export interface EnhancedClientConfig {
 		retentionDays: number
 		autoMaintenance: boolean
 		maintenanceInterval: number
+	}
+	/** Circuit breaker configuration */
+	circuitBreaker: {
+		enabled: boolean
+		failureThreshold: number
+		timeoutMs: number
+		resetTimeoutMs: number
 	}
 	/** Performance monitoring configuration */
 	monitoring: {
@@ -64,6 +75,7 @@ export interface PerformanceReport {
 		totalSizeGB: number
 		recommendations: string[]
 	}
+	circuitBreaker: { status: 'closed' | 'open' | 'half_open' }
 	performance: {
 		slowQueries: number
 		unusedIndexes: number
@@ -102,28 +114,13 @@ export class EnhancedAuditDatabaseClient {
 
 	constructor(
 		private connection: RedisType,
-		private config: EnhancedClientConfig
+		private config: EnhancedClientConfig,
+		loggerConfig: LoggingConfig
 	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - EnhancedAuditDatabaseClient',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		// Initialize enhanced database client with connection pooling and caching
@@ -131,7 +128,8 @@ export class EnhancedAuditDatabaseClient {
 			this.connection,
 			config.connectionPool,
 			config.queryCacheFactory,
-			config.replication
+			config.replication,
+			loggerConfig
 		)
 
 		// Initialize partition manager
@@ -271,11 +269,19 @@ export class EnhancedAuditDatabaseClient {
 			skipCache = false,
 		} = options || {}
 
-		if (skipCache || !cacheKey) {
-			return this.client.executeQueryUncached(queryFn)
+		const context: ErrorContext = {
+			operation: 'query',
+			timestamp: new Date(),
+			metadata: { options },
 		}
 
-		return this.client.executeQuery(queryFn, cacheKey, cacheTTL)
+		return this.executeWithProtection(async () => {
+			if (skipCache || !cacheKey) {
+				return this.client.executeQueryUncached(queryFn)
+			}
+
+			return this.client.executeQuery(queryFn, cacheKey, cacheTTL)
+		}, context)
 	}
 
 	/**
@@ -373,11 +379,13 @@ export class EnhancedAuditDatabaseClient {
 	 * Generate comprehensive performance report
 	 */
 	async generatePerformanceReport(): Promise<PerformanceReport> {
-		const [clientStats, partitionStats, performanceSummary] = await Promise.all([
-			this.client.getStats(),
-			this.partitionManager.analyzePartitionPerformance(),
-			this.performanceMonitor.getPerformanceSummary(),
-		])
+		const [clientStats, partitionStats, circuitBreakerStatus, performanceSummary] =
+			await Promise.all([
+				this.client.getStats(),
+				this.partitionManager.analyzePartitionPerformance(),
+				DatabaseCircuitBreakers.master.getState(),
+				this.performanceMonitor.getPerformanceSummary(),
+			])
 
 		return {
 			timestamp: new Date(),
@@ -402,6 +410,9 @@ export class EnhancedAuditDatabaseClient {
 				totalSizeGB: partitionStats.totalSize / (1024 * 1024 * 1024),
 				recommendations: partitionStats.recommendations,
 			},
+			circuitBreaker: {
+				status: circuitBreakerStatus as 'closed' | 'open' | 'half_open',
+			},
 			performance: {
 				slowQueries: performanceSummary.slowQueries.length,
 				unusedIndexes: performanceSummary.unusedIndexes.length,
@@ -420,6 +431,7 @@ export class EnhancedAuditDatabaseClient {
 			connectionPoolSuccessRate: `${report.connectionPool.successRate.toFixed(2)}%`,
 			cacheHitRatio: `${report.queryCache.hitRatio.toFixed(2)}%`,
 			totalPartitions: report.partitions.totalPartitions,
+			circuitBreakerStatus: report.circuitBreaker.status,
 			slowQueries: report.performance.slowQueries,
 		})
 
@@ -547,6 +559,58 @@ export class EnhancedAuditDatabaseClient {
 						: 'Unknown error',
 			})
 		}
+	}
+
+	/**
+	 * Execute operation with circuit breaker protection and error handling
+	 */
+	private async executeWithProtection<T>(
+		operation: () => Promise<T>,
+		context: ErrorContext
+	): Promise<T> {
+		//const startTime = Date.now()
+		//this.metrics.totalRequests++
+
+		try {
+			// Execute with circuit breaker protection
+			const result = await DatabaseCircuitBreakers.master.execute(operation)
+
+			// Record success metrics
+			//this.metrics.successfulRequests++
+			//this.metrics.totalResponseTime += Date.now() - startTime
+
+			return result
+		} catch (error) {
+			// Record failure metrics
+			//this.metrics.failedRequests++
+			//this.metrics.totalResponseTime += Date.now() - startTime
+
+			// Handle error with enhanced error handler
+			const resolution = await GlobalErrorHandler.handle(error as Error, context)
+
+			// Attempt recovery if suggested
+			if (resolution.retryable && resolution.retryAfterMs) {
+				this.logger.info(`Retrying operation after ${resolution.retryAfterMs}ms`, {
+					context: JSON.stringify(context),
+				})
+				await this.delay(resolution.retryAfterMs)
+
+				// Retry the operation (simple retry, could be enhanced with retry limits)
+				return this.executeWithProtection(operation, {
+					...context,
+					retryAttempt: (context as any).retryAttempt ? (context as any).retryAttempt + 1 : 1,
+				} as ErrorContext)
+			}
+
+			throw error
+		}
+	}
+
+	/**
+	 * Utility delay function
+	 */
+	private delay(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms))
 	}
 
 	/**
@@ -684,6 +748,7 @@ export class EnhancedAuditDatabaseClient {
 export function createEnhancedAuditClient(
 	connection: RedisType,
 	databaseUrl: string,
+	loggerConfig: LoggingConfig,
 	overrides?: Partial<EnhancedClientConfig>
 ): EnhancedAuditDatabaseClient {
 	const defaultConfig: EnhancedClientConfig = {
@@ -720,6 +785,12 @@ export function createEnhancedAuditClient(
 			autoMaintenance: true,
 			maintenanceInterval: 24 * 60 * 60 * 1000, // Daily
 		},
+		circuitBreaker: {
+			enabled: true,
+			failureThreshold: 5,
+			timeoutMs: 30000,
+			resetTimeoutMs: 60000,
+		},
 		monitoring: {
 			enabled: true,
 			slowQueryThreshold: 1000, // 1 second
@@ -737,5 +808,5 @@ export function createEnhancedAuditClient(
 		monitoring: { ...defaultConfig.monitoring, ...overrides?.monitoring },
 	}
 
-	return new EnhancedAuditDatabaseClient(connection, config)
+	return new EnhancedAuditDatabaseClient(connection, config, loggerConfig)
 }

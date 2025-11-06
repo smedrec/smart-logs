@@ -7,6 +7,7 @@ import * as schema from './schema.js'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisInstanceType } from 'ioredis'
 import type { Sql } from 'postgres'
+import type { LoggingConfig } from '@repo/logs'
 import type { EnhancedClientConfig } from './enhanced-client.js'
 
 interface DatabaseConfig {
@@ -167,8 +168,12 @@ export class EnhancedAuditDb {
 	 * @param connection The Redis connection instance.
 	 * @param config The database configuration.
 	 */
-	constructor(connection: RedisInstanceType, config: EnhancedClientConfig) {
-		this.client = new EnhancedAuditDatabaseClient(connection, config)
+	constructor(
+		connection: RedisInstanceType,
+		config: EnhancedClientConfig,
+		loggerConfig: LoggingConfig
+	) {
+		this.client = new EnhancedAuditDatabaseClient(connection, config, loggerConfig)
 	}
 
 	/**

@@ -15,8 +15,8 @@ import * as schema from './schema.js'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
 import type { Sql } from 'postgres'
-import type { CacheFactoryConfig } from '../cache/cache-factory.js'
-import type { IQueryCache, QueryCacheStats } from '../cache/query-cache.js'
+import type { LoggingConfig } from '@repo/logs'
+import type { CacheFactoryConfig, IQueryCache, QueryCacheStats } from '../cache/cache-factory.js'
 
 export interface ConnectionPoolConfig {
 	/** Database connection URL */
@@ -74,28 +74,13 @@ export class EnhancedConnectionPool {
 	constructor(
 		private connection: RedisType,
 		private config: ConnectionPoolConfig,
-		private replication: ReplicationConfig = { enabled: false }
+		private replication: ReplicationConfig = { enabled: false },
+		loggerConfig: LoggingConfig
 	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - EnhancedConnectionPool',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		this.client = postgres(config.url, {
@@ -299,9 +284,15 @@ export class EnhancedDatabaseClient {
 		connection: RedisType,
 		poolConfig: ConnectionPoolConfig,
 		cacheConfig: CacheFactoryConfig,
-		replicationConfig: ReplicationConfig
+		replicationConfig: ReplicationConfig,
+		loggerConfig: LoggingConfig
 	) {
-		this.connectionPool = new EnhancedConnectionPool(connection, poolConfig, replicationConfig)
+		this.connectionPool = new EnhancedConnectionPool(
+			connection,
+			poolConfig,
+			replicationConfig,
+			loggerConfig
+		)
 		this.queryCache = createQueryCache(connection, cacheConfig)
 		this.cacheConfig = cacheConfig
 

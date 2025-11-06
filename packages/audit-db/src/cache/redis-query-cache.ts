@@ -3,11 +3,12 @@
  */
 import { getSharedRedisConnection } from '@repo/redis-client'
 
-import { QueryCache } from './query-cache.js'
+import { OptimizedLRUCache } from './optimized-lru-cache.js'
+
+//import { QueryCache } from './query-cache.js'
 
 import type { Redis as RedisType } from 'ioredis'
-import type { QueryCacheConfig } from './cache-factory.js'
-import type { CacheEntry, QueryCacheStats } from './query-cache.js'
+import type { CacheEntry, QueryCacheConfig, QueryCacheStats } from './cache-factory.js'
 
 export interface RedisQueryCacheConfig extends QueryCacheConfig {
 	/** Redis key prefix for distributed cache */
@@ -27,7 +28,8 @@ export interface RedisQueryCacheConfig extends QueryCacheConfig {
  */
 export class RedisQueryCache {
 	//private redis: Redis
-	private localCache?: QueryCache
+	//private localCache?: QueryCache
+	private localCache?: OptimizedLRUCache
 	private stats: QueryCacheStats
 	private compressionThreshold = 1024 // Compress values larger than 1KB
 
@@ -44,7 +46,14 @@ export class RedisQueryCache {
 				maxSizeMB: config.localCacheSizeMB,
 				maxQueries: Math.floor(config.maxQueries * 0.2), // 20% of total for local cache
 			}
-			this.localCache = new QueryCache(localConfig)
+			this.localCache = new OptimizedLRUCache({
+				enabled: localConfig.enabled,
+				maxSizeMB: localConfig.maxSizeMB,
+				defaultTTL: localConfig.defaultTTL,
+				keyPrefix: localConfig.keyPrefix,
+				maxKeys: localConfig.maxQueries,
+				cleanupInterval: 60000,
+			})
 		}
 
 		this.stats = {
@@ -68,7 +77,7 @@ export class RedisQueryCache {
 		try {
 			// Try L1 cache first if enabled
 			if (this.localCache) {
-				const localResult = this.localCache.get<T>(key)
+				const localResult = await this.localCache.get<T>(key)
 				if (localResult !== null) {
 					this.stats.cacheHits++
 					this.updateStats(startTime)
@@ -171,7 +180,7 @@ export class RedisQueryCache {
 			// Delete from local cache
 			let localDeleted = false
 			if (this.localCache) {
-				localDeleted = this.localCache.delete(key)
+				localDeleted = await this.localCache.delete(key)
 			}
 
 			// Update size tracking

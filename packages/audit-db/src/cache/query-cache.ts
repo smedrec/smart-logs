@@ -1,30 +1,13 @@
 /**
  * Query cache
+ * @deprecated Use Optimized LRU Cache implementation with O(1) operations insted
  */
 
-import type { QueryCacheConfig } from './cache-factory.js'
+import type { CacheEntry, QueryCacheConfig, QueryCacheStats } from './cache-factory.js'
 
 // Re-export distributed cache functionality
 export { RedisQueryCache, type RedisQueryCacheConfig } from './redis-query-cache.js'
 export { createQueryCache, type IQueryCache, DEFAULT_CACHE_CONFIGS } from './cache-factory.js'
-
-export interface CacheEntry<T = any> {
-	data: T
-	timestamp: number
-	ttl: number
-	hits: number
-	size: number
-}
-
-export interface QueryCacheStats {
-	totalQueries: number
-	cacheHits: number
-	cacheMisses: number
-	hitRatio: number
-	totalSizeMB: number
-	averageQueryTime: number
-	evictions: number
-}
 
 /**
  * Query result cache with LRU eviction and TTL support

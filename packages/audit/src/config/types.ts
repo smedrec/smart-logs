@@ -130,6 +130,13 @@ export interface EnhancedClientConfig {
 		autoMaintenance: boolean
 		maintenanceInterval: number
 	}
+	/** Circuit breaker configuration */
+	circuitBreaker: {
+		enabled: boolean
+		failureThreshold: number
+		timeoutMs: number
+		resetTimeoutMs: number
+	}
 	/** Performance monitoring configuration */
 	monitoring: {
 		enabled: boolean

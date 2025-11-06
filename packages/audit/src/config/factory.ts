@@ -79,6 +79,12 @@ export function createDevelopmentConfig(): AuditConfig {
 				autoMaintenance: true,
 				maintenanceInterval: 24 * 60 * 60 * 1000, // Daily
 			},
+			circuitBreaker: {
+				enabled: true,
+				failureThreshold: 5,
+				timeoutMs: 30000,
+				resetTimeoutMs: 60000,
+			},
 			monitoring: {
 				enabled: true,
 				slowQueryThreshold: 1000, // 1 second

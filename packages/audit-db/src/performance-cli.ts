@@ -340,7 +340,25 @@ clientCmd
 		const connection = getSharedRedisConnection()
 		const client = createEnhancedAuditClient(
 			connection,
-			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit'
+			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit',
+			{
+				version: '0.1.0',
+				service: 'Performance Cli',
+				level: 'info',
+				environment: 'development',
+				console: {
+					name: 'console',
+					enabled: true,
+					format: 'pretty',
+					colorize: true,
+					level: 'info',
+				},
+				shutdownTimeoutMs: 0,
+				enableCorrelationIds: false,
+				enableRequestTracking: false,
+				enableDebugMode: false,
+				prettyPrint: false,
+			}
 		)
 
 		try {
@@ -378,7 +396,25 @@ clientCmd
 		const connection = getSharedRedisConnection()
 		const client = createEnhancedAuditClient(
 			connection,
-			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit'
+			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit',
+			{
+				version: '0.1.0',
+				service: 'Performance Cli',
+				level: 'info',
+				environment: 'development',
+				console: {
+					name: 'console',
+					enabled: true,
+					format: 'pretty',
+					colorize: true,
+					level: 'info',
+				},
+				shutdownTimeoutMs: 0,
+				enableCorrelationIds: false,
+				enableRequestTracking: false,
+				enableDebugMode: false,
+				prettyPrint: false,
+			}
 		)
 
 		try {
@@ -434,7 +470,25 @@ clientCmd
 		const connection = getSharedRedisConnection()
 		const client = createEnhancedAuditClient(
 			connection,
-			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit'
+			process.env.AUDIT_DB_URL || 'postgresql://localhost:5432/audit',
+			{
+				version: '0.1.0',
+				service: 'Performance Cli',
+				level: 'info',
+				environment: 'development',
+				console: {
+					name: 'console',
+					enabled: true,
+					format: 'pretty',
+					colorize: true,
+					level: 'info',
+				},
+				shutdownTimeoutMs: 0,
+				enableCorrelationIds: false,
+				enableRequestTracking: false,
+				enableDebugMode: false,
+				prettyPrint: false,
+			}
 		)
 
 		try {

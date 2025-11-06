@@ -111,52 +111,6 @@ let gdprComplianceService: GDPRComplianceService | undefined = undefined
 let deliveryService: DeliveryService | undefined = undefined
 
 /**
- * Create delivery configuration from server config
- */
-function createDeliveryConfig(externalServices: any): DeliveryConfig {
-	return {
-		email: {
-			smtpConfig: {
-				host: externalServices?.smtp?.host || 'localhost',
-				port: externalServices?.smtp?.port || 587,
-				secure: externalServices?.smtp?.secure || false,
-				auth: {
-					user: externalServices?.smtp?.user || '',
-					pass: externalServices?.smtp?.pass || '',
-				},
-			},
-			from: externalServices?.smtp?.from || 'audit@smedrec.com',
-			subject: 'Scheduled Audit Report',
-			bodyTemplate: 'Please find the attached audit report.',
-			attachmentName: 'audit-report',
-		},
-		webhook: {
-			url: externalServices?.webhook?.url || '',
-			method: externalServices?.webhook?.method || 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				...externalServices?.webhook?.headers,
-			},
-			timeout: externalServices?.webhook?.timeout || 30000,
-			retryConfig: {
-				maxRetries: externalServices?.webhook?.retryConfig?.maxRetries || 3,
-				backoffMultiplier: externalServices?.webhook?.retryConfig?.backoffMultiplier || 2,
-				maxBackoffDelay: externalServices?.webhook?.retryConfig?.maxBackoffDelay || 30000,
-			},
-		},
-		storage: {
-			provider: externalServices?.storage?.provider || 'local',
-			config: externalServices?.storage?.config || { basePath: './reports' },
-			path: externalServices?.storage?.path || '/audit-reports',
-			retention: {
-				days: externalServices?.storage?.retention?.days || 90,
-				autoCleanup: externalServices?.storage?.retention?.autoCleanup || true,
-			},
-		},
-	}
-}
-
-/**
  * Initialize all services.
  *
  * Call this once before any hono handlers run.
@@ -197,7 +151,7 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		if (!connection) connection = getSharedRedisConnectionWithConfig(config.redis)
 
 		if (!auditDbInstance) {
-			auditDbInstance = new EnhancedAuditDb(connection, config.enhancedClient)
+			auditDbInstance = new EnhancedAuditDb(connection, config.enhancedClient, config.logging)
 			// Check the database connection
 			const isConnected = await auditDbInstance.checkAuditDbConnection()
 			if (!isConnected) {
@@ -332,13 +286,11 @@ export function init(configManager: ConfigurationManager): MiddlewareHandler<Hon
 		if (!reportingService) reportingService = new ComplianceReportingService(client, audit)
 		if (!dataExportService) dataExportService = new DataExportService()
 		if (!scheduledReportingService) {
-			const deliveryConfig = createDeliveryConfig(config.server.externalServices)
 			scheduledReportingService = new ScheduledReportingService(
 				reportingService,
 				dataExportService,
 				client,
-				inngest,
-				deliveryConfig
+				inngest
 			)
 		}
 
