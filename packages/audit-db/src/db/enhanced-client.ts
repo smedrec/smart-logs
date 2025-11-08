@@ -134,7 +134,11 @@ export class EnhancedAuditDatabaseClient {
 
 		// Initialize partition manager
 		//this.partitionManager = new DatabasePartitionManager(this.client.getDatabase())
-		this.partitionManager = new EnhancedPartitionManager(this.client.getDatabase(), this.connection)
+		this.partitionManager = new EnhancedPartitionManager(
+			this.client.getDatabase(),
+			this.connection,
+			loggerConfig
+		)
 
 		// Initialize performance monitor
 		this.performanceMonitor = new DatabasePerformanceMonitor(this.client.getDatabase())

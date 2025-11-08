@@ -5,7 +5,7 @@
 
 import { sql } from 'drizzle-orm'
 
-import { StructuredLogger } from '@repo/logs'
+import { LoggingConfig, StructuredLogger } from '@repo/logs'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
@@ -38,28 +38,13 @@ export class EnhancedPartitionManager implements IPartitionManager {
 
 	constructor(
 		private db: PostgresJsDatabase<typeof schema>,
-		private redis: RedisType
+		private redis: RedisType,
+		loggerConfig: LoggingConfig
 	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - EnhancedPartitionManager',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 	}
 
