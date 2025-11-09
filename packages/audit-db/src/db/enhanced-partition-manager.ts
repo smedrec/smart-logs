@@ -421,11 +421,11 @@ export class EnhancedPartitionManager implements IPartitionManager {
 		const startDateStr = startDate.toISOString().split('T')[0]
 		const endDateStr = endDate.toISOString().split('T')[0]
 
-		await this.db.execute(sql`
-			CREATE TABLE IF NOT EXISTS ${sql.identifier(partitionName)} 
-			PARTITION OF ${sql.identifier(tableName)}
-			FOR VALUES FROM (${startDateStr}) TO (${endDateStr})
-		`)
+		await this.db.execute(sql.raw(`
+			CREATE TABLE IF NOT EXISTS ${partitionName} 
+			PARTITION OF ${tableName}
+			FOR VALUES FROM ('${startDateStr}') TO ('${endDateStr}')
+		`))
 	}
 
 	/**
