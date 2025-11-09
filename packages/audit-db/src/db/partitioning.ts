@@ -33,6 +33,7 @@ export interface PartitionInfo {
 
 /**
  * Database partitioning manager for audit tables
+ * @deprecated Use EnhancedPartitionManager instead
  */
 export class DatabasePartitionManager {
 	constructor(private db: PostgresJsDatabase<typeof schema>) {}
@@ -418,6 +419,7 @@ export class DatabasePartitionManager {
 
 /**
  * Partition maintenance scheduler
+ * @deprecated Use PartitionMaintenanceScheduler on ./enhanced-partition-manager.ts instead
  */
 export class PartitionMaintenanceScheduler {
 	private intervalId: NodeJS.Timeout | null = null

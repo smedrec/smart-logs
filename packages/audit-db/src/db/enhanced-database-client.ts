@@ -5,7 +5,7 @@
 
 import { sql } from 'drizzle-orm'
 
-import { StructuredLogger } from '@repo/logs'
+import { LoggingConfig, StructuredLogger } from '@repo/logs'
 
 import { OptimizedLRUCache } from '../cache/optimized-lru-cache.js'
 import { DatabaseCircuitBreakers } from './circuit-breaker.js'
@@ -79,32 +79,17 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 	constructor(
 		private readonly redis: RedisType,
 		private readonly config: EnhancedDatabaseConfig,
+		private loggerConfig: LoggingConfig,
 		database: PostgresJsDatabase<typeof schema>
 	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - EnhancedAuditDatabaseClient',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		this.db = database
-		this.partitionManager = new EnhancedPartitionManager(database, redis)
+		this.partitionManager = new EnhancedPartitionManager(database, redis, loggerConfig)
 		this.cache = new OptimizedLRUCache({
 			enabled: config.cache.enabled,
 			maxSizeMB: config.cache.maxSizeMB,
@@ -483,7 +468,8 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 export function createEnhancedAuditDatabaseClient(
 	redis: RedisType,
 	database: PostgresJsDatabase<typeof schema>,
-	config: Partial<EnhancedDatabaseConfig> = {}
+	config: Partial<EnhancedDatabaseConfig> = {},
+	loggerConfig: LoggingConfig
 ): EnhancedAuditDatabaseClient {
 	const defaultConfig: EnhancedDatabaseConfig = {
 		database: {
@@ -521,5 +507,5 @@ export function createEnhancedAuditDatabaseClient(
 	}
 
 	const finalConfig = { ...defaultConfig, ...config }
-	return new EnhancedAuditDatabaseClient(redis, finalConfig, database)
+	return new EnhancedAuditDatabaseClient(redis, finalConfig, loggerConfig, database)
 }

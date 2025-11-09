@@ -1,11 +1,13 @@
+import { StructuredLogger } from '@repo/logs'
+
+import { CircuitBreakerConfig, CircuitBreakerState, ICircuitBreaker } from './interfaces.js'
+
+import type { LoggingConfig } from '@repo/logs'
+
 /**
  * Circuit breaker implementation for database operations
  * Implements fault tolerance patterns following the design document specifications
  */
-
-import { StructuredLogger } from '@repo/logs'
-
-import { CircuitBreakerConfig, CircuitBreakerState, ICircuitBreaker } from './interfaces.js'
 
 export interface CircuitBreakerMetrics {
 	totalRequests: number
@@ -38,28 +40,13 @@ export class CircuitBreaker implements ICircuitBreaker {
 
 	constructor(
 		private readonly name: string,
-		private readonly config: CircuitBreakerConfig
+		private readonly config: CircuitBreakerConfig,
+		loggerConfig: LoggingConfig
 	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: `@repo/audit-db - CircuitBreaker[${name}]`,
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		this.metrics = {
@@ -260,35 +247,19 @@ export class CircuitBreakerRegistry {
 	private circuitBreakers = new Map<string, CircuitBreaker>()
 	private readonly logger: StructuredLogger
 
-	private constructor() {
+	private constructor(loggerConfig: LoggingConfig) {
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - CircuitBreakerRegistry',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 	}
 
 	/**
 	 * Get singleton instance
 	 */
-	static getInstance(): CircuitBreakerRegistry {
+	static getInstance(loggerConfig: LoggingConfig): CircuitBreakerRegistry {
 		if (!CircuitBreakerRegistry.instance) {
-			CircuitBreakerRegistry.instance = new CircuitBreakerRegistry()
+			CircuitBreakerRegistry.instance = new CircuitBreakerRegistry(loggerConfig)
 		}
 		return CircuitBreakerRegistry.instance
 	}
@@ -296,9 +267,13 @@ export class CircuitBreakerRegistry {
 	/**
 	 * Get or create circuit breaker
 	 */
-	getCircuitBreaker(name: string, config: CircuitBreakerConfig): CircuitBreaker {
+	getCircuitBreaker(
+		name: string,
+		config: CircuitBreakerConfig,
+		loggerConfig: LoggingConfig
+	): CircuitBreaker {
 		if (!this.circuitBreakers.has(name)) {
-			const circuitBreaker = new CircuitBreaker(name, config)
+			const circuitBreaker = new CircuitBreaker(name, config, loggerConfig)
 			this.circuitBreakers.set(name, circuitBreaker)
 			this.logger.info(`Created circuit breaker: ${name}`)
 		}
@@ -349,7 +324,8 @@ export class CircuitBreakerOpenError extends Error {
  */
 export function createCircuitBreaker(
 	name: string,
-	config?: Partial<CircuitBreakerConfig>
+	config?: Partial<CircuitBreakerConfig>,
+	loggerConfig?: LoggingConfig
 ): CircuitBreaker {
 	const defaultConfig: CircuitBreakerConfig = {
 		failureThreshold: 5,
@@ -357,9 +333,29 @@ export function createCircuitBreaker(
 		resetTimeoutMs: 60000,
 	}
 
+	const defaultLoggerConfig: LoggingConfig = {
+		service: `@repo/audit-db - CircuitBreaker[${name}]`,
+		environment: 'development',
+		console: {
+			name: 'console',
+			enabled: true,
+			format: 'pretty',
+			colorize: true,
+			level: 'info',
+		},
+		level: 'info',
+		version: '0-1.0',
+		shutdownTimeoutMs: 0,
+		enableCorrelationIds: false,
+		enableRequestTracking: false,
+		enableDebugMode: false,
+		prettyPrint: false,
+	}
+
 	const finalConfig = { ...defaultConfig, ...config }
-	const registry = CircuitBreakerRegistry.getInstance()
-	return registry.getCircuitBreaker(name, finalConfig)
+	const finalLoggerConfig = { ...defaultLoggerConfig, ...loggerConfig }
+	const registry = CircuitBreakerRegistry.getInstance(finalLoggerConfig)
+	return registry.getCircuitBreaker(name, finalConfig, finalLoggerConfig)
 }
 
 /**

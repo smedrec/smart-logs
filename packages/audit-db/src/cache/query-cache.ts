@@ -11,6 +11,7 @@ export { createQueryCache, type IQueryCache, DEFAULT_CACHE_CONFIGS } from './cac
 
 /**
  * Query result cache with LRU eviction and TTL support
+ * @deprecated Use Optimized LRU Cache implementation with O(1) operations insted
  */
 export class QueryCache {
 	private cache = new Map<string, CacheEntry>()

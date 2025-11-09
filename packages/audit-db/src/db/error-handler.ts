@@ -3,7 +3,7 @@
  * Implements comprehensive error classification, recovery, and reporting
  */
 
-import { StructuredLogger } from '@repo/logs'
+import { LoggingConfig, StructuredLogger } from '@repo/logs'
 
 import { CircuitBreakerOpenError } from './circuit-breaker.js'
 
@@ -40,27 +40,14 @@ export class EnhancedErrorHandler implements IErrorHandler {
 	private metrics: ErrorMetrics
 	private readonly logger: StructuredLogger
 
-	constructor(private config: ErrorHandlerConfig) {
+	constructor(
+		private config: ErrorHandlerConfig,
+		loggerConfig: LoggingConfig
+	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - EnhancedErrorHandler',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		this.metrics = {
@@ -629,7 +616,10 @@ export class EnhancedErrorHandler implements IErrorHandler {
 /**
  * Factory function for creating error handler with default configuration
  */
-export function createErrorHandler(config?: Partial<ErrorHandlerConfig>): EnhancedErrorHandler {
+export function createErrorHandler(
+	config?: Partial<ErrorHandlerConfig>,
+	loggerConfig?: LoggingConfig
+): EnhancedErrorHandler {
 	const defaultConfig: ErrorHandlerConfig = {
 		enableRetry: true,
 		maxRetryAttempts: 3,
@@ -640,7 +630,29 @@ export function createErrorHandler(config?: Partial<ErrorHandlerConfig>): Enhanc
 		alertingThreshold: 5,
 	}
 
-	return new EnhancedErrorHandler({ ...defaultConfig, ...config })
+	const defaultLoggerConfig: LoggingConfig = {
+		service: '@repo/audit-db - EnhancedErrorHandler',
+		environment: 'development',
+		console: {
+			name: 'console',
+			enabled: true,
+			format: 'pretty',
+			colorize: true,
+			level: 'info',
+		},
+		level: 'info',
+		version: '0-1.0',
+		shutdownTimeoutMs: 0,
+		enableCorrelationIds: false,
+		enableRequestTracking: false,
+		enableDebugMode: false,
+		prettyPrint: false,
+	}
+
+	return new EnhancedErrorHandler(
+		{ ...defaultConfig, ...config },
+		{ ...defaultLoggerConfig, ...loggerConfig }
+	)
 }
 
 /**

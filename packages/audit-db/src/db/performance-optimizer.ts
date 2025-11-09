@@ -3,7 +3,7 @@
  * Implements efficient algorithms for partition management and query optimization
  */
 
-import { StructuredLogger } from '@repo/logs'
+import { LoggingConfig, StructuredLogger } from '@repo/logs'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Redis as RedisType } from 'ioredis'
@@ -36,26 +36,13 @@ export class OptimizedPartitionMetadata {
 	private partitionsByDate: PartitionMetadata[] = []
 	private readonly logger: StructuredLogger
 
-	constructor(private redis: RedisType) {
+	constructor(
+		private redis: RedisType,
+		loggerConfig: LoggingConfig
+	) {
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - OptimizedPartitionMetadata',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 	}
 
@@ -470,30 +457,15 @@ export class PerformanceOptimizer {
 
 	constructor(
 		private db: PostgresJsDatabase<typeof schema>,
-		private redis: RedisType
+		private redis: RedisType,
+		loggerConfig: LoggingConfig
 	) {
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - PerformanceOptimizer',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
-		this.partitionMetadata = new OptimizedPartitionMetadata(redis)
+		this.partitionMetadata = new OptimizedPartitionMetadata(redis, loggerConfig)
 		this.batchProcessor = new OptimizedBatchProcessor()
 	}
 
@@ -688,7 +660,8 @@ interface IndexRecommendation {
  */
 export function createPerformanceOptimizer(
 	db: PostgresJsDatabase<typeof schema>,
-	redis: RedisType
+	redis: RedisType,
+	loggerConfig: LoggingConfig
 ): PerformanceOptimizer {
-	return new PerformanceOptimizer(db, redis)
+	return new PerformanceOptimizer(db, redis, loggerConfig)
 }

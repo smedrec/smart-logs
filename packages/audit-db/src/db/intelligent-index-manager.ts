@@ -5,7 +5,7 @@
 
 import { sql } from 'drizzle-orm'
 
-import { StructuredLogger } from '@repo/logs'
+import { LoggingConfig, StructuredLogger } from '@repo/logs'
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type * as schema from './schema.js'
@@ -63,28 +63,13 @@ export class IntelligentIndexManager {
 
 	constructor(
 		private db: PostgresJsDatabase<typeof schema>,
-		private config: IndexOptimizationConfig
+		private config: IndexOptimizationConfig,
+		loggerConfig: LoggingConfig
 	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - IntelligentIndexManager',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		this.startPeriodicAnalysis()
@@ -572,7 +557,8 @@ export class IntelligentIndexManager {
  */
 export function createIntelligentIndexManager(
 	db: PostgresJsDatabase<typeof schema>,
-	config: Partial<IndexOptimizationConfig> = {}
+	config: Partial<IndexOptimizationConfig> = {},
+	loggerConfig?: LoggingConfig
 ): IntelligentIndexManager {
 	const defaultConfig: IndexOptimizationConfig = {
 		enableAutoCreation: false, // Conservative default
@@ -583,5 +569,28 @@ export function createIntelligentIndexManager(
 		maxConcurrentIndexOps: 2,
 	}
 
-	return new IntelligentIndexManager(db, { ...defaultConfig, ...config })
+	const defaultLoggerConfig: LoggingConfig = {
+		service: '@repo/audit-db - IntelligentIndexManager',
+		environment: 'development',
+		console: {
+			name: 'console',
+			enabled: true,
+			format: 'pretty',
+			colorize: true,
+			level: 'info',
+		},
+		level: 'info',
+		version: '0-1.0',
+		shutdownTimeoutMs: 0,
+		enableCorrelationIds: false,
+		enableRequestTracking: false,
+		enableDebugMode: false,
+		prettyPrint: false,
+	}
+
+	return new IntelligentIndexManager(
+		db,
+		{ ...defaultConfig, ...config },
+		{ ...defaultLoggerConfig, ...loggerConfig }
+	)
 }

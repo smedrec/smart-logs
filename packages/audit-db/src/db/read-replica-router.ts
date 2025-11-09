@@ -3,7 +3,7 @@
  * Implements sophisticated routing strategies with health monitoring
  */
 
-import { StructuredLogger } from '@repo/logs'
+import { LoggingConfig, StructuredLogger } from '@repo/logs'
 
 import { DatabaseCircuitBreakers } from './circuit-breaker.js'
 import { IReadReplicaRouter, ReplicaHealth, RoutingOptions, RoutingStrategy } from './interfaces.js'
@@ -58,27 +58,14 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
 	private healthCheckTimer: NodeJS.Timeout | null = null
 	private readonly logger: StructuredLogger
 
-	constructor(private config: ReadReplicaConfig) {
+	constructor(
+		private config: ReadReplicaConfig,
+		loggerConfig: LoggingConfig
+	) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - ReadReplicaRouter',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		this.initializeReplicas()
@@ -488,7 +475,8 @@ export class ReadReplicaRouter implements IReadReplicaRouter {
  * Factory function for creating read replica router
  */
 export function createReadReplicaRouter(
-	config: Partial<ReadReplicaConfig> = {}
+	config: Partial<ReadReplicaConfig> = {},
+	loggerConfig?: LoggingConfig
 ): ReadReplicaRouter {
 	const defaultConfig: ReadReplicaConfig = {
 		replicas: [],
@@ -503,5 +491,27 @@ export function createReadReplicaRouter(
 		},
 	}
 
-	return new ReadReplicaRouter({ ...defaultConfig, ...config })
+	const defaultLoggerConfig: LoggingConfig = {
+		service: '@repo/audit-db - ReadReplicaRouter',
+		environment: 'development',
+		console: {
+			name: 'console',
+			enabled: true,
+			format: 'pretty',
+			colorize: true,
+			level: 'info',
+		},
+		level: 'info',
+		version: '0.1.0',
+		shutdownTimeoutMs: 0,
+		enableCorrelationIds: false,
+		enableRequestTracking: false,
+		enableDebugMode: false,
+		prettyPrint: false,
+	}
+
+	return new ReadReplicaRouter(
+		{ ...defaultConfig, ...config },
+		{ ...defaultLoggerConfig, ...loggerConfig }
+	)
 }
