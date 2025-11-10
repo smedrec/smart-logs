@@ -1,13 +1,27 @@
 export interface RedisConfig {
-	host: string
-	port: number
-	password?: string
-	db?: number
+	/** Redis connection URL */
+	url: string
+
+	/** Prefix */
 	keyPrefix?: string
-	connectTimeout?: number
-	maxRetriesPerRequest?: number
-	enableOfflineQueue?: boolean
-	enableAutoPipelining?: boolean
+
+	/** Connection timeout in milliseconds */
+	connectTimeout: number
+
+	/** Command timeout in milliseconds */
+	commandTimeout: number
+
+	/** Maximum number of retries */
+	maxRetriesPerRequest: number | null
+
+	/** Retry delay on failure */
+	retryDelayOnFailover: number
+
+	/** Enable offline queue */
+	enableOfflineQueue: boolean
+
+	/** Enable auto pipelining */
+	enableAutoPipelining: boolean
 }
 
 export interface CacheOptions {

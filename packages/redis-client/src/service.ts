@@ -1,10 +1,20 @@
-import { Redis, RedisOptions } from 'ioredis'
+import { Redis } from 'ioredis'
 
 import { StructuredLogger } from '@repo/logs'
 
 import { RedisCacheError } from './errors.js'
-import { CacheOptions, RedisConfig } from './types.js'
 
+import type { RedisOptions } from 'ioredis'
+import type { LoggingConfig } from '@repo/logs'
+import type { CacheOptions, RedisConfig } from './types.js'
+
+/**
+ * RedisService class for managing Redis client connections and operations.
+ * @class RedisService
+ * @param {RedisConfig} config - Redis configuration options.
+ * @param {LoggingConfig} loggerConfig - Logging configuration options.
+ * @returns {RedisService} - RedisService instance.
+ */
 export class RedisService {
 	private client!: Redis
 	private connected = false
@@ -13,18 +23,11 @@ export class RedisService {
 	private readonly keyPrefix: string
 	private readonly config: RedisConfig
 
-	constructor(config: RedisConfig) {
+	constructor(config: RedisConfig, loggerConfig: LoggingConfig) {
 		this.config = config
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/redis-client - RedisService',
-			environment: process.env.NODE_ENV || 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
 		})
 		this.keyPrefix = config.keyPrefix || 'app:'
 		this.initializeClient()
@@ -32,10 +35,6 @@ export class RedisService {
 
 	private initializeClient(): void {
 		const redisOptions: RedisOptions = {
-			host: this.config.host,
-			port: this.config.port,
-			password: this.config.password,
-			db: this.config.db || 0,
 			connectTimeout: this.config.connectTimeout || 10000,
 			maxRetriesPerRequest: this.config.maxRetriesPerRequest || 3,
 			enableOfflineQueue: this.config.enableOfflineQueue || true,
@@ -46,7 +45,7 @@ export class RedisService {
 			},
 		}
 
-		this.client = new Redis(redisOptions)
+		this.client = new Redis(this.config.url, redisOptions)
 
 		this.client.on('connect', () => {
 			this.connected = true

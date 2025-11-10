@@ -5,29 +5,7 @@ import Redis from 'ioredis'
 import { StructuredLogger } from '@repo/logs'
 
 import type { Redis as RedisInstanceType, RedisOptions } from 'ioredis'
-
-interface RedisConfig {
-	/** Redis connection URL */
-	url: string
-
-	/** Connection timeout in milliseconds */
-	connectTimeout: number
-
-	/** Command timeout in milliseconds */
-	commandTimeout: number
-
-	/** Maximum number of retries */
-	maxRetriesPerRequest: number | null
-
-	/** Retry delay on failure */
-	retryDelayOnFailover: number
-
-	/** Enable offline queue */
-	enableOfflineQueue: boolean
-
-	/** Enable auto pipelining */
-	enableAutoPipelining: boolean
-}
+import type { RedisConfig } from './types'
 
 let redisConnection: RedisInstanceType | null = null
 
