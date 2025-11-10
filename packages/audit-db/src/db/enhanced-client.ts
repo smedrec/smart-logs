@@ -18,6 +18,7 @@ import type { LoggingConfig } from '@repo/logs'
 import type { CacheFactoryConfig } from '../cache/cache-factory.js'
 import type { ConnectionPoolConfig, ReplicationConfig } from './connection-pool.js'
 import type * as schema from './schema.js'
+import type { QueryResult } from './types.js'
 
 /**
  * Enhanced database client integrating all performance optimizations
@@ -299,14 +300,25 @@ export class EnhancedAuditDatabaseClient {
 			cacheTTL?: number
 		}
 	): Promise<T> {
-		const startTime = Date.now()
 		const startMemory = process.memoryUsage().heapUsed
 
 		try {
-			const result = await this.executeOptimizedQuery(queryFn, options)
+			const { cacheKey, cacheTTL } = options || {}
 
-			// Record performance metrics
-			const executionTime = Date.now() - startTime
+			// Use metadata-aware query execution so we capture accurate row counts and duration
+			let meta: QueryResult<T>
+			if (cacheKey) {
+				meta = await this.client.executeQueryWithMeta(
+					queryFn,
+					cacheKey,
+					cacheTTL ?? this.config.queryCacheFactory.queryCache.defaultTTL
+				)
+			} else {
+				meta = await this.client.executeQueryUncachedWithMeta(queryFn)
+			}
+
+			const result = meta.rows as T
+			const executionTime = meta.durationMs ?? 0
 			const memoryUsed = process.memoryUsage().heapUsed - startMemory
 
 			this.storeQueryMetrics({
@@ -315,7 +327,7 @@ export class EnhancedAuditDatabaseClient {
 				executionTime,
 				planningTime: 0, // TODO Would need to extract from EXPLAIN
 				totalTime: executionTime,
-				rowsReturned: Array.isArray(result) ? result.length : 1,
+				rowsReturned: meta.rowCount,
 				bufferHits: 0, // TODO Would need to extract from pg_stat_statements
 				bufferMisses: 0,
 				timestamp: new Date(),
@@ -323,29 +335,6 @@ export class EnhancedAuditDatabaseClient {
 
 			// Log slow queries
 			if (executionTime > this.config.monitoring.slowQueryThreshold) {
-				// TODO generate alert to slow queries
-				/**const alert: Alert = {
-					id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-					severity:
-						executionTime > this.config.monitoring.slowQueryThreshold * 2 ? 'HIGH' : 'MEDIUM',
-					type: 'PERFORMANCE',
-					title: 'Slow Database Query',
-					description: `Slow query detected: ${queryName} took ${executionTime}ms`,
-					timestamp: new Date().toISOString(),
-					source: 'execute-monitored-query',
-					metadata: {
-						query: queryName,
-						executionTime,
-						planningTime: 0, // TODO Would need to extract from EXPLAIN
-						totalTime: executionTime,
-						rowsReturned: Array.isArray(result) ? result.length : 1,
-						bufferHits: 0, // TODO Would need to extract from pg_stat_statements
-						bufferMisses: 0,
-					},
-					acknowledged: false,
-					resolved: false,
-				}*/
-				//this.monitor.sendExternalAlert(alert)
 				this.logger.warn(`Slow query detected: ${queryName} took ${executionTime}ms`)
 			}
 

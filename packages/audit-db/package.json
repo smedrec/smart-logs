@@ -37,6 +37,7 @@
 		"clean": "rm -rf dist node_modules .turbo",
 		"test": "vitest run",
 		"test:ci": "vitest run --coverage",
+		"test:single": "vitest run src/__tests__/execute-monitored-query.test.ts",
 		"test:watch": "vitest"
 	},
 	"dependencies": {

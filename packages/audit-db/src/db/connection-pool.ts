@@ -192,6 +192,51 @@ export class EnhancedConnectionPool {
 	}
 
 	/**
+	 * Execute query and return metadata (rows, rowCount, duration)
+	 * This is non-breaking: existing executeQuery remains unchanged.
+	 */
+	async executeQueryWithMeta<T>(
+		queryFn: (db: PostgresJsDatabase<typeof schema>) => Promise<T>
+	): Promise<import('./types.js').QueryResult<T>> {
+		const startTime = Date.now()
+		this.stats.totalRequests++
+
+		try {
+			const result = await queryFn(this.db)
+			this.stats.successfulConnections++
+
+			const acquisitionTime = Date.now() - startTime
+			this.acquisitionTimes.push(acquisitionTime)
+
+			if (this.acquisitionTimes.length > 100) {
+				this.acquisitionTimes = this.acquisitionTimes.slice(-100)
+			}
+
+			this.updateAverageAcquisitionTime()
+
+			let rowCount = 1
+			try {
+				if (Array.isArray(result)) {
+					rowCount = result.length
+				} else if (result && typeof result === 'object' && 'rowCount' in (result as any)) {
+					rowCount = (result as any).rowCount ?? 1
+				}
+			} catch (_) {
+				rowCount = 1
+			}
+
+			return {
+				rows: result,
+				rowCount,
+				durationMs: Date.now() - startTime,
+			}
+		} catch (error) {
+			this.stats.failedConnections++
+			throw error
+		}
+	}
+
+	/**
 	 * Check connection health
 	 */
 	async healthCheck(): Promise<{
@@ -348,6 +393,46 @@ export class EnhancedDatabaseClient {
 		queryFn: (db: PostgresJsDatabase<typeof schema>) => Promise<T>
 	): Promise<T> {
 		return this.connectionPool.executeQuery(queryFn)
+	}
+
+	/**
+	 * Execute query without caching and return metadata (rows, rowCount, duration)
+	 */
+	async executeQueryUncachedWithMeta<T>(
+		queryFn: (db: PostgresJsDatabase<typeof schema>) => Promise<T>
+	): Promise<import('./types.js').QueryResult<T>> {
+		return this.connectionPool.executeQueryWithMeta(queryFn)
+	}
+
+	/**
+	 * Execute query with optional caching and return metadata (rows, rowCount, duration)
+	 */
+	async executeQueryWithMeta<T>(
+		queryFn: (db: PostgresJsDatabase<typeof schema>) => Promise<T>,
+		cacheKey?: string,
+		cacheTTL?: number
+	): Promise<import('./types.js').QueryResult<T>> {
+		// Try cache first if caching is enabled and cache key provided
+		if (cacheKey && this.queryCache.getStats().totalQueries >= 0) {
+			const cached = await this.queryCache.get<T>(cacheKey)
+			if (cached !== null) {
+				return {
+					rows: cached,
+					rowCount: Array.isArray(cached) ? (cached as any).length : 1,
+					durationMs: 0,
+				}
+			}
+		}
+
+		// Execute query through connection pool with metadata
+		const meta = await this.connectionPool.executeQueryWithMeta(queryFn)
+
+		// Cache result if caching is enabled and cache key provided
+		if (cacheKey && meta.rows !== null && meta.rows !== undefined) {
+			this.queryCache.set(cacheKey, meta.rows as any, cacheTTL)
+		}
+
+		return meta
 	}
 
 	/**
