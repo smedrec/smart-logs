@@ -641,7 +641,7 @@ export function createErrorHandler(
 			level: 'info',
 		},
 		level: 'info',
-		version: '0-1.0',
+		version: '0.1.0',
 		shutdownTimeoutMs: 0,
 		enableCorrelationIds: false,
 		enableRequestTracking: false,

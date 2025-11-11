@@ -63,6 +63,7 @@ export interface DatabaseHealth {
 
 /**
  * Enhanced audit database client with comprehensive optimizations
+ * @deprecated Only to develope new features, not to be used in production
  */
 export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionManager {
 	private readonly db: PostgresJsDatabase<typeof schema>

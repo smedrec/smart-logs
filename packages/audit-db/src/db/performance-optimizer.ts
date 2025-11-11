@@ -183,26 +183,10 @@ export class OptimizedPartitionMetadata {
 export class OptimizedBatchProcessor {
 	private readonly logger: StructuredLogger
 
-	constructor() {
+	constructor(loggerConfig: LoggingConfig) {
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - OptimizedBatchProcessor',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 	}
 
@@ -466,7 +450,7 @@ export class PerformanceOptimizer {
 		})
 
 		this.partitionMetadata = new OptimizedPartitionMetadata(redis, loggerConfig)
-		this.batchProcessor = new OptimizedBatchProcessor()
+		this.batchProcessor = new OptimizedBatchProcessor(loggerConfig)
 	}
 
 	/**
