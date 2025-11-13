@@ -87,6 +87,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						url: '/compliance/report-templates',
 					},
 					{
+						title: 'Delivery Destinations',
+						url: '/compliance/delivery-destinations',
+					},
+					{
+						title: 'Delivery History',
+						url: '/compliance/delivery-history',
+					},
+					{
 						title: 'HIPAA Reports',
 						url: '/compliance/hipaa',
 					},

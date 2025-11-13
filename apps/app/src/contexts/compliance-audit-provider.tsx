@@ -1,9 +1,9 @@
+import { AuditClientError } from '@smedrec/audit-client'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 import { useAuditContext } from './audit-provider'
 
 import type {
-	AuditClientError,
 	ComplianceService,
 	CreateScheduledReportInput,
 	ExecutionHistoryParams,
