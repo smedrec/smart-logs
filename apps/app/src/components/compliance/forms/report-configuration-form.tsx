@@ -5,6 +5,11 @@ import { Form } from '@/components/ui/form'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { useAuditContext } from '@/contexts/audit-provider'
+import {
+	transformFormDataToCreateInput,
+	transformFormDataToUpdateInput,
+	validateFormData,
+} from '@/lib/compliance/form-transformers'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Save } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
@@ -19,16 +24,17 @@ import { PreviewPanel } from './preview-panel'
 import { ReportTypeSelector } from './report-type-selector'
 import { ScheduleBuilder } from './schedule-builder'
 
+import type { ReportFormData } from '@/lib/compliance/form-transformers'
 import type { CreateScheduledReportInput, UpdateScheduledReportInput } from '@smedrec/audit-client'
 import type { DeliveryConfig, ReportType, ScheduleConfig } from '../types'
 
-// Form validation schema
+// Form validation schema - aligned with ReportFormData from form-transformers
 const reportConfigurationSchema = z.object({
 	name: z
 		.string()
 		.min(1, 'Report name is required')
-		.max(100, 'Name must be less than 100 characters'),
-	description: z.string().optional(),
+		.max(255, 'Name must be less than 255 characters'),
+	description: z.string().max(1000, 'Description must be less than 1000 characters').optional(),
 	reportType: z.enum([
 		'HIPAA_AUDIT_TRAIL',
 		'GDPR_PROCESSING_ACTIVITIES',
@@ -36,52 +42,97 @@ const reportConfigurationSchema = z.object({
 		'GENERAL_COMPLIANCE',
 		'CUSTOM_REPORT',
 	] as const),
-	criteria: z.object({
-		dateRange: z.object({
-			startDate: z.string(),
-			endDate: z.string(),
-		}),
-		filters: z.record(z.string(), z.any()).optional(),
-	}),
+	format: z
+		.enum(['PDF', 'CSV', 'JSON', 'XLSX', 'HTML', 'XML'] as const)
+		.optional()
+		.default('PDF'),
 	schedule: z.object({
-		cronExpression: z.string().min(1, 'Schedule is required'),
+		frequency: z.enum([
+			'once',
+			'hourly',
+			'daily',
+			'weekly',
+			'monthly',
+			'quarterly',
+			'yearly',
+			'custom',
+		] as const),
+		time: z.string().regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format'),
+		dayOfWeek: z.number().min(0).max(6).optional(),
+		dayOfMonth: z.number().min(1).max(31).optional(),
 		timezone: z.string().min(1, 'Timezone is required'),
-		nextExecution: z.string().optional(),
-		description: z.string().optional(),
+		cronExpression: z.string().optional(),
+		startDate: z.string().optional(),
+		endDate: z.string().optional(),
+		skipWeekends: z.boolean().optional(),
+		skipHolidays: z.boolean().optional(),
+		holidayCalendar: z.string().optional(),
+		maxMissedRuns: z.number().optional(),
+		catchUpMissedRuns: z.boolean().optional(),
 	}),
-	delivery: z.object({
-		method: z.enum(['email', 'webhook', 'storage'] as const),
-		email: z
-			.object({
-				recipients: z.array(z.string().email()),
-				subject: z.string().optional(),
-				includeAttachment: z.boolean(),
-			})
-			.optional(),
-		webhook: z
-			.object({
-				url: z.string().url(),
-				headers: z.record(z.string(), z.string()).optional(),
-				method: z.enum(['POST', 'PUT'] as const),
-			})
-			.optional(),
-		storage: z
-			.object({
-				path: z.string(),
-				format: z.enum(['pdf', 'csv', 'json'] as const),
-			})
-			.optional(),
+	notifications: z.object({
+		onSuccess: z.boolean(),
+		onFailure: z.boolean(),
+		onSkip: z.boolean().optional(),
+		recipients: z.array(z.string().email()),
+		includeReport: z.boolean().optional(),
+		customMessage: z.string().optional(),
 	}),
+	parameters: z.object({
+		dateRange: z
+			.object({
+				startDate: z.string(),
+				endDate: z.string(),
+			})
+			.optional(),
+		organizationIds: z.array(z.string()).optional(),
+		principalIds: z.array(z.string()).optional(),
+		actions: z.array(z.string()).optional(),
+		resourceTypes: z.array(z.string()).optional(),
+		dataClassifications: z
+			.array(z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'] as const))
+			.optional(),
+		statuses: z.array(z.enum(['attempt', 'success', 'failure'] as const)).optional(),
+		verifiedOnly: z.boolean().optional(),
+		includeIntegrityFailures: z.boolean().optional(),
+		limit: z.number().optional(),
+		offset: z.number().optional(),
+		sortBy: z.enum(['timestamp', 'status'] as const).optional(),
+		sortOrder: z.enum(['asc', 'desc'] as const).optional(),
+	}),
+	delivery: z
+		.object({
+			destinations: z.union([z.array(z.string()), z.literal('default')]),
+		})
+		.optional(),
+	export: z
+		.object({
+			includeMetadata: z.boolean().optional(),
+			includeIntegrityReport: z.boolean().optional(),
+			compression: z.enum(['none', 'gzip', 'zip', 'bzip2'] as const).optional(),
+			encryption: z
+				.object({
+					enabled: z.boolean(),
+					algorithm: z.string().optional(),
+					keyId: z.string().optional(),
+				})
+				.optional(),
+		})
+		.optional(),
 	enabled: z.boolean().default(true),
 	tags: z.array(z.string()).optional(),
+	metadata: z.record(z.string(), z.any()).optional(),
+	templateId: z.string().optional(),
 })
 
 type FormData = z.infer<typeof reportConfigurationSchema>
 
 interface ReportConfigurationFormProps {
-	initialData?: Partial<CreateScheduledReportInput>
+	initialData?: Partial<ReportFormData>
 	mode: 'create' | 'edit'
 	reportId?: string
+	userId: string
+	runId?: string
 	onSubmit: (data: CreateScheduledReportInput | UpdateScheduledReportInput) => Promise<void>
 	onCancel: () => void
 	className?: string
@@ -102,6 +153,8 @@ export function ReportConfigurationForm({
 	initialData,
 	mode,
 	reportId,
+	userId,
+	runId,
 	onSubmit,
 	onCancel,
 	className,
@@ -113,36 +166,61 @@ export function ReportConfigurationForm({
 	const [draftSaved, setDraftSaved] = useState(false)
 
 	// Form setup with validation
-	const form = useForm<FormData>({
+	const form = useForm({
 		resolver: zodResolver(reportConfigurationSchema),
 		defaultValues: {
 			name: initialData?.name || '',
 			description: initialData?.description || '',
-			reportType: (initialData?.reportType as ReportType) || 'HIPAA_AUDIT_TRAIL',
-			criteria: {
-				dateRange: {
-					startDate: initialData?.criteria?.dateRange?.startDate || '',
-					endDate: initialData?.criteria?.dateRange?.endDate || '',
-				},
-				filters: initialData?.criteria?.filters || {},
-			},
+			reportType: initialData?.reportType || 'HIPAA_AUDIT_TRAIL',
+			format: (initialData?.format as 'PDF' | 'CSV' | 'JSON' | 'XLSX' | 'HTML' | 'XML') || 'PDF',
 			schedule: {
-				cronExpression: initialData?.schedule?.cronExpression || '',
+				frequency: initialData?.schedule?.frequency || 'monthly',
+				time: initialData?.schedule?.time || '09:00',
+				dayOfWeek: initialData?.schedule?.dayOfWeek,
+				dayOfMonth: initialData?.schedule?.dayOfMonth || 1,
 				timezone:
 					initialData?.schedule?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-				nextExecution: initialData?.schedule?.nextExecution,
-				description: initialData?.schedule?.description,
+				cronExpression: initialData?.schedule?.cronExpression,
+				startDate: initialData?.schedule?.startDate,
+				endDate: initialData?.schedule?.endDate,
+				skipWeekends: initialData?.schedule?.skipWeekends ?? false,
+				skipHolidays: initialData?.schedule?.skipHolidays ?? false,
+				holidayCalendar: initialData?.schedule?.holidayCalendar,
+				maxMissedRuns: initialData?.schedule?.maxMissedRuns ?? 3,
+				catchUpMissedRuns: initialData?.schedule?.catchUpMissedRuns ?? false,
 			},
-			delivery: {
-				method: (initialData?.delivery?.method as 'email' | 'webhook' | 'storage') || 'email',
-				email: {
-					recipients: initialData?.delivery?.email?.recipients || [],
-					subject: initialData?.delivery?.email?.subject || '',
-					includeAttachment: initialData?.delivery?.email?.includeAttachment || true,
+			notifications: {
+				onSuccess: initialData?.notifications?.onSuccess ?? true,
+				onFailure: initialData?.notifications?.onFailure ?? true,
+				onSkip: initialData?.notifications?.onSkip,
+				recipients: initialData?.notifications?.recipients || [],
+				includeReport: initialData?.notifications?.includeReport,
+				customMessage: initialData?.notifications?.customMessage,
+			},
+			parameters: {
+				dateRange: initialData?.parameters?.dateRange || {
+					startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+					endDate: new Date().toISOString(),
 				},
+				organizationIds: initialData?.parameters?.organizationIds,
+				principalIds: initialData?.parameters?.principalIds,
+				actions: initialData?.parameters?.actions,
+				resourceTypes: initialData?.parameters?.resourceTypes,
+				dataClassifications: initialData?.parameters?.dataClassifications,
+				statuses: initialData?.parameters?.statuses,
+				verifiedOnly: initialData?.parameters?.verifiedOnly,
+				includeIntegrityFailures: initialData?.parameters?.includeIntegrityFailures,
+				limit: initialData?.parameters?.limit,
+				offset: initialData?.parameters?.offset,
+				sortBy: initialData?.parameters?.sortBy,
+				sortOrder: initialData?.parameters?.sortOrder,
 			},
+			delivery: initialData?.delivery,
+			export: initialData?.export,
 			enabled: initialData?.enabled ?? true,
 			tags: initialData?.tags || [],
+			metadata: initialData?.metadata,
+			templateId: initialData?.templateId,
 		},
 		mode: 'onChange',
 	})
@@ -231,54 +309,29 @@ export function ReportConfigurationForm({
 		return () => clearInterval(autoSaveInterval)
 	}, [isDirty, saveDraft])
 
-	// Transform form data to audit client format
-	const transformFormData = (data: FormData): any => {
-		// This is a simplified transformation for demo purposes
-		// In a real app, you'd handle all the complex type mappings properly
-		return {
-			name: data.name,
-			description: data.description,
-			reportType: data.reportType,
-			criteria: {
-				dateRange: data.criteria.dateRange,
-				limit: 1000,
-				offset: 0,
-			},
-			format: 'pdf',
-			schedule: {
-				frequency: 'daily',
-				hour: 0,
-				minute: 0,
-				timezone: data.schedule.timezone,
-				skipWeekends: false,
-				skipHolidays: false,
-				maxMissedRuns: 3,
-				catchUpMissedRuns: false,
-			},
-			delivery: {
-				method: data.delivery.method,
-				compression: 'none',
-				encryption: false,
-			},
-			export: { format: 'pdf' },
-			createdBy: 'current-user',
-			updatedBy: 'current-user',
-			tags: data.tags || [],
-		}
-	}
-
-	// Form submission handler
+	// Form submission handler with proper transformation
 	const handleSubmit = async (data: FormData) => {
 		if (!client || !isConnected) {
 			toast.error('Audit client is not connected')
 			return
 		}
 
+		// Validate form data using the transformer's validation
+		const validation = validateFormData(data as ReportFormData)
+		if (!validation.isValid) {
+			validation.errors.forEach((error) => toast.error(error))
+			return
+		}
+
 		setIsSubmitting(true)
 
 		try {
-			// Transform form data to API format
-			const submitData = transformFormData(data)
+			// Transform form data to API format using the proper transformers
+			const submitData =
+				mode === 'create'
+					? transformFormDataToCreateInput(data as ReportFormData, userId, runId)
+					: transformFormDataToUpdateInput(data as ReportFormData, userId, runId)
+
 			await onSubmit(submitData)
 
 			// Clear draft after successful submission
@@ -288,7 +341,8 @@ export function ReportConfigurationForm({
 			toast.success(`Report ${mode === 'create' ? 'created' : 'updated'} successfully`)
 		} catch (error) {
 			console.error('Form submission failed:', error)
-			toast.error(`Failed to ${mode} report`)
+			const errorMessage = error instanceof Error ? error.message : `Failed to ${mode} report`
+			toast.error(errorMessage)
 		} finally {
 			setIsSubmitting(false)
 		}
@@ -297,10 +351,10 @@ export function ReportConfigurationForm({
 	// Step validation
 	const validateCurrentStep = useCallback(async () => {
 		const fieldsToValidate: Record<FormStep, (keyof FormData)[]> = {
-			type: ['name', 'description', 'reportType'],
-			criteria: ['criteria'],
+			type: ['name', 'description', 'reportType', 'format'],
+			criteria: ['parameters'],
 			schedule: ['schedule'],
-			delivery: ['delivery'],
+			delivery: ['notifications'], // Notifications are part of delivery in our schema
 			preview: [], // No validation needed for preview
 		}
 
@@ -397,7 +451,7 @@ export function ReportConfigurationForm({
 								{currentStep === 'type' && <ReportTypeSelector />}
 								{currentStep === 'criteria' && <CriteriaBuilder />}
 								{currentStep === 'schedule' && <ScheduleBuilder />}
-								{currentStep === 'delivery' && <DeliveryConfiguration />}
+								{currentStep === 'delivery' && <DeliveryConfiguration organizationId="" />}
 								{currentStep === 'preview' && <PreviewPanel />}
 							</div>
 

@@ -19,39 +19,25 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, ArrowRight, Calendar, Check, FileText, Save, X } from 'lucide-react'
+import {
+	transformFormDataToCreateInput,
+	transformFormDataToUpdateInput,
+	validateFormData,
+} from '@/lib/compliance/form-transformers'
+import { ArrowLeft, ArrowRight, Check, FileText, Save, X } from 'lucide-react'
 import { useState } from 'react'
+
+import type { ReportFormData } from '@/lib/compliance/form-transformers'
+import type { CreateScheduledReportInput, UpdateScheduledReportInput } from '@smedrec/audit-client'
 
 interface ReportConfigurationFormProps {
 	mode: 'create' | 'edit'
 	reportId?: string
-	initialData?: {
-		reportType?: 'HIPAA_AUDIT_TRAIL' | 'GDPR_PROCESSING_ACTIVITIES' | 'INTEGRITY_VERIFICATION'
-		template?: string
-	}
-	onSubmit: (data: any) => void | Promise<void>
+	initialData?: Partial<ReportFormData>
+	onSubmit: (data: CreateScheduledReportInput | UpdateScheduledReportInput) => void | Promise<void>
 	onCancel: () => void
-}
-
-interface FormData {
-	name: string
-	description: string
-	reportType: 'HIPAA_AUDIT_TRAIL' | 'GDPR_PROCESSING_ACTIVITIES' | 'INTEGRITY_VERIFICATION'
-	format: 'PDF' | 'CSV' | 'JSON'
-	schedule: {
-		frequency: 'daily' | 'weekly' | 'monthly' | 'custom'
-		time: string
-		dayOfWeek?: number
-		dayOfMonth?: number
-		timezone: string
-	}
-	enabled: boolean
-	notifications: {
-		onSuccess: boolean
-		onFailure: boolean
-		recipients: string[]
-	}
-	parameters: Record<string, any>
+	userId: string
+	runId?: string
 }
 
 const REPORT_TYPE_OPTIONS = [
@@ -85,27 +71,44 @@ export function ReportConfigurationForm({
 	initialData,
 	onSubmit,
 	onCancel,
+	userId,
+	runId,
 }: ReportConfigurationFormProps) {
 	const [currentStep, setCurrentStep] = useState(1)
-	const [formData, setFormData] = useState<FormData>({
-		name: '',
-		description: '',
+	const [formData, setFormData] = useState<ReportFormData>({
+		name: initialData?.name || '',
+		description: initialData?.description || '',
 		reportType: initialData?.reportType || 'HIPAA_AUDIT_TRAIL',
-		format: 'PDF',
-		schedule: {
+		format: initialData?.format || 'PDF',
+		schedule: initialData?.schedule || {
 			frequency: 'monthly',
 			time: '09:00',
 			timezone: 'UTC',
+			skipWeekends: false,
+			skipHolidays: false,
+			maxMissedRuns: 3,
+			catchUpMissedRuns: false,
 		},
-		enabled: true,
-		notifications: {
+		enabled: initialData?.enabled ?? true,
+		notifications: initialData?.notifications || {
 			onSuccess: true,
 			onFailure: true,
 			recipients: [],
 		},
-		parameters: {},
+		parameters: initialData?.parameters || {
+			dateRange: {
+				startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+				endDate: new Date().toISOString(),
+			},
+		},
+		delivery: initialData?.delivery,
+		export: initialData?.export,
+		tags: initialData?.tags || [],
+		metadata: initialData?.metadata,
+		templateId: initialData?.templateId,
 	})
 	const [loading, setLoading] = useState(false)
+	const [validationErrors, setValidationErrors] = useState<string[]>([])
 
 	const steps = [
 		{ number: 1, title: 'Basic Information', description: 'Report name and type' },
@@ -115,22 +118,34 @@ export function ReportConfigurationForm({
 		{ number: 5, title: 'Review', description: 'Confirm settings' },
 	]
 
-	const updateFormData = (updates: Partial<FormData>) => {
+	const updateFormData = (updates: Partial<ReportFormData>) => {
 		setFormData((prev) => ({ ...prev, ...updates }))
+		// Clear validation errors when form data changes
+		setValidationErrors([])
 	}
 
-	const updateSchedule = (updates: Partial<FormData['schedule']>) => {
+	const updateSchedule = (updates: Partial<ReportFormData['schedule']>) => {
 		setFormData((prev) => ({
 			...prev,
 			schedule: { ...prev.schedule, ...updates },
 		}))
+		setValidationErrors([])
 	}
 
-	const updateNotifications = (updates: Partial<FormData['notifications']>) => {
+	const updateNotifications = (updates: Partial<ReportFormData['notifications']>) => {
 		setFormData((prev) => ({
 			...prev,
 			notifications: { ...prev.notifications, ...updates },
 		}))
+		setValidationErrors([])
+	}
+
+	const updateParameters = (updates: Partial<ReportFormData['parameters']>) => {
+		setFormData((prev) => ({
+			...prev,
+			parameters: { ...prev.parameters, ...updates },
+		}))
+		setValidationErrors([])
 	}
 
 	const handleNext = () => {
@@ -146,11 +161,29 @@ export function ReportConfigurationForm({
 	}
 
 	const handleSubmit = async () => {
+		// Validate form data before submission
+		const validation = validateFormData(formData)
+		if (!validation.isValid) {
+			setValidationErrors(validation.errors)
+			return
+		}
+
 		setLoading(true)
+		setValidationErrors([])
+
 		try {
-			await onSubmit(formData)
+			// Transform form data to API format
+			const transformedData =
+				mode === 'create'
+					? transformFormDataToCreateInput(formData, userId, runId)
+					: transformFormDataToUpdateInput(formData, userId, runId)
+
+			await onSubmit(transformedData)
 		} catch (error) {
 			console.error('Error submitting form:', error)
+			setValidationErrors([
+				error instanceof Error ? error.message : 'An error occurred while submitting the form',
+			])
 		} finally {
 			setLoading(false)
 		}
@@ -490,6 +523,22 @@ export function ReportConfigurationForm({
 				showBackButton
 				backButtonHref="/compliance/scheduled-reports"
 			/>
+
+			{/* Validation Errors */}
+			{validationErrors.length > 0 && (
+				<Card className="border-destructive">
+					<CardContent className="pt-6">
+						<div className="space-y-2">
+							<h4 className="font-medium text-destructive">Please fix the following errors:</h4>
+							<ul className="list-disc list-inside space-y-1 text-sm text-destructive">
+								{validationErrors.map((error, index) => (
+									<li key={index}>{error}</li>
+								))}
+							</ul>
+						</div>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* Progress Steps */}
 			<Card>
