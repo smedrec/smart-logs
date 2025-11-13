@@ -2,6 +2,7 @@
 // Built-in Plugins for Common Use Cases
 // ============================================================================
 
+import type { ValidationResult } from '@/types/shared-schemas'
 import type { CacheStorage } from '../cache'
 import type {
 	AuthContext,
@@ -13,7 +14,6 @@ import type {
 	PluginCacheStorage,
 	PluginContext,
 	StoragePlugin,
-	ValidationResult,
 } from '../plugins'
 
 // ============================================================================
@@ -86,7 +86,7 @@ export class RequestLoggingPlugin implements MiddlewarePlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {
@@ -152,7 +152,7 @@ export class CorrelationIdPlugin implements MiddlewarePlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {
@@ -236,7 +236,7 @@ export class RateLimitingPlugin implements MiddlewarePlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {
@@ -298,7 +298,7 @@ export class RedisStoragePlugin implements StoragePlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {
@@ -391,7 +391,7 @@ export class IndexedDBStoragePlugin implements StoragePlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {
@@ -522,7 +522,7 @@ export class JWTAuthPlugin implements AuthPlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {
@@ -635,7 +635,7 @@ export class OAuth2AuthPlugin implements AuthPlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {
@@ -701,7 +701,7 @@ export class CustomHeaderAuthPlugin implements AuthPlugin {
 		}
 
 		const result: ValidationResult = {
-			valid: errors.length === 0,
+			isValid: errors.length === 0,
 		}
 
 		if (errors.length > 0) {

@@ -2,13 +2,13 @@
 // Plugin Utilities
 // ============================================================================
 
+import type { ValidationResult } from '@/types/shared-schemas'
 import type {
 	AuthPlugin,
 	MiddlewarePlugin,
 	Plugin,
 	PluginRegistry,
 	StoragePlugin,
-	ValidationResult,
 } from '../plugins'
 
 // ============================================================================
@@ -53,7 +53,7 @@ export function validatePlugin(plugin: any): ValidationResult {
 	}
 
 	const result: ValidationResult = {
-		valid: errors.length === 0,
+		isValid: errors.length === 0,
 	}
 
 	if (errors.length > 0) {
@@ -72,7 +72,7 @@ export function validatePlugin(plugin: any): ValidationResult {
  */
 export function validateMiddlewarePlugin(plugin: any): ValidationResult {
 	const baseValidation = validatePlugin(plugin)
-	if (!baseValidation.valid) {
+	if (!baseValidation.isValid) {
 		return baseValidation
 	}
 
@@ -105,7 +105,7 @@ export function validateMiddlewarePlugin(plugin: any): ValidationResult {
 	const allWarnings = [...(baseValidation.warnings || []), ...warnings]
 
 	const result: ValidationResult = {
-		valid: allErrors.length === 0,
+		isValid: allErrors.length === 0,
 	}
 
 	if (allErrors.length > 0) {
@@ -124,7 +124,7 @@ export function validateMiddlewarePlugin(plugin: any): ValidationResult {
  */
 export function validateStoragePlugin(plugin: any): ValidationResult {
 	const baseValidation = validatePlugin(plugin)
-	if (!baseValidation.valid) {
+	if (!baseValidation.isValid) {
 		return baseValidation
 	}
 
@@ -141,7 +141,7 @@ export function validateStoragePlugin(plugin: any): ValidationResult {
 	const allErrors = [...(baseValidation.errors || []), ...errors]
 
 	const result: ValidationResult = {
-		valid: allErrors.length === 0,
+		isValid: allErrors.length === 0,
 	}
 
 	if (allErrors.length > 0) {
@@ -160,7 +160,7 @@ export function validateStoragePlugin(plugin: any): ValidationResult {
  */
 export function validateAuthPlugin(plugin: any): ValidationResult {
 	const baseValidation = validatePlugin(plugin)
-	if (!baseValidation.valid) {
+	if (!baseValidation.isValid) {
 		return baseValidation
 	}
 
@@ -191,7 +191,7 @@ export function validateAuthPlugin(plugin: any): ValidationResult {
 	const allWarnings = [...(baseValidation.warnings || []), ...warnings]
 
 	const result: ValidationResult = {
-		valid: allErrors.length === 0,
+		isValid: allErrors.length === 0,
 	}
 
 	if (allErrors.length > 0) {
@@ -231,7 +231,7 @@ export function discoverPlugins(
 			const plugin = new PluginConstructor()
 			const validation = validatePlugin(plugin)
 
-			if (validation.valid) {
+			if (validation.isValid) {
 				plugins.push(plugin)
 			} else {
 				errors.push({
@@ -403,7 +403,7 @@ export function validatePluginConfig(config: any, schema: any): ValidationResult
 	const errors: string[] = []
 
 	if (!schema) {
-		return { valid: true }
+		return { isValid: true }
 	}
 
 	// Basic type checking
@@ -425,7 +425,7 @@ export function validatePluginConfig(config: any, schema: any): ValidationResult
 	}
 
 	const result: ValidationResult = {
-		valid: errors.length === 0,
+		isValid: errors.length === 0,
 	}
 
 	if (errors.length > 0) {

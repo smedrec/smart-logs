@@ -6,6 +6,7 @@ import { DefaultLogger } from '../infrastructure/logger'
 import { PluginManager } from '../infrastructure/plugins'
 import { RetryManager } from '../infrastructure/retry'
 import { ComplianceService } from '../services/compliance'
+import { DeliveryService } from '../services/delivery'
 // Import all services
 import { EventsService } from '../services/events'
 import { HealthService } from '../services/health'
@@ -73,6 +74,7 @@ export class AuditClient {
 	private _presets!: PresetsService
 	private _metrics!: MetricsService
 	private _health!: HealthService
+	private _delivery!: DeliveryService
 
 	// Cleanup and lifecycle management
 	private cleanupTasks: Array<() => void | Promise<void>> = []
@@ -318,9 +320,18 @@ export class AuditClient {
 		this._presets = new PresetsService(this.config, logger)
 		this._metrics = new MetricsService(this.config, logger)
 		this._health = new HealthService(this.config, logger)
+		this._delivery = new DeliveryService(this.config, logger)
 
 		this.getLogger().debug('Services initialized', {
-			services: ['events', 'compliance', 'scheduledReports', 'presets', 'metrics', 'health'],
+			services: [
+				'events',
+				'compliance',
+				'scheduledReports',
+				'presets',
+				'metrics',
+				'health',
+				'delivery',
+			],
 		})
 	}
 
@@ -341,6 +352,7 @@ export class AuditClient {
 		this.cleanupTasks.push(() => this._presets.destroy())
 		this.cleanupTasks.push(() => this._metrics.destroy())
 		this.cleanupTasks.push(() => this._health.destroy())
+		this.cleanupTasks.push(() => this._delivery.destroy())
 
 		// Set up process cleanup handlers if in Node.js environment
 		if (typeof process !== 'undefined' && process.on) {
@@ -426,6 +438,14 @@ export class AuditClient {
 	}
 
 	/**
+	 * Delivery service for delivery destination and request management
+	 */
+	public get delivery(): DeliveryService {
+		this.validateClientState()
+		return this._delivery
+	}
+
+	/**
 	 * Plugin manager for managing plugins
 	 */
 	public get plugins(): PluginManager {
@@ -497,6 +517,7 @@ export class AuditClient {
 			this._presets.updateConfig(this.config)
 			this._metrics.updateConfig(this.config)
 			this._health.updateConfig(this.config)
+			this._delivery.updateConfig(this.config)
 
 			this.getLogger().info('Configuration updated successfully', {
 				updatedFields: Object.keys(updates),
@@ -529,6 +550,7 @@ export class AuditClient {
 				this._presets.updateConfig(this.config)
 				this._metrics.updateConfig(this.config)
 				this._health.updateConfig(this.config)
+				this._delivery.updateConfig(this.config)
 			}
 
 			this.getLogger().info('Environment configuration loaded', { environment })
@@ -555,6 +577,7 @@ export class AuditClient {
 		this._presets.addRequestInterceptor(interceptor, options)
 		this._metrics.addRequestInterceptor(interceptor, options)
 		this._health.addRequestInterceptor(interceptor, options)
+		this._delivery.addRequestInterceptor(interceptor, options)
 
 		this.getLogger().debug('Request interceptor added to all services')
 	}
@@ -574,6 +597,7 @@ export class AuditClient {
 		this._presets.addResponseInterceptor(interceptor, options)
 		this._metrics.addResponseInterceptor(interceptor, options)
 		this._health.addResponseInterceptor(interceptor, options)
+		this._delivery.addResponseInterceptor(interceptor, options)
 
 		this.getLogger().debug('Response interceptor added to all services')
 	}
@@ -590,6 +614,7 @@ export class AuditClient {
 		this._presets.clearInterceptors()
 		this._metrics.clearInterceptors()
 		this._health.clearInterceptors()
+		this._delivery.clearInterceptors()
 
 		this.getLogger().debug('All interceptors cleared from all services')
 	}
@@ -642,6 +667,7 @@ export class AuditClient {
 		presets: any
 		metrics: any
 		health: any
+		delivery: any
 	} {
 		this.validateClientState()
 
@@ -652,6 +678,7 @@ export class AuditClient {
 			presets: this._presets.getStats(),
 			metrics: this._metrics.getStats(),
 			health: this._health.getStats(),
+			delivery: this._delivery.getStats(),
 		}
 	}
 

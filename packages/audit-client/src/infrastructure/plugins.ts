@@ -2,6 +2,7 @@
 // Plugin Architecture System
 // ============================================================================
 
+import type { ValidationResult } from '@/types/shared-schemas'
 import type { AuditClientConfig } from '../core/config'
 import type { CacheStorage } from './cache'
 import type { Logger } from './logger'
@@ -54,15 +55,6 @@ export interface PluginContext {
 	logger: Logger
 	/** Plugin registry for accessing other plugins */
 	registry: PluginRegistry
-}
-
-/**
- * Plugin validation result
- */
-export interface ValidationResult {
-	valid: boolean
-	errors?: string[]
-	warnings?: string[]
 }
 
 // ============================================================================
@@ -268,7 +260,7 @@ export class PluginRegistry {
 		// Validate configuration if plugin supports it
 		if (plugin.validateConfig) {
 			const validation = plugin.validateConfig(config)
-			if (!validation.valid) {
+			if (!validation.isValid) {
 				throw new Error(
 					`Invalid configuration for plugin '${plugin.name}': ${validation.errors?.join(', ')}`
 				)

@@ -156,3 +156,13 @@ export const DeliveryConfigSchema = z.object({
 	destinations: z.union([z.array(z.string()), z.literal('default')]),
 })
 export type DeliveryConfig = z.infer<typeof DeliveryConfigSchema>
+
+/**
+ * Validation result
+ */
+export const ValidationResultSchema = z.object({
+	isValid: z.boolean(),
+	errors: z.array(z.string()).optional(),
+	warnings: z.array(z.string()).optional(),
+})
+export type ValidationResult = z.infer<typeof ValidationResultSchema>

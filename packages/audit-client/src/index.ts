@@ -103,7 +103,6 @@ export type {
 	StoragePlugin,
 	AuthPlugin,
 	PluginContext,
-	ValidationResult,
 	MiddlewareRequest,
 	MiddlewareResponse,
 	MiddlewareNext,
@@ -282,6 +281,33 @@ export {
 	type HealthSubscriptionParams,
 	type RealTimeHealthData,
 	type HealthSubscription,
+} from './services'
+
+// Delivery Service exports
+export {
+	DeliveryService,
+	type DeliveryDestination,
+	type CreateDeliveryDestination,
+	type UpdateDeliveryDestination,
+	type DeliveryDestinationQuery,
+	type PaginatedDeliveryDestinations,
+	type DeliveryRequest,
+	type DeliveryResponse,
+	type DeliveryStatusResponse,
+	type DeliveryListQuery,
+	type PaginatedDeliveries,
+	type ValidationResult,
+	type ConnectionTestResult,
+	type DestinationHealth,
+	type DeliveryMetrics,
+	type MetricsQuery,
+	type DeliveryDestinationType,
+	type DeliveryDestinationConfig,
+	type DeliveryPayloadType,
+	type DeliveryStatus,
+	type DestinationDeliveryStatus,
+	type DestinationHealthStatus,
+	type CircuitBreakerState,
 } from './services'
 
 // Export all other services

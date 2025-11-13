@@ -22,6 +22,14 @@ import {
 	ReportTemplateSchema,
 } from '../types/compliance'
 import {
+	CreateDeliveryDestinationSchema,
+	DeliveryDestinationQuerySchema,
+	DeliveryListQuerySchema,
+	DeliveryRequestSchema,
+	MetricsQuerySchema,
+	UpdateDeliveryDestinationSchema,
+} from '../types/delivery'
+import {
 	DetailedHealthStatusSchema,
 	HealthStatusSchema,
 	ReadinessStatusSchema,
@@ -407,6 +415,40 @@ export const validateReadinessStatus = createValidator(ReadinessStatusSchema)
  * Validates version information
  */
 export const validateVersionInfo = createValidator(VersionInfoSchema)
+
+// ============================================================================
+// Delivery Validators
+// ============================================================================
+
+/**
+ * Validates create delivery destination input
+ */
+export const validateCreateDeliveryDestination = createValidator(CreateDeliveryDestinationSchema)
+
+/**
+ * Validates update delivery destination input
+ */
+export const validateUpdateDeliveryDestination = createValidator(UpdateDeliveryDestinationSchema)
+
+/**
+ * Validates delivery destination query parameters
+ */
+export const validateDeliveryDestinationQuery = createValidator(DeliveryDestinationQuerySchema)
+
+/**
+ * Validates delivery request
+ */
+export const validateDeliveryRequest = createValidator(DeliveryRequestSchema)
+
+/**
+ * Validates delivery list query parameters
+ */
+export const validateDeliveryListQuery = createValidator(DeliveryListQuerySchema)
+
+/**
+ * Validates metrics query parameters
+ */
+export const validateMetricsQuery = createValidator(MetricsQuerySchema)
 
 // ============================================================================
 // Composite Validation Functions

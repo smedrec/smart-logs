@@ -11,6 +11,7 @@ import {
 } from '@/types/presets'
 
 import { BaseResource } from '../core/base-resource'
+import { ValidationResult } from '../types/shared-schemas'
 import {
 	assertDefined,
 	assertType,
@@ -71,7 +72,7 @@ export interface AuditPresetMetadata {
 /**
  * Result of preset validation
  */
-export interface ValidationResult {
+/**export interface ValidationResult {
 	isValid: boolean
 	errors: Array<{
 		field: string
@@ -83,7 +84,7 @@ export interface ValidationResult {
 		message: string
 		code: string
 	}>
-}
+}*/
 
 /**
  * Parameters for listing audit presets

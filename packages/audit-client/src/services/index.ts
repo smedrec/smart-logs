@@ -65,7 +65,6 @@ export {
 	type AuditPresetTemplate,
 	type AuditPresetValidation,
 	type AuditPresetMetadata,
-	type ValidationResult,
 	type ListAuditPresetsParams,
 	type PaginatedAuditPresets,
 } from './presets'
@@ -133,10 +132,38 @@ export {
 	type VersionInfo,
 } from '../types/health'
 
+// Delivery Service - Comprehensive delivery destination and request management
+export { DeliveryService } from './delivery'
+
+export {
+	type DeliveryDestination,
+	type CreateDeliveryDestination,
+	type UpdateDeliveryDestination,
+	type DeliveryDestinationQuery,
+	type PaginatedDeliveryDestinations,
+	type DeliveryRequest,
+	type DeliveryResponse,
+	type DeliveryStatusResponse,
+	type DeliveryListQuery,
+	type PaginatedDeliveries,
+	type ConnectionTestResult,
+	type DestinationHealth,
+	type DeliveryMetrics,
+	type MetricsQuery,
+	type DeliveryDestinationType,
+	type DeliveryDestinationConfig,
+	type DeliveryPayloadType,
+	type DeliveryStatus,
+	type DestinationDeliveryStatus,
+	type DestinationHealthStatus,
+	type CircuitBreakerState,
+} from '../types/delivery'
+
 export {
 	type DeliveryConfig,
 	type ExecutionStatus,
 	type ExecutionTrigger,
 	type ReportStatus,
 	type ReportFormat,
+	type ValidationResult,
 } from '../types/shared-schemas'

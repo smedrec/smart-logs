@@ -72,11 +72,14 @@ export * from './metrics'
 // Re-export all health types
 export * from './health'
 
+// Re-export all delivery types
+export * from './delivery'
+
 // Re-export utility types
 export * from './utils'
 
 // Re-export shared schemas
-export type { DeliveryStatus, ExecutionStatus } from './shared-schemas'
+export type { DeliveryStatus, ExecutionStatus, ValidationResult } from './shared-schemas'
 //export * from './shared-schemas'
 
 /**
