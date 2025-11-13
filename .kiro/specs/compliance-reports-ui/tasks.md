@@ -186,7 +186,7 @@
     - Create adaptive layouts for different screen sizes
     - _Requirements: 9.1, 9.4_
 
-  - [ ] 8.4 Add accessibility testing
+  - [x] 8.4 Add accessibility testing
     - Write automated accessibility tests with jest-axe
     - Implement accessibility linting and validation
     - Create accessibility testing documentation
@@ -250,56 +250,78 @@
     - _Requirements: Performance considerations from design_
 
   - [ ] 11.4 Add comprehensive testing
-    - Write unit tests for all components using React Testing Library
-    - Create integration tests for component interactions
+    - Set up testing infrastructure (React Testing Library, Vitest)
+    - Write unit tests for dashboard components (DashboardStats, RecentExecutions, etc.)
+    - Write unit tests for form components (ReportConfigurationForm, CriteriaBuilder, etc.)
+    - Write unit tests for data table components (ReportsDataTable, ExecutionHistoryPage)
+    - Create integration tests for report creation flow
+    - Create integration tests for report execution flow
     - Implement end-to-end tests for critical user journeys
+    - Add test coverage reporting
     - _Requirements: Testing strategy from design_
 
-- [ ] 12. Connect UI components to real API data
-  - [ ] 12.1 Integrate dashboard components with ComplianceAuditProvider
-    - Connect DashboardStats to listScheduledReports API
+- [ ] 12. Fix form data transformation and API integration
+  - [ ] 12.0 Fix ReportConfigurationForm data transformation
+    - Review CreateScheduledReportInput and UpdateScheduledReportInput types from audit-client
+    - Update transformFormData function to properly map all form fields
+    - Ensure schedule configuration matches API expectations
+    - Ensure delivery configuration matches API expectations
+    - Add proper type safety for form data transformation
+    - Test transformation with various report types
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 10.1_
+
+- [ ] 13. Connect UI components to real API data
+  - [ ] 13.1 Integrate dashboard components with ComplianceAuditProvider
+    - Replace mock data in DashboardStats with listScheduledReports API
     - Wire RecentExecutions to getExecutionHistory API
     - Connect UpcomingReports to listScheduledReports with filtering
     - Update SystemHealth to use checkConnection from provider
+    - Remove commented-out API calls and use real data
     - _Requirements: 1.1, 1.2, 1.3, 10.1_
 
-  - [ ] 12.2 Connect ScheduledReportsPage to real data
+  - [ ] 13.2 Connect ScheduledReportsPage to real data
     - Replace mock data with listScheduledReports API calls
     - Implement real-time data fetching with loading states
     - Add error handling for API failures
-    - Wire up bulk operations to API endpoints
+    - Wire up bulk operations (enable/disable, delete) to API endpoints
+    - Implement proper pagination using API pagination
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 10.1_
 
-  - [ ] 12.3 Connect ReportConfigurationForm to API
-    - Wire create form to createScheduledReport API
-    - Wire edit form to updateScheduledReport API
+  - [ ] 13.3 Connect ReportConfigurationForm to API
+    - Fix transformFormData to properly map form data to CreateScheduledReportInput
+    - Wire create form to createScheduledReport from ComplianceAuditProvider
+    - Wire edit form to updateScheduledReport from ComplianceAuditProvider
     - Implement form data loading for edit mode using getScheduledReport
     - Add proper error handling and validation feedback
+    - Test form submission with real API
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 4.1, 10.1_
 
-  - [ ] 12.4 Connect ExecutionHistoryPage to API
+  - [ ] 13.4 Connect ExecutionHistoryPage to API
     - Wire execution history to getExecutionHistory API
     - Implement real-time execution status updates
     - Connect download actions to actual report file endpoints
     - Add proper pagination and filtering
+    - Remove mock data and use real API responses
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 7.1, 10.1_
 
-  - [ ] 12.5 Connect ManualExecutionDialog to API
+  - [ ] 13.5 Connect ManualExecutionDialog to API
     - Wire manual execution to executeScheduledReport API
     - Implement real-time progress tracking
     - Add execution result handling and notifications
     - Connect to NotificationCenter for alerts
+    - Test manual execution flow end-to-end
     - _Requirements: 6.1, 6.2, 6.3, 11.1, 11.2_
 
-  - [ ] 12.6 Connect ReportDetailsPage to API
+  - [ ] 13.6 Connect ReportDetailsPage to API
     - Wire report details to getScheduledReport API
-    - Implement edit and delete operations
+    - Implement edit and delete operations using ComplianceAuditProvider
     - Add execution history integration
     - Connect manual execution trigger
+    - Add proper loading and error states
     - _Requirements: 4.1, 5.1, 6.1, 10.1_
 
-- [x] 13. Implement delivery destinations management UI
-  - [x] 13.1 Create delivery destinations list page
+- [x] 14. Implement delivery destinations management UI
+  - [x] 14.1 Create delivery destinations list page
     - Build DeliveryDestinationsPage component at `/compliance/delivery-destinations`
     - Create data table with columns: label, type, status, usage count, last used
     - Implement filtering by destination type (email, webhook, storage, SFTP, download)
@@ -308,7 +330,7 @@
     - Add pagination for large destination lists
     - _Requirements: 2.4, 3.1, 3.2_
 
-  - [x] 13.2 Create delivery destination form components
+  - [x] 14.2 Create delivery destination form components
     - Build DeliveryDestinationForm main component for create/edit
     - Create DestinationTypeSelector for choosing destination type
     - Implement EmailDestinationConfig component with SMTP/API configuration
@@ -319,7 +341,7 @@
     - Add real-time validation for each destination type
     - _Requirements: 2.4, 8.3_
 
-  - [x] 13.3 Create destination testing and validation
+  - [x] 14.3 Create destination testing and validation
     - Build TestDestinationDialog for testing destination connections
     - Implement real-time connection testing with progress indicators
     - Create validation feedback for configuration errors
@@ -327,7 +349,7 @@
     - Implement retry functionality for failed tests
     - _Requirements: 2.4, 8.1, 8.2_
 
-  - [x] 13.4 Create destination management actions
+  - [x] 14.4 Create destination management actions
     - Implement enable/disable destination functionality
     - Add destination deletion with confirmation dialog
     - Create duplicate destination feature for quick setup
@@ -335,7 +357,7 @@
     - Add destination usage history and metrics display
     - _Requirements: 3.4, 8.1_
 
-  - [x] 13.5 Create delivery history and monitoring
+  - [x] 14.5 Create delivery history and monitoring
     - Build DeliveryHistoryPage component at `/compliance/delivery-history`
     - Create delivery status timeline with visual indicators
     - Implement filtering by status (pending, delivered, failed, retrying)
@@ -344,7 +366,7 @@
     - Implement retry functionality for failed deliveries
     - _Requirements: 5.1, 5.2, 5.3, 11.1_
 
-  - [x] 13.6 Integrate delivery destinations with report configuration
+  - [x] 14.6 Integrate delivery destinations with report configuration
     - Update DeliveryConfiguration component to use delivery destinations
     - Add destination selector with preview of destination details
     - Implement multiple destination selection for reports
@@ -353,7 +375,7 @@
     - Display destination health status in selector
     - _Requirements: 2.4, 4.5_
 
-  - [x] 13.7 Create delivery destination routes
+  - [x] 14.7 Create delivery destination routes
     - Add route `/compliance/delivery-destinations` for list page
     - Add route `/compliance/delivery-destinations/create` for creation
     - Add route `/compliance/delivery-destinations/:id/edit` for editing
@@ -362,7 +384,7 @@
     - Implement route guards for delivery management permissions
     - _Requirements: 1.5, 9.1_
 
-  - [x] 13.8 Create delivery metrics and health monitoring
+  - [x] 14.8 Create delivery metrics and health monitoring
     - Build DeliveryMetricsCard for dashboard integration
     - Display destination health status indicators
     - Show delivery success/failure rates
@@ -371,51 +393,57 @@
     - Create destination health check scheduling
     - _Requirements: 1.3, 8.1, 11.1, 11.3_
 
-  - [x] 13.9 Integrate delivery destinations with sidebar navigation
+  - [x] 14.9 Integrate delivery destinations with sidebar navigation
     - Add "Delivery Destinations" menu item under Compliance section
     - Add "Delivery History" menu item for tracking
     - Update navigation to highlight active delivery routes
     - Add destination count badge to navigation item
     - _Requirements: 1.5, 9.1_
 
-- [ ] 14. Final integration and polish
-  - [x] 14.1 Integrate with existing app structure
+- [ ] 15. Final integration and polish
+  - [x] 15.1 Integrate with existing app structure
     - Update app routing to include compliance routes
     - Integrate with existing sidebar navigation
     - Ensure consistent theming and styling
     - _Requirements: 1.5, 9.1_
 
-  - [ ] 14.2 Add ComplianceAuditProvider to app root
-    - Wrap compliance routes with ComplianceAuditProvider
-    - Ensure proper provider hierarchy with AuditProvider
+  - [ ] 15.2 Add ComplianceAuditProvider to app root
+    - Wrap compliance routes with ComplianceAuditProvider in \_\_root.tsx
+    - Ensure proper provider hierarchy (ThemeProvider > AuthProvider > AuditProvider > ComplianceAuditProvider)
     - Test connection status monitoring
+    - Verify all compliance pages have access to the provider
     - _Requirements: 10.1, 10.2_
 
-  - [ ] 14.3 Implement comprehensive error boundaries
-    - Add error boundaries at route level
+  - [ ] 15.3 Implement comprehensive error boundaries
+    - Add error boundaries at compliance route level
     - Implement fallback UI for component errors
-    - Add error reporting and logging
+    - Add error reporting and logging integration
+    - Test error recovery flows
     - _Requirements: 8.1, 8.2_
 
-  - [ ] 14.4 Performance optimization and monitoring
-    - Implement performance monitoring and analytics
-    - Add error tracking and user behavior analytics
-    - Optimize bundle size and loading performance
-    - Test and optimize API call patterns
+  - [ ] 15.4 Performance optimization and monitoring
+    - Implement performance monitoring for compliance pages
+    - Add error tracking integration (e.g., Sentry)
+    - Optimize bundle size with code splitting verification
+    - Test and optimize API call patterns (reduce redundant calls)
+    - Add loading state optimizations
     - _Requirements: Performance and monitoring from design_
 
-  - [ ] 14.5 Create documentation and examples
+  - [ ] 15.5 Create documentation and examples
     - Write component documentation with usage examples
     - Create user guide for compliance features
     - Add developer documentation for extending the system
     - Document API integration patterns
     - Document delivery destinations setup and usage
+    - Add troubleshooting guide
     - _Requirements: All requirements_
 
-  - [ ] 14.6 Final testing and validation
+  - [ ] 15.6 Final testing and validation
     - Perform comprehensive testing across all features
     - Validate API compatibility and error handling
-    - Test accessibility compliance and responsive design
+    - Test accessibility compliance with automated tools
+    - Test responsive design on multiple devices
     - Test delivery destinations functionality end-to-end
     - Verify all requirements are met
+    - Create test report documenting coverage
     - _Requirements: All requirements_
