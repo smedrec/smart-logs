@@ -1,4 +1,6 @@
 import { BaseResource } from '../core/base-resource'
+import { LoggingHelper } from '../utils/logging-helper'
+import { InputSanitizer } from '../utils/sanitization'
 import { assertDefined, assertType, isObject } from '../utils/type-guards'
 import {
 	validateCreateDeliveryDestination,
@@ -54,10 +56,14 @@ export class DeliveryService extends BaseResource {
 
 	/**
 	 * Create a new delivery destination
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async createDestination(destination: CreateDeliveryDestination): Promise<DeliveryDestination> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedDestination = InputSanitizer.sanitizeObject(destination)
+
 		// Validate input
-		const validationResult = validateCreateDeliveryDestination(destination)
+		const validationResult = validateCreateDeliveryDestination(sanitizedDestination)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid delivery destination data', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -78,6 +84,7 @@ export class DeliveryService extends BaseResource {
 
 	/**
 	 * Update an existing delivery destination
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async updateDestination(
 		id: string,
@@ -85,8 +92,11 @@ export class DeliveryService extends BaseResource {
 	): Promise<DeliveryDestination> {
 		assertDefined(id, 'Destination ID is required')
 
+		// Sanitize input first to prevent injection attacks
+		const sanitizedUpdates = InputSanitizer.sanitizeObject(updates)
+
 		// Validate input
-		const validationResult = validateUpdateDeliveryDestination(updates)
+		const validationResult = validateUpdateDeliveryDestination(sanitizedUpdates)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid delivery destination update data', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -225,10 +235,14 @@ export class DeliveryService extends BaseResource {
 
 	/**
 	 * Submit a delivery request
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async deliver(request: DeliveryRequest): Promise<DeliveryResponse> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedRequest = InputSanitizer.sanitizeObject(request)
+
 		// Validate input
-		const validationResult = validateDeliveryRequest(request)
+		const validationResult = validateDeliveryRequest(sanitizedRequest)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid delivery request data', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),

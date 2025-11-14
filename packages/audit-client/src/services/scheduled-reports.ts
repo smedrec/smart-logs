@@ -1,6 +1,8 @@
 import { ReportCriteria } from '@/types/compliance'
 
 import { BaseResource } from '../core/base-resource'
+import { LoggingHelper } from '../utils/logging-helper'
+import { InputSanitizer } from '../utils/sanitization'
 import { assertDefined, assertType, isNonEmptyString, isObject } from '../utils/type-guards'
 import {
 	validateCreateScheduledReportInput,
@@ -101,10 +103,14 @@ export class ScheduledReportsService extends BaseResource {
 	/**
 	 * Create a new scheduled report
 	 * Requirement 6.1: WHEN creating scheduled reports THEN the client SHALL validate schedule configuration and report parameters
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async create(report: CreateScheduledReportInput): Promise<ScheduledReport> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedReport = InputSanitizer.sanitizeObject(report)
+
 		// Validate input using centralized validation
-		const validationResult = validateCreateScheduledReportInput(report)
+		const validationResult = validateCreateScheduledReportInput(sanitizedReport)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid create scheduled report input', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -127,6 +133,7 @@ export class ScheduledReportsService extends BaseResource {
 	/**
 	 * Update an existing scheduled report
 	 * Requirement 6.2: WHEN updating scheduled reports THEN the client SHALL support partial updates and validation
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async update(id: string, updates: UpdateScheduledReportInput): Promise<ScheduledReport> {
 		// Validate input
@@ -135,7 +142,10 @@ export class ScheduledReportsService extends BaseResource {
 			throw new ValidationError('Scheduled report ID must be a non-empty string')
 		}
 
-		const validationResult = validateUpdateScheduledReportInput(updates)
+		// Sanitize input first to prevent injection attacks
+		const sanitizedUpdates = InputSanitizer.sanitizeObject(updates)
+
+		const validationResult = validateUpdateScheduledReportInput(sanitizedUpdates)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid update scheduled report input', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),

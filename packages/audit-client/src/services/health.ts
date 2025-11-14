@@ -1,4 +1,5 @@
 import { BaseResource } from '../core/base-resource'
+import { LoggingHelper } from '../utils/logging-helper'
 import {
 	assertDefined,
 	assertType,

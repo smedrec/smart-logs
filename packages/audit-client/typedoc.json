@@ -1,0 +1,24 @@
+{
+	"entryPoints": ["src/index.ts"],
+	"out": "docs/api",
+	"readme": "README.md",
+	"exclude": [
+		"**/*.test.ts",
+		"**/*.spec.ts",
+		"**/examples/**",
+		"**/node_modules/**",
+		"**/__tests__/**"
+	],
+	"excludePrivate": true,
+	"excludeProtected": false,
+	"excludeInternal": true,
+	"name": "@smedrec/audit-client",
+	"includeVersion": true,
+	"categorizeByGroup": true,
+	"categoryOrder": ["Core", "Services", "Infrastructure", "Types", "Utilities", "*"],
+	"sort": ["source-order"],
+	"navigation": {
+		"includeCategories": true,
+		"includeGroups": true
+	}
+}

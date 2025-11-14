@@ -157,7 +157,7 @@ queryLoginEvents()
 
 ## 5. Advanced Configuration
 
-The client is highly configurable. You can enable features like automatic retries, caching, and detailed logging to enhance reliability and performance.
+The client is highly configurable. You can enable features like automatic retries, caching, detailed logging, and performance monitoring to enhance reliability and performance.
 
 ```typescript
 import { AuditClient } from '@smedrec/audit-client'
@@ -174,20 +174,70 @@ const config: AuditClientConfig = {
 	retry: {
 		enabled: true,
 		maxAttempts: 3,
+		circuitBreaker: {
+			enabled: true,
+			failureThreshold: 5,
+			resetTimeout: 60000, // 1 minute
+		},
 	},
 	// Enable in-memory caching for GET requests to reduce latency
 	cache: {
 		enabled: true,
 		defaultTtlMs: 60000, // Cache responses for 1 minute
+		maxSize: 100, // Maximum number of cached entries
 	},
 	// Configure logging for better observability
 	logging: {
 		enabled: true,
 		level: 'info', // Can be 'debug', 'info', 'warn', or 'error'
 	},
+	// Enable performance monitoring
+	performance: {
+		enabled: true,
+		budget: {
+			maxRequestTime: 1000, // 1 second
+			maxMemoryUsage: 50 * 1024 * 1024, // 50MB
+		},
+	},
 }
 
 const client = new AuditClient(config)
+```
+
+### Performance Monitoring
+
+The client includes built-in performance monitoring to track request times, memory usage, and cache efficiency:
+
+```typescript
+// Get performance metrics
+const metrics = client.getPerformanceMetrics()
+console.log('Average request time:', metrics.avgRequestTime, 'ms')
+console.log('Cache hit rate:', metrics.cacheHitRate, '%')
+console.log('Memory usage:', metrics.memoryUsage, 'bytes')
+
+// Check for performance budget violations
+const violations = client.checkPerformanceBudget()
+if (violations.length > 0) {
+	console.warn('Performance budget violations:', violations)
+}
+```
+
+### Lazy Loading Plugins
+
+The client supports lazy loading of plugins to reduce initial bundle size. Plugins are automatically loaded when needed:
+
+```typescript
+// Plugins are loaded on-demand
+const client = new AuditClient({
+	baseUrl: 'https://api.smartlogs.com',
+	authentication: { type: 'apiKey', apiKey: 'YOUR_API_KEY' },
+	plugins: {
+		lazyLoad: true, // Enable lazy loading (default: true)
+	},
+})
+
+// The request logging plugin will be loaded automatically when first used
+await client.events.create({ action: 'user.login' /* ... */ })
 ```
 
 ## Next Steps

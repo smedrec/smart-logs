@@ -7,6 +7,7 @@ import {
 	StreamingManager,
 	StreamMetrics,
 } from '../infrastructure/streaming'
+import { LoggingHelper } from '../utils/logging-helper'
 import { InputSanitizer } from '../utils/sanitization'
 import {
 	assertDefined,

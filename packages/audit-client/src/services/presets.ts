@@ -12,6 +12,8 @@ import {
 
 import { BaseResource } from '../core/base-resource'
 import { ValidationResult } from '../types/shared-schemas'
+import { LoggingHelper } from '../utils/logging-helper'
+import { InputSanitizer } from '../utils/sanitization'
 import {
 	assertDefined,
 	assertType,
@@ -218,8 +220,11 @@ export class PresetsService extends BaseResource {
 	 * ```
 	 */
 	async create(preset: CreateAuditPresetInput): Promise<AuditPreset> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedPreset = InputSanitizer.sanitizeObject(preset)
+
 		// Validate input using centralized validation
-		const validationResult = validateCreateAuditPresetInput(preset)
+		const validationResult = validateCreateAuditPresetInput(sanitizedPreset)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid audit preset input', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -261,7 +266,10 @@ export class PresetsService extends BaseResource {
 			throw new ValidationError('Preset name must be a non-empty string')
 		}
 
-		const validationResult = validateUpdateAuditPresetInput(updates)
+		// Sanitize input first to prevent injection attacks
+		const sanitizedUpdates = InputSanitizer.sanitizeObject(updates)
+
+		const validationResult = validateUpdateAuditPresetInput(sanitizedUpdates)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid audit preset update input', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -327,7 +335,10 @@ export class PresetsService extends BaseResource {
 			throw new ValidationError('Preset name must be a non-empty string')
 		}
 
-		const validationResult = validatePresetContext(context)
+		// Sanitize input first to prevent injection attacks
+		const sanitizedContext = InputSanitizer.sanitizeObject(context)
+
+		const validationResult = validatePresetContext(sanitizedContext)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid preset context', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -385,7 +396,10 @@ export class PresetsService extends BaseResource {
 			throw new ValidationError('Preset name must be a non-empty string')
 		}
 
-		const validationResult = validatePresetContext(context)
+		// Sanitize input first to prevent injection attacks
+		const sanitizedContext = InputSanitizer.sanitizeObject(context)
+
+		const validationResult = validatePresetContext(sanitizedContext)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid preset context', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),

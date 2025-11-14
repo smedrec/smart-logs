@@ -285,7 +285,9 @@ export class DetailedLoggingResponseInterceptor implements ResponseInterceptor {
 			...config,
 		}
 		this.masker = new SensitiveDataMasker(this.config.customSensitiveFields)
-		this.requestInterceptor = requestInterceptor
+		if (requestInterceptor) {
+			this.requestInterceptor = requestInterceptor
+		}
 	}
 
 	intercept<T>(response: T, options: RequestOptions, context: InterceptorContext): T {

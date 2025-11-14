@@ -7,6 +7,7 @@ import { AuditLogger, LoggerFactory } from '../infrastructure/logger'
 import { PerformanceManager } from '../infrastructure/performance'
 import { PerformanceMonitor } from '../infrastructure/performance-monitor'
 import { RetryManager } from '../infrastructure/retry'
+import { LoggingHelper } from '../utils/logging-helper'
 import { HttpClient } from './http-client'
 
 import type {
@@ -718,29 +719,10 @@ export abstract class BaseResource {
 
 	/**
 	 * Log request information using enhanced logging system
+	 * Now delegates to LoggingHelper for consistent logging behavior
 	 */
 	private logRequest(message: string, meta: Record<string, any>): void {
-		if (!this.config.logging.enabled) {
-			return
-		}
-
-		// Set request correlation if available
-		if (meta.requestId && this.logger.setRequestId) {
-			this.logger.setRequestId(meta.requestId)
-		}
-
-		if (meta.correlationId && this.logger.setCorrelationId) {
-			this.logger.setCorrelationId(meta.correlationId)
-		}
-
-		// Determine log level based on context
-		if (meta.error) {
-			this.logger.error(message, meta)
-		} else if (meta.warning || meta.status >= 400) {
-			this.logger.warn(message, meta)
-		} else {
-			this.logger.info(message, meta)
-		}
+		LoggingHelper.logRequest(this.logger, this.config.logging, message, meta)
 	}
 
 	/**

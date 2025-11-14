@@ -11,6 +11,9 @@ The performance optimization system consists of several interconnected component
 - **Request Queue Management**: Controls concurrent requests and prevents overload
 - **Request Deduplication**: Eliminates duplicate requests automatically
 - **Performance Metrics**: Comprehensive monitoring and analytics
+- **Performance Budgets**: Enforce performance thresholds and track violations
+- **Lazy Loading**: Load plugins on-demand to reduce initial bundle size
+- **Circuit Breaker**: Prevent cascading failures with automatic circuit breaking
 - **Bandwidth Optimization**: Various strategies to reduce network usage
 
 ## Configuration
@@ -267,7 +270,138 @@ console.log('Performance Report:', {
 client.resetPerformanceTracking()
 ```
 
-### 6. Bandwidth Optimization
+### 6. Performance Budgets
+
+Set and enforce performance budgets to ensure your application meets performance targets.
+
+#### Configuration
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.example.com',
+	authentication: { type: 'apiKey', apiKey: 'your-api-key' },
+	performance: {
+		enabled: true,
+		budget: {
+			maxBundleSize: 140 * 1024, // 140KB gzipped
+			maxInitTime: 100, // 100ms
+			maxRequestTime: 1000, // 1 second (p95)
+			maxMemoryUsage: 50 * 1024 * 1024, // 50MB
+			maxCacheSize: 100, // 100 entries
+		},
+	},
+})
+```
+
+#### Monitoring Budgets
+
+```typescript
+// Get current metrics
+const metrics = client.getPerformanceMetrics()
+console.log('Current Performance:', {
+	bundleSize: metrics.bundleSize,
+	initTime: metrics.initTime,
+	p95RequestTime: metrics.p95RequestTime,
+	memoryUsage: metrics.memoryUsage,
+	cacheHitRate: metrics.cacheHitRate,
+})
+
+// Check for budget violations
+const violations = client.checkPerformanceBudget()
+if (violations.length > 0) {
+	console.warn('Performance Budget Violations:')
+	violations.forEach((v) => {
+		console.warn(`- ${v.metric}: ${v.actual} > ${v.budget} (${v.severity})`)
+	})
+}
+
+// Get full performance report
+const report = client.getPerformanceReport()
+console.log('Performance Report:', {
+	timestamp: report.timestamp,
+	passed: report.passed,
+	summary: report.summary,
+	violations: report.violations,
+})
+```
+
+### 7. Lazy Loading
+
+Reduce initial bundle size by loading plugins on-demand.
+
+#### How it Works
+
+- Plugins are split into separate chunks
+- Loaded dynamically when first used
+- Cached after initial load
+- Reduces initial bundle by 30-40%
+
+#### Configuration
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.example.com',
+	authentication: { type: 'apiKey', apiKey: 'your-api-key' },
+	plugins: {
+		lazyLoad: true, // Default: true
+	},
+})
+
+// Plugins are loaded automatically when needed
+// No manual intervention required!
+```
+
+#### Bundle Size Comparison
+
+- **Without lazy loading**: ~200KB gzipped
+- **With lazy loading**: ~140KB initial + ~60KB loaded on-demand
+
+### 8. Circuit Breaker
+
+Prevent cascading failures by automatically stopping requests when error rates are high.
+
+#### Configuration
+
+```typescript
+const client = new AuditClient({
+	baseUrl: 'https://api.example.com',
+	authentication: { type: 'apiKey', apiKey: 'your-api-key' },
+	retry: {
+		enabled: true,
+		circuitBreaker: {
+			enabled: true,
+			failureThreshold: 5, // Open after 5 consecutive failures
+			successThreshold: 2, // Close after 2 consecutive successes
+			resetTimeout: 60000, // Try again after 1 minute
+			halfOpenMaxAttempts: 3, // Max attempts in half-open state
+		},
+	},
+})
+```
+
+#### Circuit States
+
+- **Closed**: Normal operation, requests pass through
+- **Open**: Too many failures, requests fail immediately
+- **Half-Open**: Testing if service recovered
+
+#### Monitoring
+
+```typescript
+// Get circuit breaker stats
+const retryManager = client.getRetryManager()
+const stats = retryManager.getCircuitBreakerStats()
+
+console.log('Circuit Breaker Status:', {
+	state: stats.state, // 'closed', 'open', or 'half-open'
+	failureCount: stats.failureCount,
+	successCount: stats.successCount,
+	lastFailureTime: stats.lastFailureTime,
+	nextAttemptTime: stats.nextAttemptTime,
+})
+```
+
+### 9. Bandwidth Optimization
 
 Various strategies to minimize network usage and improve transfer efficiency.
 
@@ -278,6 +412,7 @@ Various strategies to minimize network usage and improve transfer efficiency.
 - **Deduplication**: Prevents duplicate network calls
 - **Streaming**: Reduces memory usage for large transfers
 - **Request Batching**: Combines multiple operations (where supported)
+- **Lazy Loading**: Reduces initial bundle size
 
 ## Best Practices
 
