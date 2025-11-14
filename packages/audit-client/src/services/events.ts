@@ -289,8 +289,8 @@ export class EventsService extends BaseResource {
 	private streamingManager: StreamingManager
 	private activeSubscriptions: Set<EventSubscription> = new Set()
 
-	constructor(config: any, logger?: any) {
-		super(config, logger)
+	constructor(config: any, logger?: any, performanceMonitor?: any) {
+		super(config, logger, performanceMonitor)
 		this.streamingManager = new StreamingManager(
 			{
 				enableCompression: config.performance?.enableCompression || true,

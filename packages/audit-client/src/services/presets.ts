@@ -130,8 +130,8 @@ export interface PaginatedAuditPresets {
  * - Template-based audit event creation
  */
 export class PresetsService extends BaseResource {
-	constructor(config: AuditClientConfig, logger?: Logger) {
-		super(config, logger)
+	constructor(config: AuditClientConfig, logger?: Logger, performanceMonitor?: any) {
+		super(config, logger, performanceMonitor)
 	}
 
 	/**

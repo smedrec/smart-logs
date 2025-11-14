@@ -49,8 +49,8 @@ export interface ReportDownloadOptions {
 export class ComplianceService extends BaseResource {
 	private streamingManager: StreamingManager
 
-	constructor(config: AuditClientConfig, logger?: Logger) {
-		super(config, logger)
+	constructor(config: AuditClientConfig, logger?: Logger, performanceMonitor?: any) {
+		super(config, logger, performanceMonitor)
 		this.streamingManager = new StreamingManager(
 			{
 				enableCompression: config.performance?.enableCompression || true,

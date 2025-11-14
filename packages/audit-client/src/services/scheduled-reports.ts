@@ -36,8 +36,8 @@ import type { DeliveryConfig } from '../types/shared-schemas'
  * - Comprehensive validation and error handling
  */
 export class ScheduledReportsService extends BaseResource {
-	constructor(config: AuditClientConfig, logger?: Logger) {
-		super(config, logger)
+	constructor(config: AuditClientConfig, logger?: Logger, performanceMonitor?: any) {
+		super(config, logger, performanceMonitor)
 	}
 
 	/**

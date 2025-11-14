@@ -5,6 +5,7 @@ import { ErrorHandler } from '../infrastructure/error'
 import { InterceptorManager } from '../infrastructure/interceptors'
 import { AuditLogger, LoggerFactory } from '../infrastructure/logger'
 import { PerformanceManager } from '../infrastructure/performance'
+import { PerformanceMonitor } from '../infrastructure/performance-monitor'
 import { RetryManager } from '../infrastructure/retry'
 import { HttpClient } from './http-client'
 
@@ -55,6 +56,7 @@ export abstract class BaseResource {
 	protected logger: Logger
 	protected interceptorManager!: InterceptorManager
 	protected performanceManager!: PerformanceManager
+	protected performanceMonitor?: PerformanceMonitor
 	protected httpClient!: HttpClient
 	protected requestInterceptors: (
 		| RequestInterceptor
@@ -65,9 +67,12 @@ export abstract class BaseResource {
 		| (<T>(response: T, options: RequestOptions) => Promise<T> | T)
 	)[] = []
 
-	constructor(config: AuditClientConfig, logger?: Logger) {
+	constructor(config: AuditClientConfig, logger?: Logger, performanceMonitor?: PerformanceMonitor) {
 		this.config = config
 		this.logger = logger || LoggerFactory.create(config.logging)
+		if (performanceMonitor !== undefined) {
+			this.performanceMonitor = performanceMonitor
+		}
 		this.initializeManagers()
 	}
 
@@ -120,6 +125,9 @@ export abstract class BaseResource {
 		// Start performance tracking
 		this.performanceManager.getMetricsCollector().startRequest(requestId, endpoint, method)
 
+		// Track memory usage periodically
+		this.trackMemoryUsage()
+
 		// Create interceptor context
 		const context: InterceptorContext = {
 			requestId,
@@ -145,8 +153,18 @@ export abstract class BaseResource {
 						cached: true,
 					})
 
+					// Track cache hit in performance monitor
+					if (this.performanceMonitor) {
+						this.performanceMonitor.recordCacheHit()
+					}
+
 					this.logRequest('Cache hit', { endpoint, requestId, cached: true })
 					return cached
+				} else {
+					// Track cache miss in performance monitor
+					if (this.performanceMonitor) {
+						this.performanceMonitor.recordCacheMiss()
+					}
 				}
 			}
 
@@ -206,31 +224,45 @@ export abstract class BaseResource {
 			}
 
 			// Complete performance tracking for successful request
+			const duration = Date.now() - startTime
 			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
 				status: 200,
 				cached: false,
 			})
 
+			// Track request time and success in performance monitor
+			if (this.performanceMonitor) {
+				this.performanceMonitor.recordRequestTime(duration)
+				this.performanceMonitor.recordSuccess()
+			}
+
 			// Log successful request
 			this.logRequest('Request completed', {
 				endpoint,
 				requestId,
-				duration: Date.now() - startTime,
+				duration,
 				cached: false,
 			})
 
 			return processedResponse
 		} catch (error) {
 			// Complete performance tracking for failed request
+			const duration = Date.now() - startTime
 			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
 				error: error instanceof Error ? error.message : 'Unknown error',
 			})
+
+			// Track error in performance monitor
+			if (this.performanceMonitor) {
+				this.performanceMonitor.recordRequestTime(duration)
+				this.performanceMonitor.recordError()
+			}
 
 			// Handle and transform errors
 			const processedError = await this.errorHandler.handleError(error, {
 				endpoint,
 				requestId,
-				duration: Date.now() - startTime,
+				duration,
 				method: options.method,
 				url: this.buildUrl(endpoint),
 			})
@@ -239,7 +271,7 @@ export abstract class BaseResource {
 				endpoint,
 				requestId,
 				error: processedError.message,
-				duration: Date.now() - startTime,
+				duration,
 			})
 
 			if (this.config.errorHandling.throwOnError) {
@@ -808,6 +840,29 @@ export abstract class BaseResource {
 
 		// Reinitialize managers with new config
 		this.initializeManagers()
+	}
+
+	/**
+	 * Track current memory usage in performance monitor
+	 */
+	protected trackMemoryUsage(): void {
+		if (!this.performanceMonitor) {
+			return
+		}
+
+		// Try to get memory usage from performance API
+		if (typeof performance !== 'undefined' && (performance as any).memory) {
+			const memoryUsage = (performance as any).memory.usedJSHeapSize || 0
+			this.performanceMonitor.recordMemoryUsage(memoryUsage)
+			return
+		}
+
+		// Try to get memory usage from Node.js process
+		if (typeof process !== 'undefined' && process.memoryUsage) {
+			const memoryUsage = process.memoryUsage().heapUsed
+			this.performanceMonitor.recordMemoryUsage(memoryUsage)
+			return
+		}
 	}
 
 	/**

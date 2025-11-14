@@ -142,8 +142,8 @@ export interface HealthSubscription {
  * - Component-level health breakdown
  */
 export class HealthService extends BaseResource {
-	constructor(config: any, logger?: any) {
-		super(config, logger)
+	constructor(config: any, logger?: any, performanceMonitor?: any) {
+		super(config, logger, performanceMonitor)
 	}
 
 	/**

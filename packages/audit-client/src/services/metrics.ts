@@ -171,8 +171,8 @@ export interface ResolveAlertRequest {
 export class MetricsService extends BaseResource {
 	private streamingManager: StreamingManager
 
-	constructor(config: any, logger?: any) {
-		super(config, logger)
+	constructor(config: any, logger?: any, performanceMonitor?: any) {
+		super(config, logger, performanceMonitor)
 		this.streamingManager = new StreamingManager(
 			{
 				enableCompression: config.performance?.enableCompression || true,

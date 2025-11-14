@@ -1,0 +1,174 @@
+name: Performance Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/audit-client/**'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/audit-client/**'
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/audit-client
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for comparison
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm run build
+
+      - name: Check bundle size
+        id: check-performance
+        run: |
+          pnpm exec tsx scripts/check-performance.ts
+        continue-on-error: true
+
+      - name: Read performance report
+        id: read-report
+        if: always()
+        run: |
+          if [ -f performance-report.json ]; then
+            echo "report_exists=true" >> $GITHUB_OUTPUT
+            cat performance-report.json
+          else
+            echo "report_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment PR with performance results
+        if: github.event_name == 'pull_request' && steps.read-report.outputs.report_exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reportPath = 'packages/audit-client/performance-report.json';
+
+            if (!fs.existsSync(reportPath)) {
+              console.log('Performance report not found');
+              return;
+            }
+
+            const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+            // Format bytes
+            function formatBytes(bytes) {
+              if (bytes < 1024) return `${bytes} B`;
+              if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+              return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+            }
+
+            // Format milliseconds
+            function formatMs(ms) {
+              if (ms < 1000) return `${ms.toFixed(2)} ms`;
+              return `${(ms / 1000).toFixed(2)} s`;
+            }
+
+            // Build comment body
+            let body = `## 📊 Performance Report\n\n`;
+            body += `**Status:** ${report.passed ? '✅ Passed' : '❌ Failed'}\n`;
+            body += `**Timestamp:** ${report.timestamp}\n\n`;
+
+            body += `### Results\n\n`;
+            body += `| Check | Status | Actual | Budget | Difference |\n`;
+            body += `|-------|--------|--------|--------|------------|\n`;
+
+            for (const result of report.results) {
+              const status = result.passed ? '✅' : '❌';
+              const actual = result.unit === 'bytes' ? formatBytes(result.actual) : formatMs(result.actual);
+              const budget = result.unit === 'bytes' ? formatBytes(result.budget) : formatMs(result.budget);
+              const diff = result.passed 
+                ? '-' 
+                : `+${result.exceedPercentage.toFixed(1)}%`;
+              
+              body += `| ${result.name} | ${status} | ${actual} | ${budget} | ${diff} |\n`;
+            }
+
+            if (!report.passed) {
+              body += `\n### ⚠️ Performance Budget Violations\n\n`;
+              body += `Some performance budgets were exceeded. Please review and optimize:\n\n`;
+              
+              for (const result of report.results) {
+                if (!result.passed) {
+                  body += `- **${result.name}**: Exceeded by ${result.exceedPercentage.toFixed(1)}%\n`;
+                }
+              }
+            }
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('📊 Performance Report')
+            );
+
+            // Create or update comment
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: packages/audit-client/performance-report.json
+          if-no-files-found: ignore
+
+      - name: Fail if performance checks failed
+        if: steps.check-performance.outcome == 'failure'
+        run: |
+          echo "❌ Performance checks failed"
+          exit 1

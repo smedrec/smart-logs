@@ -4,9 +4,10 @@ export default defineConfig({
 	test: {
 		globals: true,
 		environment: 'node',
+		setupFiles: ['./src/__tests__/setup.ts'],
 		coverage: {
 			provider: 'v8',
-			reporter: ['text', 'json', 'html'],
+			reporter: ['text', 'json', 'html', 'lcov'],
 			include: ['src/**/*.ts'],
 			exclude: [
 				'src/index.ts',
@@ -18,6 +19,12 @@ export default defineConfig({
 				'src/**/*.spec.ts',
 				'src/examples/**/*',
 			],
+			thresholds: {
+				lines: 80,
+				functions: 80,
+				branches: 75,
+				statements: 80,
+			},
 		},
 	},
 })

@@ -3,6 +3,7 @@ import { BatchManager } from '../infrastructure/batch'
 import { CacheManager } from '../infrastructure/cache'
 import { ErrorHandler } from '../infrastructure/error'
 import { DefaultLogger } from '../infrastructure/logger'
+import { PerformanceMonitor } from '../infrastructure/performance-monitor'
 import { PluginManager } from '../infrastructure/plugins'
 import { RetryManager } from '../infrastructure/retry'
 import { ComplianceService } from '../services/compliance'
@@ -17,6 +18,7 @@ import { ConfigManager } from './config'
 
 import type { RequestInterceptor, ResponseInterceptor } from '../infrastructure/interceptors'
 import type { Logger } from '../infrastructure/logger'
+import type { PerformanceReport } from '../infrastructure/performance-monitor'
 import type { AuditClientConfig, PartialAuditClientConfig } from './config'
 
 /**
@@ -66,6 +68,7 @@ export class AuditClient {
 	private batchManager!: BatchManager
 	private errorHandler!: ErrorHandler
 	private pluginManager!: PluginManager
+	private performanceMonitor!: PerformanceMonitor
 
 	// Service instances
 	private _events!: EventsService
@@ -85,6 +88,8 @@ export class AuditClient {
 	 * Initialize the AuditClient with configuration
 	 */
 	constructor(config: PartialAuditClientConfig) {
+		const initStartTime = Date.now()
+
 		try {
 			// Initialize configuration manager
 			this.configManager = new ConfigManager(config)
@@ -109,10 +114,15 @@ export class AuditClient {
 			// Mark as ready (plugins will be loaded separately if needed)
 			this.state = 'ready'
 
+			// Record initialization time
+			const initTime = Date.now() - initStartTime
+			this.performanceMonitor.setInitTime(initTime)
+
 			this.getLogger().info('AuditClient initialized successfully', {
 				baseUrl: this.config.baseUrl,
 				environment: this.config.environment,
 				features: this.getEnabledFeatures(),
+				initTime,
 			})
 
 			// Initialize plugins asynchronously if auto-load is enabled
@@ -158,6 +168,18 @@ export class AuditClient {
 		this.errorHandler = new ErrorHandler(
 			this.config.logging,
 			this.config.errorHandling,
+			this.getLogger()
+		)
+
+		// Initialize performance monitor with default budgets
+		this.performanceMonitor = new PerformanceMonitor(
+			{
+				maxBundleSize: 200 * 1024, // 200KB gzipped
+				maxInitTime: 100, // 100ms
+				maxRequestTime: 1000, // 1000ms p95
+				maxMemoryUsage: 50 * 1024 * 1024, // 50MB
+				maxCacheSize: 1000, // 1000 entries
+			},
 			this.getLogger()
 		)
 
@@ -312,15 +334,19 @@ export class AuditClient {
 	 * Initialize all service instances
 	 */
 	private initializeServices(): void {
-		// All services share the same configuration and logger
+		// All services share the same configuration, logger, and performance monitor
 		const logger = this.getLogger()
-		this._events = new EventsService(this.config, logger)
-		this._compliance = new ComplianceService(this.config, logger)
-		this._scheduledReports = new ScheduledReportsService(this.config, logger)
-		this._presets = new PresetsService(this.config, logger)
-		this._metrics = new MetricsService(this.config, logger)
-		this._health = new HealthService(this.config, logger)
-		this._delivery = new DeliveryService(this.config, logger)
+		this._events = new EventsService(this.config, logger, this.performanceMonitor)
+		this._compliance = new ComplianceService(this.config, logger, this.performanceMonitor)
+		this._scheduledReports = new ScheduledReportsService(
+			this.config,
+			logger,
+			this.performanceMonitor
+		)
+		this._presets = new PresetsService(this.config, logger, this.performanceMonitor)
+		this._metrics = new MetricsService(this.config, logger, this.performanceMonitor)
+		this._health = new HealthService(this.config, logger, this.performanceMonitor)
+		this._delivery = new DeliveryService(this.config, logger, this.performanceMonitor)
 
 		this.getLogger().debug('Services initialized', {
 			services: [
@@ -680,6 +706,30 @@ export class AuditClient {
 			health: this._health.getStats(),
 			delivery: this._delivery.getStats(),
 		}
+	}
+
+	/**
+	 * Get comprehensive performance report
+	 */
+	public getPerformanceReport(): PerformanceReport {
+		this.validateClientState()
+		return this.performanceMonitor.getReport()
+	}
+
+	/**
+	 * Check performance budgets and return violations
+	 */
+	public checkPerformanceBudget(): ReturnType<PerformanceMonitor['checkBudget']> {
+		this.validateClientState()
+		return this.performanceMonitor.checkBudget()
+	}
+
+	/**
+	 * Get performance monitor instance for advanced usage
+	 */
+	public getPerformanceMonitor(): PerformanceMonitor {
+		this.validateClientState()
+		return this.performanceMonitor
 	}
 
 	// Lifecycle management methods
