@@ -179,4 +179,280 @@ describe('BaseResource', () => {
 			expect(() => testResource.destroy()).not.toThrow()
 		})
 	})
+
+	describe('Timeout Handling', () => {
+		beforeEach(() => {
+			// Mock fetch globally
+			global.fetch = vi.fn()
+		})
+
+		it('should enforce timeout and throw TimeoutError', async () => {
+			// Mock a slow response that exceeds timeout
+			;(global.fetch as any).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						setTimeout(() => {
+							const headers = new Headers()
+							headers.set('content-type', 'application/json')
+							resolve({
+								ok: true,
+								status: 200,
+								statusText: 'OK',
+								headers,
+								json: async () => ({ data: 'test' }),
+								text: async () => JSON.stringify({ data: 'test' }),
+								clone: function () {
+									return this
+								},
+							})
+						}, 2000) // 2 second delay
+					})
+			)
+
+			// Set a short timeout
+			const shortTimeoutConfig = {
+				...testConfig,
+				timeout: 100, // 100ms timeout
+			}
+			const shortTimeoutResource = new TestResource(shortTimeoutConfig, mockLogger)
+
+			// Expect timeout error
+			await expect(
+				shortTimeoutResource.testRequest('/test', { skipCache: true, skipRetry: true })
+			).rejects.toThrow('timed out')
+		})
+
+		it('should use default timeout from config when not specified', async () => {
+			;(global.fetch as any).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						setTimeout(() => {
+							const headers = new Headers()
+							headers.set('content-type', 'application/json')
+							resolve({
+								ok: true,
+								status: 200,
+								statusText: 'OK',
+								headers,
+								json: async () => ({ data: 'test' }),
+								text: async () => JSON.stringify({ data: 'test' }),
+								clone: function () {
+									return this
+								},
+							})
+						}, 50) // Short delay that's well within default timeout
+					})
+			)
+
+			// Default timeout is 30000ms, so this should succeed
+			await expect(
+				testResource.testRequest('/test', { skipCache: true, skipRetry: true })
+			).resolves.toBeDefined()
+		})
+
+		it('should use request-specific timeout over default', async () => {
+			;(global.fetch as any).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						setTimeout(() => {
+							const headers = new Headers()
+							headers.set('content-type', 'application/json')
+							resolve({
+								ok: true,
+								status: 200,
+								statusText: 'OK',
+								headers,
+								json: async () => ({ data: 'test' }),
+								text: async () => JSON.stringify({ data: 'test' }),
+								clone: function () {
+									return this
+								},
+							})
+						}, 200) // 200ms delay
+					})
+			)
+
+			// Request-specific timeout of 100ms should timeout
+			await expect(
+				testResource.testRequest('/test', {
+					timeout: 100,
+					skipCache: true,
+					skipRetry: true,
+				})
+			).rejects.toThrow('timed out')
+		})
+
+		it('should clean up AbortController after successful request', async () => {
+			const headers = new Headers()
+			headers.set('content-type', 'application/json')
+			;(global.fetch as any).mockResolvedValue({
+				ok: true,
+				status: 200,
+				statusText: 'OK',
+				headers,
+				json: async () => ({ data: 'test' }),
+				text: async () => JSON.stringify({ data: 'test' }),
+				clone: function () {
+					return this
+				},
+			})
+
+			await testResource.testRequest('/test', { skipCache: true, skipRetry: true })
+
+			// If cleanup didn't happen, subsequent requests might fail
+			// This test verifies no errors occur
+			await expect(
+				testResource.testRequest('/test2', { skipCache: true, skipRetry: true })
+			).resolves.toBeDefined()
+		})
+
+		it('should clean up AbortController after failed request', async () => {
+			;(global.fetch as any).mockRejectedValue(new Error('Network error'))
+
+			await expect(
+				testResource.testRequest('/test', { skipCache: true, skipRetry: true })
+			).rejects.toThrow()
+
+			// Verify cleanup by making another request
+			const headers = new Headers()
+			headers.set('content-type', 'application/json')
+			;(global.fetch as any).mockResolvedValue({
+				ok: true,
+				status: 200,
+				statusText: 'OK',
+				headers,
+				json: async () => ({ data: 'test' }),
+				text: async () => JSON.stringify({ data: 'test' }),
+				clone: function () {
+					return this
+				},
+			})
+
+			await expect(
+				testResource.testRequest('/test2', { skipCache: true, skipRetry: true })
+			).resolves.toBeDefined()
+		})
+
+		it('should work with retry logic on timeout', async () => {
+			let attemptCount = 0
+
+			;(global.fetch as any).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						attemptCount++
+						setTimeout(() => {
+							const headers = new Headers()
+							headers.set('content-type', 'application/json')
+							resolve({
+								ok: true,
+								status: 200,
+								statusText: 'OK',
+								headers,
+								json: async () => ({ data: 'test' }),
+								text: async () => JSON.stringify({ data: 'test' }),
+								clone: function () {
+									return this
+								},
+							})
+						}, 200) // Delay longer than timeout
+					})
+			)
+
+			// With retry enabled and short timeout, should attempt multiple times
+			const retryConfig = {
+				...testConfig,
+				timeout: 100,
+				retry: {
+					...testConfig.retry,
+					enabled: true,
+					maxAttempts: 3,
+					initialDelayMs: 10,
+					retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+					retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'TIMEOUT_ERROR'],
+				},
+			}
+			const retryResource = new TestResource(retryConfig, mockLogger)
+
+			await expect(retryResource.testRequest('/test', { skipCache: true })).rejects.toThrow()
+
+			// Should have attempted multiple times (timeout is retryable)
+			expect(attemptCount).toBeGreaterThan(1)
+		})
+
+		it('should handle external AbortSignal along with timeout', async () => {
+			const externalController = new AbortController()
+
+			;(global.fetch as any).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						setTimeout(() => {
+							const headers = new Headers()
+							headers.set('content-type', 'application/json')
+							resolve({
+								ok: true,
+								status: 200,
+								statusText: 'OK',
+								headers,
+								json: async () => ({ data: 'test' }),
+								text: async () => JSON.stringify({ data: 'test' }),
+								clone: function () {
+									return this
+								},
+							})
+						}, 1000)
+					})
+			)
+
+			// Start request with external signal
+			const requestPromise = testResource.testRequest('/test', {
+				signal: externalController.signal,
+				timeout: 5000, // Long timeout
+				skipCache: true,
+				skipRetry: true,
+			})
+
+			// Abort externally before timeout
+			setTimeout(() => externalController.abort(), 50)
+
+			// Should abort due to external signal
+			await expect(requestPromise).rejects.toThrow()
+		})
+
+		it('should create TimeoutError with correct duration and context', async () => {
+			;(global.fetch as any).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						setTimeout(() => {
+							const headers = new Headers()
+							headers.set('content-type', 'application/json')
+							resolve({
+								ok: true,
+								status: 200,
+								statusText: 'OK',
+								headers,
+								json: async () => ({ data: 'test' }),
+								text: async () => JSON.stringify({ data: 'test' }),
+								clone: function () {
+									return this
+								},
+							})
+						}, 500)
+					})
+			)
+
+			const timeoutMs = 100
+
+			try {
+				await testResource.testRequest('/test', {
+					timeout: timeoutMs,
+					skipCache: true,
+					skipRetry: true,
+				})
+				expect.fail('Should have thrown TimeoutError')
+			} catch (error: any) {
+				expect(error.message).toContain('timed out')
+				expect(error.message).toContain(`${timeoutMs}ms`)
+			}
+		})
+	})
 })

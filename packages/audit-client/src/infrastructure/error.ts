@@ -71,8 +71,16 @@ export abstract class AuditClientError extends Error {
 		const constructor = this.constructor as new (...args: any[]) => this
 		const newInstance = Object.create(constructor.prototype)
 
-		// Copy all properties
+		// Copy all properties including non-enumerable ones like message
 		Object.assign(newInstance, this)
+
+		// Explicitly copy message property from Error base class
+		Object.defineProperty(newInstance, 'message', {
+			value: this.message,
+			writable: true,
+			enumerable: false,
+			configurable: true,
+		})
 
 		// Override context with merged version
 		Object.defineProperty(newInstance, 'context', {
@@ -130,9 +138,9 @@ export class HttpError extends AuditClientError {
 			case 400:
 				return 'Invalid request. Please check your input and try again.'
 			case 401:
-				return 'Authentication failed. Please check your credentials.'
+				return 'Authentication failed. Please verify your API key or token is valid and not expired.'
 			case 403:
-				return 'Access denied. You do not have permission to perform this action.'
+				return 'Access denied. You do not have permission to perform this action. Please contact your administrator if you believe this is an error.'
 			case 404:
 				return 'The requested resource was not found.'
 			case 409:
@@ -148,6 +156,219 @@ export class HttpError extends AuditClientError {
 			default:
 				return `Request failed with status ${this.status}. Please try again.`
 		}
+	}
+
+	/**
+	 * Get actionable advice for resolving the error
+	 */
+	getActionableAdvice(): string {
+		switch (this.status) {
+			case 400:
+				// Check if we have validation errors in the response
+				if (this.response?.errors || this.response?.fieldErrors) {
+					return 'Review the validation errors and correct the invalid fields before retrying.'
+				}
+				return 'Verify that all required fields are provided and have valid values.'
+			case 401:
+				return 'Check that your API key or authentication token is correct, not expired, and has the necessary permissions. You may need to refresh your token or obtain a new API key.'
+			case 403:
+				return 'Contact your system administrator to request the necessary permissions for this operation. Ensure your account has the required role or access level.'
+			case 404:
+				const resourceType = this.getResourceType()
+				if (resourceType) {
+					return `Verify that the ${resourceType} ID is correct and that the resource exists. Check for typos in the identifier.`
+				}
+				return 'Verify that the resource identifier is correct and that the resource exists in the system.'
+			case 409:
+				return 'Refresh the resource to get the latest version before attempting the operation again. Consider implementing optimistic locking in your application.'
+			case 429:
+				const retryAfter = this.getRetryAfter()
+				if (retryAfter) {
+					return `Wait ${retryAfter} before retrying. Consider implementing exponential backoff or request throttling in your application.`
+				}
+				return 'Reduce the frequency of your requests. Consider implementing rate limiting or request queuing in your application.'
+			case 500:
+				return 'This is a server-side error. If the problem persists, contact support with the correlation ID for assistance.'
+			case 502:
+				return 'The gateway received an invalid response. This is usually temporary - wait a moment and retry.'
+			case 503:
+				return 'The service is temporarily overloaded or down for maintenance. Wait a few minutes and retry.'
+			case 504:
+				return 'The request timed out at the gateway. Try again, or if the problem persists, the operation may need to be optimized.'
+			default:
+				if (this.status >= 500) {
+					return 'This is a server-side error. If the problem persists, contact support.'
+				}
+				return 'Review the error details and adjust your request accordingly.'
+		}
+	}
+
+	/**
+	 * Get human-readable retry duration from Retry-After header
+	 */
+	getRetryAfter(): string | null {
+		if (!this.response?.headers) {
+			return null
+		}
+
+		// Try to get Retry-After header (case-insensitive)
+		let retryAfterValue: string | null = null
+		if (typeof this.response.headers === 'object') {
+			// Handle both Headers object and plain object
+			if (this.response.headers instanceof Headers) {
+				retryAfterValue = this.response.headers.get('retry-after')
+			} else {
+				// Plain object - search case-insensitively
+				const headerKey = Object.keys(this.response.headers).find(
+					(key) => key.toLowerCase() === 'retry-after'
+				)
+				if (headerKey) {
+					retryAfterValue = this.response.headers[headerKey]
+				}
+			}
+		}
+
+		if (!retryAfterValue) {
+			return null
+		}
+
+		// Parse the value - it can be either seconds or an HTTP date
+		const secondsMatch = /^\d+$/.test(retryAfterValue)
+		if (secondsMatch) {
+			const seconds = parseInt(retryAfterValue, 10)
+			return this.formatDuration(seconds)
+		}
+
+		// Try to parse as HTTP date
+		try {
+			const retryDate = new Date(retryAfterValue)
+			const now = new Date()
+			const diffMs = retryDate.getTime() - now.getTime()
+			const diffSeconds = Math.max(0, Math.floor(diffMs / 1000))
+			return this.formatDuration(diffSeconds)
+		} catch {
+			return null
+		}
+	}
+
+	/**
+	 * Format duration in seconds to human-readable string
+	 */
+	private formatDuration(seconds: number): string {
+		if (seconds < 60) {
+			return `${seconds} second${seconds !== 1 ? 's' : ''}`
+		}
+
+		const minutes = Math.floor(seconds / 60)
+		const remainingSeconds = seconds % 60
+
+		if (minutes < 60) {
+			if (remainingSeconds === 0) {
+				return `${minutes} minute${minutes !== 1 ? 's' : ''}`
+			}
+			return `${minutes} minute${minutes !== 1 ? 's' : ''} and ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`
+		}
+
+		const hours = Math.floor(minutes / 60)
+		const remainingMinutes = minutes % 60
+
+		if (remainingMinutes === 0) {
+			return `${hours} hour${hours !== 1 ? 's' : ''}`
+		}
+		return `${hours} hour${hours !== 1 ? 's' : ''} and ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`
+	}
+
+	/**
+	 * Get the resource type from the request URL for 404 errors
+	 */
+	getResourceType(): string | null {
+		if (this.status !== 404 || !this.request?.url) {
+			return null
+		}
+
+		try {
+			const url = new URL(this.request.url)
+			const pathParts = url.pathname.split('/').filter((part) => part.length > 0)
+
+			// Common patterns:
+			// /api/v1/events/{id} -> "event"
+			// /audit/events/{id} -> "event"
+			// /compliance/reports/{id} -> "report"
+
+			if (pathParts.length >= 2) {
+				// Get the second-to-last part (the resource type, not the ID)
+				const resourcePart = pathParts[pathParts.length - 2]
+				if (resourcePart) {
+					// Singularize common plural forms
+					if (resourcePart.endsWith('ies')) {
+						return resourcePart.slice(0, -3) + 'y'
+					}
+					if (resourcePart.endsWith('es')) {
+						return resourcePart.slice(0, -2)
+					}
+					if (resourcePart.endsWith('s')) {
+						return resourcePart.slice(0, -1)
+					}
+					return resourcePart
+				}
+			}
+
+			return null
+		} catch {
+			return null
+		}
+	}
+
+	/**
+	 * Get formatted validation message for 400 errors
+	 */
+	getValidationMessage(): string | null {
+		if (this.status !== 400) {
+			return null
+		}
+
+		// Check for validation errors in various response formats
+		const errors =
+			this.response?.errors || this.response?.fieldErrors || this.response?.validationErrors
+
+		if (!errors) {
+			return null
+		}
+
+		// Handle array of error messages
+		if (Array.isArray(errors)) {
+			if (errors.length === 0) {
+				return null
+			}
+			if (errors.length === 1) {
+				return `Validation error: ${errors[0]}`
+			}
+			return `Validation errors:\n${errors.map((err, idx) => `  ${idx + 1}. ${err}`).join('\n')}`
+		}
+
+		// Handle object with field-specific errors
+		if (typeof errors === 'object') {
+			const fieldErrors: string[] = []
+			for (const [field, fieldErrorList] of Object.entries(errors)) {
+				if (Array.isArray(fieldErrorList)) {
+					fieldErrorList.forEach((err) => {
+						fieldErrors.push(`${field}: ${err}`)
+					})
+				} else if (typeof fieldErrorList === 'string') {
+					fieldErrors.push(`${field}: ${fieldErrorList}`)
+				}
+			}
+
+			if (fieldErrors.length === 0) {
+				return null
+			}
+			if (fieldErrors.length === 1) {
+				return `Validation error: ${fieldErrors[0]}`
+			}
+			return `Validation errors:\n${fieldErrors.map((err, idx) => `  ${idx + 1}. ${err}`).join('\n')}`
+		}
+
+		return null
 	}
 }
 

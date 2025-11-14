@@ -16,6 +16,11 @@ import {
 	CorrelationIdPlugin,
 	RequestLoggingPlugin,
 } from '../infrastructure/plugins/built-in'
+// ============================================================================
+// Plugin Lazy Loading Tests
+// ============================================================================
+
+import { PluginLoader } from '../infrastructure/plugins/plugin-loader'
 import {
 	discoverPlugins,
 	PluginPerformanceTracker,
@@ -34,8 +39,8 @@ import type {
 	Plugin,
 	PluginContext,
 	StoragePlugin,
-	ValidationResult,
 } from '../infrastructure/plugins'
+import type { ValidationResult } from '../types/shared-schemas'
 
 // ============================================================================
 // Mock Plugins for Testing
@@ -583,5 +588,174 @@ describe('Plugin Errors', () => {
 		expect(error.message).toContain('test-plugin')
 		expect(error.message).toContain('Registration failed')
 		expect(error.name).toBe('PluginRegistrationError')
+	})
+})
+
+describe('PluginLoader', () => {
+	let loader: PluginLoader
+
+	beforeEach(() => {
+		loader = new PluginLoader()
+	})
+
+	afterEach(() => {
+		loader.clear()
+	})
+
+	describe('Lazy Loading', () => {
+		it('should load plugin on demand', async () => {
+			const plugin = await loader.loadBuiltInPlugin('request-logging')
+
+			expect(plugin).toBeDefined()
+			expect(plugin?.name).toBe('request-logging')
+			expect(plugin?.version).toBe('1.0.0')
+		})
+
+		it('should return null for unknown plugin', async () => {
+			const plugin = await loader.loadBuiltInPlugin('unknown-plugin')
+			expect(plugin).toBeNull()
+		})
+
+		it('should cache loaded plugins', async () => {
+			const plugin1 = await loader.loadBuiltInPlugin('correlation-id')
+			const plugin2 = await loader.loadBuiltInPlugin('correlation-id')
+
+			expect(plugin1).toBe(plugin2) // Same instance
+			expect(loader.isLoaded('correlation-id')).toBe(true)
+		})
+
+		it('should deduplicate concurrent loads', async () => {
+			// Load the same plugin concurrently
+			const [plugin1, plugin2, plugin3] = await Promise.all([
+				loader.loadBuiltInPlugin('rate-limiting'),
+				loader.loadBuiltInPlugin('rate-limiting'),
+				loader.loadBuiltInPlugin('rate-limiting'),
+			])
+
+			expect(plugin1).toBe(plugin2)
+			expect(plugin2).toBe(plugin3)
+			expect(loader.isLoaded('rate-limiting')).toBe(true)
+		})
+
+		it('should load multiple different plugins', async () => {
+			const plugins = await Promise.all([
+				loader.loadBuiltInPlugin('request-logging'),
+				loader.loadBuiltInPlugin('correlation-id'),
+				loader.loadBuiltInPlugin('rate-limiting'),
+			])
+
+			expect(plugins).toHaveLength(3)
+			expect(plugins.every((p) => p !== null)).toBe(true)
+			expect(loader.getLoadedPlugins()).toHaveLength(3)
+		})
+
+		it('should handle errors for unknown plugins', async () => {
+			await expect(loader.loadBuiltInPlugin('invalid-plugin')).rejects.toThrow(
+				'Unknown built-in plugin'
+			)
+		})
+	})
+
+	describe('Plugin Types', () => {
+		it('should load middleware plugins', async () => {
+			const requestLogging = await loader.loadBuiltInPlugin('request-logging')
+			const correlationId = await loader.loadBuiltInPlugin('correlation-id')
+			const rateLimiting = await loader.loadBuiltInPlugin('rate-limiting')
+
+			expect(requestLogging?.type).toBe('middleware')
+			expect(correlationId?.type).toBe('middleware')
+			expect(rateLimiting?.type).toBe('middleware')
+		})
+
+		it('should load storage plugins', async () => {
+			const redis = await loader.loadBuiltInPlugin('redis-storage')
+			const indexeddb = await loader.loadBuiltInPlugin('indexeddb-storage')
+
+			expect(redis?.type).toBe('storage')
+			expect(indexeddb?.type).toBe('storage')
+		})
+
+		it('should load auth plugins', async () => {
+			const jwt = await loader.loadBuiltInPlugin('jwt-auth')
+			const oauth2 = await loader.loadBuiltInPlugin('oauth2-auth')
+			const customHeader = await loader.loadBuiltInPlugin('custom-header-auth')
+
+			expect(jwt?.type).toBe('auth')
+			expect(oauth2?.type).toBe('auth')
+			expect(customHeader?.type).toBe('auth')
+		})
+	})
+
+	describe('Cache Management', () => {
+		it('should track loaded plugins', async () => {
+			expect(loader.getLoadedPlugins()).toHaveLength(0)
+
+			await loader.loadBuiltInPlugin('request-logging')
+			expect(loader.getLoadedPlugins()).toHaveLength(1)
+
+			await loader.loadBuiltInPlugin('correlation-id')
+			expect(loader.getLoadedPlugins()).toHaveLength(2)
+		})
+
+		it('should check if plugin is loaded', async () => {
+			expect(loader.isLoaded('request-logging')).toBe(false)
+
+			await loader.loadBuiltInPlugin('request-logging')
+			expect(loader.isLoaded('request-logging')).toBe(true)
+		})
+
+		it('should clear all loaded plugins', async () => {
+			await loader.loadBuiltInPlugin('request-logging')
+			await loader.loadBuiltInPlugin('correlation-id')
+
+			expect(loader.getLoadedPlugins()).toHaveLength(2)
+
+			loader.clear()
+			expect(loader.getLoadedPlugins()).toHaveLength(0)
+			expect(loader.isLoaded('request-logging')).toBe(false)
+		})
+	})
+})
+
+// ============================================================================
+// Bundle Size Impact Tests
+// ============================================================================
+
+describe('Bundle Size Optimization', () => {
+	it('should not load plugins until requested', () => {
+		const loader = new PluginLoader()
+
+		// No plugins should be loaded initially
+		expect(loader.getLoadedPlugins()).toHaveLength(0)
+	})
+
+	it('should load plugins independently', async () => {
+		const loader = new PluginLoader()
+
+		// Load only one plugin
+		await loader.loadBuiltInPlugin('request-logging')
+
+		// Only one plugin should be loaded
+		expect(loader.getLoadedPlugins()).toHaveLength(1)
+		expect(loader.isLoaded('request-logging')).toBe(true)
+		expect(loader.isLoaded('correlation-id')).toBe(false)
+	})
+
+	it('should support tree-shaking by loading only used plugins', async () => {
+		const loader = new PluginLoader()
+
+		// Simulate loading only specific plugins
+		const usedPlugins = ['request-logging', 'jwt-auth']
+
+		for (const pluginName of usedPlugins) {
+			await loader.loadBuiltInPlugin(pluginName)
+		}
+
+		// Only the used plugins should be loaded
+		expect(loader.getLoadedPlugins()).toHaveLength(2)
+		expect(loader.isLoaded('request-logging')).toBe(true)
+		expect(loader.isLoaded('jwt-auth')).toBe(true)
+		expect(loader.isLoaded('correlation-id')).toBe(false)
+		expect(loader.isLoaded('rate-limiting')).toBe(false)
 	})
 })

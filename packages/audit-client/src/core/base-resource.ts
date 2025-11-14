@@ -1,7 +1,7 @@
 import { AuthManager } from '../infrastructure/auth'
 import { BatchManager } from '../infrastructure/batch'
 import { CacheManager } from '../infrastructure/cache'
-import { ErrorHandler } from '../infrastructure/error'
+import { ErrorHandler, TimeoutError } from '../infrastructure/error'
 import { InterceptorManager } from '../infrastructure/interceptors'
 import { AuditLogger, LoggerFactory } from '../infrastructure/logger'
 import { PerformanceManager } from '../infrastructure/performance'
@@ -33,6 +33,7 @@ export interface RequestOptions {
 	cacheTtl?: number
 	cacheTags?: string[]
 	metadata?: Record<string, any>
+	timeout?: number
 }
 
 /**
@@ -137,6 +138,24 @@ export abstract class BaseResource {
 			metadata: options.metadata,
 		}
 
+		// Setup timeout handling with AbortController
+		const timeout = options.timeout ?? this.config.timeout
+		const abortController = new AbortController()
+		let timeoutId: NodeJS.Timeout | number | undefined
+
+		// If no signal was provided, use our abort controller
+		// If a signal was provided, we need to chain them
+		const effectiveSignal = options.signal
+			? this.createChainedSignal(options.signal, abortController.signal)
+			: abortController.signal
+
+		// Set up timeout
+		if (timeout > 0) {
+			timeoutId = setTimeout(() => {
+				abortController.abort()
+			}, timeout)
+		}
+
 		try {
 			// Apply request interceptors
 			const processedOptions = await this.applyRequestInterceptors(options, context)
@@ -179,14 +198,20 @@ export abstract class BaseResource {
 				.generateKey(endpoint, method, processedOptions.body, processedOptions.query)
 
 			const executeWithPerformance = async (): Promise<T> => {
+				// Update options with effective signal for timeout handling
+				const optionsWithSignal = {
+					...processedOptions,
+					signal: effectiveSignal,
+				}
+
 				// Execute request with retry logic (unless explicitly skipped)
 				if (!processedOptions.skipRetry) {
 					return this.retryManager.execute(
-						() => this.executeRequest<T>(endpoint, processedOptions, requestId),
+						() => this.executeRequest<T>(endpoint, optionsWithSignal, requestId),
 						{ endpoint, requestId, method }
 					)
 				} else {
-					return this.executeRequest<T>(endpoint, processedOptions, requestId)
+					return this.executeRequest<T>(endpoint, optionsWithSignal, requestId)
 				}
 			}
 
@@ -258,8 +283,15 @@ export abstract class BaseResource {
 				this.performanceMonitor.recordError()
 			}
 
+			// Check if this is a timeout error (AbortError from our timeout)
+			let errorToHandle = error
+			if (error instanceof Error && error.name === 'AbortError' && abortController.signal.aborted) {
+				// Create TimeoutError with proper context
+				errorToHandle = new TimeoutError(timeout, requestId)
+			}
+
 			// Handle and transform errors
-			const processedError = await this.errorHandler.handleError(error, {
+			const processedError = await this.errorHandler.handleError(errorToHandle, {
 				endpoint,
 				requestId,
 				duration,
@@ -279,6 +311,11 @@ export abstract class BaseResource {
 			}
 
 			return processedError as unknown as T
+		} finally {
+			// Clean up timeout
+			if (timeoutId !== undefined) {
+				clearTimeout(timeoutId)
+			}
 		}
 	}
 
@@ -596,6 +633,21 @@ export abstract class BaseResource {
 	 */
 	private generateRequestId(): string {
 		return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+	}
+
+	/**
+	 * Create a chained AbortSignal that aborts when either signal aborts
+	 */
+	private createChainedSignal(signal1: AbortSignal, signal2: AbortSignal): AbortSignal {
+		const controller = new AbortController()
+
+		// Abort if either signal aborts
+		const abortHandler = () => controller.abort()
+
+		signal1.addEventListener('abort', abortHandler, { once: true })
+		signal2.addEventListener('abort', abortHandler, { once: true })
+
+		return controller.signal
 	}
 
 	/**

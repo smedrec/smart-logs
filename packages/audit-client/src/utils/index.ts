@@ -10,3 +10,6 @@ export * from './type-guards'
 
 // Export additional utility functions
 export * from './helpers'
+
+// Export sanitization utilities
+export * from './sanitization'

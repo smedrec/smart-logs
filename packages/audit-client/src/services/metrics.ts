@@ -23,6 +23,7 @@ import {
 	StreamConfig,
 	StreamingManager,
 } from '../infrastructure/streaming'
+import { InputSanitizer } from '../utils/sanitization'
 import {
 	assertDefined,
 	assertType,
@@ -392,10 +393,14 @@ export class MetricsService extends BaseResource {
 	 *
 	 * @param request Alert configuration details
 	 * @returns Promise<{ success: boolean }> Save result
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async saveAlertConfig(request: AlertConfig): Promise<AlertActionResponse> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedRequest = InputSanitizer.sanitizeObject(request)
+
 		// Validate input parameters
-		const validationResult = validateAlertsConfiguration(request)
+		const validationResult = validateAlertsConfiguration(sanitizedRequest)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid alerts configuration', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -403,7 +408,7 @@ export class MetricsService extends BaseResource {
 		}
 		return this.request<AlertActionResponse>(`/alerts/config`, {
 			method: 'POST',
-			body: request,
+			body: validationResult.data,
 		})
 	}
 
@@ -505,6 +510,7 @@ export class MetricsService extends BaseResource {
 	 *
 	 * @param query Custom metrics query
 	 * @returns Promise<any> Query results
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async customQuery(query: {
 		metrics: string[]
@@ -513,9 +519,12 @@ export class MetricsService extends BaseResource {
 		groupBy?: string[]
 		aggregation?: 'sum' | 'avg' | 'min' | 'max' | 'count'
 	}): Promise<any> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedQuery = InputSanitizer.sanitizeObject(query)
+
 		return this.request('/metrics/query', {
 			method: 'POST',
-			body: query,
+			body: sanitizedQuery,
 		})
 	}
 
@@ -540,6 +549,7 @@ export class MetricsService extends BaseResource {
 	 *
 	 * @param config Updated configuration
 	 * @returns Promise<any> Updated configuration
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async updateMetricsConfig(config: {
 		alertThresholds?: Record<string, any>
@@ -547,9 +557,12 @@ export class MetricsService extends BaseResource {
 		samplingRates?: Record<string, number>
 		enabledMetrics?: string[]
 	}): Promise<any> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedConfig = InputSanitizer.sanitizeObject(config)
+
 		return this.request('/metrics/config', {
 			method: 'PUT',
-			body: config,
+			body: sanitizedConfig,
 		})
 	}
 

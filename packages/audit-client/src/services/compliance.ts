@@ -1,5 +1,6 @@
 import { BaseResource } from '../core/base-resource'
 import { ManagedReadableStream, StreamConfig, StreamingManager } from '../infrastructure/streaming'
+import { InputSanitizer } from '../utils/sanitization'
 import { assertDefined, assertType, isNonEmptyString, isObject } from '../utils/type-guards'
 import {
 	validateCustomReportParams,
@@ -66,10 +67,14 @@ export class ComplianceService extends BaseResource {
 	/**
 	 * Generate HIPAA compliance report
 	 * Requirement 5.1: WHEN generating HIPAA reports THEN the client SHALL provide methods with proper criteria validation
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async generateHipaaReport(criteria: ReportCriteria): Promise<HIPAAReport> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedCriteria = InputSanitizer.sanitizeObject(criteria)
+
 		// Validate input using centralized validation
-		const validationResult = validateReportCriteria(criteria)
+		const validationResult = validateReportCriteria(sanitizedCriteria)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid report criteria for HIPAA report', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -92,10 +97,14 @@ export class ComplianceService extends BaseResource {
 	/**
 	 * Generate GDPR compliance report
 	 * Requirement 5.2: WHEN generating GDPR reports THEN the client SHALL support data export and pseudonymization requests
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async generateGdprReport(criteria: ReportCriteria): Promise<GDPRReport> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedCriteria = InputSanitizer.sanitizeObject(criteria)
+
 		// Validate input using centralized validation
-		const validationResult = validateReportCriteria(criteria)
+		const validationResult = validateReportCriteria(sanitizedCriteria)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid report criteria for GDPR report', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -118,10 +127,14 @@ export class ComplianceService extends BaseResource {
 	/**
 	 * Generate custom compliance report
 	 * Requirement 5.3: WHEN creating custom reports THEN the client SHALL allow flexible report criteria and formatting
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async generateCustomReport(params: CustomReportParams): Promise<CustomReport> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedParams = InputSanitizer.sanitizeObject(params)
+
 		// Validate input using centralized validation
-		const validationResult = validateCustomReportParams(params)
+		const validationResult = validateCustomReportParams(sanitizedParams)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid custom report parameters', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -144,10 +157,14 @@ export class ComplianceService extends BaseResource {
 	/**
 	 * Export data for GDPR requests
 	 * Requirement 5.2: WHEN generating GDPR reports THEN the client SHALL support data export and pseudonymization requests
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async exportGdprData(params: GdprExportParams): Promise<GdprExportResult> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedParams = InputSanitizer.sanitizeObject(params)
+
 		// Validate input using centralized validation
-		const validationResult = validateGdprExportParams(params)
+		const validationResult = validateGdprExportParams(sanitizedParams)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid GDPR export parameters', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -170,10 +187,14 @@ export class ComplianceService extends BaseResource {
 	/**
 	 * Pseudonymize data for GDPR compliance
 	 * Requirement 5.2: WHEN generating GDPR reports THEN the client SHALL support data export and pseudonymization requests
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async pseudonymizeData(params: PseudonymizationParams): Promise<PseudonymizationResult> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedParams = InputSanitizer.sanitizeObject(params)
+
 		// Validate input using centralized validation
-		const validationResult = validatePseudonymizationParams(params)
+		const validationResult = validatePseudonymizationParams(sanitizedParams)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid pseudonymization parameters', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),

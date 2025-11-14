@@ -5,6 +5,7 @@ import { ErrorHandler } from '../infrastructure/error'
 import { DefaultLogger } from '../infrastructure/logger'
 import { PerformanceMonitor } from '../infrastructure/performance-monitor'
 import { PluginManager } from '../infrastructure/plugins'
+import { PluginLoader } from '../infrastructure/plugins/plugin-loader'
 import { RetryManager } from '../infrastructure/retry'
 import { ComplianceService } from '../services/compliance'
 import { DeliveryService } from '../services/delivery'
@@ -19,6 +20,7 @@ import { ConfigManager } from './config'
 import type { RequestInterceptor, ResponseInterceptor } from '../infrastructure/interceptors'
 import type { Logger } from '../infrastructure/logger'
 import type { PerformanceReport } from '../infrastructure/performance-monitor'
+import type { Plugin } from '../infrastructure/plugins'
 import type { AuditClientConfig, PartialAuditClientConfig } from './config'
 
 /**
@@ -68,7 +70,9 @@ export class AuditClient {
 	private batchManager!: BatchManager
 	private errorHandler!: ErrorHandler
 	private pluginManager!: PluginManager
+	private pluginLoader!: PluginLoader
 	private performanceMonitor!: PerformanceMonitor
+	private pluginsInitialized: boolean = false
 
 	// Service instances
 	private _events!: EventsService
@@ -104,6 +108,7 @@ export class AuditClient {
 			// Initialize plugin system (async initialization will be handled separately)
 			this.pluginManager = new PluginManager(this.getLogger())
 			this.pluginManager.setClientConfig(this.config)
+			this.pluginLoader = new PluginLoader()
 
 			// Initialize services
 			this.initializeServices()
@@ -218,32 +223,19 @@ export class AuditClient {
 	}
 
 	/**
-	 * Load built-in plugins based on configuration
+	 * Load built-in plugins based on configuration using lazy loading
 	 */
 	private async loadBuiltInPlugins(): Promise<void> {
-		const { BuiltInPluginFactory } = await import('../infrastructure/plugins/built-in')
-
 		// Load middleware plugins
 		if (this.config.plugins.middleware.enabled) {
 			for (const pluginName of this.config.plugins.middleware.plugins) {
 				try {
-					let plugin
-					switch (pluginName) {
-						case 'request-logging':
-							plugin = BuiltInPluginFactory.createRequestLoggingPlugin()
-							break
-						case 'correlation-id':
-							plugin = BuiltInPluginFactory.createCorrelationIdPlugin()
-							break
-						case 'rate-limiting':
-							plugin = BuiltInPluginFactory.createRateLimitingPlugin()
-							break
-						default:
-							this.getLogger().warn(`Unknown built-in middleware plugin: ${pluginName}`)
-							continue
+					const plugin = await this.pluginLoader.loadBuiltInPlugin(pluginName)
+					if (plugin) {
+						await this.pluginManager.getRegistry().register(plugin, {})
+					} else {
+						this.getLogger().warn(`Unknown built-in middleware plugin: ${pluginName}`)
 					}
-
-					await this.pluginManager.getRegistry().register(plugin, {})
 				} catch (error) {
 					this.getLogger().error(`Failed to load built-in middleware plugin '${pluginName}'`, {
 						error,
@@ -258,20 +250,12 @@ export class AuditClient {
 				this.config.plugins.storage.plugins
 			)) {
 				try {
-					let plugin
-					switch (pluginName) {
-						case 'redis-storage':
-							plugin = BuiltInPluginFactory.createRedisStoragePlugin()
-							break
-						case 'indexeddb-storage':
-							plugin = BuiltInPluginFactory.createIndexedDBStoragePlugin()
-							break
-						default:
-							this.getLogger().warn(`Unknown built-in storage plugin: ${pluginName}`)
-							continue
+					const plugin = await this.pluginLoader.loadBuiltInPlugin(pluginName)
+					if (plugin) {
+						await this.pluginManager.getRegistry().register(plugin, pluginConfig)
+					} else {
+						this.getLogger().warn(`Unknown built-in storage plugin: ${pluginName}`)
 					}
-
-					await this.pluginManager.getRegistry().register(plugin, pluginConfig)
 				} catch (error) {
 					this.getLogger().error(`Failed to load built-in storage plugin '${pluginName}'`, {
 						error,
@@ -284,23 +268,12 @@ export class AuditClient {
 		if (this.config.plugins.auth.enabled) {
 			for (const [pluginName, pluginConfig] of Object.entries(this.config.plugins.auth.plugins)) {
 				try {
-					let plugin
-					switch (pluginName) {
-						case 'jwt-auth':
-							plugin = BuiltInPluginFactory.createJWTAuthPlugin()
-							break
-						case 'oauth2-auth':
-							plugin = BuiltInPluginFactory.createOAuth2AuthPlugin()
-							break
-						case 'custom-header-auth':
-							plugin = BuiltInPluginFactory.createCustomHeaderAuthPlugin()
-							break
-						default:
-							this.getLogger().warn(`Unknown built-in auth plugin: ${pluginName}`)
-							continue
+					const plugin = await this.pluginLoader.loadBuiltInPlugin(pluginName)
+					if (plugin) {
+						await this.pluginManager.getRegistry().register(plugin, pluginConfig)
+					} else {
+						this.getLogger().warn(`Unknown built-in auth plugin: ${pluginName}`)
 					}
-
-					await this.pluginManager.getRegistry().register(plugin, pluginConfig)
 				} catch (error) {
 					this.getLogger().error(`Failed to load built-in auth plugin '${pluginName}'`, { error })
 				}
@@ -370,6 +343,7 @@ export class AuditClient {
 		this.cleanupTasks.push(() => this.batchManager.clear())
 		this.cleanupTasks.push(() => this.authManager.clearAllTokenCache())
 		this.cleanupTasks.push(() => this.pluginManager.cleanup())
+		this.cleanupTasks.push(() => this.pluginLoader.clear())
 
 		// Add cleanup for services
 		this.cleanupTasks.push(() => this._events.destroy())
@@ -472,11 +446,75 @@ export class AuditClient {
 	}
 
 	/**
-	 * Plugin manager for managing plugins
+	 * Plugin manager for managing plugins (lazy initialization)
 	 */
 	public get plugins(): PluginManager {
 		this.validateClientState()
+
+		// Lazy initialize plugins on first access if not already initialized
+		if (!this.pluginsInitialized && this.config.plugins.enabled && this.config.plugins.autoLoad) {
+			this.initializePlugins().catch((error) => {
+				this.getLogger().error('Failed to lazy initialize plugins', { error })
+			})
+			this.pluginsInitialized = true
+		}
+
 		return this.pluginManager
+	}
+
+	/**
+	 * Load a single plugin by name
+	 *
+	 * @param name - Plugin name to load
+	 * @param config - Plugin configuration
+	 * @returns The loaded plugin instance
+	 */
+	public async loadPlugin(name: string, config: any = {}): Promise<Plugin | null> {
+		this.validateClientState()
+
+		try {
+			const plugin = await this.pluginLoader.loadBuiltInPlugin(name)
+			if (plugin) {
+				await this.pluginManager.getRegistry().register(plugin, config)
+				this.getLogger().info(`Plugin '${name}' loaded successfully`)
+				return plugin
+			}
+
+			this.getLogger().warn(`Plugin '${name}' not found`)
+			return null
+		} catch (error) {
+			this.getLogger().error(`Failed to load plugin '${name}'`, { error })
+			throw error
+		}
+	}
+
+	/**
+	 * Load multiple plugins by name
+	 *
+	 * @param plugins - Array of plugin names or plugin configurations
+	 * @returns Array of loaded plugin instances
+	 */
+	public async loadPlugins(
+		plugins: Array<string | { name: string; config?: any }>
+	): Promise<Array<Plugin | null>> {
+		this.validateClientState()
+
+		const results: Array<Plugin | null> = []
+
+		for (const pluginSpec of plugins) {
+			const name = typeof pluginSpec === 'string' ? pluginSpec : pluginSpec.name
+			const config = typeof pluginSpec === 'string' ? {} : pluginSpec.config || {}
+
+			try {
+				const plugin = await this.loadPlugin(name, config)
+				results.push(plugin)
+			} catch (error) {
+				this.getLogger().error(`Failed to load plugin '${name}'`, { error })
+				results.push(null)
+			}
+		}
+
+		return results
 	}
 
 	/**

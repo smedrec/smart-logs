@@ -7,6 +7,7 @@ import {
 	StreamingManager,
 	StreamMetrics,
 } from '../infrastructure/streaming'
+import { InputSanitizer } from '../utils/sanitization'
 import {
 	assertDefined,
 	assertType,
@@ -309,13 +310,18 @@ export class EventsService extends BaseResource {
 	 * @returns Promise resolving to the created audit event
 	 *
 	 * Requirements: 4.1 - WHEN creating audit events THEN the client SHALL validate event data and submit to the server API
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async create(
 		event: CreateAuditEventInput,
 		options: CreateAuditEventOptions = {}
 	): Promise<AuditEvent> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedEvent = InputSanitizer.sanitizeObject(event)
+		const sanitizedOptions = InputSanitizer.sanitizeObject(options)
+
 		// Validate input data
-		const validationResult = validateCreateAuditEventInput(event)
+		const validationResult = validateCreateAuditEventInput(sanitizedEvent)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid audit event data', {
 				...(validationResult.zodError && { originalError: validationResult.zodError }),
@@ -324,7 +330,7 @@ export class EventsService extends BaseResource {
 
 		const response = await this.request<AuditEvent>('/audit/events', {
 			method: 'POST',
-			body: { eventData: validationResult.data, options },
+			body: { eventData: validationResult.data, options: sanitizedOptions },
 		})
 
 		// Validate response
@@ -339,10 +345,14 @@ export class EventsService extends BaseResource {
 	 * @returns Promise resolving to bulk creation result
 	 *
 	 * Requirements: 4.1 - WHEN creating audit events THEN the client SHALL validate event data and submit to the server API
+	 * Requirements: 7.5 - Sanitize input before validation
 	 */
 	async bulkCreate(events: CreateAuditEventInput[]): Promise<BulkCreateResult> {
+		// Sanitize input first to prevent injection attacks
+		const sanitizedEvents = events.map((event) => InputSanitizer.sanitizeObject(event))
+
 		// Validate input data
-		const bulkInput = { events }
+		const bulkInput = { events: sanitizedEvents }
 		const validationResult = validateBulkCreateAuditEventsInput(bulkInput)
 		if (!validationResult.success) {
 			throw new ValidationError('Invalid bulk create input', {
