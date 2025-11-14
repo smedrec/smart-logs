@@ -105,7 +105,7 @@ export class DataMasker {
 	/**
 	 * Mask sensitive data in an object or string
 	 */
-	mask(data: any): any {
+	mask(data: any, seen = new WeakSet()): any {
 		if (typeof data === 'string') {
 			return this.maskString(data)
 		}
@@ -114,12 +114,20 @@ export class DataMasker {
 			return data
 		}
 
+		// Handle circular references
+		if (typeof data === 'object') {
+			if (seen.has(data)) {
+				return '[Circular Reference]'
+			}
+			seen.add(data)
+		}
+
 		if (Array.isArray(data)) {
-			return data.map((item) => this.mask(item))
+			return data.map((item) => this.mask(item, seen))
 		}
 
 		if (typeof data === 'object') {
-			return this.maskObject(data)
+			return this.maskObject(data, seen)
 		}
 
 		return data
@@ -136,7 +144,7 @@ export class DataMasker {
 		return masked
 	}
 
-	private maskObject(obj: Record<string, any>): Record<string, any> {
+	private maskObject(obj: Record<string, any>, seen = new WeakSet()): Record<string, any> {
 		const masked: Record<string, any> = {}
 
 		for (const [key, value] of Object.entries(obj)) {
@@ -145,7 +153,7 @@ export class DataMasker {
 			if (this.sensitiveFields.has(lowerKey) || this.containsSensitiveKeyword(lowerKey)) {
 				masked[key] = this.createMask(typeof value === 'string' ? value.length : 8)
 			} else {
-				masked[key] = this.mask(value)
+				masked[key] = this.mask(value, seen)
 			}
 		}
 
@@ -168,7 +176,18 @@ export class LogFormatter {
 	static formatEntry(entry: LogEntry, format: LogFormat): string {
 		switch (format) {
 			case 'json':
-				return JSON.stringify(entry)
+				try {
+					return JSON.stringify(entry)
+				} catch (error) {
+					// Handle circular references or other serialization errors
+					const safeEntry = {
+						...entry,
+						metadata: entry.metadata
+							? `[Serialization Error: ${error instanceof Error ? error.message : 'Unknown error'}]`
+							: undefined,
+					}
+					return JSON.stringify(safeEntry)
+				}
 
 			case 'structured':
 				return LogFormatter.formatStructured(entry)
@@ -191,13 +210,24 @@ export class LogFormatter {
 		let formatted = parts.join(' ')
 
 		if (entry.metadata && Object.keys(entry.metadata).length > 0) {
-			formatted += ` | ${JSON.stringify(entry.metadata)}`
+			try {
+				const metadataStr = JSON.stringify(entry.metadata, null, 2)
+				// Indent each line of metadata for better readability
+				const indentedMetadata = metadataStr
+					.split('\n')
+					.map((line, index) => (index === 0 ? line : '  ' + line))
+					.join('\n')
+				formatted += `\n  Metadata: ${indentedMetadata}`
+			} catch (error) {
+				// Handle metadata serialization errors gracefully
+				formatted += `\n  Metadata: [Serialization Error: ${error instanceof Error ? error.message : 'Unknown error'}]`
+			}
 		}
 
 		if (entry.error) {
-			formatted += ` | Error: ${entry.error.name}: ${entry.error.message}`
+			formatted += `\n  Error: ${entry.error.name}: ${entry.error.message}`
 			if (entry.error.stack) {
-				formatted += `\n${entry.error.stack}`
+				formatted += `\n  Stack: ${entry.error.stack}`
 			}
 		}
 
@@ -461,20 +491,113 @@ export class AuditLogger implements Logger {
 	}
 
 	private writeToConsole(level: LogLevel, message: string): void {
+		const formattedMessage = this.formatConsoleMessage(level, message)
+
 		switch (level) {
 			case 'debug':
-				console.debug(message)
+				console.debug(formattedMessage)
 				break
 			case 'info':
-				console.info(message)
+				console.info(formattedMessage)
 				break
 			case 'warn':
-				console.warn(message)
+				console.warn(formattedMessage)
 				break
 			case 'error':
-				console.error(message)
+				console.error(formattedMessage)
 				break
 		}
+	}
+
+	/**
+	 * Format console message with color coding, timestamps, and proper indentation
+	 */
+	private formatConsoleMessage(level: LogLevel, message: string): string {
+		// ANSI color codes
+		const colors = {
+			debug: '\x1b[36m', // Cyan
+			info: '\x1b[32m', // Green
+			warn: '\x1b[33m', // Yellow
+			error: '\x1b[31m', // Red
+			reset: '\x1b[0m', // Reset
+		}
+
+		// Add ISO timestamp
+		const timestamp = new Date().toISOString()
+
+		// Parse the message to extract components
+		let formattedMessage = message
+
+		// If message is JSON format, parse and format it
+		if (message.startsWith('{')) {
+			try {
+				const parsed = JSON.parse(message)
+				const color = colors[level]
+				const reset = colors.reset
+
+				// Format with color coding
+				let output = `${color}[${timestamp}] [${level.toUpperCase()}]${reset}`
+
+				// Add component if present
+				if (parsed.component) {
+					output += ` ${color}[${parsed.component}]${reset}`
+				}
+
+				// Add request ID if present
+				if (parsed.requestId) {
+					output += ` ${color}[${parsed.requestId}]${reset}`
+				}
+
+				// Add message
+				output += ` ${parsed.message}`
+
+				// Add metadata with proper indentation
+				if (parsed.metadata && Object.keys(parsed.metadata).length > 0) {
+					try {
+						const metadataStr = JSON.stringify(parsed.metadata, null, 2)
+						// Indent each line of metadata
+						const indentedMetadata = metadataStr
+							.split('\n')
+							.map((line, index) => (index === 0 ? line : '  ' + line))
+							.join('\n')
+						output += `\n  Metadata: ${indentedMetadata}`
+					} catch (error) {
+						// Handle serialization errors gracefully
+						output += `\n  Metadata: [Serialization Error: ${error instanceof Error ? error.message : 'Unknown error'}]`
+					}
+				}
+
+				// Add error information if present
+				if (parsed.error) {
+					output += `\n  Error: ${parsed.error.name}: ${parsed.error.message}`
+					if (parsed.error.stack) {
+						output += `\n  Stack: ${parsed.error.stack}`
+					}
+				}
+
+				// Reset color at the end
+				output += reset
+
+				return output
+			} catch (error) {
+				// If parsing fails, fall through to text format handling
+			}
+		}
+
+		// For text format messages, add color and timestamp
+		const color = colors[level]
+		const reset = colors.reset
+
+		// Check if message already has timestamp (from LogFormatter.formatText)
+		if (message.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+			// Message already has timestamp, just add color
+			formattedMessage = `${color}${message}${reset}`
+		} else {
+			// Add timestamp and color
+			formattedMessage = `${color}[${timestamp}] ${message}${reset}`
+		}
+
+		return formattedMessage
 	}
 }
 

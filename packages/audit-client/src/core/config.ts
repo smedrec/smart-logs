@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+import { ConfigValidator } from './config-validator'
+
+import type { Logger } from '../infrastructure/logger'
+
 // Zod schemas for configuration validation
 const AuthenticationConfigSchema = z.object({
 	type: z.enum(['apiKey', 'session', 'bearer', 'custom', 'cookie']),
@@ -189,8 +193,10 @@ export interface ConfigValidationResult {
 export class ConfigManager {
 	private config: AuditClientConfig
 	private environmentConfigs: EnvironmentConfig = {}
+	private logger: Logger | undefined
 
-	constructor(config: PartialAuditClientConfig) {
+	constructor(config: PartialAuditClientConfig, logger?: Logger) {
+		this.logger = logger
 		this.config = this.validateAndNormalizeConfig(config)
 	}
 
@@ -198,6 +204,31 @@ export class ConfigManager {
 	 * Validates and normalizes the configuration using Zod schemas
 	 */
 	private validateAndNormalizeConfig(config: PartialAuditClientConfig): AuditClientConfig {
+		// First, run ConfigValidator for detailed validation
+		const validationResult = ConfigValidator.validate(config)
+
+		// Log warnings for non-critical issues
+		if (validationResult.warnings.length > 0 && this.logger) {
+			validationResult.warnings.forEach((warning) => {
+				this.logger?.warn(`Configuration warning: ${warning.field} - ${warning.message}`, {
+					code: warning.code,
+					field: warning.field,
+				})
+			})
+		}
+
+		// Throw descriptive errors if validation failed
+		if (!validationResult.isValid) {
+			const errorMessage = ConfigValidator.formatValidationResult(validationResult)
+			const zodErrors = validationResult.errors.map((error) => ({
+				code: error.code as any,
+				path: error.field.split('.'),
+				message: error.message,
+			}))
+			throw new ConfigurationError(errorMessage, zodErrors)
+		}
+
+		// Then, use Zod for normalization and type safety
 		try {
 			return AuditClientConfigSchema.parse(config)
 		} catch (error) {

@@ -45,6 +45,52 @@ describe('ConfigManager', () => {
 			expect(() => new ConfigManager(invalidConfig)).toThrow(ConfigurationError)
 		})
 
+		it('should log warnings for non-critical configuration issues', () => {
+			const mockLogger = {
+				debug: vi.fn(),
+				info: vi.fn(),
+				warn: vi.fn(),
+				error: vi.fn(),
+			}
+
+			const configWithWarnings = {
+				...validConfig,
+				authentication: {
+					type: 'apiKey' as const,
+					apiKey: 'short', // Too short, should trigger warning
+				},
+			}
+
+			const manager = new ConfigManager(configWithWarnings, mockLogger)
+
+			expect(mockLogger.warn).toHaveBeenCalled()
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('Configuration warning'),
+				expect.objectContaining({
+					code: 'WEAK_API_KEY',
+				})
+			)
+		})
+
+		it('should throw descriptive error with validation details', () => {
+			const invalidConfig = {
+				baseUrl: 'not-a-url',
+				authentication: {
+					type: 'apiKey' as const,
+				},
+			}
+
+			try {
+				new ConfigManager(invalidConfig)
+				expect.fail('Should have thrown ConfigurationError')
+			} catch (error) {
+				expect(error).toBeInstanceOf(ConfigurationError)
+				const configError = error as ConfigurationError
+				expect(configError.message).toContain('baseUrl')
+				expect(configError.message).toContain('apiKey')
+			}
+		})
+
 		it('should apply default values for optional fields', () => {
 			const manager = new ConfigManager(validConfig)
 			const config = manager.getConfig()

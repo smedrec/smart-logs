@@ -552,3 +552,299 @@ describe('Logger Integration', () => {
 		expect(consoleErrorSpy).toHaveBeenCalledWith('Custom logger failed:', expect.any(Error))
 	})
 })
+
+// Console formatting tests
+describe('Console Output Formatting', () => {
+	let consoleDebugSpy: any
+	let consoleInfoSpy: any
+	let consoleWarnSpy: any
+	let consoleErrorSpy: any
+
+	beforeEach(() => {
+		consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+		consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+		consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+	})
+
+	afterEach(() => {
+		consoleDebugSpy.mockRestore()
+		consoleInfoSpy.mockRestore()
+		consoleWarnSpy.mockRestore()
+		consoleErrorSpy.mockRestore()
+	})
+
+	describe('color coding', () => {
+		it('should use cyan color for debug messages', () => {
+			const logger = new AuditLogger({
+				level: 'debug',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.debug('Debug message')
+
+			expect(consoleDebugSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[36m'))
+			expect(consoleDebugSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[0m'))
+		})
+
+		it('should use green color for info messages', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.info('Info message')
+
+			expect(consoleInfoSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[32m'))
+			expect(consoleInfoSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[0m'))
+		})
+
+		it('should use yellow color for warn messages', () => {
+			const logger = new AuditLogger({
+				level: 'warn',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.warn('Warning message')
+
+			expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[33m'))
+			expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[0m'))
+		})
+
+		it('should use red color for error messages', () => {
+			const logger = new AuditLogger({
+				level: 'error',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.error('Error message')
+
+			expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[31m'))
+			expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('\x1b[0m'))
+		})
+
+		it('should reset color codes after each message', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.info('First message')
+			logger.info('Second message')
+
+			const firstCall = consoleInfoSpy.mock.calls[0][0]
+			const secondCall = consoleInfoSpy.mock.calls[1][0]
+
+			expect(firstCall).toMatch(/\x1b\[0m$/)
+			expect(secondCall).toMatch(/\x1b\[0m$/)
+		})
+	})
+
+	describe('timestamp formatting', () => {
+		it('should include ISO timestamp in console output', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.info('Test message')
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			// Check for ISO 8601 timestamp format
+			expect(output).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/)
+		})
+
+		it('should include timestamp for all log levels', () => {
+			const logger = new AuditLogger({
+				level: 'debug',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.debug('Debug message')
+			logger.info('Info message')
+			logger.warn('Warn message')
+			logger.error('Error message')
+
+			expect(consoleDebugSpy.mock.calls[0][0]).toMatch(/\d{4}-\d{2}-\d{2}T/)
+			expect(consoleInfoSpy.mock.calls[0][0]).toMatch(/\d{4}-\d{2}-\d{2}T/)
+			expect(consoleWarnSpy.mock.calls[0][0]).toMatch(/\d{4}-\d{2}-\d{2}T/)
+			expect(consoleErrorSpy.mock.calls[0][0]).toMatch(/\d{4}-\d{2}-\d{2}T/)
+		})
+	})
+
+	describe('metadata formatting', () => {
+		it('should format metadata objects with proper indentation', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+				maskSensitiveData: false, // Disable masking for this test
+			})
+
+			logger.info('Test message', {
+				key1: 'value1',
+				key2: 'value2',
+				nested: {
+					nestedKey: 'nestedValue',
+				},
+			})
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('Metadata:')
+			expect(output).toContain('key1')
+			expect(output).toContain('value1')
+			expect(output).toContain('nested')
+			// Check for indentation (at least 2 spaces)
+			expect(output).toMatch(/\n {2,}/)
+		})
+
+		it('should handle empty metadata gracefully', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.info('Test message', {})
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('Test message')
+			// Should not include metadata section for empty objects
+			expect(output).not.toContain('Metadata:')
+		})
+
+		it('should format metadata in text format with indentation', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'text',
+				maskSensitiveData: false, // Disable masking for this test
+			})
+
+			logger.info('Test message', {
+				key1: 'value1',
+				nested: {
+					nestedKey: 'nestedValue',
+				},
+			})
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('Metadata:')
+			expect(output).toContain('key1')
+			// Check for proper indentation
+			expect(output).toMatch(/\n {2,}/)
+		})
+	})
+
+	describe('error handling', () => {
+		it('should handle metadata serialization errors gracefully', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+				maskSensitiveData: false, // Disable masking to test JSON serialization directly
+			})
+
+			// Create circular reference
+			const circular: any = { key: 'value' }
+			circular.self = circular
+
+			logger.info('Test message', circular)
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('Test message')
+			// With masking disabled, circular references should be caught during JSON.stringify
+			expect(output).toContain('Serialization Error')
+		})
+
+		it('should handle metadata serialization errors in text format', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'text',
+				maskSensitiveData: false, // Disable masking to test JSON serialization directly
+			})
+
+			// Create circular reference
+			const circular: any = { key: 'value' }
+			circular.self = circular
+
+			logger.info('Test message', circular)
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('Test message')
+			expect(output).toContain('Serialization Error')
+		})
+
+		it('should display error information with proper formatting', () => {
+			const logger = new AuditLogger({
+				level: 'error',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			const error = new Error('Test error')
+			error.stack = 'Error: Test error\n  at test.ts:10:5'
+
+			logger.logError(error, { context: 'test' })
+
+			const output = consoleErrorSpy.mock.calls[0][0]
+			expect(output).toContain('Error:')
+			expect(output).toContain('Test error')
+			expect(output).toContain('Stack:')
+		})
+	})
+
+	describe('component and request ID formatting', () => {
+		it('should include component in formatted output', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+				component: 'TestComponent',
+			})
+
+			logger.info('Test message')
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('TestComponent')
+		})
+
+		it('should include request ID in formatted output', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+			})
+
+			logger.setRequestId('req-123')
+			logger.info('Test message')
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('req-123')
+		})
+
+		it('should include both component and request ID', () => {
+			const logger = new AuditLogger({
+				level: 'info',
+				enableConsole: true,
+				format: 'json',
+				component: 'TestComponent',
+			})
+
+			logger.setRequestId('req-123')
+			logger.info('Test message')
+
+			const output = consoleInfoSpy.mock.calls[0][0]
+			expect(output).toContain('TestComponent')
+			expect(output).toContain('req-123')
+		})
+	})
+})
