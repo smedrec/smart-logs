@@ -261,7 +261,7 @@
   - Test timing tracking
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
 
-- [-] 13. Extract common logging patterns
+- [x] 13. Extract common logging patterns
 - [x] 13.1 Create LoggingHelper utility
   - Create src/utils/logging-helper.ts
   - Implement logRequest static method
@@ -277,7 +277,7 @@
   - Replace duplicated logging code in HealthService
   - _Requirements: 10.6_
 
-- [ ] 13.3 Add tests for LoggingHelper
+- [x] 13.3 Add tests for LoggingHelper
   - Test log level determination
   - Test correlation ID setting
   - Test logging disabled behavior
