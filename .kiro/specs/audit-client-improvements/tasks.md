@@ -18,7 +18,7 @@
   - Create tests verifying size limits are enforced
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 3. Add circuit breaker persistence
+- [x] 3. Add circuit breaker persistence
   - Create CircuitBreakerPersistence interface with save/load/clear methods
   - Implement MemoryCircuitBreakerPersistence for testing
   - Implement LocalStorageCircuitBreakerPersistence for browser
@@ -30,8 +30,8 @@
 
 ## Phase 2: High Priority Improvements (Weeks 2-4)
 
-- [ ] 4. Extract HttpClient from BaseResource
-- [ ] 4.1 Create HttpClient class
+- [x] 4. Extract HttpClient from BaseResource
+- [x] 4.1 Create HttpClient class
   - Create src/core/http-client.ts file
   - Implement request method with HttpRequestOptions interface
   - Add buildHeaders method for auth, correlation IDs, and custom headers
@@ -41,7 +41,7 @@
   - Add getUserAgent method for client identification
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 4.2 Refactor BaseResource to use HttpClient
+- [x] 4.2 Refactor BaseResource to use HttpClient
   - Inject HttpClient into BaseResource constructor
   - Update request method to delegate HTTP operations to HttpClient
   - Simplify BaseResource to focus on orchestration (caching, retry, interceptors)
@@ -49,7 +49,7 @@
   - Ensure BaseResource file is <600 lines after refactoring
   - _Requirements: 2.2, 2.3, 2.5_
 
-- [ ] 4.3 Add tests for HttpClient
+- [x] 4.3 Add tests for HttpClient
   - Test successful GET/POST/PUT/DELETE requests
   - Test auth header inclusion
   - Test custom header handling
@@ -58,7 +58,7 @@
   - Test HttpError creation on failures
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 4.4 Update services to use refactored BaseResource
+- [x] 4.4 Update services to use refactored BaseResource
   - Verify all services work with new BaseResource
   - Ensure no breaking changes to service APIs
   - Update service tests if needed

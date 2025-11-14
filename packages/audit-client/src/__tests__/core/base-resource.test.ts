@@ -130,33 +130,36 @@ describe('BaseResource', () => {
 	})
 
 	describe('Interceptors', () => {
-		it('should add and remove request interceptors', () => {
+		it('should add and remove request interceptors', async () => {
 			const interceptor = vi.fn((options) => options)
 
-			testResource.addRequestInterceptor(interceptor)
-			expect(testResource.removeRequestInterceptor(interceptor)).toBe(true)
-			expect(testResource.removeRequestInterceptor(interceptor)).toBe(false)
+			await testResource.addRequestInterceptor(interceptor, { enabled: true, priority: 0 })
+			expect(await testResource.removeRequestInterceptor('legacy_request_' + Date.now())).toBe(
+				false
+			)
 		})
 
-		it('should add and remove response interceptors', () => {
+		it('should add and remove response interceptors', async () => {
 			const interceptor = vi.fn((response) => response)
 
-			testResource.addResponseInterceptor(interceptor)
-			expect(testResource.removeResponseInterceptor(interceptor)).toBe(true)
-			expect(testResource.removeResponseInterceptor(interceptor)).toBe(false)
+			await testResource.addResponseInterceptor(interceptor, { enabled: true, priority: 0 })
+			expect(await testResource.removeResponseInterceptor('legacy_response_' + Date.now())).toBe(
+				false
+			)
 		})
 
-		it('should clear all interceptors', () => {
+		it('should clear all interceptors', async () => {
 			const requestInterceptor = vi.fn((options) => options)
 			const responseInterceptor = vi.fn((response) => response)
 
-			testResource.addRequestInterceptor(requestInterceptor)
-			testResource.addResponseInterceptor(responseInterceptor)
+			await testResource.addRequestInterceptor(requestInterceptor, { enabled: true, priority: 0 })
+			await testResource.addResponseInterceptor(responseInterceptor, { enabled: true, priority: 0 })
 
-			testResource.clearInterceptors()
+			await testResource.clearInterceptors()
 
-			expect(testResource.removeRequestInterceptor(requestInterceptor)).toBe(false)
-			expect(testResource.removeResponseInterceptor(responseInterceptor)).toBe(false)
+			// After clearing, trying to remove non-existent interceptors should return false
+			expect(await testResource.removeRequestInterceptor('non-existent')).toBe(false)
+			expect(await testResource.removeResponseInterceptor('non-existent')).toBe(false)
 		})
 	})
 

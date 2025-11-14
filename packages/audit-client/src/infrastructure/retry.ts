@@ -55,6 +55,126 @@ export interface CircuitBreakerStats {
 	totalRequests: number
 	lastFailureTime?: number | undefined
 	nextRetryTime?: number | undefined
+	persistedAt?: number | undefined
+}
+
+/**
+ * Interface for persisting circuit breaker state
+ */
+export interface CircuitBreakerPersistence {
+	save(key: string, stats: CircuitBreakerStats): Promise<void>
+	load(key: string): Promise<CircuitBreakerStats | null>
+	loadAll(): Promise<Map<string, CircuitBreakerStats>>
+	clear(key: string): Promise<void>
+	clearAll(): Promise<void>
+}
+
+/**
+ * In-memory implementation of circuit breaker persistence for testing
+ */
+export class MemoryCircuitBreakerPersistence implements CircuitBreakerPersistence {
+	private storage: Map<string, CircuitBreakerStats> = new Map()
+
+	async save(key: string, stats: CircuitBreakerStats): Promise<void> {
+		this.storage.set(key, { ...stats, persistedAt: Date.now() })
+	}
+
+	async load(key: string): Promise<CircuitBreakerStats | null> {
+		return this.storage.get(key) || null
+	}
+
+	async loadAll(): Promise<Map<string, CircuitBreakerStats>> {
+		return new Map(this.storage)
+	}
+
+	async clear(key: string): Promise<void> {
+		this.storage.delete(key)
+	}
+
+	async clearAll(): Promise<void> {
+		this.storage.clear()
+	}
+}
+
+/**
+ * LocalStorage implementation of circuit breaker persistence for browser environments
+ */
+export class LocalStorageCircuitBreakerPersistence implements CircuitBreakerPersistence {
+	private prefix: string
+
+	constructor(prefix: string = 'circuit-breaker:') {
+		this.prefix = prefix
+	}
+
+	async save(key: string, stats: CircuitBreakerStats): Promise<void> {
+		try {
+			const storageKey = this.getStorageKey(key)
+			const data = JSON.stringify({ ...stats, persistedAt: Date.now() })
+			localStorage.setItem(storageKey, data)
+		} catch (error) {
+			// Silently fail if localStorage is not available or quota exceeded
+			console.warn('Failed to persist circuit breaker state:', error)
+		}
+	}
+
+	async load(key: string): Promise<CircuitBreakerStats | null> {
+		try {
+			const storageKey = this.getStorageKey(key)
+			const data = localStorage.getItem(storageKey)
+			if (!data) return null
+			return JSON.parse(data) as CircuitBreakerStats
+		} catch (error) {
+			console.warn('Failed to load circuit breaker state:', error)
+			return null
+		}
+	}
+
+	async loadAll(): Promise<Map<string, CircuitBreakerStats>> {
+		const result = new Map<string, CircuitBreakerStats>()
+		try {
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i)
+				if (key && key.startsWith(this.prefix)) {
+					const data = localStorage.getItem(key)
+					if (data) {
+						const originalKey = key.substring(this.prefix.length)
+						result.set(originalKey, JSON.parse(data) as CircuitBreakerStats)
+					}
+				}
+			}
+		} catch (error) {
+			console.warn('Failed to load all circuit breaker states:', error)
+		}
+		return result
+	}
+
+	async clear(key: string): Promise<void> {
+		try {
+			const storageKey = this.getStorageKey(key)
+			localStorage.removeItem(storageKey)
+		} catch (error) {
+			console.warn('Failed to clear circuit breaker state:', error)
+		}
+	}
+
+	async clearAll(): Promise<void> {
+		try {
+			const keysToRemove: string[] = []
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i)
+				if (key && key.startsWith(this.prefix)) {
+					keysToRemove.push(key)
+				}
+			}
+			keysToRemove.forEach((key) => localStorage.removeItem(key))
+		} catch (error) {
+			console.warn('Failed to clear all circuit breaker states:', error)
+		}
+	}
+
+	private getStorageKey(key: string): string {
+		return `${this.prefix}${key}`
+	}
 }
 
 /**
@@ -119,8 +239,14 @@ export class RetryManager {
 	private config: RetryConfig
 	private circuitBreakerConfig: CircuitBreakerConfig
 	private circuitBreakers: Map<string, CircuitBreakerStats> = new Map()
+	private persistence?: CircuitBreakerPersistence
+	private persistenceLoaded: boolean = false
 
-	constructor(config: RetryConfig, circuitBreakerConfig?: Partial<CircuitBreakerConfig>) {
+	constructor(
+		config: RetryConfig,
+		circuitBreakerConfig?: Partial<CircuitBreakerConfig>,
+		persistence?: CircuitBreakerPersistence
+	) {
 		this.config = config
 		this.circuitBreakerConfig = {
 			enabled: true,
@@ -130,6 +256,38 @@ export class RetryManager {
 			minimumRequestThreshold: 10,
 			...circuitBreakerConfig,
 		}
+		if (persistence !== undefined) {
+			this.persistence = persistence
+		}
+	}
+
+	/**
+	 * Loads persisted circuit breaker state (only states less than 1 hour old)
+	 */
+	async loadPersistedState(): Promise<void> {
+		if (!this.persistence || this.persistenceLoaded) {
+			return
+		}
+
+		try {
+			const persistedStates = await this.persistence.loadAll()
+			const oneHourAgo = Date.now() - 3600000 // 1 hour in milliseconds
+
+			for (const [key, stats] of Array.from(persistedStates.entries())) {
+				// Only restore states that are less than 1 hour old
+				if (stats.persistedAt && stats.persistedAt > oneHourAgo) {
+					this.circuitBreakers.set(key, stats)
+				} else {
+					// Clear old persisted state
+					await this.persistence.clear(key)
+				}
+			}
+
+			this.persistenceLoaded = true
+		} catch (error) {
+			console.warn('Failed to load persisted circuit breaker state:', error)
+			this.persistenceLoaded = true // Mark as loaded to prevent retry
+		}
 	}
 
 	/**
@@ -138,6 +296,11 @@ export class RetryManager {
 	async execute<T>(operation: () => Promise<T>, context: RetryContext): Promise<T> {
 		if (!this.config.enabled) {
 			return operation()
+		}
+
+		// Load persisted state on first execution
+		if (!this.persistenceLoaded && this.persistence) {
+			await this.loadPersistedState()
 		}
 
 		const startTime = Date.now()
@@ -335,6 +498,13 @@ export class RetryManager {
 					// Transition to half-open
 					stats.state = CircuitBreakerState.HALF_OPEN
 					this.circuitBreakers.set(key, stats)
+
+					// Persist state change
+					if (this.persistence) {
+						this.persistence.save(key, stats).catch((error) => {
+							console.warn('Failed to persist circuit breaker state:', error)
+						})
+					}
 				} else {
 					throw new CircuitBreakerOpenError(
 						`Circuit breaker is open for ${key}. Next retry at ${new Date(
@@ -373,6 +543,13 @@ export class RetryManager {
 
 		this.circuitBreakers.set(key, stats)
 		this.cleanupOldStats(key, stats)
+
+		// Persist state change
+		if (this.persistence) {
+			this.persistence.save(key, stats).catch((error) => {
+				console.warn('Failed to persist circuit breaker state:', error)
+			})
+		}
 	}
 
 	/**
@@ -395,6 +572,13 @@ export class RetryManager {
 
 		this.circuitBreakers.set(key, stats)
 		this.cleanupOldStats(key, stats)
+
+		// Persist state change
+		if (this.persistence) {
+			this.persistence.save(key, stats).catch((error) => {
+				console.warn('Failed to persist circuit breaker state:', error)
+			})
+		}
 	}
 
 	/**
@@ -497,15 +681,16 @@ export class RetryManager {
 	 */
 	static create(
 		config: RetryConfig,
-		circuitBreakerConfig?: Partial<CircuitBreakerConfig>
+		circuitBreakerConfig?: Partial<CircuitBreakerConfig>,
+		persistence?: CircuitBreakerPersistence
 	): RetryManager {
-		return new RetryManager(config, circuitBreakerConfig)
+		return new RetryManager(config, circuitBreakerConfig, persistence)
 	}
 
 	/**
 	 * Creates a retry manager with default configuration
 	 */
-	static createDefault(): RetryManager {
+	static createDefault(persistence?: CircuitBreakerPersistence): RetryManager {
 		const defaultConfig: RetryConfig = {
 			enabled: true,
 			maxAttempts: 3,
@@ -516,6 +701,6 @@ export class RetryManager {
 			retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'],
 		}
 
-		return new RetryManager(defaultConfig)
+		return new RetryManager(defaultConfig, undefined, persistence)
 	}
 }

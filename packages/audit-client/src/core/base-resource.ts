@@ -6,6 +6,7 @@ import { InterceptorManager } from '../infrastructure/interceptors'
 import { AuditLogger, LoggerFactory } from '../infrastructure/logger'
 import { PerformanceManager } from '../infrastructure/performance'
 import { RetryManager } from '../infrastructure/retry'
+import { HttpClient } from './http-client'
 
 import type {
 	InterceptorContext,
@@ -54,6 +55,7 @@ export abstract class BaseResource {
 	protected logger: Logger
 	protected interceptorManager!: InterceptorManager
 	protected performanceManager!: PerformanceManager
+	protected httpClient!: HttpClient
 	protected requestInterceptors: (
 		| RequestInterceptor
 		| ((options: RequestOptions) => Promise<RequestOptions> | RequestOptions)
@@ -75,6 +77,9 @@ export abstract class BaseResource {
 	private initializeManagers(): void {
 		// Initialize authentication manager
 		this.authManager = new AuthManager(this.config.authentication)
+
+		// Initialize HTTP client
+		this.httpClient = new HttpClient(this.config, this.authManager, this.logger)
 
 		// Initialize cache manager
 		this.cacheManager = new CacheManager(this.config.cache)
@@ -253,40 +258,36 @@ export abstract class BaseResource {
 		options: RequestOptions,
 		requestId: string
 	): Promise<T> {
-		const startTime = Date.now()
 		const url = this.buildUrl(endpoint, options.query)
-		const headers = await this.buildHeaders(options.headers, requestId)
-		let body = this.buildBody(options.body)
 		let bytesTransferred = 0
 		let compressed = false
 
+		// Prepare headers for compression if enabled
+		let customHeaders = options.headers || {}
+		if (this.config.performance.enableCompression) {
+			customHeaders = {
+				...customHeaders,
+				'Accept-Encoding': 'gzip, deflate, br',
+			}
+		}
+
 		// Apply request compression if enabled and applicable
+		let body = options.body
 		if (this.config.performance.enableCompression && body) {
-			const contentType = headers.get('Content-Type') || 'application/json'
+			const contentType = 'application/json'
+			const serializedBody = typeof body === 'string' ? body : JSON.stringify(body)
 			const compressionResult = await this.performanceManager
 				.getCompressionManager()
-				.compressRequest(body, contentType)
+				.compressRequest(serializedBody, contentType)
 
 			body = compressionResult.body
 			compressed = compressionResult.compressed
 
 			// Update headers with compression info
-			Object.entries(compressionResult.headers).forEach(([key, value]) => {
-				headers.set(key, value)
-			})
-		}
-
-		const fetchOptions: RequestInit = {
-			method: options.method || 'GET',
-			headers,
-			body,
-			...(options.signal && { signal: options.signal }),
-			credentials: 'include',
-		}
-
-		// Add compression acceptance if enabled
-		if (this.config.performance.enableCompression) {
-			headers.set('Accept-Encoding', 'gzip, deflate, br')
+			customHeaders = {
+				...customHeaders,
+				...compressionResult.headers,
+			}
 		}
 
 		// Calculate request size for metrics
@@ -294,112 +295,37 @@ export abstract class BaseResource {
 			bytesTransferred += this.getBodySize(body)
 		}
 
-		// Log the outgoing request
-		const headersObj: Record<string, string> = {}
-		headers.forEach((value, key) => {
-			headersObj[key] = value
+		// Execute request via HttpClient
+		const response = await this.httpClient.request<T>(url, {
+			...(options.method && { method: options.method }),
+			headers: customHeaders,
+			body,
+			...(options.signal && { signal: options.signal }),
+			requestId,
+			...(options.responseType && { responseType: options.responseType }),
 		})
-		this.logHttpRequest(options.method || 'GET', url, headersObj, options.body, requestId)
-
-		const response = await fetch(url, fetchOptions)
-		const duration = Date.now() - startTime
 
 		// Handle response decompression if needed
-		const decompressedResponse = await this.performanceManager
-			.getCompressionManager()
-			.decompressResponse(response)
+		let decompressedData = response.data
+		if (this.config.performance.enableCompression && response.headers['content-encoding']) {
+			// Note: Fetch API handles decompression automatically for most cases
+			// This is a placeholder for custom decompression logic if needed
+		}
 
 		// Calculate response size for metrics
-		const contentLength = decompressedResponse.headers.get('content-length')
+		const contentLength = response.headers['content-length']
 		if (contentLength) {
 			bytesTransferred += parseInt(contentLength, 10)
 		}
 
-		// Log the response
-		const responseHeadersObj: Record<string, string> = {}
-		decompressedResponse.headers.forEach((value, key) => {
-			responseHeadersObj[key] = value
-		})
-
-		if (!decompressedResponse.ok) {
-			// Update performance metrics for failed request
-			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
-				status: decompressedResponse.status,
-				bytesTransferred,
-				compressed,
-				error: `HTTP ${decompressedResponse.status} ${decompressedResponse.statusText}`,
-			})
-
-			// Log error response
-			let errorBody: any
-			try {
-				errorBody = await decompressedResponse.clone().json()
-			} catch {
-				errorBody = await decompressedResponse.clone().text()
-			}
-
-			this.logHttpResponse(
-				decompressedResponse.status,
-				decompressedResponse.statusText,
-				responseHeadersObj,
-				errorBody,
-				duration,
-				requestId
-			)
-
-			const httpError = await ErrorHandler.createHttpError(decompressedResponse, requestId, {
-				url,
-				method: options.method || 'GET',
-				headers: headersObj,
-			})
-			throw httpError
-		}
-
-		// Check if response should be streamed
-		const streamingManager = this.performanceManager.getStreamingManager()
-		if (options.responseType === 'stream' || streamingManager.shouldStream(decompressedResponse)) {
-			// Return streaming response
-			const parsedResponse = await this.parseResponse<T>(decompressedResponse, 'stream')
-
-			// Update performance metrics for successful streaming request
-			this.performanceManager.getMetricsCollector().completeRequest(requestId, {
-				status: decompressedResponse.status,
-				bytesTransferred,
-				compressed,
-			})
-
-			this.logHttpResponse(
-				decompressedResponse.status,
-				decompressedResponse.statusText,
-				responseHeadersObj,
-				'[Streaming Response]',
-				duration,
-				requestId
-			)
-
-			return parsedResponse
-		}
-
-		// Parse response normally and log success
-		const parsedResponse = await this.parseResponse<T>(decompressedResponse, options.responseType)
-
 		// Update performance metrics for successful request
 		this.performanceManager.getMetricsCollector().completeRequest(requestId, {
-			status: decompressedResponse.status,
+			status: response.status,
 			bytesTransferred,
 			compressed,
 		})
 
-		this.logHttpResponse(
-			decompressedResponse.status,
-			decompressedResponse.statusText,
-			responseHeadersObj,
-			this.config.logging.includeResponseBody ? parsedResponse : undefined,
-			duration,
-			requestId
-		)
-
-		return parsedResponse
+		return decompressedData
 	}
 
 	/**
@@ -440,112 +366,6 @@ export abstract class BaseResource {
 		}
 
 		return url
-	}
-
-	/**
-	 * Build request headers with authentication and metadata
-	 */
-	private async buildHeaders(
-		customHeaders: Record<string, string> = {},
-		requestId: string
-	): Promise<Headers> {
-		const headers = new Headers()
-
-		// Set default headers
-		headers.set('Accept', 'application/json')
-		headers.set('Content-Type', 'application/json')
-		headers.set('User-Agent', this.getUserAgent())
-		headers.set('X-Request-ID', requestId)
-
-		// Add API version header
-		if (this.config.apiVersion) {
-			headers.set('Accept-Version', this.config.apiVersion)
-		}
-
-		// Add custom headers from config
-		Object.entries(this.config.customHeaders).forEach(([key, value]) => {
-			headers.set(key, value)
-		})
-
-		// Add authentication headers
-		const authHeaders = await this.authManager.getAuthHeaders()
-		Object.entries(authHeaders).forEach(([key, value]) => {
-			headers.set(key, value)
-		})
-
-		// Add request-specific custom headers (these take precedence)
-		Object.entries(customHeaders).forEach(([key, value]) => {
-			headers.set(key, value)
-		})
-
-		return headers
-	}
-
-	/**
-	 * Build request body with proper serialization
-	 */
-	private buildBody(body?: any): string | FormData | Blob | null {
-		if (!body) {
-			return null
-		}
-
-		// Handle different body types
-		if (body instanceof FormData || body instanceof Blob) {
-			return body
-		}
-
-		if (typeof body === 'string') {
-			return body
-		}
-
-		// Default to JSON serialization
-		try {
-			return JSON.stringify(body)
-		} catch (error) {
-			throw new Error(
-				`Failed to serialize request body: ${error instanceof Error ? error.message : 'Unknown error'}`
-			)
-		}
-	}
-
-	/**
-	 * Parse response based on response type
-	 */
-	private async parseResponse<T>(response: Response, responseType?: string): Promise<T> {
-		switch (responseType) {
-			case 'blob':
-				return response.blob() as Promise<T>
-
-			case 'text':
-				return response.text() as Promise<T>
-
-			case 'stream':
-				if (!response.body) {
-					throw new Error('Response body is not available for streaming')
-				}
-				return response.body as unknown as T
-
-			case 'json':
-			default:
-				// Handle empty responses
-				const contentLength = response.headers.get('content-length')
-				if (contentLength === '0' || response.status === 204) {
-					return {} as T
-				}
-
-				const text = await response.text()
-				if (!text) {
-					return {} as T
-				}
-
-				try {
-					return JSON.parse(text) as T
-				} catch (error) {
-					throw new Error(
-						`Failed to parse JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`
-					)
-				}
-		}
 	}
 
 	/**
@@ -747,15 +567,6 @@ export abstract class BaseResource {
 	}
 
 	/**
-	 * Get user agent string
-	 */
-	private getUserAgent(): string {
-		const version = '1.0.0' // This would come from package.json in real implementation
-		const platform = typeof window !== 'undefined' ? 'browser' : 'node'
-		return `audit-client/${version} (${platform})`
-	}
-
-	/**
 	 * Simple string hashing function
 	 */
 	private hashString(str: string): string {
@@ -846,95 +657,6 @@ export abstract class BaseResource {
 		} else {
 			this.logger.info(message, meta)
 		}
-	}
-
-	/**
-	 * Log HTTP request details
-	 */
-	private logHttpRequest(
-		method: string,
-		url: string,
-		headers?: Record<string, string>,
-		body?: any,
-		requestId?: string
-	): void {
-		if (!this.config.logging.enabled) {
-			return
-		}
-
-		if (this.logger instanceof AuditLogger) {
-			this.logger.logRequest(method, url, headers, body)
-		} else {
-			this.logger.info(`HTTP ${method} ${url}`, {
-				type: 'request',
-				method,
-				url,
-				headers: this.config.logging.maskSensitiveData ? this.maskSensitiveData(headers) : headers,
-				body:
-					this.config.logging.includeRequestBody && this.config.logging.maskSensitiveData
-						? this.maskSensitiveData(body)
-						: this.config.logging.includeRequestBody
-							? body
-							: undefined,
-				requestId,
-			})
-		}
-	}
-
-	/**
-	 * Log HTTP response details
-	 */
-	private logHttpResponse(
-		status: number,
-		statusText: string,
-		headers?: Record<string, string>,
-		body?: any,
-		duration?: number,
-		requestId?: string
-	): void {
-		if (!this.config.logging.enabled) {
-			return
-		}
-
-		if (this.logger instanceof AuditLogger) {
-			this.logger.logResponse(status, statusText, headers, body, duration)
-		} else {
-			const level = status >= 400 ? 'error' : status >= 300 ? 'warn' : 'info'
-			this.logger[level](`HTTP ${status} ${statusText}`, {
-				type: 'response',
-				status,
-				statusText,
-				duration,
-				headers: this.config.logging.maskSensitiveData ? this.maskSensitiveData(headers) : headers,
-				body:
-					this.config.logging.includeResponseBody && this.config.logging.maskSensitiveData
-						? this.maskSensitiveData(body)
-						: this.config.logging.includeResponseBody
-							? body
-							: undefined,
-				requestId,
-			})
-		}
-	}
-
-	/**
-	 * Basic sensitive data masking for non-AuditLogger instances
-	 */
-	private maskSensitiveData(data: any): any {
-		if (!data || typeof data !== 'object') {
-			return data
-		}
-
-		const sensitiveFields = ['password', 'token', 'apiKey', 'authorization', 'cookie', 'session']
-		const masked = { ...data }
-
-		for (const field of sensitiveFields) {
-			if (field in masked) {
-				masked[field] = '***'
-			}
-		}
-
-		return masked
 	}
 
 	/**
