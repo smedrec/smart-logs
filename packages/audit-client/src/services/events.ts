@@ -58,6 +58,8 @@ export interface EventSubscription {
 	updateFilter(filter: SubscriptionParams['filter']): void
 	getMetrics(): StreamMetrics | null
 	send(data: any): boolean
+	cleanup(): void
+	destroy(): void
 }
 
 /**
@@ -188,6 +190,31 @@ class EventSubscriptionImpl implements EventSubscription {
 		this.emit('disconnect')
 	}
 
+	/**
+	 * Clean up all event handlers to prevent memory leaks
+	 * This method clears all registered event handlers without disconnecting
+	 */
+	cleanup(): void {
+		// Clear all event handlers
+		this.eventHandlers.forEach((handlers) => handlers.clear())
+		this.eventHandlers.clear()
+	}
+
+	/**
+	 * Completely destroy the subscription and release all resources
+	 * This includes disconnecting and cleaning up all event handlers
+	 */
+	destroy(): void {
+		// Disconnect if still connected
+		this.disconnect()
+
+		// Clean up all event handlers
+		this.cleanup()
+
+		// Clear the streaming manager reference
+		this.streamingManager = null as any
+	}
+
 	on(event: 'message' | 'error' | 'connect' | 'disconnect', handler: (data?: any) => void): void {
 		const handlers = this.eventHandlers.get(event)
 		if (handlers) {
@@ -260,6 +287,7 @@ class EventSubscriptionImpl implements EventSubscription {
  */
 export class EventsService extends BaseResource {
 	private streamingManager: StreamingManager
+	private activeSubscriptions: Set<EventSubscription> = new Set()
 
 	constructor(config: any, logger?: any) {
 		super(config, logger)
@@ -692,7 +720,21 @@ export class EventsService extends BaseResource {
 		if (validatedData.heartbeatInterval !== undefined)
 			cleanParams.heartbeatInterval = validatedData.heartbeatInterval
 
-		return new EventSubscriptionImpl(this.config.baseUrl, cleanParams, this.authManager)
+		const subscription = new EventSubscriptionImpl(
+			this.config.baseUrl,
+			cleanParams,
+			this.authManager
+		)
+
+		// Track the subscription
+		this.activeSubscriptions.add(subscription)
+
+		// Set up automatic cleanup when subscription disconnects
+		subscription.on('disconnect', () => {
+			this.activeSubscriptions.delete(subscription)
+		})
+
+		return subscription
 	}
 
 	/**
@@ -727,6 +769,49 @@ export class EventsService extends BaseResource {
 	 */
 	async destroyStreaming(): Promise<void> {
 		await this.streamingManager.destroy()
+	}
+
+	/**
+	 * Get all active subscriptions
+	 * @returns Array of active subscription instances
+	 */
+	getActiveSubscriptions(): EventSubscription[] {
+		return Array.from(this.activeSubscriptions)
+	}
+
+	/**
+	 * Get the count of active subscriptions
+	 * @returns Number of active subscriptions
+	 */
+	getActiveSubscriptionCount(): number {
+		return this.activeSubscriptions.size
+	}
+
+	/**
+	 * Destroy all active subscriptions and clean up resources
+	 * This method should be called when the service is being destroyed
+	 */
+	destroyAllSubscriptions(): void {
+		this.activeSubscriptions.forEach((subscription) => {
+			if ('destroy' in subscription && typeof subscription.destroy === 'function') {
+				subscription.destroy()
+			} else {
+				subscription.disconnect()
+			}
+		})
+		this.activeSubscriptions.clear()
+	}
+
+	/**
+	 * Complete cleanup of the EventsService
+	 * Destroys all subscriptions and streaming resources
+	 */
+	async destroy(): Promise<void> {
+		// Destroy all active subscriptions
+		this.destroyAllSubscriptions()
+
+		// Destroy streaming resources
+		await this.destroyStreaming()
 	}
 
 	/**

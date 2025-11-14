@@ -461,6 +461,15 @@ export class CacheCompression {
 }
 
 /**
+ * Logger interface for cache warnings and alerts
+ */
+export interface CacheLogger {
+	warn(message: string, meta?: any): void
+	error(message: string, meta?: any): void
+	info(message: string, meta?: any): void
+}
+
+/**
  * Main cache manager with comprehensive caching capabilities
  */
 export class CacheManager {
@@ -469,11 +478,13 @@ export class CacheManager {
 	private stats: CacheStats
 	private invalidator: CacheInvalidator
 	private cleanupInterval?: NodeJS.Timeout | undefined
+	private logger?: CacheLogger | undefined
 
-	constructor(config: CacheConfig) {
+	constructor(config: CacheConfig, logger?: CacheLogger | undefined) {
 		this.config = config
 		this.storage = this.initializeStorage()
 		this.invalidator = new CacheInvalidator(this.storage)
+		this.logger = logger
 		this.stats = {
 			hits: 0,
 			misses: 0,
@@ -549,6 +560,11 @@ export class CacheManager {
 		}
 
 		try {
+			const prefixedKey = this.prefixKey(key)
+
+			// Enforce size limits before adding new entries
+			await this.enforceSize(prefixedKey)
+
 			const now = Date.now()
 			const expiresAt = now + (ttlMs || this.config.defaultTtlMs)
 
@@ -568,11 +584,13 @@ export class CacheManager {
 				...(tags && { tags }),
 			}
 
-			const prefixedKey = this.prefixKey(key)
 			await this.storage.set(prefixedKey, JSON.stringify(entry))
 
 			this.stats.sets++
 			await this.updateStats()
+
+			// Check for high cache utilization and alert
+			await this.checkCacheUtilization()
 		} catch (error) {
 			console.warn('Cache set error:', error)
 		}
@@ -694,6 +712,133 @@ export class CacheManager {
 		if (this.cleanupInterval) {
 			clearInterval(this.cleanupInterval)
 			this.cleanupInterval = undefined
+		}
+	}
+
+	/**
+	 * Evict least recently used entries from cache
+	 * @param count Number of entries to evict
+	 * @returns Number of entries actually evicted
+	 */
+	async evictLRU(count: number): Promise<number> {
+		if (!this.config.enabled || count <= 0) {
+			return 0
+		}
+
+		try {
+			const keys = await this.storage.keys()
+			const entries: Array<{ key: string; lastAccessed: number; createdAt: number }> = []
+
+			// Collect all entries with their access metadata
+			for (const key of keys) {
+				try {
+					const value = await this.storage.get(key)
+					if (value) {
+						const entry = JSON.parse(value)
+						entries.push({
+							key,
+							lastAccessed: entry.lastAccessed || entry.createdAt || 0,
+							createdAt: entry.createdAt || 0,
+						})
+					}
+				} catch (error) {
+					// If we can't parse an entry, mark it for eviction
+					entries.push({
+						key,
+						lastAccessed: 0,
+						createdAt: 0,
+					})
+				}
+			}
+
+			// Sort by lastAccessed (oldest first), then by createdAt as tiebreaker
+			entries.sort((a, b) => {
+				if (a.lastAccessed !== b.lastAccessed) {
+					return a.lastAccessed - b.lastAccessed
+				}
+				return a.createdAt - b.createdAt
+			})
+
+			// Evict the oldest entries
+			const toEvict = entries.slice(0, Math.min(count, entries.length))
+			await Promise.all(toEvict.map((entry) => this.storage.delete(entry.key)))
+
+			this.stats.evictions += toEvict.length
+			await this.updateStats()
+
+			return toEvict.length
+		} catch (error) {
+			console.warn('Cache evictLRU error:', error)
+			return 0
+		}
+	}
+
+	/**
+	 * Enforce cache size limits with LRU eviction
+	 * @param keyToAdd The key that will be added (to check if it already exists)
+	 */
+	private async enforceSize(keyToAdd?: string): Promise<void> {
+		try {
+			const currentSize = await this.storage.size()
+			const maxSize = this.config.maxSize
+			const hardLimit = Math.floor(maxSize * 1.2) // 120% of maxSize
+
+			// Check if we're adding a new entry (not updating existing)
+			const isNewEntry = keyToAdd ? !(await this.storage.get(keyToAdd)) : true
+
+			// Emergency eviction if we exceed hard limit (120% of maxSize)
+			if (currentSize > hardLimit) {
+				const toEvict = currentSize - maxSize
+				const evicted = await this.evictLRU(toEvict)
+
+				if (this.logger) {
+					this.logger.warn('Cache hard limit exceeded, emergency eviction performed', {
+						currentSize,
+						maxSize,
+						hardLimit,
+						evicted,
+					})
+				}
+			}
+			// Normal eviction if at capacity and adding new entry
+			else if (isNewEntry && currentSize >= maxSize) {
+				// Evict 10% of maxSize or at least 1 entry
+				const evictCount = Math.max(1, Math.floor(maxSize * 0.1))
+				const evicted = await this.evictLRU(evictCount)
+
+				if (this.logger) {
+					this.logger.info('Cache size limit reached, LRU eviction performed', {
+						currentSize,
+						maxSize,
+						evicted,
+					})
+				}
+			}
+		} catch (error) {
+			console.warn('Cache enforceSize error:', error)
+		}
+	}
+
+	/**
+	 * Check cache utilization and alert if high
+	 */
+	private async checkCacheUtilization(): Promise<void> {
+		try {
+			const currentSize = await this.storage.size()
+			const maxSize = this.config.maxSize
+			const utilizationPercent = (currentSize / maxSize) * 100
+
+			// Alert if utilization is above 90%
+			if (utilizationPercent >= 90 && this.logger) {
+				this.logger.warn('High cache utilization detected', {
+					currentSize,
+					maxSize,
+					utilizationPercent: utilizationPercent.toFixed(2),
+					recommendation: 'Consider increasing maxSize or reducing TTL values',
+				})
+			}
+		} catch (error) {
+			console.warn('Cache checkCacheUtilization error:', error)
 		}
 	}
 

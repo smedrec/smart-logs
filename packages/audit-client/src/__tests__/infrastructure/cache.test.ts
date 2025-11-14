@@ -549,3 +549,270 @@ describe('CacheManager', () => {
 		)
 	})
 })
+
+describe('CacheManager - LRU Eviction', () => {
+	let cacheManager: CacheManager
+	let config: CacheConfig
+	let mockLogger: any
+
+	beforeEach(() => {
+		mockLogger = {
+			warn: vi.fn(),
+			error: vi.fn(),
+			info: vi.fn(),
+		}
+		config = {
+			enabled: true,
+			defaultTtlMs: 10000,
+			maxSize: 10, // Small size for testing
+			storage: 'memory',
+			keyPrefix: 'test',
+			compressionEnabled: false,
+		}
+		cacheManager = new CacheManager(config, mockLogger)
+	})
+
+	afterEach(() => {
+		cacheManager.destroy()
+	})
+
+	it('should evict LRU entries when cache reaches maxSize', async () => {
+		// Fill cache to capacity
+		for (let i = 0; i < 10; i++) {
+			await cacheManager.set(`key${i}`, `value${i}`)
+		}
+
+		// Add one more entry, should trigger eviction
+		await cacheManager.set('key10', 'value10')
+
+		// First entry should be evicted (LRU)
+		expect(await cacheManager.get('key0')).toBeNull()
+
+		// Newest entry should exist
+		expect(await cacheManager.get('key10')).toBe('value10')
+
+		// Cache size should not exceed maxSize
+		const stats = cacheManager.getStats()
+		expect(stats.size).toBeLessThanOrEqual(10)
+	})
+
+	it('should evict multiple entries when needed', async () => {
+		// Fill cache to capacity
+		for (let i = 0; i < 10; i++) {
+			await cacheManager.set(`key${i}`, `value${i}`)
+		}
+
+		// Manually evict 3 entries
+		const evicted = await cacheManager.evictLRU(3)
+
+		expect(evicted).toBe(3)
+		expect(await cacheManager.get('key0')).toBeNull()
+		expect(await cacheManager.get('key1')).toBeNull()
+		expect(await cacheManager.get('key2')).toBeNull()
+		expect(await cacheManager.get('key3')).toBe('value3')
+
+		const stats = cacheManager.getStats()
+		expect(stats.size).toBe(7)
+		expect(stats.evictions).toBe(3)
+	})
+
+	it('should evict based on lastAccessed time', async () => {
+		// Add entries
+		await cacheManager.set('key1', 'value1')
+		await cacheManager.set('key2', 'value2')
+		await cacheManager.set('key3', 'value3')
+
+		// Wait a bit
+		await new Promise((resolve) => setTimeout(resolve, 10))
+
+		// Access key1 and key3 to update their lastAccessed time
+		await cacheManager.get('key1')
+		await cacheManager.get('key3')
+
+		// Evict one entry - should evict key2 (least recently accessed)
+		const evicted = await cacheManager.evictLRU(1)
+
+		expect(evicted).toBe(1)
+		expect(await cacheManager.get('key1')).toBe('value1')
+		expect(await cacheManager.get('key2')).toBeNull()
+		expect(await cacheManager.get('key3')).toBe('value3')
+	})
+
+	it('should perform emergency eviction when exceeding 120% of maxSize', async () => {
+		// Create a custom storage that allows exceeding maxSize
+		const customStorage = new MemoryCache(1000) // Large internal limit
+		const customConfig = {
+			...config,
+			maxSize: 5,
+			storage: 'custom' as const,
+			customStorage,
+		}
+		const customManager = new CacheManager(customConfig, mockLogger)
+
+		// Manually add entries directly to storage to simulate exceeding hard limit
+		for (let i = 0; i < 7; i++) {
+			const entry = {
+				data: `value${i}`,
+				expiresAt: Date.now() + 10000,
+				createdAt: Date.now(),
+				accessCount: 0,
+				lastAccessed: Date.now(),
+				compressed: false,
+			}
+			await customStorage.set(`test:key${i}`, JSON.stringify(entry))
+		}
+
+		// Now try to add a new entry, should trigger emergency eviction
+		await customManager.set('newkey', 'newvalue')
+
+		// Should have logged warning about emergency eviction
+		expect(mockLogger.warn).toHaveBeenCalledWith(
+			'Cache hard limit exceeded, emergency eviction performed',
+			expect.objectContaining({
+				currentSize: expect.any(Number),
+				maxSize: 5,
+				hardLimit: 6,
+			})
+		)
+
+		customManager.destroy()
+	})
+
+	it('should alert when cache utilization exceeds 90%', async () => {
+		// Fill cache to 90%+ capacity
+		for (let i = 0; i < 9; i++) {
+			await cacheManager.set(`key${i}`, `value${i}`)
+		}
+
+		// Add one more to trigger the alert
+		await cacheManager.set('key9', 'value9')
+
+		// Should have logged warning about high utilization
+		expect(mockLogger.warn).toHaveBeenCalledWith(
+			'High cache utilization detected',
+			expect.objectContaining({
+				currentSize: expect.any(Number),
+				maxSize: 10,
+				utilizationPercent: expect.any(String),
+				recommendation: expect.any(String),
+			})
+		)
+	})
+
+	it('should not evict when updating existing entry', async () => {
+		// Fill cache to capacity
+		for (let i = 0; i < 10; i++) {
+			await cacheManager.set(`key${i}`, `value${i}`)
+		}
+
+		const initialStats = cacheManager.getStats()
+		const initialSize = initialStats.size
+
+		// Update an existing entry
+		await cacheManager.set('key5', 'updated-value5')
+
+		// Should not trigger eviction
+		const stats = cacheManager.getStats()
+		expect(stats.size).toBe(initialSize)
+		expect(await cacheManager.get('key5')).toBe('updated-value5')
+		expect(await cacheManager.get('key0')).toBe('value0') // First entry still exists
+	})
+
+	it('should handle eviction with invalid entries', async () => {
+		const customStorage = new MemoryCache()
+		const customConfig = {
+			...config,
+			storage: 'custom' as const,
+			customStorage,
+		}
+		const customManager = new CacheManager(customConfig, mockLogger)
+
+		// Add valid entries
+		await customManager.set('key1', 'value1')
+		await customManager.set('key2', 'value2')
+
+		// Add invalid entry directly to storage
+		await customStorage.set('test:invalid', 'not-json-data')
+
+		// Evict should handle invalid entries gracefully
+		const evicted = await customManager.evictLRU(2)
+
+		expect(evicted).toBeGreaterThan(0)
+
+		customManager.destroy()
+	})
+
+	it('should evict 10% of maxSize when at capacity', async () => {
+		const largeConfig = {
+			...config,
+			maxSize: 100,
+		}
+		const largeManager = new CacheManager(largeConfig, mockLogger)
+
+		// Fill to capacity
+		for (let i = 0; i < 100; i++) {
+			await largeManager.set(`key${i}`, `value${i}`)
+		}
+
+		// Add one more entry
+		await largeManager.set('key100', 'value100')
+
+		// Should have evicted 10% (10 entries)
+		const stats = largeManager.getStats()
+		expect(stats.evictions).toBeGreaterThanOrEqual(10)
+		expect(stats.size).toBeLessThanOrEqual(100)
+
+		largeManager.destroy()
+	})
+
+	it('should return 0 when evicting with count <= 0', async () => {
+		await cacheManager.set('key1', 'value1')
+
+		const evicted = await cacheManager.evictLRU(0)
+		expect(evicted).toBe(0)
+
+		const evictedNegative = await cacheManager.evictLRU(-5)
+		expect(evictedNegative).toBe(0)
+	})
+
+	it('should not evict when cache is disabled', async () => {
+		const disabledConfig = { ...config, enabled: false }
+		const disabledManager = new CacheManager(disabledConfig, mockLogger)
+
+		const evicted = await disabledManager.evictLRU(5)
+		expect(evicted).toBe(0)
+
+		disabledManager.destroy()
+	})
+
+	it('should track eviction statistics', async () => {
+		// Fill cache
+		for (let i = 0; i < 10; i++) {
+			await cacheManager.set(`key${i}`, `value${i}`)
+		}
+
+		const initialStats = cacheManager.getStats()
+		const initialEvictions = initialStats.evictions
+
+		// Trigger eviction
+		await cacheManager.set('key10', 'value10')
+
+		const finalStats = cacheManager.getStats()
+		expect(finalStats.evictions).toBeGreaterThan(initialEvictions)
+	})
+
+	it('should maintain cache size within limits after multiple operations', async () => {
+		// Perform many set operations
+		for (let i = 0; i < 50; i++) {
+			await cacheManager.set(`key${i}`, `value${i}`)
+
+			const stats = cacheManager.getStats()
+			expect(stats.size).toBeLessThanOrEqual(config.maxSize)
+		}
+
+		// Final check
+		const finalStats = cacheManager.getStats()
+		expect(finalStats.size).toBeLessThanOrEqual(config.maxSize)
+		expect(finalStats.evictions).toBeGreaterThan(0)
+	})
+})

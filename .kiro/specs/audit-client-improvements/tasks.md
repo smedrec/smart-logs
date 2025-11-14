@@ -2,7 +2,7 @@
 
 ## Phase 1: Critical Fixes (Week 1)
 
-- [ ] 1. Fix memory leaks in event subscriptions
+- [x] 1. Fix memory leaks in event subscriptions
   - Add cleanup method to EventSubscriptionImpl that clears all event handlers
   - Update EventsService to track active subscriptions
   - Implement destroy method for complete cleanup
@@ -10,7 +10,7 @@
   - Verify memory usage remains stable after 1000+ subscription cycles
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Implement cache size limits with LRU eviction
+- [x] 2. Implement cache size limits with LRU eviction
   - Add evictLRU method to CacheManager for removing oldest entries
   - Enforce size limit in set method before adding new entries
   - Implement hard limit enforcement for emergency eviction (>120% of maxSize)

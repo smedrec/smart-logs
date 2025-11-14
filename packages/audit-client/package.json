@@ -61,6 +61,7 @@
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
 		"test:environments": "node scripts/test-environments.cjs",
+		"test:leaks": "node --expose-gc ./node_modules/.bin/vitest run src/__tests__/services/events.memory-leak.test.ts",
 		"test:watch": "vitest",
 		"validate": "pnpm run check-types && pnpm run lint && pnpm run test",
 		"validate:full": "pnpm run validate && pnpm run validate:package && pnpm run test:environments",
