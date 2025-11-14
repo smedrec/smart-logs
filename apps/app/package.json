@@ -63,6 +63,7 @@
 		"zod": "^4.1.8"
 	},
 	"devDependencies": {
+		"@playwright/test": "^1.56.1",
 		"@tanstack/react-query-devtools": "^5.90.1",
 		"@tanstack/react-router-devtools": "^1.131.50",
 		"@tanstack/router-plugin": "^1.131.50",
