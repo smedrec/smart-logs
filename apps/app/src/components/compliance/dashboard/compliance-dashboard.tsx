@@ -1,6 +1,7 @@
 import { CompliancePageHeader } from '@/components/compliance/navigation'
+import { performanceMonitor } from '@/lib/performance-monitor'
 import { Plus } from 'lucide-react'
-import React from 'react'
+import React, { useEffect } from 'react'
 
 import { COMPLIANCE_SHORTCUTS, useKeyboardNavigation } from '../hooks'
 import { SkipLinks, useSkipLinkTarget } from '../navigation/skip-links'
@@ -14,6 +15,10 @@ interface ComplianceDashboardProps {
 }
 
 export function ComplianceDashboard({ className }: ComplianceDashboardProps) {
+	// Measure page load performance
+	useEffect(() => {
+		performanceMonitor.measurePageLoad('compliance-dashboard')
+	}, [])
 	// Keyboard shortcuts for dashboard
 	const shortcuts = [
 		{

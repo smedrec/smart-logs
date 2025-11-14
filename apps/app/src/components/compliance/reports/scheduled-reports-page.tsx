@@ -33,9 +33,11 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { useScheduledReportsUrlState } from '@/hooks/useComplianceUrlState'
 import { Link } from '@tanstack/react-router'
 import {
+	AlertCircle,
 	Calendar,
 	Clock,
 	Edit,
@@ -43,6 +45,7 @@ import {
 	MoreHorizontal,
 	Play,
 	Plus,
+	RefreshCw,
 	Search,
 	Trash2,
 } from 'lucide-react'
@@ -50,23 +53,7 @@ import { useEffect, useState } from 'react'
 
 import { ExportButton } from '../export'
 
-interface ScheduledReport {
-	id: string
-	name: string
-	description?: string
-	reportType:
-		| 'HIPAA_AUDIT_TRAIL'
-		| 'GDPR_PROCESSING_ACTIVITIES'
-		| 'INTEGRITY_VERIFICATION'
-		| 'CUSTOM_REPORT'
-	format: 'PDF' | 'CSV' | 'JSON'
-	enabled: boolean
-	lastRun?: Date
-	nextRun: Date
-	executionCount: number
-	createdAt: Date
-	createdBy: string
-}
+import type { ScheduledReport } from '@smedrec/audit-client'
 
 interface ScheduledReportsPageProps {
 	searchParams: {
@@ -82,62 +69,72 @@ interface ScheduledReportsPageProps {
 
 export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps) {
 	const { state, setParam } = useScheduledReportsUrlState()
+	const { listScheduledReports, deleteScheduledReport, executeScheduledReport, connectionStatus } =
+		useComplianceAudit()
 	const [reports, setReports] = useState<ScheduledReport[]>([])
+	const [totalCount, setTotalCount] = useState(0)
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+	const [selectedReports, setSelectedReports] = useState<Set<string>>(new Set())
 
-	// Mock data - in real implementation, this would come from API
-	useEffect(() => {
-		const mockReports: ScheduledReport[] = [
-			{
-				id: 'report-1',
-				name: 'Monthly HIPAA Audit',
-				description: 'Comprehensive HIPAA compliance audit report',
-				reportType: 'HIPAA_AUDIT_TRAIL',
-				format: 'PDF',
-				enabled: true,
-				lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-				nextRun: new Date(Date.now() + 1000 * 60 * 60 * 24 * 29), // 29 days from now
-				executionCount: 12,
-				createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365), // 1 year ago
-				createdBy: 'admin@example.com',
-			},
-			{
-				id: 'report-2',
-				name: 'GDPR Processing Activities',
-				description: 'Weekly GDPR processing activities report',
-				reportType: 'GDPR_PROCESSING_ACTIVITIES',
-				format: 'CSV',
-				enabled: true,
-				lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 1 week ago
-				nextRun: new Date(Date.now() + 1000 * 60 * 60 * 24), // 1 day from now
-				executionCount: 52,
-				createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365), // 1 year ago
-				createdBy: 'compliance@example.com',
-			},
-			{
-				id: 'report-3',
-				name: 'Data Integrity Check',
-				description: 'Daily data integrity verification report',
-				reportType: 'INTEGRITY_VERIFICATION',
-				format: 'JSON',
-				enabled: false,
-				lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
-				nextRun: new Date(Date.now() + 1000 * 60 * 60 * 24), // 1 day from now
-				executionCount: 90,
-				createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 180), // 6 months ago
-				createdBy: 'security@example.com',
-			},
-		]
-
-		// Simulate API call
-		setTimeout(() => {
-			setReports(mockReports)
+	const fetchReports = async () => {
+		if (!connectionStatus.isConnected) {
+			setError('Audit service not connected')
 			setLoading(false)
-		}, 1000)
-	}, [])
+			return
+		}
 
-	const getReportTypeLabel = (type: ScheduledReport['reportType']) => {
+		try {
+			setLoading(true)
+			setError(null)
+
+			// Map sortBy values to API field names
+			const sortByMap: Record<string, string> = {
+				name: 'name',
+				reportType: 'name', // API doesn't support sorting by reportType
+				lastRun: 'last_run',
+				nextRun: 'next_run',
+				createdAt: 'created_at',
+			}
+
+			const response = await listScheduledReports({
+				limit: searchParams.limit || 10,
+				offset: ((searchParams.page || 1) - 1) * (searchParams.limit || 10),
+				search: searchParams.search,
+				enabled:
+					searchParams.status === 'enabled'
+						? true
+						: searchParams.status === 'disabled'
+							? false
+							: undefined,
+				sortBy: searchParams.sortBy ? (sortByMap[searchParams.sortBy] as any) : undefined,
+				sortOrder: searchParams.sortOrder,
+			})
+
+			setReports(response.data || [])
+			setTotalCount(response.pagination?.total || 0)
+		} catch (err) {
+			console.error('Failed to fetch scheduled reports:', err)
+			setError(err instanceof Error ? err.message : 'Failed to fetch reports')
+		} finally {
+			setLoading(false)
+		}
+	}
+
+	useEffect(() => {
+		fetchReports()
+	}, [
+		searchParams.page,
+		searchParams.limit,
+		searchParams.search,
+		searchParams.reportType,
+		searchParams.status,
+		searchParams.sortBy,
+		searchParams.sortOrder,
+		connectionStatus.isConnected,
+	])
+
+	const getReportTypeLabel = (type: string) => {
 		switch (type) {
 			case 'HIPAA_AUDIT_TRAIL':
 				return 'HIPAA Audit'
@@ -145,36 +142,37 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 				return 'GDPR Processing'
 			case 'INTEGRITY_VERIFICATION':
 				return 'Integrity Check'
-			case 'CUSTOM_REPORT':
-				return 'Custom Report'
+			case 'GENERAL_COMPLIANCE':
+				return 'General Compliance'
 			default:
 				return type
 		}
 	}
 
-	const getReportTypeBadgeVariant = (type: ScheduledReport['reportType']) => {
+	const getReportTypeBadgeVariant = (type: string) => {
 		switch (type) {
 			case 'HIPAA_AUDIT_TRAIL':
-				return 'default'
+				return 'default' as const
 			case 'GDPR_PROCESSING_ACTIVITIES':
-				return 'secondary'
+				return 'secondary' as const
 			case 'INTEGRITY_VERIFICATION':
-				return 'outline'
-			case 'CUSTOM_REPORT':
-				return 'destructive'
+				return 'outline' as const
+			case 'GENERAL_COMPLIANCE':
+				return 'destructive' as const
 			default:
-				return 'default'
+				return 'default' as const
 		}
 	}
 
-	const formatDate = (date: Date) => {
+	const formatDate = (date: string | Date) => {
+		const dateObj = typeof date === 'string' ? new Date(date) : date
 		return new Intl.DateTimeFormat('en-US', {
 			month: 'short',
 			day: 'numeric',
 			year: 'numeric',
 			hour: '2-digit',
 			minute: '2-digit',
-		}).format(date)
+		}).format(dateObj)
 	}
 
 	const handleSearch = (value: string) => {
@@ -192,14 +190,49 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 		setParam('page', 1)
 	}
 
-	const handleExecuteReport = (reportId: string) => {
-		// TODO: Implement report execution
-		console.log('Executing report:', reportId)
+	const handleExecuteReport = async (reportId: string) => {
+		try {
+			await executeScheduledReport(reportId)
+			console.log('Report execution triggered:', reportId)
+			// Refresh the reports list
+			fetchReports()
+		} catch (err) {
+			console.error('Failed to execute report:', err)
+			setError(err instanceof Error ? err.message : 'Failed to execute report')
+		}
 	}
 
-	const handleDeleteReport = (reportId: string) => {
-		// TODO: Implement report deletion
-		console.log('Deleting report:', reportId)
+	const handleDeleteReport = async (reportId: string) => {
+		if (!confirm('Are you sure you want to delete this report?')) {
+			return
+		}
+
+		try {
+			await deleteScheduledReport(reportId)
+			console.log('Report deleted:', reportId)
+			// Refresh the reports list
+			fetchReports()
+		} catch (err) {
+			console.error('Failed to delete report:', err)
+			setError(err instanceof Error ? err.message : 'Failed to delete report')
+		}
+	}
+
+	const handleBulkDelete = async () => {
+		if (selectedReports.size === 0) return
+		if (!confirm(`Are you sure you want to delete ${selectedReports.size} report(s)?`)) {
+			return
+		}
+
+		try {
+			await Promise.all(Array.from(selectedReports).map((id) => deleteScheduledReport(id)))
+			console.log('Bulk delete completed')
+			setSelectedReports(new Set())
+			fetchReports()
+		} catch (err) {
+			console.error('Failed to bulk delete reports:', err)
+			setError(err instanceof Error ? err.message : 'Failed to delete reports')
+		}
 	}
 
 	if (loading) {
@@ -207,7 +240,7 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 			<div className="flex flex-col gap-6 p-6">
 				<CompliancePageHeader title="Scheduled Reports" description="Loading reports..." />
 				<div className="flex items-center justify-center h-64">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+					<RefreshCw className="h-8 w-8 animate-spin text-primary" />
 				</div>
 			</div>
 		)
@@ -219,8 +252,15 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 				<CompliancePageHeader title="Scheduled Reports" description="Error loading reports" />
 				<Card>
 					<CardContent className="pt-6">
-						<div className="text-center text-red-600">
-							<p>Error: {error}</p>
+						<div className="flex flex-col items-center gap-4">
+							<AlertCircle className="h-12 w-12 text-destructive" />
+							<div className="text-center">
+								<p className="text-destructive font-medium">Error: {error}</p>
+								<Button variant="outline" onClick={fetchReports} className="mt-4">
+									<RefreshCw className="h-4 w-4 mr-2" />
+									Retry
+								</Button>
+							</div>
 						</div>
 					</CardContent>
 				</Card>
@@ -316,9 +356,20 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 
 			{/* Reports Table */}
 			<Card>
-				<CardHeader>
-					<CardTitle>Reports ({reports.length})</CardTitle>
-					<CardDescription>Manage your scheduled compliance reports</CardDescription>
+				<CardHeader className="flex flex-row items-center justify-between">
+					<div>
+						<CardTitle>Reports ({totalCount})</CardTitle>
+						<CardDescription>Manage your scheduled compliance reports</CardDescription>
+					</div>
+					{selectedReports.size > 0 && (
+						<div className="flex items-center gap-2">
+							<span className="text-sm text-muted-foreground">{selectedReports.size} selected</span>
+							<Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+								<Trash2 className="h-4 w-4 mr-2" />
+								Delete Selected
+							</Button>
+						</div>
+					)}
 				</CardHeader>
 				<CardContent>
 					<Table>
@@ -361,8 +412,10 @@ export function ScheduledReportsPage({ searchParams }: ScheduledReportsPageProps
 										</Badge>
 									</TableCell>
 									<TableCell>{report.lastRun ? formatDate(report.lastRun) : 'Never'}</TableCell>
-									<TableCell>{formatDate(report.nextRun)}</TableCell>
-									<TableCell>{report.executionCount}</TableCell>
+									<TableCell>
+										{report.nextRun ? formatDate(report.nextRun) : 'Not scheduled'}
+									</TableCell>
+									<TableCell>{report.executionCount || 0}</TableCell>
 									<TableCell>
 										<DropdownMenu>
 											<DropdownMenuTrigger asChild>

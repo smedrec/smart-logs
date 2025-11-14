@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { AlertCircle, Calendar, Clock, ExternalLink, Play, RefreshCw } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
@@ -19,7 +19,7 @@ interface UpcomingReportsProps {
 }
 
 export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProps) {
-	const { client, isConnected } = useAuditContext()
+	const { listScheduledReports, executeScheduledReport, connectionStatus } = useComplianceAudit()
 	const [reports, setReports] = useState<UpcomingReport[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
@@ -61,8 +61,8 @@ export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProp
 	}
 
 	const fetchUpcomingReports = async () => {
-		if (!client || !isConnected) {
-			setError('Audit client not available')
+		if (!connectionStatus.isConnected) {
+			setError('Audit service not connected')
 			setLoading(false)
 			return
 		}
@@ -71,33 +71,13 @@ export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProp
 			setLoading(true)
 			setError(null)
 
-			const response = await client.scheduledReports.list({
-				limit: 50, // Get more reports to filter enabled ones
+			const response = await listScheduledReports({
+				limit: maxItems,
 				offset: 0,
 				enabled: true, // Only get enabled reports
 				sortBy: 'next_run',
-				// Sort by next run time
 				sortOrder: 'asc', // Ascending order (soonest first)
 			})
-
-			/**const enabledReports = (response.data || [])
-				.map((report) => {
-					const nextExecution = calculateNextExecution(
-						report.schedule?.cronExpression || '0 0 * * *'
-					)
-					return {
-						...report,
-						nextExecutionTime: nextExecution?.toISOString(),
-						timeUntilExecution: nextExecution ? formatTimeUntil(nextExecution) : 'Unknown',
-					}
-				})
-				.sort((a, b) => {
-					// Sort by next execution time (earliest first)
-					if (!a.nextExecutionTime) return 1
-					if (!b.nextExecutionTime) return -1
-					return new Date(a.nextExecutionTime).getTime() - new Date(b.nextExecutionTime).getTime()
-				})
-				.slice(0, maxItems)*/
 
 			setReports(response.data || [])
 		} catch (err) {
@@ -109,10 +89,8 @@ export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProp
 	}
 
 	const handleManualExecution = async (report: ScheduledReport) => {
-		if (!client) return
-
 		try {
-			await client.scheduledReports.execute(report.id)
+			await executeScheduledReport(report.id)
 			// Show success notification
 			console.log('Manual execution triggered for report:', report.name)
 			// Refresh the data
@@ -139,7 +117,7 @@ export function UpcomingReports({ className, maxItems = 5 }: UpcomingReportsProp
 		}, 60000)
 
 		return () => clearInterval(interval)
-	}, [client, isConnected, maxItems])
+	}, [connectionStatus.isConnected, maxItems])
 
 	const getReportTypeBadge = (reportType: string) => {
 		const colors = {

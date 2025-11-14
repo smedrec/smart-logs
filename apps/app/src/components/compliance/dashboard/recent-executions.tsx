@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { AlertCircle, CheckCircle, Clock, ExternalLink, RefreshCw, XCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
@@ -15,14 +15,14 @@ interface RecentExecutionsProps {
 }
 
 export function RecentExecutions({ className, maxItems = 5 }: RecentExecutionsProps) {
-	const { client, isConnected } = useAuditContext()
+	const { listScheduledReports, getExecutionHistory, connectionStatus } = useComplianceAudit()
 	const [executions, setExecutions] = useState<ReportExecution[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	const fetchRecentExecutions = async () => {
-		if (!client || !isConnected) {
-			setError('Audit client not available')
+		if (!connectionStatus.isConnected) {
+			setError('Audit service not connected')
 			setLoading(false)
 			return
 		}
@@ -32,7 +32,7 @@ export function RecentExecutions({ className, maxItems = 5 }: RecentExecutionsPr
 			setError(null)
 
 			// Get all scheduled reports first, then get their execution history
-			const reportsResponse = await client.scheduledReports.list({
+			const reportsResponse = await listScheduledReports({
 				limit: 10,
 				offset: 0,
 			})
@@ -41,7 +41,7 @@ export function RecentExecutions({ className, maxItems = 5 }: RecentExecutionsPr
 			const allExecutions: ReportExecution[] = []
 			for (const report of reportsResponse.data || []) {
 				try {
-					const executionResponse = await client.scheduledReports.getExecutionHistory(report.id, {
+					const executionResponse = await getExecutionHistory(report.id, {
 						limit: 5,
 						offset: 0,
 						sortBy: 'scheduled_time',
@@ -75,7 +75,7 @@ export function RecentExecutions({ className, maxItems = 5 }: RecentExecutionsPr
 		const interval = setInterval(fetchRecentExecutions, 15000)
 
 		return () => clearInterval(interval)
-	}, [client, isConnected, maxItems])
+	}, [connectionStatus.isConnected, maxItems])
 
 	const getStatusIcon = (status: ExecutionStatus) => {
 		switch (status) {

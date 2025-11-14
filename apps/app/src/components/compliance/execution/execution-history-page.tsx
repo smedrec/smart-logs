@@ -13,7 +13,7 @@ import {
 	SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { cn } from '@/lib/utils'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { format } from 'date-fns'
@@ -33,12 +33,12 @@ import React, { useEffect, useState } from 'react'
 
 import { ExportButton } from '../export'
 
+import type { ReportExecution } from '@smedrec/audit-client'
 import type {
 	ExecutionDetailsUI,
 	ExecutionHistoryFilters,
 	ExecutionStatus,
 	PaginationState,
-	ReportExecution,
 } from '../types'
 
 interface ExecutionHistoryPageProps {
@@ -50,7 +50,7 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 	const params = useParams({
 		from: '/_authenticated/compliance/scheduled-reports/$reportId/executions',
 	})
-	const { client, isConnected } = useAuditContext()
+	const { getExecutionHistory, connectionStatus } = useComplianceAudit()
 
 	// State management
 	const [executions, setExecutions] = useState<ReportExecution[]>([])
@@ -80,7 +80,12 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 
 	// Fetch executions data
 	const fetchExecutions = async () => {
-		if (!client || !isConnected) return
+		if (!connectionStatus.isConnected) return
+		if (!filters.reportId) {
+			setError('Report ID is required')
+			setLoading(false)
+			return
+		}
 
 		try {
 			setLoading(true)
@@ -88,70 +93,25 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 
 			// Build query parameters
 			const queryParams = {
-				page: pagination.page,
-				pageSize: pagination.pageSize,
-				...(filters.reportId && { reportId: filters.reportId }),
-				...(filters.status && filters.status.length > 0 && { status: filters.status }),
+				limit: pagination.pageSize,
+				offset: (pagination.page - 1) * pagination.pageSize,
+				...(filters.status && filters.status.length > 0 && { status: filters.status as any }),
 				...(filters.dateRange && {
 					startDate: filters.dateRange.startDate,
 					endDate: filters.dateRange.endDate,
 				}),
-				...(searchTerm && { search: searchTerm }),
+				sortBy: 'scheduled_time' as const,
+				sortOrder: 'desc' as const,
 			}
 
-			// Mock API call - replace with actual client method when available
-			// const response = await client.reportExecutions.list(queryParams)
+			// Fetch execution history from API
+			const response = await getExecutionHistory(filters.reportId, queryParams)
 
-			// Mock data for now
-			const mockExecutions: ReportExecution[] = [
-				{
-					id: '1',
-					reportId: filters.reportId || 'report-1',
-					status: 'completed' as ExecutionStatus,
-					scheduledTime: new Date(Date.now() - 3600000).toISOString(),
-					executionTime: new Date(Date.now() - 3000000).toISOString(),
-					duration: 600000,
-					recordsProcessed: 1250,
-					outputSize: 2048576,
-					outputFormat: 'pdf',
-					triggeredBy: 'system',
-					metadata: {
-						reportType: 'HIPAA_AUDIT_TRAIL',
-						version: '1.0',
-					},
-				},
-				{
-					id: '2',
-					reportId: filters.reportId || 'report-1',
-					status: 'failed' as ExecutionStatus,
-					scheduledTime: new Date(Date.now() - 7200000).toISOString(),
-					executionTime: new Date(Date.now() - 6600000).toISOString(),
-					duration: 600000,
-					error: { code: '500', message: 'Database connection timeout' },
-					triggeredBy: 'user',
-					metadata: {
-						reportType: 'HIPAA_AUDIT_TRAIL',
-						version: '1.0',
-					},
-				},
-				{
-					id: '3',
-					reportId: filters.reportId || 'report-1',
-					status: 'running' as ExecutionStatus,
-					scheduledTime: new Date(Date.now() - 300000).toISOString(),
-					triggeredBy: 'schedule',
-					metadata: {
-						reportType: 'HIPAA_AUDIT_TRAIL',
-						version: '1.0',
-					},
-				},
-			]
-
-			setExecutions(mockExecutions)
+			setExecutions(response.data || [])
 			setPagination((prev) => ({
 				...prev,
-				total: mockExecutions.length,
-				totalPages: Math.ceil(mockExecutions.length / prev.pageSize),
+				total: response.pagination?.total || 0,
+				totalPages: Math.ceil((response.pagination?.total || 0) / prev.pageSize),
 			}))
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to fetch executions')
@@ -162,16 +122,19 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 
 	// Load execution details
 	const loadExecutionDetails = async (executionId: string) => {
-		if (!client || !isConnected) return
-
 		try {
-			// Mock API call - replace with actual client method
-			// const details = await client.reportExecutions.getDetails(executionId)
+			// Find the execution in the current list
+			const execution = executions.find((e) => e.id === executionId)
+			if (!execution) {
+				setError('Execution not found')
+				return
+			}
 
-			// Mock detailed data
+			// For now, use the execution data we have
+			// In the future, we could fetch more detailed logs from the API
 			const mockDetails: ExecutionDetailsUI = {
-				...executions.find((e) => e.id === executionId)!,
-				logs: [
+				...execution,
+				logs: execution.logs || [
 					{ message: 'Starting report execution', level: 'info', timestamp: '2024-01-15 10:00:00' },
 					{ message: 'Connecting to database', level: 'info', timestamp: '2024-01-15 10:00:05' },
 					{
@@ -179,8 +142,8 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 						level: 'info',
 						timestamp: '2024-01-15 10:00:10',
 					},
-					{ message: 'Processing 1250 records', level: 'info', timestamp: '2024-01-15 10:05:30' },
-					{ message: 'Generating PDF report', level: 'info', timestamp: '2024-01-15 10:08:45' },
+					{ message: 'Processing records', level: 'info', timestamp: '2024-01-15 10:05:30' },
+					{ message: 'Generating report', level: 'info', timestamp: '2024-01-15 10:08:45' },
 					{
 						message: 'Report generation completed',
 						level: 'info',
@@ -188,9 +151,9 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 					},
 				],
 				metrics: {
-					recordsProcessed: 1250,
-					fileSize: 2048576,
-					processingTime: 600000,
+					recordsProcessed: execution.recordsProcessed || 0,
+					fileSize: execution.exportResult?.dataSize || 0,
+					processingTime: execution.duration || 0,
 				},
 			}
 
@@ -271,9 +234,9 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 	// Effects
 	useEffect(() => {
 		fetchExecutions()
-	}, [client, isConnected, filters, pagination.page, pagination.pageSize, searchTerm])
+	}, [connectionStatus.isConnected, filters, pagination.page, pagination.pageSize, searchTerm])
 
-	if (!isConnected) {
+	if (!connectionStatus.isConnected) {
 		return (
 			<Card>
 				<CardContent className="flex items-center justify-center py-8">
@@ -368,7 +331,11 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 									initialFocus
 									mode="range"
 									defaultMonth={dateRange.from}
-									selected={dateRange}
+									selected={
+										dateRange.from && dateRange.to
+											? { from: dateRange.from, to: dateRange.to }
+											: undefined
+									}
 									onSelect={(range) => handleDateRangeFilter(range || {})}
 									numberOfMonths={2}
 								/>
@@ -495,8 +462,10 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 													{execution.recordsProcessed.toLocaleString()} records
 												</Badge>
 											)}
-											{execution.outputSize && (
-												<Badge variant="outline">{formatFileSize(execution.outputSize)}</Badge>
+											{execution.exportResult?.dataSize && (
+												<Badge variant="outline">
+													{formatFileSize(execution.exportResult.dataSize)}
+												</Badge>
 											)}
 
 											<Button
@@ -619,7 +588,7 @@ export function ExecutionHistoryPage({ reportId }: ExecutionHistoryPageProps) {
 								<div className="bg-muted p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
 									{selectedExecution.logs?.map((log, index) => (
 										<div key={index} className="mb-1">
-											{log}
+											[{log.timestamp}] [{log.level.toUpperCase()}] {log.message}
 										</div>
 									)) || <p>No logs available</p>}
 								</div>

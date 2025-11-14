@@ -17,7 +17,8 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table'
-import { Link } from '@tanstack/react-router'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
+import { Link, useNavigate } from '@tanstack/react-router'
 import {
 	AlertCircle,
 	Calendar,
@@ -27,119 +28,92 @@ import {
 	Edit,
 	FileText,
 	Play,
+	RefreshCw,
 	Settings,
 	Trash2,
 	User,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import type { ReportExecution, ScheduledReport } from '@smedrec/audit-client'
+
 interface ReportDetailsPageProps {
 	reportId: string
 }
 
-interface ScheduledReport {
-	id: string
-	name: string
-	description?: string
-	reportType:
-		| 'HIPAA_AUDIT_TRAIL'
-		| 'GDPR_PROCESSING_ACTIVITIES'
-		| 'INTEGRITY_VERIFICATION'
-		| 'CUSTOM_REPORT'
-	format: 'PDF' | 'CSV' | 'JSON'
-	enabled: boolean
-	lastRun?: Date
-	nextRun: Date
-	executionCount: number
-	createdAt: Date
-	createdBy: string
-	schedule: {
-		frequency: string
-		time: string
-		timezone: string
-	}
-	notifications: {
-		onSuccess: boolean
-		onFailure: boolean
-		recipients: string[]
-	}
-}
-
-interface RecentExecution {
-	id: string
-	scheduledTime: Date
-	executionTime?: Date
-	duration?: number
-	status: 'completed' | 'failed' | 'running' | 'pending'
-	errorMessage?: string
-	outputSize?: number
-}
-
 export function ReportDetailsPage({ reportId }: ReportDetailsPageProps) {
+	const navigate = useNavigate()
+	const {
+		getScheduledReport,
+		getExecutionHistory,
+		deleteScheduledReport,
+		executeScheduledReport,
+		connectionStatus,
+	} = useComplianceAudit()
 	const [report, setReport] = useState<ScheduledReport | null>(null)
-	const [recentExecutions, setRecentExecutions] = useState<RecentExecution[]>([])
+	const [recentExecutions, setRecentExecutions] = useState<ReportExecution[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
-	useEffect(() => {
-		// Mock data - in real implementation, this would come from API
-		const mockReport: ScheduledReport = {
-			id: reportId,
-			name: 'Monthly HIPAA Audit',
-			description:
-				'Comprehensive HIPAA compliance audit report covering all patient data access and modifications',
-			reportType: 'HIPAA_AUDIT_TRAIL',
-			format: 'PDF',
-			enabled: true,
-			lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-			nextRun: new Date(Date.now() + 1000 * 60 * 60 * 24 * 29), // 29 days from now
-			executionCount: 12,
-			createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365), // 1 year ago
-			createdBy: 'admin@example.com',
-			schedule: {
-				frequency: 'monthly',
-				time: '09:00',
-				timezone: 'UTC',
-			},
-			notifications: {
-				onSuccess: true,
-				onFailure: true,
-				recipients: ['compliance@example.com', 'admin@example.com'],
-			},
+	const fetchReportDetails = async () => {
+		if (!connectionStatus.isConnected) {
+			setError('Audit service not connected')
+			setLoading(false)
+			return
 		}
 
-		const mockExecutions: RecentExecution[] = [
-			{
-				id: 'exec-1',
-				scheduledTime: new Date(Date.now() - 1000 * 60 * 60 * 24),
-				executionTime: new Date(Date.now() - 1000 * 60 * 60 * 24 + 1000 * 60 * 2),
-				duration: 120000, // 2 minutes
-				status: 'completed',
-				outputSize: 2048576, // 2MB
-			},
-			{
-				id: 'exec-2',
-				scheduledTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 31),
-				executionTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 31 + 1000 * 60 * 3),
-				duration: 180000, // 3 minutes
-				status: 'completed',
-				outputSize: 1945600, // 1.9MB
-			},
-			{
-				id: 'exec-3',
-				scheduledTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 62),
-				status: 'failed',
-				errorMessage: 'Database connection timeout',
-			},
-		]
+		try {
+			setLoading(true)
+			setError(null)
 
-		// Simulate API call
-		setTimeout(() => {
-			setReport(mockReport)
-			setRecentExecutions(mockExecutions)
+			// Fetch report details
+			const reportData = await getScheduledReport(reportId)
+			setReport(reportData)
+
+			// Fetch recent executions
+			const executionsData = await getExecutionHistory(reportId, {
+				limit: 5,
+				offset: 0,
+				sortBy: 'scheduled_time',
+				sortOrder: 'desc',
+			})
+			setRecentExecutions(executionsData.data || [])
+		} catch (err) {
+			console.error('Failed to fetch report details:', err)
+			setError(err instanceof Error ? err.message : 'Failed to fetch report details')
+		} finally {
 			setLoading(false)
-		}, 1000)
-	}, [reportId])
+		}
+	}
+
+	const handleDelete = async () => {
+		if (!confirm('Are you sure you want to delete this report?')) {
+			return
+		}
+
+		try {
+			await deleteScheduledReport(reportId)
+			navigate({ to: '/compliance/scheduled-reports' })
+		} catch (err) {
+			console.error('Failed to delete report:', err)
+			setError(err instanceof Error ? err.message : 'Failed to delete report')
+		}
+	}
+
+	const handleExecute = async () => {
+		try {
+			await executeScheduledReport(reportId)
+			// Refresh the data to show the new execution
+			fetchReportDetails()
+		} catch (err) {
+			console.error('Failed to execute report:', err)
+			setError(err instanceof Error ? err.message : 'Failed to execute report')
+		}
+	}
+
+	useEffect(() => {
+		fetchReportDetails()
+	}, [reportId, connectionStatus.isConnected])
 
 	const getReportTypeLabel = (type: ScheduledReport['reportType']) => {
 		switch (type) {
@@ -186,11 +160,6 @@ export function ReportDetailsPage({ reportId }: ReportDetailsPageProps) {
 	const handleToggleStatus = () => {
 		// TODO: Implement status toggle
 		console.log('Toggling report status:', reportId)
-	}
-
-	const handleDelete = () => {
-		// TODO: Implement report deletion
-		console.log('Deleting report:', reportId)
 	}
 
 	if (loading) {

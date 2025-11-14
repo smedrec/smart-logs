@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Wifi, XCircle } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
@@ -13,42 +13,37 @@ interface SystemHealthProps {
 }
 
 export function SystemHealth({ className }: SystemHealthProps) {
-	const { client, isConnected, error: contextError, reconnect } = useAuditContext()
+	const { checkConnection, connectionStatus, reconnect, lastError } = useComplianceAudit()
 	const [healthStatus, setHealthStatus] = useState<SystemHealthStatus | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [lastCheckTime, setLastCheckTime] = useState<Date>(new Date())
 
 	const performHealthCheck = async () => {
 		setLoading(true)
-		const checkStartTime = Date.now()
 
 		try {
-			if (!client) {
-				setHealthStatus({
-					isConnected: false,
-					lastCheck: new Date().toISOString(),
-					status: 'down',
-					message: 'Audit client not initialized',
-				})
-				return
-			}
-
-			// Perform a simple health check by trying to fetch a small amount of data
 			const startTime = Date.now()
-			await client.scheduledReports.list({ limit: 1, offset: 0 })
+			const isHealthy = await checkConnection()
 			const responseTime = Date.now() - startTime
 
 			setHealthStatus({
-				isConnected: true,
+				isConnected: isHealthy,
 				responseTime,
 				lastCheck: new Date().toISOString(),
-				status: responseTime < 1000 ? 'healthy' : responseTime < 3000 ? 'degraded' : 'down',
-				message:
-					responseTime < 1000
+				status: isHealthy
+					? responseTime < 1000
+						? 'healthy'
+						: responseTime < 3000
+							? 'degraded'
+							: 'down'
+					: 'down',
+				message: isHealthy
+					? responseTime < 1000
 						? 'All systems operational'
 						: responseTime < 3000
 							? 'Slower than usual response times'
-							: 'High response times detected',
+							: 'High response times detected'
+					: connectionStatus.error || 'Connection failed',
 			})
 		} catch (err) {
 			console.error('Health check failed:', err)
@@ -71,7 +66,7 @@ export function SystemHealth({ className }: SystemHealthProps) {
 		const interval = setInterval(performHealthCheck, 30000)
 
 		return () => clearInterval(interval)
-	}, [client, isConnected])
+	}, [connectionStatus.isConnected])
 
 	const getStatusIcon = (status: SystemHealthStatus['status']) => {
 		switch (status) {
@@ -255,13 +250,13 @@ export function SystemHealth({ className }: SystemHealthProps) {
 					)}
 
 					{/* Context Error Display */}
-					{contextError && (
+					{lastError && (
 						<div className="pt-2 border-t">
 							<div className="flex items-start space-x-2 p-2 bg-destructive/10 rounded-md">
 								<XCircle className="h-4 w-4 text-destructive mt-0.5" />
 								<div className="text-xs">
 									<p className="font-medium text-destructive">Connection Error</p>
-									<p className="text-muted-foreground">{contextError}</p>
+									<p className="text-muted-foreground">{lastError}</p>
 								</div>
 							</div>
 						</div>

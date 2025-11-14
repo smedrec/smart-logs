@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { AlertCircle, CheckCircle, Clock, FileText } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 
@@ -139,14 +139,14 @@ const mockExecutions: ExecutionRecord[] = [
 ]
 
 export function DashboardStats({ className }: DashboardStatsProps) {
-	const { client, isConnected } = useAuditContext()
+	const { listScheduledReports, connectionStatus } = useComplianceAudit()
 	const [stats, setStats] = useState<DashboardStatsType | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	const fetchStats = async () => {
-		if (!client || !isConnected) {
-			setError('Audit client not available')
+		if (!connectionStatus.isConnected) {
+			setError('Audit service not connected')
 			setLoading(false)
 			return
 		}
@@ -156,26 +156,20 @@ export function DashboardStats({ className }: DashboardStatsProps) {
 			setError(null)
 
 			// Fetch scheduled reports to calculate stats
-			/**const reportsResponse = await client.scheduledReports.list({
-				page: 1,
-				pageSize: 100, // Get all reports for stats calculation
-			})
-
-			// Fetch recent executions to calculate success rate
-			const executionsResponse = await client.scheduledReports.getExecutions({
-				page: 1,
-				pageSize: 50, // Get recent executions for success rate
+			const reportsResponse = await listScheduledReports({
+				limit: 100, // Get all reports for stats calculation
+				offset: 0,
 			})
 
 			const reports = reportsResponse.data || []
-			const executions = executionsResponse.data || []*/
-
-			const reports = mockReports
-			const executions = mockExecutions
 
 			// Calculate stats
 			const totalReports = reports.length
 			const activeReports = reports.filter((report) => report.enabled).length
+
+			// For now, we'll use mock execution data for success rate
+			// In a future task, we'll integrate with actual execution history
+			const executions = mockExecutions
 
 			// Calculate success rate from recent executions
 			const completedExecutions = executions.filter(
@@ -211,7 +205,7 @@ export function DashboardStats({ className }: DashboardStatsProps) {
 		const interval = setInterval(fetchStats, 30000)
 
 		return () => clearInterval(interval)
-	}, [client, isConnected])
+	}, [connectionStatus.isConnected])
 
 	if (loading) {
 		return (

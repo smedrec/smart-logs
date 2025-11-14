@@ -1,6 +1,7 @@
 import { AuditClientError } from '@smedrec/audit-client'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
+import { performanceMonitor } from '../lib/performance-monitor'
 import { useAuditContext } from './audit-provider'
 
 import type {
@@ -151,13 +152,22 @@ export function ComplianceAuditProvider({
 				throw new Error('Scheduled reports service not available')
 			}
 
+			const startTime = performance.now()
 			try {
 				const result = await scheduledReports.create(input)
+				performanceMonitor.measureApiCall('/scheduled-reports', 'POST', startTime, 200)
 				setLastError(null)
 				return result
 			} catch (error) {
 				const errorMessage =
 					error instanceof AuditClientError ? error.message : 'Failed to create scheduled report'
+				performanceMonitor.measureApiCall(
+					'/scheduled-reports',
+					'POST',
+					startTime,
+					undefined,
+					errorMessage
+				)
 				setLastError(errorMessage)
 				throw error
 			}
@@ -230,13 +240,22 @@ export function ComplianceAuditProvider({
 				throw new Error('Scheduled reports service not available')
 			}
 
+			const startTime = performance.now()
 			try {
 				const result = await scheduledReports.list(params)
+				performanceMonitor.measureApiCall('/scheduled-reports', 'GET', startTime, 200)
 				setLastError(null)
 				return result
 			} catch (error) {
 				const errorMessage =
 					error instanceof AuditClientError ? error.message : 'Failed to list scheduled reports'
+				performanceMonitor.measureApiCall(
+					'/scheduled-reports',
+					'GET',
+					startTime,
+					undefined,
+					errorMessage
+				)
 				setLastError(errorMessage)
 				throw error
 			}

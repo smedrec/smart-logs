@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Loader2 } from 'lucide-react'
@@ -42,7 +42,7 @@ function RouteComponent() {
 	const navigate = useNavigate()
 	const context = Route.useRouteContext()
 	const user = 'user' in context ? context.user : null
-	const { client } = useAuditContext()
+	const { getScheduledReport, updateScheduledReport, connectionStatus } = useComplianceAudit()
 
 	// Fetch the existing report data
 	const {
@@ -52,23 +52,15 @@ function RouteComponent() {
 	} = useQuery({
 		queryKey: ['scheduled-report', reportId],
 		queryFn: async () => {
-			if (!client) {
-				throw new Error('Audit client is not available')
-			}
-			// Use the scheduledReports API
-			return await client.scheduledReports.get(reportId)
+			return await getScheduledReport(reportId)
 		},
-		enabled: !!client && !!reportId,
+		enabled: connectionStatus.isConnected && !!reportId,
 	})
 
 	const handleSubmit = async (data: UpdateScheduledReportInput) => {
-		if (!client) {
-			throw new Error('Audit client is not available')
-		}
-
 		try {
-			// Update the scheduled report using the audit client
-			await client.scheduledReports.update(reportId, data)
+			// Update the scheduled report using the compliance audit provider
+			await updateScheduledReport(reportId, data)
 
 			// Navigate back to report details after successful update
 			navigate({

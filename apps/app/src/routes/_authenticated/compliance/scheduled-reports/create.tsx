@@ -1,4 +1,4 @@
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { lazy } from 'react'
 import { z } from 'zod'
@@ -39,16 +39,12 @@ function RouteComponent() {
 	const navigate = useNavigate()
 	const context = Route.useRouteContext()
 	const user = 'user' in context ? context.user : null
-	const { client } = useAuditContext()
+	const { createScheduledReport } = useComplianceAudit()
 
 	const handleSubmit = async (data: CreateScheduledReportInput | UpdateScheduledReportInput) => {
-		if (!client) {
-			throw new Error('Audit client is not available')
-		}
-
 		try {
-			// Create the scheduled report using the audit client
-			const result = await client.scheduledReports.create(data as CreateScheduledReportInput)
+			// Create the scheduled report using the compliance audit provider
+			const result = await createScheduledReport(data as CreateScheduledReportInput)
 
 			// Navigate to the newly created report's detail page
 			navigate({

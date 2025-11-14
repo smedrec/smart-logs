@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { useAuditContext } from '@/contexts/audit-provider'
+import { useComplianceAudit } from '@/contexts/compliance-audit-provider'
 import { AlertCircle, Calendar, Clock, Play, Settings, X } from 'lucide-react'
 import React, { useState } from 'react'
 
@@ -51,7 +51,7 @@ export function ManualExecutionDialog({
 	report,
 	onExecutionStart,
 }: ManualExecutionDialogProps) {
-	const { client, isConnected } = useAuditContext()
+	const { executeScheduledReport, connectionStatus } = useComplianceAudit()
 	const [isExecuting, setIsExecuting] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [parameters, setParameters] = useState<ExecutionParameters>({
@@ -62,8 +62,8 @@ export function ManualExecutionDialog({
 	})
 
 	const handleExecute = async () => {
-		if (!client || !report) {
-			setError('Audit client not available or no report selected')
+		if (!connectionStatus.isConnected || !report) {
+			setError('Audit service not connected or no report selected')
 			return
 		}
 
@@ -72,7 +72,7 @@ export function ManualExecutionDialog({
 
 		try {
 			// Execute the scheduled report manually
-			const execution = await client.scheduledReports.execute(report.id)
+			const execution = await executeScheduledReport(report.id)
 
 			// Notify parent component about execution start
 			onExecutionStart?.(execution.id)
