@@ -1,1 +1,0 @@
-ALTER TABLE "scheduled_reports" ADD COLUMN "report_type" varchar(50) NOT NULL;

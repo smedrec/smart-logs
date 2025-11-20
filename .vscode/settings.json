@@ -7,5 +7,7 @@
 		"typescript": true,
 		"typescriptreact": true
 	},
-	"github.copilot.nextEditSuggestions.enabled": false
+	"github.copilot.nextEditSuggestions.enabled": false,
+	"kiroAgent.configureMCP": "Enabled",
+	"editor.tabSize": 2
 }

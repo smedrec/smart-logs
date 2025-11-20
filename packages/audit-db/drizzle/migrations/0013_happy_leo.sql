@@ -1,1 +1,0 @@
-ALTER TABLE "scheduled_reports" RENAME COLUMN "notifications" TO "notification";

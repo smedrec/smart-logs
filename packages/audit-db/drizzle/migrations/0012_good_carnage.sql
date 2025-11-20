@@ -1,1 +1,0 @@
-ALTER TABLE "scheduled_reports" ADD COLUMN "notifications" jsonb NOT NULL;

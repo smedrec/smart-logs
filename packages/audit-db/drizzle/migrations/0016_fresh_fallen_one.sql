@@ -1,1 +1,0 @@
-ALTER TABLE "alerts" ADD COLUMN "tags" jsonb DEFAULT '[]' NOT NULL;
