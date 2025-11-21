@@ -98,7 +98,7 @@ export class EnhancedAuditDatabaseClient implements IAuditDatabase, IConnectionM
 			keyPrefix: 'audit_db',
 			maxKeys: 50000,
 			cleanupInterval: 60000,
-		})
+		}, loggerConfig)
 
 		this.initialize()
 	}

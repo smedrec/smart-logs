@@ -1,6 +1,7 @@
 /**
  * Example usage of Redis-based distributed query caching
  */
+import type { LoggingConfig } from '@repo/logs'
 import { DEFAULT_CACHE_CONFIGS } from '../cache/cache-factory.js'
 import { CachedQueryExecutor, QueryCacheUtils } from '../cache/cached-query-executor.js'
 
@@ -13,10 +14,11 @@ import type { Pool } from 'pg'
 export function setupCachedQueryExecutor(
 	connection: RedisType,
 	pool: Pool,
+	loggerConfig: LoggingConfig,
 	environment: 'development' | 'production' | 'test'
 ) {
 	const cacheConfig = DEFAULT_CACHE_CONFIGS[environment]
-	return new CachedQueryExecutor(connection, pool, cacheConfig)
+	return new CachedQueryExecutor(connection, pool, cacheConfig, loggerConfig)
 }
 
 /**
@@ -101,7 +103,7 @@ export async function batchCachedQueries(executor: CachedQueryExecutor) {
  * Example: Cache invalidation patterns
  */
 export class CacheInvalidationService {
-	constructor(private executor: CachedQueryExecutor) {}
+	constructor(private executor: CachedQueryExecutor) { }
 
 	/**
 	 * Invalidate user-related caches when user data changes
@@ -147,7 +149,7 @@ export class CacheInvalidationService {
  * Example: Monitoring and metrics
  */
 export class CacheMonitoringService {
-	constructor(private executor: CachedQueryExecutor) {}
+	constructor(private executor: CachedQueryExecutor) { }
 
 	/**
 	 * Get comprehensive cache metrics

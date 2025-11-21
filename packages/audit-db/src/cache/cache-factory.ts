@@ -4,6 +4,7 @@ import { RedisQueryCache } from './redis-query-cache.js'
 
 import type { Redis as RedisType } from 'ioredis'
 import type { RedisQueryCacheConfig } from './redis-query-cache.js'
+import type { LoggingConfig } from '@repo/logs'
 
 /**
  * Cache factory for creating appropriate cache instances
@@ -75,7 +76,7 @@ export interface IQueryCache {
 /**
  * Factory function to create appropriate cache instance
  */
-export function createQueryCache(connection: RedisType, config: CacheFactoryConfig): IQueryCache {
+export function createQueryCache(connection: RedisType, config: CacheFactoryConfig, loggerConfig: LoggingConfig): IQueryCache {
 	switch (config.type) {
 		case 'local':
 			return new LocalCacheAdapter(
@@ -86,7 +87,7 @@ export function createQueryCache(connection: RedisType, config: CacheFactoryConf
 					keyPrefix: config.queryCache.keyPrefix,
 					maxKeys: config.queryCache.maxQueries,
 					cleanupInterval: 60000,
-				})
+				}, loggerConfig)
 			)
 
 		case 'redis':
@@ -100,7 +101,7 @@ export function createQueryCache(connection: RedisType, config: CacheFactoryConf
 				enableLocalCache: false, // Pure Redis mode
 			}
 
-			return new RedisQueryCache(connection, redisConfig)
+			return new RedisQueryCache(connection, redisConfig, loggerConfig)
 
 		case 'hybrid':
 			if (!config.redis) {
@@ -113,7 +114,7 @@ export function createQueryCache(connection: RedisType, config: CacheFactoryConf
 				enableLocalCache: true, // Enable L1 cache
 			}
 
-			return new RedisQueryCache(connection, hybridConfig)
+			return new RedisQueryCache(connection, hybridConfig, loggerConfig)
 
 		default:
 			throw new Error(`Unknown cache type: ${config.type}`)
@@ -124,7 +125,7 @@ export function createQueryCache(connection: RedisType, config: CacheFactoryConf
  * Adapter to make local cache async-compatible
  */
 class LocalCacheAdapter implements IQueryCache {
-	constructor(private cache: OptimizedLRUCache) {}
+	constructor(private cache: OptimizedLRUCache) { }
 
 	async get<T>(key: string): Promise<T | null> {
 		return this.cache.get<T>(key)

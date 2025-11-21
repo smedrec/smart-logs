@@ -8,6 +8,7 @@ import { createQueryCache } from './cache-factory.js'
 import type { Redis as RedisType } from 'ioredis'
 import type { Pool } from 'pg'
 import type { CacheFactoryConfig, IQueryCache } from './cache-factory.js'
+import type { LoggingConfig } from '@repo/logs'
 
 export interface QueryResult<T = any> {
 	rows: T[]
@@ -35,9 +36,10 @@ export class CachedQueryExecutor {
 	constructor(
 		connection: RedisType,
 		private pool: Pool,
-		cacheConfig: CacheFactoryConfig
+		cacheConfig: CacheFactoryConfig,
+		loggerConfig: LoggingConfig
 	) {
-		this.cache = createQueryCache(connection, cacheConfig)
+		this.cache = createQueryCache(connection, cacheConfig, loggerConfig)
 	}
 
 	/**

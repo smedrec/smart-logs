@@ -3,7 +3,7 @@
  * Addresses the O(N) complexity issues identified in the code review
  */
 
-import { StructuredLogger } from '@repo/logs'
+import { LoggingConfig, StructuredLogger } from '@repo/logs'
 
 import type { IQueryCache, QueryCacheStats } from './cache-factory.js'
 
@@ -49,27 +49,11 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
 	private cleanupTimer: NodeJS.Timeout | null = null
 	private readonly logger: StructuredLogger
 
-	constructor(private config: OptimizedLRUConfig) {
+	constructor(private config: OptimizedLRUConfig, loggerConfig: LoggingConfig) {
 		// Initialize Structured Logger
 		this.logger = new StructuredLogger({
+			...loggerConfig,
 			service: '@repo/audit-db - OptimizedLRUCache',
-			environment: 'development',
-			console: {
-				name: 'console',
-				enabled: true,
-				format: 'pretty',
-				colorize: true,
-				level: 'info',
-			},
-			otlp: {
-				name: 'otpl',
-				enabled: true,
-				level: 'info',
-				endpoint: 'http://localhost:5080/api/default/default/_json',
-				headers: {
-					Authorization: process.env.OTLP_AUTH_HEADER || '',
-				},
-			},
 		})
 
 		// Initialize dummy head and tail nodes for easier list manipulation
@@ -510,7 +494,8 @@ export class OptimizedLRUCache<T = any> implements IQueryCache {
  * Factory function for creating optimized LRU cache
  */
 export function createOptimizedLRUCache<T = any>(
-	config: Partial<OptimizedLRUConfig> = {}
+	config: Partial<OptimizedLRUConfig> = {},
+	loggerConfig?: LoggingConfig
 ): OptimizedLRUCache<T> {
 	const defaultConfig: OptimizedLRUConfig = {
 		maxSizeMB: 100,
@@ -521,5 +506,27 @@ export function createOptimizedLRUCache<T = any>(
 		cleanupInterval: 60000, // 1 minute
 	}
 
-	return new OptimizedLRUCache<T>({ ...defaultConfig, ...config })
+	const defaultLoggerConfig: LoggingConfig = {
+		service: '@repo/audit-db - OptimizedLRUCache',
+		environment: 'development',
+		console: {
+			name: 'console',
+			enabled: true,
+			format: 'pretty',
+			colorize: true,
+			level: 'info',
+		},
+		level: 'info',
+		version: '0.1.0',
+		shutdownTimeoutMs: 0,
+		enableCorrelationIds: false,
+		enableRequestTracking: false,
+		enableDebugMode: false,
+		prettyPrint: false,
+	}
+
+	return new OptimizedLRUCache<T>(
+		{ ...defaultConfig, ...config },
+		{ ...defaultLoggerConfig, ...loggerConfig }
+	)
 }

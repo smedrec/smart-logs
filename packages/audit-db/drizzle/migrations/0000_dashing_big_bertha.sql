@@ -75,7 +75,7 @@ CREATE TABLE "audit_log" (
 	"processing_latency" integer,
 	"archived_at" timestamp with time zone,
 	"details" jsonb
-);
+) PARTITION BY RANGE (timestamp);
 --> statement-breakpoint
 CREATE TABLE "audit_preset" (
 	"id" serial PRIMARY KEY NOT NULL,

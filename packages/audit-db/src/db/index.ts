@@ -45,6 +45,9 @@ function getEnv(variableName: string): string | undefined {
 	return undefined
 }
 
+/**
+ * @deprecated Use EnhancedAuditDb instead
+ */
 export class AuditDb {
 	private client: Sql
 	private auditDb: PostgresJsDatabase<typeof schema>
@@ -107,6 +110,9 @@ export class AuditDb {
 	}
 }
 
+/**
+ * @deprecated Use EnhancedAuditDb instead
+ */
 export class AuditDbWithConfig {
 	private client: Sql
 	private auditDb: PostgresJsDatabase<typeof schema>

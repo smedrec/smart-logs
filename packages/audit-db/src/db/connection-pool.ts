@@ -338,7 +338,7 @@ export class EnhancedDatabaseClient {
 			replicationConfig,
 			loggerConfig
 		)
-		this.queryCache = createQueryCache(connection, cacheConfig)
+		this.queryCache = createQueryCache(connection, cacheConfig, loggerConfig)
 		this.cacheConfig = cacheConfig
 
 		// Setup periodic cache cleanup

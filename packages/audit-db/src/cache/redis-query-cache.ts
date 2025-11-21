@@ -9,6 +9,7 @@ import { OptimizedLRUCache } from './optimized-lru-cache.js'
 
 import type { Redis as RedisType } from 'ioredis'
 import type { CacheEntry, QueryCacheConfig, QueryCacheStats } from './cache-factory.js'
+import type { LoggingConfig } from '@repo/logs'
 
 export interface RedisQueryCacheConfig extends QueryCacheConfig {
 	/** Redis key prefix for distributed cache */
@@ -35,7 +36,8 @@ export class RedisQueryCache {
 
 	constructor(
 		private redis: RedisType,
-		private config: RedisQueryCacheConfig
+		private config: RedisQueryCacheConfig,
+		loggerConfig: LoggingConfig
 	) {
 		//this.redis = getSharedRedisConnection()
 
@@ -53,7 +55,7 @@ export class RedisQueryCache {
 				keyPrefix: localConfig.keyPrefix,
 				maxKeys: localConfig.maxQueries,
 				cleanupInterval: 60000,
-			})
+			}, loggerConfig)
 		}
 
 		this.stats = {
