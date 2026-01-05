@@ -10,5 +10,5 @@
 	"github.copilot.nextEditSuggestions.enabled": false,
 	"kiroAgent.configureMCP": "Enabled",
 	"editor.tabSize": 2,
-	"editor.fontSize": 16
+	"editor.fontSize": 18
 }
